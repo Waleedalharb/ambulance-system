@@ -51,12 +51,13 @@
     <!-- html2pdf.js لتصدير PDF -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
-    <link rel="stylesheet" href="css/smart-toolbar.css?v=4">
+    <link rel="stylesheet" href="css/smart-toolbar.css?v=5"><!-- v=5 (2026-09-01): جولة توحيد ثيم النماذج — نص الحقول/الجداول/التسميات (R1–R3) -->
     <link rel="stylesheet" href="css/app.css?v=35">
     <!-- طبقة التوحيد البصري (المرحلة الثانية) — لغة شاشة الدخول المعتمدة، تحمَّل أخيرًا لتتغلب -->
-    <link rel="stylesheet" href="css/executive-theme.css?v=5"><!-- v=5 (2026-08-28): الملف تغيّر (+ثيم الخريطة Light Ops) برقم قديم — رُفع لكسر الكاش السنوي
+    <link rel="stylesheet" href="css/executive-theme.css?v=7"><!-- v=7 (2026-09-02): L-6 — أنماط قسم «النماذج المرتبطة بالبلاغ» في بطاقة البلاغ (إضافة صِرفة)
     <!-- طبقة الهوية الموحدة (هوية التكميل المعتمدة FROZEN) — تُحمَّل بعد كل ملفات CSS -->
     <link rel="stylesheet" href="/css/platform-identity.css?v=1">
+    <link rel="stylesheet" href="css/incident-lookup.css?v=1">
 <script src="js/shift-codes-config.js"></script>
 <script>
 // Session check - skip login if token exists
@@ -2680,16 +2681,17 @@ window.addEventListener('load', function() {
 <script src="/js/auth-manager.js"></script>
 <script src="/js/time-riyadh.js"></script>
 <script src="js/table-sort.js?v=1" defer></script>
-<script src="js/app.js?v=50" defer></script><!-- v=50: دفع تخطيط القائمة الجانبية على سطح المكتب (اعتماد المالك 2026-08-31) -->
+<script src="js/incident-lookup.js?v=1" defer></script>
+<script src="js/app.js?v=53" defer></script><!-- v=53 (L-5، 2026-09-02): قائمة فرقة الجوي من /api/cad-reports/south-teams مع fallback للقائمة الثابتة -->
 <script src="js/crew-batch-cancel.js?v=1" defer></script><!-- الاختيار الجماعي لفرق البلاغ في توزيع البلاغات — بعد app.js (خطافات عرض فقط) -->
-<script src="js/place-suggestion.js?v=1" defer></script><!-- PI-7: عرض «هوية الموقع» (اقتراح خارجي غير معتمد) — قراءة فقط، بعد app.js -->
+<script src="js/place-suggestion.js?v=2" defer></script><!-- PI-7: عرض «هوية الموقع» (اقتراح خارجي غير معتمد) — قراءة فقط، بعد app.js — v=2: PI-10 حالات pending/paused/incomplete -->
 <script src="js/alert-rules.js?v=1" defer></script><!-- قواعد التنبيه التشغيلي النقية — قبل smart-map.js -->
 <script src="https://unpkg.com/mapbox-gl@2.15.0/dist/mapbox-gl.js" defer></script><!-- محرك Mapbox GL — يُستخدم فقط عند تفعيله في map-config.local.js -->
 <script src="js/map-config.js?v=1" defer></script><!-- إعداد مزود الخريطة (الافتراضي leaflet) — تفعيل Mapbox إنتاجيًا ينتظر قرار تجاوز حماية GitHub للتوكن -->
 <script src="js/map-config.local.js?v=1" defer onerror="void 0"></script><!-- اختياري محلي خارج Git: مفتاح Mapbox العام المقيّد — غيابه طبيعي -->
 <script src="js/map-config.runtime.js" defer></script><!-- إعداد الإنتاج من متغير البيئة MAPBOX_PUBLIC_TOKEN (المسار «ب» — اعتماد المالك 2026-08-28): لا توكن في Git، وغياب المتغير = no-op -->
 <script src="js/map-adapter.js?v=3" defer></script><!-- MapAdapter: طبقة الرسم الموحدة — قبل smart-map.js وmap-history.js · v=3: pointsLayer المجمّعة القابلة للتوسع (RC-6، اعتماد المالك 2026-09-01) -->
-<script src="js/smart-map.js?v=7" defer></script><!-- الخريطة التشغيلية الذكية — بعد app.js (تقرأ جداوله الثابتة) · v=7: Fullscreen API عزل التكبير (المرحلة C، اعتماد المالك 2026-08-31) -->
+<script src="js/smart-map.js?v=8" defer></script><!-- الخريطة التشغيلية الذكية — بعد app.js (تقرأ جداوله الثابتة) · v=8 (L-6، 2026-09-02): قسم «النماذج المرتبطة بالبلاغ» في بطاقة البلاغ — جلب كسول عرض فقط -->
 <script src="js/map-history.js?v=3" defer></script><!-- ذاكرة الخريطة — الوضع التاريخي التحليلي (H1–H4) داخل نفس الخريطة؛ عرض فقط · v=3: نقاط مجمّعة + بطاقة كسولة (RC-6) -->
 <script src="js/map-guide.js?v=2" defer></script><!-- 📖 دليل استخدام الخريطة التشغيلية داخل المنصة (اعتماد المالك 2026-08-25) — محتوى ثابت يشرح، لا يلمس بيانات · v=2: حدّ بطاقة الشرح يخصم القائمة المفتوحة (اعتماد المالك 2026-08-31) -->
 <script src="js/crew-achievement-board.js?v=1" defer></script><!-- Phase D: لوحة إنجاز الفرق — بعد app.js حتى يسبقها تعريف AuthGate -->

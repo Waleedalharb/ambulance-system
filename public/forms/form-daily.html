@@ -1,4 +1,8 @@
 <!-- ===== نموذج التقرير اليومي ===== -->
+<!-- L-4 (اعتماد المالك 2026-09-02 — FORMS-LOOKUP-L4-SPEC.md): رقم التقرير =
+     معرّف اليوم DAILY-YYYY-MM-DD (تلقائي read-only) · عدد بلاغات الجوي =
+     عدد طلبات الجوي المسجلة في المنصة لهذا اليوم (تلقائي read-only) ·
+     الفرق المستجيبة والمركبات تبقى يدوية (تعريفها التشغيلي غير محسوم). -->
 <div class="form-card">
     <div class="form-card-title">
         <i class="fas fa-calendar-day" style="color:var(--primary-700);"></i>
@@ -7,7 +11,8 @@
     <div class="form-row-grid">
         <div class="form-group">
             <label><i class="fas fa-hashtag" style="color:var(--primary-700);"></i> رقم التقرير:</label>
-            <input type="text" id="dailyReportNumber" placeholder="مثال: 2025-DAILY-001">
+            <input type="text" id="dailyReportNumber" readonly tabindex="-1" title="معرّف اليوم — يُولّد تلقائيًا">
+            <small style="color:var(--pi-ink-dim,#9AA7C4); font-size:0.75rem;">معرّف اليوم — يُولّد تلقائيًا بالصيغة DAILY-YYYY-MM-DD.</small>
         </div>
         <div class="form-group">
             <label><i class="fas fa-calendar-alt" style="color:var(--gold);"></i> التاريخ:</label>
@@ -21,7 +26,8 @@
         </div>
         <div class="form-group">
             <label><i class="fas fa-helicopter" style="color:var(--teal);"></i> عدد بلاغات الإسعاف الجوي:</label>
-            <input type="number" id="dailyAir" min="0" value="0">
+            <input type="number" id="dailyAir" min="0" value="0" readonly tabindex="-1" title="عدد طلبات الجوي المسجلة في المنصة لهذا اليوم">
+            <small style="color:var(--pi-ink-dim,#9AA7C4); font-size:0.75rem;">عدد طلبات الجوي المسجلة في المنصة لهذا اليوم — يُحسب تلقائيًا.</small>
         </div>
     </div>
 </div>

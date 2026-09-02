@@ -5761,19 +5761,94 @@ async function loadIncidentRecords() {
 }
 
 function initForm_incident() {
-    var dt = getRiyadhLocalInputValue(); // جدارية الرياض (كانت toISOString UTC)
-    var el = document.getElementById('incDateTime');
-    if (el) el.value = dt;
+    initIncLookup();
     renderIncidentPreview();
     loadIncidentRecords();
 }
 
+// ----- L-3: ربط نموذج حادث بمكوّن IncidentLookup -----
+// نفس نمط L-2: بيانات CAD read-only + الفرقة من المشاركات المحتسبة فقط + حارس الحمولة البالية
+var incLookupState = { payload: null };
+var incLookupInstance = null;
+
+function initIncLookup() {
+    var host = document.getElementById('incIncidentLookup');
+    if (!host || !window.IncidentLookup || incLookupInstance) return;
+    incLookupInstance = window.IncidentLookup.mount(host, { onResolved: fillIncidentFromLookup });
+}
+
+function fillIncidentFromLookup(payload) {
+    incLookupState.payload = payload;
+    var inc = (payload && payload.incident) || {};
+    var dtEl = document.getElementById('incDateTime');
+    if (dtEl) {
+        dtEl.value = cadRawToLocalInput(inc.cadCreatedAtRaw);
+        dtEl.title = inc.cadCreatedAtRaw ? ('CAD الخام: ' + inc.cadCreatedAtRaw) : '';
+    }
+    var locEl = document.getElementById('incLocation');
+    if (locEl) {
+        var parts = [inc.address, inc.district, inc.street, inc.city].filter(function (s) { return s && String(s).trim(); });
+        locEl.value = parts.join('، ');
+    }
+    // وصف CAD تعبئة مسبقة قابلة للتحرير — الأصل يُحفظ منفصلًا في cadDescription عند الحفظ
+    var descEl = document.getElementById('incDescription');
+    if (descEl) descEl.value = inc.description || '';
+    var unitSel = document.getElementById('incUnit');
+    if (unitSel) {
+        unitSel.innerHTML = '';
+        var counted = eCountedUnits(payload);
+        if (counted.length !== 1) {
+            var ph = document.createElement('option');
+            ph.value = ''; ph.textContent = counted.length > 1 ? '-- أي فرقة باشرت فعليًا؟ --' : '-- لا توجد فرقة محتسبة --';
+            unitSel.appendChild(ph);
+        }
+        counted.forEach(function (u) {
+            var o = document.createElement('option');
+            o.value = u.unit; o.textContent = u.unit;
+            unitSel.appendChild(o);
+        });
+        ((payload && payload.units) || []).forEach(function (u) {
+            if (!u || u.counted !== false) return;
+            var o = document.createElement('option');
+            o.value = u.unit; o.disabled = true;
+            o.textContent = u.unit + ' (ملغاة — خارج الاحتساب)';
+            unitSel.appendChild(o);
+        });
+        unitSel.value = counted.length === 1 ? counted[0].unit : '';
+        unitSel.disabled = counted.length === 0;
+    }
+}
+
+function incSelectedUnit() {
+    var payload = incLookupState.payload;
+    var sel = document.getElementById('incUnit');
+    if (!payload || !sel || !sel.value) return null;
+    var found = null;
+    (payload.units || []).forEach(function (u) {
+        if (u && u.unit === sel.value && u.counted !== false) found = u;
+    });
+    return found;
+}
+
 async function saveIncident() {
-    var reportNumber = (document.getElementById('incReportNumber') || {}).value || '';
-    var dateTime = (document.getElementById('incDateTime') || {}).value || '';
+    var payload = incLookupState.payload;
+    var stale = incLookupInstance && typeof incLookupInstance.getLastPayload === 'function' && incLookupInstance.getLastPayload() !== payload;
+    if (!payload || !payload.found || stale) {
+        alert('⚠️ ابحث عن البلاغ وتحقق منه أولًا — لا حفظ بدون بلاغ متحقق من CAD');
+        return;
+    }
+    var selUnit = incSelectedUnit();
+    if (!selUnit) {
+        alert('⚠️ الرجاء اختيار الفرقة التي باشرت فعليًا');
+        return;
+    }
     var type = (document.getElementById('incType') || {}).value || '';
+    if (!type) {
+        alert('⚠️ الرجاء اختيار نوع الحادث');
+        return;
+    }
+    var dateTime = (document.getElementById('incDateTime') || {}).value || '';
     var location = (document.getElementById('incLocation') || {}).value || '';
-    var unit = (document.getElementById('incUnit') || {}).value || '';
     var center = (document.getElementById('incCenter') || {}).value || '';
     var patientName = (document.getElementById('incPatientName') || {}).value || '';
     var age = (document.getElementById('incAge') || {}).value || '';
@@ -5781,23 +5856,22 @@ async function saveIncident() {
     var description = (document.getElementById('incDescription') || {}).value || '';
     var actions = (document.getElementById('incActions') || {}).value || '';
 
-    if (!reportNumber || !type || !location) {
-        alert('⚠️ الرجاء ملء الحقول المطلوبة (رقم البلاغ، نوع الحادث، الموقع)');
-        return;
-    }
-
-    // نفس الكائن الذي كانت الواجهة تخزنه محلياً (الخادم يختم createdAt)
+    var incidentNumber = String(payload.number || (payload.incident && payload.incident.number) || '').trim();
+    // نفس الكائن السابق + مُعرّفات CAD المتحقق منها + أصل الوصف الخام (الخادم يختم createdAt)
     var record = {
-        reportNumber: reportNumber.trim(),
+        reportNumber: incidentNumber, // توافق عرض القائمة
+        incidentNumber: incidentNumber,
+        incidentUnit: selUnit.unit,
         dateTime: dateTime,
         type: type,
         location: location.trim(),
-        unit: unit,
+        unit: selUnit.unit,
         center: center,
         patientName: patientName.trim(),
         age: age,
         gender: gender,
-        description: description.trim(),
+        description: description.trim(), // نص الموظف (قد يكون معدّلًا)
+        cadDescription: (payload.incident && payload.incident.description) || null, // أصل CAD للتتبع
         actions: actions.trim()
     };
     try {
@@ -5818,29 +5892,43 @@ async function saveIncident() {
 }
 
 function clearIncidentForm() {
-    var ids = ['incReportNumber','incLocation','incPatientName','incAge','incDescription','incActions'];
+    var ids = ['incLocation','incPatientName','incAge','incDescription','incActions'];
     ids.forEach(function(id) {
         var el = document.getElementById(id);
         if (el) el.value = '';
     });
     var typeEl = document.getElementById('incType');
     if (typeEl) typeEl.selectedIndex = 0;
-    var unitEl = document.getElementById('incUnit');
-    if (unitEl) unitEl.selectedIndex = 0;
     var centerEl = document.getElementById('incCenter');
     if (centerEl) centerEl.selectedIndex = 0;
     var genderEl = document.getElementById('incGender');
     if (genderEl) genderEl.selectedIndex = 0;
     var dtEl = document.getElementById('incDateTime');
-    if (dtEl) dtEl.value = getRiyadhLocalInputValue(); // جدارية الرياض (كانت UTC)
+    if (dtEl) { dtEl.value = ''; dtEl.title = ''; }
+    var unitSel = document.getElementById('incUnit');
+    if (unitSel) {
+        unitSel.innerHTML = '';
+        var ph = document.createElement('option');
+        ph.value = ''; ph.textContent = '-- ابحث عن البلاغ أولًا --';
+        unitSel.appendChild(ph);
+        unitSel.disabled = true;
+    }
+    incLookupState.payload = null;
+    if (incLookupInstance) incLookupInstance.reset();
 }
 
 function sendIncidentWhatsApp() {
-    var reportNumber = (document.getElementById('incReportNumber') || {}).value || '';
+    var payload = incLookupState.payload;
+    var stale = incLookupInstance && typeof incLookupInstance.getLastPayload === 'function' && incLookupInstance.getLastPayload() !== payload;
+    var selUnit = incSelectedUnit();
+    if (!payload || !payload.found || stale || !selUnit) {
+        alert('⚠️ تحقق من البلاغ واختر الفرقة أولًا');
+        return;
+    }
+    var reportNumber = String(payload.number || '').trim();
     var dateTime = (document.getElementById('incDateTime') || {}).value || '';
     var type = (document.getElementById('incType') || {}).value || '';
     var location = (document.getElementById('incLocation') || {}).value || '';
-    var unit = (document.getElementById('incUnit') || {}).value || '';
     var center = (document.getElementById('incCenter') || {}).value || '';
     var patientName = (document.getElementById('incPatientName') || {}).value || '';
     var age = (document.getElementById('incAge') || {}).value || '';
@@ -5848,18 +5936,13 @@ function sendIncidentWhatsApp() {
     var description = (document.getElementById('incDescription') || {}).value || '';
     var actions = (document.getElementById('incActions') || {}).value || '';
 
-    if (!reportNumber || !type || !location) {
-        alert('⚠️ الرجاء ملء الحقول المطلوبة');
-        return;
-    }
-
     var msg = '🚨 *بلاغ حادث*\n';
     msg += '═══════════════════\n';
     msg += 'رقم البلاغ: ' + reportNumber + '\n';
     msg += 'التاريخ: ' + (dateTime ? dateTime.replace('T', ' ') : '-') + '\n';
-    msg += 'نوع الحادث: ' + type + '\n';
+    msg += 'نوع الحادث: ' + (type || '-') + '\n';
     msg += 'الموقع: ' + location + '\n';
-    if (unit) msg += 'الفرقة: ' + unit + '\n';
+    msg += 'الفرقة: ' + selUnit.unit + '\n';
     if (center) msg += 'المركز: ' + center + '\n';
     if (patientName) msg += 'المريض: ' + patientName + ' (' + age + ' سنة، ' + gender + ')\n';
     if (description) msg += 'الوصف: ' + description + '\n';
@@ -5961,8 +6044,57 @@ function initForm_senior() {
         var el = document.getElementById(id);
         if (el) el.value = today;
     });
+    loadSeniorNameLists();
     renderSeniorPreview();
     loadSeniorShifts();
+}
+
+// L-4: قوائما أسماء التسليم من employees بالمطابقة التامة للمسمى (قرار التصنيف الإداري)
+// قائمة اختيار لا تعبئة صامتة — لا يعرف النظام من كان المناوب فعليًا من حملة المسمى
+async function loadSeniorNameLists() {
+    var defs = [
+        { sel: 'senChiefName', other: 'senChiefNameOther', title: 'كبير مسعفين', ph: '-- اختر كبير المسعفين --' },
+        { sel: 'senAsstName', other: 'senAsstNameOther', title: 'مساعد كبير مسعفين', ph: '-- اختر مساعد كبير المسعفين --' }
+    ];
+    var employees = [];
+    try {
+        var res = await AuthManager.apiRequest('/api/employees');
+        if (!res.ok) throw new Error('status=' + res.status);
+        var data = await res.json();
+        employees = (data && data.employees) || [];
+    } catch (e) {
+        console.error('❌ فشل جلب قائمة الموظفين:', e);
+    }
+    defs.forEach(function (d) {
+        var sel = document.getElementById(d.sel);
+        if (!sel) return;
+        sel.innerHTML = '';
+        var ph = document.createElement('option'); ph.value = ''; ph.textContent = d.ph;
+        sel.appendChild(ph);
+        employees
+            .filter(function (e) { return e && e.job_title === d.title && e.is_active; }) // مطابقة تامة — لا مطابقة جزئية
+            .forEach(function (e) {
+                var o = document.createElement('option'); o.value = e.name; o.textContent = e.name;
+                sel.appendChild(o);
+            });
+        var other = document.createElement('option'); other.value = '__other__'; other.textContent = 'أخرى — اسم حر';
+        sel.appendChild(other);
+        sel.onchange = function () {
+            var oi = document.getElementById(d.other);
+            if (oi) {
+                oi.style.display = sel.value === '__other__' ? '' : 'none';
+                if (sel.value !== '__other__') oi.value = '';
+            }
+        };
+    });
+}
+
+// قيمة الاسم: من القائمة، أو من حقل «أخرى — اسم حر» عند اختيارها
+function seniorNameValue(selId, otherId) {
+    var sel = document.getElementById(selId);
+    if (!sel) return '';
+    if (sel.value === '__other__') return ((document.getElementById(otherId) || {}).value || '').trim();
+    return sel.value || '';
 }
 
 async function saveSenior() {
@@ -5980,11 +6112,11 @@ async function saveSenior() {
 
     var notes = (document.getElementById('senNotes') || {}).value || '';
 
-    var asstName = (document.getElementById('senAsstName') || {}).value || '';
+    var asstName = seniorNameValue('senAsstName', 'senAsstNameOther');
     var asstSign = (document.getElementById('senAsstSign') || {}).value || '';
     var asstDate = (document.getElementById('senAsstDate') || {}).value || '';
 
-    var chiefName = (document.getElementById('senChiefName') || {}).value || '';
+    var chiefName = seniorNameValue('senChiefName', 'senChiefNameOther');
     var chiefSign = (document.getElementById('senChiefSign') || {}).value || '';
     var chiefDate = (document.getElementById('senChiefDate') || {}).value || '';
 
@@ -6045,10 +6177,20 @@ function clearSeniorForm() {
         if (el) el.checked = false;
     });
 
-    var textIds = ['senNotes', 'senAsstName', 'senAsstSign', 'senChiefName', 'senChiefSign', 'senCmdrName', 'senCmdrSign'];
+    var textIds = ['senNotes', 'senAsstSign', 'senChiefSign', 'senCmdrName', 'senCmdrSign'];
     textIds.forEach(function(id) {
         var el = document.getElementById(id);
         if (el) el.value = '';
+    });
+
+    // L-4: حقلا الاسم أصبحا قائمتين — تصفير الاختيار وإخفاء «أخرى»
+    ['senAsstName', 'senChiefName'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) el.value = '';
+    });
+    ['senAsstNameOther', 'senChiefNameOther'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) { el.value = ''; el.style.display = 'none'; }
     });
 
     var today = TimeRiyadh.formatDate(new Date());
@@ -6073,8 +6215,8 @@ function sendSeniorWhatsApp() {
     if ((document.getElementById('senAreaMansoura') || {}).checked) areas.push('المنصورة');
 
     var notes = (document.getElementById('senNotes') || {}).value || '';
-    var asstName = (document.getElementById('senAsstName') || {}).value || '';
-    var chiefName = (document.getElementById('senChiefName') || {}).value || '';
+    var asstName = seniorNameValue('senAsstName', 'senAsstNameOther');
+    var chiefName = seniorNameValue('senChiefName', 'senChiefNameOther');
     var cmdrName = (document.getElementById('senCmdrName') || {}).value || '';
 
     if (!asstName || !chiefName) {
@@ -6150,6 +6292,42 @@ function initForm_air() {
     if (el) el.value = getRiyadhLocalInputValue(); // جدارية الرياض (كانت UTC)
     renderAirPreview();
     loadAirRecords();
+    loadAirUnitList(); // L-5: قائمة الفرقة من المصدر الحي
+}
+
+// L-5 (اعتماد المالك 2026-09-02): قائمة فرقة الجوي من المصدر الحي
+// GET /api/cad-reports/south-teams (فرق المناوبة النشطة الفعلية).
+// عند فشل الجلب أو غياب مناوبة نشطة (teams فارغة) تبقى القائمة الثابتة
+// الموجودة في form-air.html كـfallback حتى لا يُحجب الحفظ — موثق في FORMS-LOOKUP-L5.
+// ملاحظة: ربط airReportNumber بـIncident Lookup موقوف — سؤال تشغيلي غير محسوم.
+async function loadAirUnitList() {
+    var sel = fq('airUnit') || document.getElementById('airUnit');
+    if (!sel) return;
+    try {
+        var resp = await AuthManager.apiRequest('/api/cad-reports/south-teams');
+        if (!resp || !resp.ok) return; // fallback: القائمة الثابتة
+        var data = await resp.json();
+        var teams = (data && data.teams) || [];
+        if (!teams.length) return; // لا مناوبة نشطة → fallback
+        var escA = function (s) {
+            return String(s == null ? '' : s)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        };
+        var prev = sel.value;
+        var html = '<option value="">-- اختر الفرقة --</option>';
+        teams.forEach(function (t) {
+            var name = (t && t.name) || '';
+            if (!name) return;
+            html += '<option value="' + escA(name) + '">' + escA(name) + '</option>';
+        });
+        sel.innerHTML = html;
+        // استعادة اختيار سابق إن كان ما زال موجودًا في القائمة الحية
+        if (prev && teams.some(function (t) { return t && t.name === prev; })) sel.value = prev;
+    } catch (e) {
+        // fallback صامت — القائمة الثابتة تبقى كما هي
+        console.warn('⚠️ تعذر جلب فرق الجنوب الحية — استخدام القائمة الثابتة', e);
+    }
 }
 
 // قراءة حقول النموذج من حاويته فقط — يمنع أي التباس مع عناصر أخرى بنفس المعرف
@@ -6331,10 +6509,33 @@ async function loadDailyRecords() {
 }
 
 function initForm_daily() {
+    var today = TimeRiyadh.formatDate(new Date());
     var el = document.getElementById('dailyDate');
-    if (el) el.value = TimeRiyadh.formatDate(new Date());
+    if (el) el.value = today;
+    // L-4: رقم التقرير = معرّف اليوم (read-only) — لا عدّاد ولا لاحقة -2 (قرار المالك 2026-09-02)
+    var numEl = document.getElementById('dailyReportNumber');
+    if (numEl) numEl.value = 'DAILY-' + today;
+    loadDailyAirCount(today);
     renderDailyPreview();
     loadDailyRecords(); // حلّ محل القراءة الكسولة من localStorage
+}
+
+// L-4: «عدد طلبات الجوي المسجلة في المنصة لهذا اليوم» — من نماذج air_ambulance عبر النقطة القائمة
+async function loadDailyAirCount(today) {
+    var airEl = document.getElementById('dailyAir');
+    if (!airEl) return;
+    try {
+        var res = await AuthManager.apiRequest('/api/air-ambulance');
+        if (!res.ok) throw new Error('status=' + res.status);
+        var data = await res.json();
+        var records = (data && data.records) || [];
+        airEl.value = records.filter(function (r) {
+            return r && r.createdAt && TimeRiyadh.formatDate(r.createdAt) === today;
+        }).length;
+    } catch (e) {
+        console.error('❌ فشل حساب بلاغات الجوي لليوم:', e);
+        airEl.value = 0;
+    }
 }
 
 function renderDailyPreview() {
@@ -6425,14 +6626,17 @@ async function deleteDailyRecord(id) {
 }
 
 function clearDailyForm() {
-    var ids = ['dailyReportNumber','dailyBorderReports','dailyFormFill','dailySummary'];
+    var ids = ['dailyBorderReports','dailyFormFill','dailySummary'];
     ids.forEach(function(id) {
         var el = document.getElementById(id);
         if (el) el.value = '';
     });
     var el_dailyResponseTeams_v18 = document.getElementById('dailyResponseTeams'); if (el_dailyResponseTeams_v18) el_dailyResponseTeams_v18.value = 0;
-    var el_dailyAir_v19 = document.getElementById('dailyAir'); if (el_dailyAir_v19) el_dailyAir_v19.value = 0;
-    var el_dailyDate_v20 = document.getElementById('dailyDate'); if (el_dailyDate_v20) el_dailyDate_v20.value = TimeRiyadh.formatDate(new Date());
+    // L-4: رقم التقرير وبلاغات الجوي مشتقان — يُعاد اشتقاقهما لا مسحهما
+    var today = TimeRiyadh.formatDate(new Date());
+    var el_dailyDate_v20 = document.getElementById('dailyDate'); if (el_dailyDate_v20) el_dailyDate_v20.value = today;
+    var el_dailyNum = document.getElementById('dailyReportNumber'); if (el_dailyNum) el_dailyNum.value = 'DAILY-' + today;
+    loadDailyAirCount(today);
     ['dailyPath1','dailyPath2','dailyPath3','dailyPath4','dailyPath5','dailyPath6','dailyPath7','dailyPath8'].forEach(function(id) {
         var cb = document.getElementById(id);
         if (cb) cb.checked = false;
@@ -6520,38 +6724,140 @@ async function loadERecords() {
 }
 
 function initForm_e() {
-    var el = document.getElementById('eDateTime');
-    if (el) el.value = getRiyadhLocalInputValue(); // جدارية الرياض (كانت UTC)
+    initELookup();
     renderEPreview();
     loadERecords();
 }
 
+// ----- L-2: ربط نموذج E بمكوّن IncidentLookup -----
+// وقت الاستجابة يُقرأ من CAD (report_times) عبر /api/incidents/lookup — لا يُعاد حسابه في الواجهة
+var eLookupState = { payload: null };
+var eLookupInstance = null;
+
+// تحويل وقت CAD الخام (جداري الرياض «31/8/2026 10:22 PM») إلى صيغة datetime-local
+// دون المرور بكائن Date — cadCreatedAtTs يُبنى بمنطقة الخادم الزمنية وقد ينزاح (تصحيح موثّق للمواصفة)
+function cadRawToLocalInput(raw) {
+    if (!raw) return '';
+    var m = String(raw).match(/(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM|ص|م)/i);
+    if (!m) return '';
+    var hh = parseInt(m[4], 10);
+    var ap = (m[7] || '').toUpperCase();
+    if (ap === 'PM' || ap === 'م') { if (hh < 12) hh += 12; }
+    else if (ap === 'AM' || ap === 'ص') { if (hh === 12) hh = 0; }
+    function p2(n) { return String(n).padStart(2, '0'); }
+    return m[3] + '-' + p2(m[2]) + '-' + p2(m[1]) + 'T' + p2(hh) + ':' + m[5];
+}
+
+function eCountedUnits(payload) {
+    return ((payload && payload.units) || []).filter(function (u) { return u && u.counted !== false; });
+}
+
+function initELookup() {
+    var host = document.getElementById('eIncidentLookup');
+    if (!host || !window.IncidentLookup || eLookupInstance) return;
+    eLookupInstance = window.IncidentLookup.mount(host, { onResolved: fillEFromLookup });
+    var unitSel = document.getElementById('eUnit');
+    if (unitSel) unitSel.addEventListener('change', updateEResponseView);
+}
+
+function fillEFromLookup(payload) {
+    eLookupState.payload = payload;
+    var inc = (payload && payload.incident) || {};
+    var dtEl = document.getElementById('eDateTime');
+    if (dtEl) {
+        dtEl.value = cadRawToLocalInput(inc.cadCreatedAtRaw);
+        dtEl.title = inc.cadCreatedAtRaw ? ('CAD الخام: ' + inc.cadCreatedAtRaw) : '';
+    }
+    var locEl = document.getElementById('eLocation');
+    if (locEl) {
+        var parts = [inc.address, inc.district, inc.street, inc.city].filter(function (s) { return s && String(s).trim(); });
+        locEl.value = parts.join('، ');
+    }
+    var unitSel = document.getElementById('eUnit');
+    if (unitSel) {
+        unitSel.innerHTML = '';
+        var counted = eCountedUnits(payload);
+        if (counted.length !== 1) {
+            var ph = document.createElement('option');
+            ph.value = ''; ph.textContent = counted.length > 1 ? '-- أي فرقة باشرت فعليًا؟ --' : '-- لا توجد فرقة محتسبة --';
+            unitSel.appendChild(ph);
+        }
+        counted.forEach(function (u) {
+            var o = document.createElement('option');
+            o.value = u.unit; o.textContent = u.unit;
+            unitSel.appendChild(o);
+        });
+        // الملغاة تُعرض موسومة وغير قابلة للاختيار (counted:false)
+        ((payload && payload.units) || []).forEach(function (u) {
+            if (!u || u.counted !== false) return;
+            var o = document.createElement('option');
+            o.value = u.unit; o.disabled = true;
+            o.textContent = u.unit + ' (ملغاة — خارج الاحتساب)';
+            unitSel.appendChild(o);
+        });
+        unitSel.value = counted.length === 1 ? counted[0].unit : '';
+        unitSel.disabled = counted.length === 0;
+    }
+    updateEResponseView();
+}
+
+function eSelectedUnit() {
+    var payload = eLookupState.payload;
+    var sel = document.getElementById('eUnit');
+    if (!payload || !sel || !sel.value) return null;
+    var found = null;
+    (payload.units || []).forEach(function (u) {
+        if (u && u.unit === sel.value && u.counted !== false) found = u;
+    });
+    return found;
+}
+
+function updateEResponseView() {
+    var view = document.getElementById('eResponseTimeView');
+    if (!view) return;
+    var u = eSelectedUnit();
+    if (!u) { view.textContent = '— سيظهر من CAD بعد تحديد الفرقة'; return; }
+    if (u.respArrivalMin == null) { view.textContent = '⚠️ زمن الاستجابة غير متاح — بيانات CAD ناقصة'; return; }
+    var txt = '⏱ الاستجابة (وصول): ' + u.respArrivalMin + ' دقيقة';
+    if (u.respMubasharaMin != null) txt += ' · المباشرة: ' + u.respMubasharaMin + ' دقيقة';
+    view.textContent = txt;
+}
+
 async function saveE() {
-    var reportNumber = (document.getElementById('eReportNumber') || {}).value || '';
+    var payload = eLookupState.payload;
+    var selUnit = eSelectedUnit();
+    // حارس الحمولة البالية: بحث فاشل لاحق يصفّر lastPayload داخل المكوّن — لا حفظ على بيانات بلاغ سابق
+    var stale = eLookupInstance && typeof eLookupInstance.getLastPayload === 'function' && eLookupInstance.getLastPayload() !== payload;
+    if (!payload || !payload.found || stale) {
+        alert('⚠️ ابحث عن البلاغ وتحقق منه أولًا — لا حفظ بدون بلاغ متحقق من CAD');
+        return;
+    }
+    if (!selUnit) {
+        alert('⚠️ الرجاء اختيار الفرقة التي باشرت فعليًا');
+        return;
+    }
     var dateTime = (document.getElementById('eDateTime') || {}).value || '';
     var location = (document.getElementById('eLocation') || {}).value || '';
     var age = (document.getElementById('eAge') || {}).value || '';
     var gender = (document.getElementById('eGender') || {}).value || '';
-    var unit = (document.getElementById('eUnit') || {}).value || '';
-    var responseTime = (document.getElementById('eResponseTime') || {}).value || '';
     var hospital = (document.getElementById('eHospital') || {}).value || '';
     var outcome = (document.getElementById('eOutcome') || {}).value || '';
     var notes = (document.getElementById('eNotes') || {}).value || '';
 
-    if (!reportNumber || !location || !unit) {
-        alert('⚠️ الرجاء ملء الحقول المطلوبة (رقم البلاغ، الموقع، الفرقة)');
-        return;
-    }
-
-    // نفس الكائن الذي كانت الواجهة تخزنه محلياً (الخادم يختم createdAt)
+    var incidentNumber = String(payload.number || (payload.incident && payload.incident.number) || '').trim();
+    var respMin = (selUnit.respArrivalMin == null) ? null : selUnit.respArrivalMin;
+    // نفس الكائن الذي كانت الواجهة تخزنه محلياً + مُعرّفات CAD المتحقق منها (الخادم يختم createdAt)
     var record = {
-        reportNumber: reportNumber.trim(),
+        reportNumber: incidentNumber, // توافق عرض القائمة
+        incidentNumber: incidentNumber,
+        incidentUnit: selUnit.unit,
         dateTime: dateTime,
         location: location.trim(),
         age: age,
         gender: gender,
-        unit: unit,
-        responseTime: responseTime,
+        unit: selUnit.unit,
+        responseTime: respMin, // رقم أو null — لا صفر وهمي
+        responseTimeSource: respMin == null ? 'cad-unavailable' : 'cad-central',
         hospital: hospital.trim(),
         outcome: outcome,
         notes: notes.trim()
@@ -6574,35 +6880,46 @@ async function saveE() {
 }
 
 function clearEForm() {
-    var ids = ['eReportNumber','eLocation','eAge','eResponseTime','eHospital','eNotes'];
+    var ids = ['eLocation','eAge','eHospital','eNotes'];
     ids.forEach(function(id) {
         var el = document.getElementById(id);
         if (el) el.value = '';
     });
-    ['eGender','eUnit','eOutcome'].forEach(function(id) {
+    ['eGender','eOutcome'].forEach(function(id) {
         var el = document.getElementById(id);
         if (el) el.value = '';
     });
     var dtEl = document.getElementById('eDateTime');
-    if (dtEl) dtEl.value = getRiyadhLocalInputValue(); // جدارية الرياض (كانت UTC)
+    if (dtEl) { dtEl.value = ''; dtEl.title = ''; }
+    var unitSel = document.getElementById('eUnit');
+    if (unitSel) {
+        unitSel.innerHTML = '';
+        var ph = document.createElement('option');
+        ph.value = ''; ph.textContent = '-- ابحث عن البلاغ أولًا --';
+        unitSel.appendChild(ph);
+        unitSel.disabled = true;
+    }
+    eLookupState.payload = null;
+    if (eLookupInstance) eLookupInstance.reset();
+    updateEResponseView();
 }
 
 function sendEWhatsApp() {
-    var reportNumber = (document.getElementById('eReportNumber') || {}).value || '';
+    var payload = eLookupState.payload;
+    var selUnit = eSelectedUnit();
+    var stale = eLookupInstance && typeof eLookupInstance.getLastPayload === 'function' && eLookupInstance.getLastPayload() !== payload;
+    if (!payload || !payload.found || stale || !selUnit) {
+        alert('⚠️ تحقق من البلاغ واختر الفرقة أولًا');
+        return;
+    }
+    var reportNumber = String(payload.number || '').trim();
     var dateTime = (document.getElementById('eDateTime') || {}).value || '';
     var location = (document.getElementById('eLocation') || {}).value || '';
     var age = (document.getElementById('eAge') || {}).value || '';
     var gender = (document.getElementById('eGender') || {}).value || '';
-    var unit = (document.getElementById('eUnit') || {}).value || '';
-    var responseTime = (document.getElementById('eResponseTime') || {}).value || '';
     var hospital = (document.getElementById('eHospital') || {}).value || '';
     var outcome = (document.getElementById('eOutcome') || {}).value || '';
     var notes = (document.getElementById('eNotes') || {}).value || '';
-
-    if (!reportNumber || !location || !unit) {
-        alert('⚠️ الرجاء ملء الحقول المطلوبة');
-        return;
-    }
 
     var msg = '❤️ *حالة توقف قلب وتنفس (E)*\n';
     msg += '═══════════════════════════════════\n';
@@ -6611,8 +6928,8 @@ function sendEWhatsApp() {
     msg += 'الموقع: ' + location + '\n';
     if (age) msg += 'العمر: ' + age + ' سنة\n';
     if (gender) msg += 'الجنس: ' + gender + '\n';
-    msg += 'الفرقة المستجيبة: ' + unit + '\n';
-    if (responseTime) msg += 'وقت الاستجابة: ' + responseTime + ' دقيقة\n';
+    msg += 'الفرقة المستجيبة: ' + selUnit.unit + '\n';
+    msg += 'وقت الاستجابة: ' + (selUnit.respArrivalMin != null ? selUnit.respArrivalMin + ' دقيقة' : 'غير متاح — بيانات CAD ناقصة') + '\n';
     if (hospital) msg += 'المستشفى المستلم: ' + hospital + '\n';
     if (outcome) msg += 'الحالة النهائية: ' + outcome + '\n';
     if (notes) msg += 'الملاحظات: ' + notes + '\n';
@@ -6706,17 +7023,54 @@ async function loadEscalationRecords() {
 }
 
 function initForm_escalation() {
-    var el = document.getElementById('escDateTime');
-    if (el) el.value = getRiyadhLocalInputValue(); // جدارية الرياض (كانت UTC)
+    initEscLookup();
     renderEscalationPreview();
     loadEscalationRecords();
 }
 
+// ----- L-3: ربط نموذج التصعيد بمكوّن IncidentLookup -----
+// التصعيد لا يحتوي فرقة ولا زمن استجابة — الحفظ يتطلب بلاغًا متحققًا فقط
+var escLookupState = { payload: null };
+var escLookupInstance = null;
+
+function initEscLookup() {
+    var host = document.getElementById('escIncidentLookup');
+    if (!host || !window.IncidentLookup || escLookupInstance) return;
+    escLookupInstance = window.IncidentLookup.mount(host, { onResolved: fillEscFromLookup });
+}
+
+function fillEscFromLookup(payload) {
+    escLookupState.payload = payload;
+    var inc = (payload && payload.incident) || {};
+    var dtEl = document.getElementById('escDateTime');
+    if (dtEl) {
+        dtEl.value = cadRawToLocalInput(inc.cadCreatedAtRaw);
+        dtEl.title = inc.cadCreatedAtRaw ? ('CAD الخام: ' + inc.cadCreatedAtRaw) : '';
+    }
+    var locEl = document.getElementById('escLocation');
+    if (locEl) {
+        var parts = [inc.address, inc.district, inc.street, inc.city].filter(function (s) { return s && String(s).trim(); });
+        locEl.value = parts.join('، ');
+    }
+    // تفاصيل CAD تعبئة مسبقة قابلة للتحرير — الأصل يُحفظ منفصلًا في cadDescription
+    var detEl = document.getElementById('escDetails');
+    if (detEl) detEl.value = inc.description || '';
+}
+
 async function saveEscalation() {
-    var reportNumber = (document.getElementById('escReportNumber') || {}).value || '';
+    var payload = escLookupState.payload;
+    var stale = escLookupInstance && typeof escLookupInstance.getLastPayload === 'function' && escLookupInstance.getLastPayload() !== payload;
+    if (!payload || !payload.found || stale) {
+        alert('⚠️ ابحث عن البلاغ وتحقق منه أولًا — لا حفظ بدون بلاغ متحقق من CAD');
+        return;
+    }
+    var eventType = (document.getElementById('escEventType') || {}).value || '';
+    if (!eventType) {
+        alert('⚠️ الرجاء اختيار نوع الحدث');
+        return;
+    }
     var dateTime = (document.getElementById('escDateTime') || {}).value || '';
     var location = (document.getElementById('escLocation') || {}).value || '';
-    var eventType = (document.getElementById('escEventType') || {}).value || '';
     var injuries = (document.getElementById('escInjuries') || {}).value || 0;
     var deaths = (document.getElementById('escDeaths') || {}).value || 0;
     var details = (document.getElementById('escDetails') || {}).value || '';
@@ -6725,21 +7079,19 @@ async function saveEscalation() {
         agencies.push(cb.value);
     });
 
-    if (!reportNumber || !location || !eventType) {
-        alert('⚠️ الرجاء ملء الحقول المطلوبة (رقم البلاغ، الموقع، نوع الحدث)');
-        return;
-    }
-
-    // نفس الكائن الذي كانت الواجهة تخزنه محلياً (الخادم يختم createdAt)
+    var incidentNumber = String(payload.number || (payload.incident && payload.incident.number) || '').trim();
+    // نفس الكائن السابق + مُعرّف CAD المتحقق منه + أصل الوصف الخام (الخادم يختم createdAt)
     var record = {
-        reportNumber: reportNumber.trim(),
+        reportNumber: incidentNumber, // توافق عرض القائمة
+        incidentNumber: incidentNumber,
         dateTime: dateTime,
         location: location.trim(),
         eventType: eventType,
         injuries: parseInt(injuries) || 0,
         deaths: parseInt(deaths) || 0,
         agencies: agencies,
-        details: details.trim()
+        details: details.trim(), // نص الموظف (قد يكون معدّلًا)
+        cadDescription: (payload.incident && payload.incident.description) || null // أصل CAD للتتبع
     };
     try {
         var response = await AuthManager.apiRequest('/api/escalations', {
@@ -6759,7 +7111,7 @@ async function saveEscalation() {
 }
 
 function clearEscalationForm() {
-    var ids = ['escReportNumber','escLocation','escInjuries','escDeaths','escDetails'];
+    var ids = ['escLocation','escInjuries','escDeaths','escDetails'];
     ids.forEach(function(id) {
         var el = document.getElementById(id);
         if (el) el.value = '';
@@ -6768,11 +7120,19 @@ function clearEscalationForm() {
     if (typeEl) typeEl.value = '';
     document.querySelectorAll('.esc-agency').forEach(function(cb) { cb.checked = false; });
     var dtEl = document.getElementById('escDateTime');
-    if (dtEl) dtEl.value = getRiyadhLocalInputValue(); // جدارية الرياض (كانت UTC)
+    if (dtEl) { dtEl.value = ''; dtEl.title = ''; }
+    escLookupState.payload = null;
+    if (escLookupInstance) escLookupInstance.reset();
 }
 
 function sendEscalationWhatsApp() {
-    var reportNumber = (document.getElementById('escReportNumber') || {}).value || '';
+    var payload = escLookupState.payload;
+    var stale = escLookupInstance && typeof escLookupInstance.getLastPayload === 'function' && escLookupInstance.getLastPayload() !== payload;
+    if (!payload || !payload.found || stale) {
+        alert('⚠️ تحقق من البلاغ أولًا');
+        return;
+    }
+    var reportNumber = String(payload.number || '').trim();
     var dateTime = (document.getElementById('escDateTime') || {}).value || '';
     var location = (document.getElementById('escLocation') || {}).value || '';
     var eventType = (document.getElementById('escEventType') || {}).value || '';
@@ -6784,17 +7144,12 @@ function sendEscalationWhatsApp() {
         agencies.push(cb.value);
     });
 
-    if (!reportNumber || !location || !eventType) {
-        alert('⚠️ الرجاء ملء الحقول المطلوبة');
-        return;
-    }
-
     var msg = '📢 *بلاغ تصعيد*\n';
     msg += '═══════════════════════════════════\n';
     msg += 'رقم البلاغ: ' + reportNumber + '\n';
     msg += 'التاريخ والوقت: ' + (dateTime ? dateTime.replace('T', ' ') : '-') + '\n';
     msg += 'الموقع: ' + location + '\n';
-    msg += 'نوع الحدث: ' + eventType + '\n';
+    msg += 'نوع الحدث: ' + (eventType || '-') + '\n';
     msg += 'عدد المصابين: ' + injuries + '\n';
     msg += 'عدد الوفيات: ' + deaths + '\n';
     if (agencies.length > 0) msg += 'الجهات المشاركة: ' + agencies.join('، ') + '\n';

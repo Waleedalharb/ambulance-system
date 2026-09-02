@@ -2331,8 +2331,11 @@ body #chartsModal .chart-card h3 { font-size: 0.92rem !important; }
    نافذة إدارة وقت الذروة (#peakTimeModal)، نافذة تنبيه الذروة (#peakAlertModal).
    بصري فقط: صفر منطق، صفر تعديل على app.css (محمي) و app.js و index.html
    (سلسلة الأقفال المعتمدة تمنع إعادة الهيكلة — التوحيد يُفرض من هذه الطبقة).
-   الجذر: app.css يصمّم أصناف peak-*/analytics-* بخلفيات var(--white)/var(--gray-50)
+   الجذر: app.css يصمّم أصناف peak-* و analytics-* بخلفيات var(--white)/var(--gray-50)
    وتغليبات الطبقة السابقة كانت تلتقط الأنماط المضمّنة فقط ([style*=]) لا الأصناف.
+   ملاحظة تأريخية (2026-09-01): هذا السطر كان يحمل «peak-» متصلة بالتسلسل
+   «نجمة+خط مائل» فأغلق التعليق مبكرًا وأسقط القاعدة التالية (analytics-section)
+   من المحلل — صُحّح بفصل النجمتين عن الشرطة.
    ========================================================================== */
 
 /* ── نافذة الإحصائيات: صناديق الأقسام البيضاء (الخريطة الحرارية + توقع الذروة) ──
@@ -2652,6 +2655,35 @@ body #chartsModal .chart-card h3 { font-size: 0.92rem !important; }
 .smap-dup-why { margin: 5px 0 0; padding-inline-start: 16px; font-size: 0.68rem; color: #CBD5E1; line-height: 1.7; }
 .smap-light-ops .smap-dup-why { color: #334155; }
 
+/* L-6 (اعتماد المالك 2026-09-02): «النماذج المرتبطة بالبلاغ» — قسم عرض فقط داخل
+   بطاقة البلاغ الحية. لغة بصرية محايدة (لا لون حالة) لأنها شارات معلوماتية. */
+.smap-linked-forms {
+    margin-top: 8px; padding: 8px 10px; border-radius: 10px;
+    background: rgba(46, 139, 122, 0.07); border: 1px solid rgba(46, 139, 122, 0.35);
+}
+.smap-lf-title { font-size: 0.78rem; font-weight: 800; color: #2E8B7A; margin-bottom: 6px; }
+.smap-lf-body { display: flex; flex-wrap: wrap; gap: 5px; font-size: 0.72rem; color: #CBD5E1; }
+.smap-lf-badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 0.7rem; font-weight: 700; color: #F1F5F9;
+    background: rgba(148, 163, 184, 0.12); border: 1px solid rgba(148, 163, 184, 0.35);
+    border-radius: 6px; padding: 2px 8px;
+}
+.smap-lf-badge small { font-weight: 400; color: #94A3B8; }
+.smap-lf-e { border-color: rgba(46, 139, 122, 0.55); color: #7FD8C6; }
+.smap-lf-incident { border-color: rgba(245, 158, 11, 0.5); color: #FCD34D; }
+.smap-lf-escalation { border-color: rgba(239, 68, 68, 0.5); color: #FCA5A5; }
+.smap-lf-none { font-size: 0.7rem; color: #8A9BB0; }
+.smap-light-ops .smap-linked-forms { background: rgba(46, 139, 122, 0.08); border-color: rgba(46, 139, 122, 0.4); }
+.smap-light-ops .smap-lf-title { color: #1F6B5E; }
+.smap-light-ops .smap-lf-body { color: #334155; }
+.smap-light-ops .smap-lf-badge { color: #1A3A5C; background: rgba(255, 255, 255, 0.85); border-color: rgba(26, 58, 92, 0.25); }
+.smap-light-ops .smap-lf-badge small { color: #64748B; }
+.smap-light-ops .smap-lf-e { border-color: rgba(46, 139, 122, 0.6); color: #1F6B5E; }
+.smap-light-ops .smap-lf-incident { border-color: rgba(217, 119, 6, 0.55); color: #92400E; }
+.smap-light-ops .smap-lf-escalation { border-color: rgba(220, 38, 38, 0.5); color: #991B1B; }
+.smap-light-ops .smap-lf-none { color: #64748B; }
+
 /* ══════════════════════════════════════════════════════════════════════════
    ثيم Light Ops لعناصر عرض الخريطة (اعتماد المالك 2026-08-28)
    يُفعَّل فقط عندما يكون مزود الرسم Mapbox: الـAdapter يضيف كلاس
@@ -2826,3 +2858,192 @@ body #chartsModal .chart-card h3 { font-size: 0.92rem !important; }
 .smap-kpi-v > span { min-width: 0; }
 #smapKpiStatus { overflow: visible; text-overflow: unset; }
 #smapKpiStatus > span:last-child { white-space: normal; overflow: visible; text-overflow: unset; line-height: 1.25; }
+
+/* ==========================================================================
+   جولة «Operations UI Theme Audit» (اعتماد المالك 2026-09-01) — توحيد النماذج
+   الستة والنوافذ المتأثرة. المبدأ: طبقة Theme فقط — صفر تعديل على app.css
+   (محمي) وapp.js وforms/*.html وبنية النماذج ومنطقها وحفظها.
+   سلّم الطبقات المعتمد: خلفية ← بطاقة 0.035 ← حقل 0.05 ← نص pi-ink ←
+   placeholder pi-ink-faint (أهدأ بوضوح) ← focus أزرق بهالة ← حالة دلالية.
+   المرجع: OPS-UI-FORMS-THEME-DIAGNOSIS.md (R1–R10) — القياس الحي قبل الإصلاح.
+   ========================================================================== */
+
+/* ── R4: المحدد الواسع في app.css:2047 «#formContent div[style*="grid-template-columns"]»
+   كان يفرض خلفية بيضاء على أي شبكة مضمّنة (التقط شبكة تواقيع senior). نفس
+   المحدد حرفيًا (نفس السبقية 1,1,1) + هذا الملف يُحمَّل لاحقًا ⇒ الداكن يكسب.
+   ملاحظة: أثر auto-fill التخطيطي على شبكة التواقيع موثّق للمالك — خارج نطاق
+   الثيم ولم يُمس هنا. */
+#formContent div[style*="grid-template-columns"] {
+    background: rgba(255,255,255,0.035) !important;
+    border-color: rgba(255,255,255,0.08) !important;
+}
+
+/* ── عناوين senior المتدرجة (قرار المالك 2026-09-01): إلغاء التدرج الفاقع مع
+   الإبقاء على لكنة لونية بسيطة = خط accent رفيع عند حافة البداية (يمين RTL)
+   عبر box-shadow داخلي — صفر أثر تخطيطي (لا border يزاح الصندوق). */
+#formContent .form-card-title[style*="8B5CF6"] {
+    background: rgba(255,255,255,0.04) !important;
+    color: var(--pi-ink, #E8EDF8) !important;
+    box-shadow: inset -3px 0 0 rgba(167,139,250,0.65) !important; /* لكنة بنفسجية */
+}
+#formContent .form-card-title[style*="1E3A5F"] {
+    background: rgba(255,255,255,0.04) !important;
+    color: var(--pi-ink, #E8EDF8) !important;
+    box-shadow: inset -3px 0 0 rgba(96,165,250,0.65) !important; /* لكنة زرقاء */
+}
+
+/* ── R6-أ: ترويسة analyticsModal (فجوة تغطية — لم تكن لها قاعدة داكنة أصلًا) ── */
+#analyticsModal .analytics-header {
+    background: rgba(11,18,32,0.55) !important;
+    border-bottom: 1px solid rgba(255,255,255,0.08) !important;
+}
+#analyticsModal .analytics-header-text h2 { color: var(--ex-text) !important; }
+#analyticsModal .analytics-header-text p { color: var(--ex-text-4) !important; }
+#analyticsModal .analytics-close-btn {
+    background: rgba(255,255,255,0.06) !important;
+    color: var(--ex-text-2) !important;
+    border-color: rgba(255,255,255,0.10) !important;
+}
+
+/* ── R6-ب: ثلاثي controlModal (بطاقات الأفراد + صندوق التاريخ + شارة الدور) ── */
+#controlModal .control-person {
+    background: rgba(255,255,255,0.035) !important;
+    border-color: rgba(255,255,255,0.08) !important;
+}
+#controlModal .control-person:hover { border-color: rgba(255,255,255,0.14) !important; box-shadow: none !important; }
+#controlModal .control-person .name { color: var(--ex-text) !important; }
+#controlModal .control-person .role { color: var(--ex-text-3) !important; }
+#controlModal .control-person .display {
+    background: rgba(255,255,255,0.05) !important;
+    border-color: rgba(255,255,255,0.10) !important;
+    color: var(--ex-text-2) !important;
+}
+#controlModal .control-role-badge {
+    background: rgba(96,165,250,0.14) !important;
+    color: #7FB3FA !important;
+    border-color: rgba(96,165,250,0.35) !important;
+}
+/* أزرار controlModal الذهبية المصمتة ← اللغة الزجاجية الكهرمانية المعتمدة */
+#controlModal .modal-content .btn.btn-gold,
+#controlModal .modal-content #changePasswordBtn,
+#controlModal .modal-content #editVacationsBtn {
+    background: rgba(251,191,36,0.14) !important;
+    color: var(--pi-amber, #FBBF24) !important;
+    border: 1px solid rgba(251,191,36,0.4) !important;
+    box-shadow: none !important;
+}
+
+/* ── R7: نص حقول التاريخ/الوقت (::-webkit-datetime-edit لا يلتقطه ::placeholder) ── */
+.modal-content input::-webkit-datetime-edit { color: var(--pi-ink, #E8EDF8) !important; }
+.modal-content input::-webkit-calendar-picker-indicator { filter: invert(0.75); cursor: pointer; }
+
+/* ── R8: مؤشر تركيز مرئي لكل حقول النوافذ الـ19 — قاعدة smart-toolbar (1,1,1)
+   تفرض border-color في كل الحالات وتسحق :focus الأدنى؛ هذه المجموعة (1,2,1)
+   تكسبها. نفس لغة الكتلة ⑩ المعتمدة في index.html (أزرق + هالة). */
+#shiftModal .modal-content input:focus, #shiftModal .modal-content select:focus, #shiftModal .modal-content textarea:focus,
+#distributionModal .modal-content input:focus, #distributionModal .modal-content select:focus, #distributionModal .modal-content textarea:focus,
+#peakTimeModal .modal-content input:focus, #peakTimeModal .modal-content select:focus, #peakTimeModal .modal-content textarea:focus,
+#controlModal .modal-content input:focus, #controlModal .modal-content select:focus, #controlModal .modal-content textarea:focus,
+#formsModal .modal-content input:focus, #formsModal .modal-content select:focus, #formsModal .modal-content textarea:focus,
+#analyticsModal .modal-content input:focus, #analyticsModal .modal-content select:focus, #analyticsModal .modal-content textarea:focus,
+#chartsModal .modal-content input:focus, #chartsModal .modal-content select:focus, #chartsModal .modal-content textarea:focus,
+#auditLogModal .modal-content input:focus, #auditLogModal .modal-content select:focus, #auditLogModal .modal-content textarea:focus,
+#operationsRoomModal .modal-content input:focus, #operationsRoomModal .modal-content select:focus, #operationsRoomModal .modal-content textarea:focus,
+#passwordModal .modal-content input:focus, #passwordModal .modal-content select:focus, #passwordModal .modal-content textarea:focus,
+#changePasswordModal .modal-content input:focus, #changePasswordModal .modal-content select:focus, #changePasswordModal .modal-content textarea:focus,
+#seniorShiftModal .modal-content input:focus, #seniorShiftModal .modal-content select:focus, #seniorShiftModal .modal-content textarea:focus,
+#monthlyTableModal .modal-content input:focus, #monthlyTableModal .modal-content select:focus, #monthlyTableModal .modal-content textarea:focus,
+#airAmbulanceModal .modal-content input:focus, #airAmbulanceModal .modal-content select:focus, #airAmbulanceModal .modal-content textarea:focus,
+#peakAlertModal .modal-content input:focus, #peakAlertModal .modal-content select:focus, #peakAlertModal .modal-content textarea:focus,
+#mapModal .modal-content input:focus, #mapModal .modal-content select:focus, #mapModal .modal-content textarea:focus,
+#opsModal .modal-content input:focus, #opsModal .modal-content select:focus, #opsModal .modal-content textarea:focus {
+    border-color: rgba(96,165,250,0.55) !important;
+    box-shadow: 0 0 0 3px rgba(96,165,250,0.14) !important;
+    outline: none !important;
+}
+
+/* ── R8ب: توحيد Placeholder في النوافذ الـ19 — درجة واحدة هادئة من لوحة
+   المنصة (--pi-ink-dim) بدل عائلتين متفرقتين (app.css gray + وراثة لون الحقل).
+   الطبقة المطلوبة: نص فعلي فاتح ← placeholder أهدأ بوضوح. opacity:1 لأن بعض
+   المتصفحات تخفضه افتراضيًا فتتفاوت الدرجة بين الحقول. ── */
+#shiftModal .modal-content input::placeholder, #shiftModal .modal-content textarea::placeholder,
+#distributionModal .modal-content input::placeholder, #distributionModal .modal-content textarea::placeholder,
+#peakTimeModal .modal-content input::placeholder, #peakTimeModal .modal-content textarea::placeholder,
+#controlModal .modal-content input::placeholder, #controlModal .modal-content textarea::placeholder,
+#formsModal .modal-content input::placeholder, #formsModal .modal-content textarea::placeholder,
+#analyticsModal .modal-content input::placeholder, #analyticsModal .modal-content textarea::placeholder,
+#chartsModal .modal-content input::placeholder, #chartsModal .modal-content textarea::placeholder,
+#auditLogModal .modal-content input::placeholder, #auditLogModal .modal-content textarea::placeholder,
+#operationsRoomModal .modal-content input::placeholder, #operationsRoomModal .modal-content textarea::placeholder,
+#passwordModal .modal-content input::placeholder, #passwordModal .modal-content textarea::placeholder,
+#changePasswordModal .modal-content input::placeholder, #changePasswordModal .modal-content textarea::placeholder,
+#seniorShiftModal .modal-content input::placeholder, #seniorShiftModal .modal-content textarea::placeholder,
+#monthlyTableModal .modal-content input::placeholder, #monthlyTableModal .modal-content textarea::placeholder,
+#airAmbulanceModal .modal-content input::placeholder, #airAmbulanceModal .modal-content textarea::placeholder,
+#peakAlertModal .modal-content input::placeholder, #peakAlertModal .modal-content textarea::placeholder,
+#mapModal .modal-content input::placeholder, #mapModal .modal-content textarea::placeholder,
+#opsModal .modal-content input::placeholder, #opsModal .modal-content textarea::placeholder,
+#seniorShiftModal .modal-content select::placeholder, #distributionModal .modal-content select::placeholder,
+#peakTimeModal .modal-content select::placeholder, #controlModal .modal-content select::placeholder,
+#formsModal .modal-content select::placeholder, #analyticsModal .modal-content select::placeholder,
+#chartsModal .modal-content select::placeholder, #auditLogModal .modal-content select::placeholder,
+#operationsRoomModal .modal-content select::placeholder, #passwordModal .modal-content select::placeholder,
+#changePasswordModal .modal-content select::placeholder, #monthlyTableModal .modal-content select::placeholder,
+#airAmbulanceModal .modal-content select::placeholder, #peakAlertModal .modal-content select::placeholder,
+#mapModal .modal-content select::placeholder, #opsModal .modal-content select::placeholder {
+    color: var(--pi-ink-dim, #9AA7C4) !important;
+    opacity: 1 !important;
+}
+
+/* ── R9: checkbox/radio بلون المنصة بدل أزرق المتصفح الافتراضي ── */
+.modal-content input[type="checkbox"],
+.modal-content input[type="radio"] { accent-color: #3B82F6 !important; }
+
+/* ── R10: لغة الأزرار داخل formsModal — نفس سبقية smart-toolbar (1,3,0) وهذا
+   الملف لاحق ⇒ تكسب. أساسي: التدرج الأزرق المعتمد · خطر/نجاح/تحذير: زجاج
+   دلالي شفاف · المحايد الزجاجي قائم سلفًا من هذه الطبقة. */
+#formsModal .modal-content .btn.btn-primary {
+    background: linear-gradient(150deg, #2F6BF0, #1D4FD7) !important;
+    color: #fff !important;
+    border: none !important;
+    box-shadow: 0 10px 24px rgba(30,90,220,0.35) !important;
+}
+#formsModal .modal-content .btn.btn-danger,
+#formsModal .modal-content .btn.btn-coral {
+    background: rgba(248,113,113,0.14) !important;
+    color: #FCA5A5 !important;
+    border: 1px solid rgba(248,113,113,0.4) !important;
+    box-shadow: none !important;
+}
+#formsModal .modal-content .btn.btn-success,
+#formsModal .modal-content .btn.btn-teal,
+#formsModal .modal-content .btn.btn-whatsapp {
+    background: rgba(52,211,153,0.14) !important;
+    color: var(--pi-green, #34D399) !important;
+    border: 1px solid rgba(52,211,153,0.4) !important;
+    box-shadow: none !important;
+}
+#formsModal .modal-content .btn.btn-warning,
+#formsModal .modal-content .btn.btn-gold {
+    background: rgba(251,191,36,0.14) !important;
+    color: var(--pi-amber, #FBBF24) !important;
+    border: 1px solid rgba(251,191,36,0.4) !important;
+    box-shadow: none !important;
+}
+
+/* ── شرائح الحذف المضمّنة (background:var(--coral-50) في قوائم المحفوظات الست)
+   ← زجاج أحمر شفاف؛ صائد خاصية يكمل صائدي 1823-1826 القائمين. */
+.modal-content button[style*="coral-50"] {
+    background: rgba(248,113,113,0.14) !important;
+    color: #FCA5A5 !important;
+    border-color: rgba(248,113,113,0.4) !important;
+}
+
+/* ── R6ج (استكمال جولة ثيم النماذج 2026-09-01): أيقونات .card-icon بألوان -50
+   الفاتحة من app.css (200-203) — ظهرت كأسطح فاتحة في controlModal (gold) وتكمن
+   في بقية النوافذ الداكنة (primary/teal/coral). زجاج دلالي شفاف موحّد؛ السبقية
+   (0,3,0) + !important تتغلب على (0,2,0) + !important. ── */
+.modal-content .card-icon.primary { background: rgba(96,165,250,0.14) !important; color: #93C5FD !important; }
+.modal-content .card-icon.teal    { background: rgba(45,212,191,0.14) !important;  color: #5EEAD4 !important; }
+.modal-content .card-icon.coral   { background: rgba(248,113,113,0.14) !important; color: #FCA5A5 !important; }
+.modal-content .card-icon.gold    { background: rgba(245,158,11,0.14) !important;  color: #FBBF24 !important; }

@@ -1,44 +1,43 @@
 <!-- ===== نموذج التصعيد ===== -->
+<!-- L-3 (اعتماد المالك 2026-09-02 — FORMS-LOOKUP-L3-SPEC.md): رقم البلاغ أصبح
+     بحثًا موثّقًا عبر مكوّن IncidentLookup — الوقت/الموقع من CAD read-only بوسم
+     «من CAD». نوع الحدث يبقى يدويًا (لا نظير محسوم له في CAD الواصل)، والتصعيد
+     لا يحتوي فرقة — الحفظ يتطلب بلاغًا متحققًا فقط. -->
 <div class="form-card">
     <div class="form-card-title">
         <i class="fas fa-arrow-up" style="color:var(--coral);"></i>
         معلومات البلاغ
     </div>
-    <div class="form-row-grid">
+    <div id="escIncidentLookup"></div>
+    <div class="form-row-grid" style="margin-top:12px;">
         <div class="form-group">
-            <label><i class="fas fa-hashtag" style="color:var(--primary-700);"></i> رقم البلاغ:</label>
-            <input type="text" id="escReportNumber" placeholder="مثال: 2025-ESC-001">
+            <label><i class="fas fa-calendar-clock" style="color:var(--gold);"></i> تاريخ ووقت البلاغ: <span class="e-cad-tag">من CAD</span></label>
+            <input type="datetime-local" id="escDateTime" readonly tabindex="-1" title="يُعبأ تلقائيًا من بيانات البلاغ الموثّق">
         </div>
         <div class="form-group">
-            <label><i class="fas fa-calendar-clock" style="color:var(--gold);"></i> تاريخ ووقت البلاغ:</label>
-            <input type="datetime-local" id="escDateTime">
+            <label><i class="fas fa-map-marker-alt" style="color:var(--coral);"></i> موقع البلاغ: <span class="e-cad-tag">من CAD</span></label>
+            <input type="text" id="escLocation" readonly tabindex="-1" placeholder="يُعبأ تلقائيًا من بيانات البلاغ الموثّق" title="يُعبأ تلقائيًا من بيانات البلاغ الموثّق">
         </div>
     </div>
-    <div class="form-row-grid">
-        <div class="form-group">
-            <label><i class="fas fa-map-marker-alt" style="color:var(--coral);"></i> موقع البلاغ:</label>
-            <input type="text" id="escLocation" placeholder="الموقع بالتفصيل">
-        </div>
-        <div class="form-group">
-            <label><i class="fas fa-exclamation-triangle" style="color:var(--coral);"></i> نوع الحدث:</label>
-            <select id="escEventType">
-                <option value="">-- اختر نوع الحدث --</option>
-                <option value="كارثة طبيعية">كارثة طبيعية</option>
-                <option value="حادث تصادم مروري">حادث تصادم مروري</option>
-                <option value="حريق">حريق</option>
-                <option value="إصابة في المدارس">إصابة في المدارس</option>
-                <option value="إصابة رياضية">إصابة رياضية</option>
-                <option value="حالة طارئة صحية">حالة طارئة صحية</option>
-                <option value="حادث عمل">حادث عمل</option>
-                <option value="غرق">غرق</option>
-                <option value="انهيار مبنى">انهيار مبنى</option>
-                <option value="تلوث كيميائي">تلوث كيميائي</option>
-                <option value="حادث كهربائي">حادث كهربائي</option>
-                <option value="عنف أسري">عنف أسري</option>
-                <option value="اعتداء">اعتداء</option>
-                <option value="أخرى">أخرى</option>
-            </select>
-        </div>
+    <div class="form-group">
+        <label><i class="fas fa-exclamation-triangle" style="color:var(--coral);"></i> نوع الحدث:</label>
+        <select id="escEventType">
+            <option value="">-- اختر نوع الحدث --</option>
+            <option value="كارثة طبيعية">كارثة طبيعية</option>
+            <option value="حادث تصادم مروري">حادث تصادم مروري</option>
+            <option value="حريق">حريق</option>
+            <option value="إصابة في المدارس">إصابة في المدارس</option>
+            <option value="إصابة رياضية">إصابة رياضية</option>
+            <option value="حالة طارئة صحية">حالة طارئة صحية</option>
+            <option value="حادث عمل">حادث عمل</option>
+            <option value="غرق">غرق</option>
+            <option value="انهيار مبنى">انهيار مبنى</option>
+            <option value="تلوث كيميائي">تلوث كيميائي</option>
+            <option value="حادث كهربائي">حادث كهربائي</option>
+            <option value="عنف أسري">عنف أسري</option>
+            <option value="اعتداء">اعتداء</option>
+            <option value="أخرى">أخرى</option>
+        </select>
     </div>
 </div>
 

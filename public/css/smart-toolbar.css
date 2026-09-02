@@ -2173,7 +2173,8 @@
 #peakAlertModal .modal-content .form-row label,
 #mapModal .modal-content .form-row label,
 #opsModal .modal-content .form-row label {
-    color: #64748B !important;
+    /* إصلاح R3 (اعتماد المالك 2026-09-01): #64748B كان رماديًا ضعيفًا على الداكن */
+    color: var(--pi-ink-dim, #9AA7C4) !important;
 }
 
 /* 5. Inputs inside modals */
@@ -2229,7 +2230,8 @@
 #opsModal .modal-content select,
 #opsModal .modal-content textarea {
     background: rgba(255,255,255,0.05) !important;
-    color: #1E293B !important;
+    /* إصلاح R1 (اعتماد المالك 2026-09-01): كان color:#1E293B بقية ثيم فاتح — نص داكن على زجاج داكن = غير مقروء في 19 نافذة */
+    color: var(--pi-ink, #E8EDF8) !important;
     border-color: rgba(255,255,255,0.1) !important;
 }
 
@@ -2242,7 +2244,8 @@
 #monthlyTableModal .modal-content table,
 #airAmbulanceModal .modal-content table,
 #opsModal .modal-content table {
-    color: #1E293B !important;
+    /* إصلاح R2 (اعتماد المالك 2026-09-01): جداول داكنة بهوية المنصة بدل الفاتحة الكامنة */
+    color: var(--pi-ink, #E8EDF8) !important;
 }
 #shiftModal .modal-content th,
 #distributionModal .modal-content th,
@@ -2252,9 +2255,9 @@
 #monthlyTableModal .modal-content th,
 #airAmbulanceModal .modal-content th,
 #opsModal .modal-content th {
-    background: #F1F5F9 !important;
-    color: #2563EB !important;
-    border-color: #E2E8F0 !important;
+    background: rgba(255,255,255,0.06) !important;
+    color: var(--pi-ink, #E8EDF8) !important;
+    border-color: rgba(255,255,255,0.08) !important;
 }
 #shiftModal .modal-content td,
 #distributionModal .modal-content td,
@@ -2264,7 +2267,7 @@
 #monthlyTableModal .modal-content td,
 #airAmbulanceModal .modal-content td,
 #opsModal .modal-content td {
-    border-color: #E2E8F0 !important;
+    border-color: rgba(255,255,255,0.06) !important;
 }
 
 /* 7. docsPage specific styling */

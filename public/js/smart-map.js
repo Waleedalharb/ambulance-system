@@ -911,6 +911,7 @@
         if (!html) { closeCard(); return; }
         card.innerHTML = '<button type="button" class="smap-card-close" onclick="SmartMap.closeCard();SmartMap.clearFocus();"><i class="fas fa-xmark"></i></button>' + html;
         card.style.display = 'block';
+        if (kind === 'incident') loadLinkedForms(key); // L-6: جلب كسول بعد العرض — لا يبطئ فتح البطاقة
     }
     function sevText(sev) {
         return { green: 'تحت السيطرة', yellow: 'في الطريق / متابعة', red: 'تحتاج تدخلًا' }[sev] || '—';
@@ -997,7 +998,68 @@
             + '<div class="smap-card-times">'
             + '<div class="smap-card-time"><div class="tv">' + ((ic.bestArrivalMin !== null && ic.bestArrivalMin !== undefined) ? ic.bestArrivalMin + ' د' : '—') + '</div><div class="tl">زمن الوصول</div></div>'
             + '<div class="smap-card-time"><div class="tv">' + ((ic.bestMubasharaMin !== null && ic.bestMubasharaMin !== undefined) ? ic.bestMubasharaMin + ' د' : '—') + '</div><div class="tl">زمن المباشرة</div></div>'
-            + '</div></div>';
+            + '</div>'
+            + '<div class="smap-linked-forms" id="smapLinkedForms" data-incident="' + esc(String(num)) + '">'
+            + '<div class="smap-lf-title"><i class="fas fa-file-lines"></i> النماذج المرتبطة بهذا البلاغ</div>'
+            + '<div class="smap-lf-body">جارٍ التحميل…</div></div>'
+            + '</div>';
+    }
+    // L-6 (اعتماد المالك 2026-09-02): «النماذج المرتبطة بالبلاغ» — قسم عرض فقط داخل
+    // بطاقة البلاغ الحية. جلب كسول عند فتح البطاقة + كاش لكل رقم؛ يرشّح سجلات
+    // E/حادث/تصعيد بمطابقة incidentNumber التامة. السجلات القديمة بلا incidentNumber
+    // لن تطابق — صحيح ومتوقع (موثق). لا تعديل على النماذج ولا على الخادم.
+    var linkedFormsCache = {};
+    function loadLinkedForms(num) {
+        var host = document.getElementById('smapLinkedForms');
+        if (!host) return;
+        if (host.getAttribute('data-incident') !== String(num)) return; // بطاقة أخرى سبقتنا
+        var body = host.querySelector('.smap-lf-body');
+        if (!body) return;
+        if (!window.AuthManager || typeof AuthManager.apiRequest !== 'function') {
+            body.textContent = '—';
+            return;
+        }
+        var render = function (items) {
+            if (!items.length) {
+                body.innerHTML = '<span class="smap-lf-none">لا توجد نماذج مرتبطة بهذا البلاغ</span>';
+                return;
+            }
+            body.innerHTML = items.map(function (it) {
+                return '<span class="smap-lf-badge smap-lf-' + it.kind + '" title="' + esc(it.createdAt || '') + '">'
+                    + '<i class="fas ' + it.icon + '"></i> ' + esc(it.label)
+                    + (it.date ? ' <small>' + esc(it.date) + '</small>' : '')
+                    + '</span>';
+            }).join('');
+        };
+        if (linkedFormsCache[num]) { render(linkedFormsCache[num]); return; }
+        var kinds = [
+            { url: '/api/e-cases', kind: 'e', label: 'نموذج E', icon: 'fa-file-medical' },
+            { url: '/api/incidents', kind: 'incident', label: 'حادث', icon: 'fa-triangle-exclamation' },
+            { url: '/api/escalations', kind: 'escalation', label: 'تصعيد', icon: 'fa-arrow-up-right-dots' }
+        ];
+        Promise.all(kinds.map(function (k) {
+            return AuthManager.apiRequest(k.url).then(function (r) {
+                if (!r || !r.ok) return [];
+                return r.json().then(function (data) {
+                    var recs = (data && data.records) || [];
+                    return recs.filter(function (rec) {
+                        return rec && String(rec.incidentNumber || '') === String(num);
+                    }).map(function (rec) {
+                        return { kind: k.kind, label: k.label, icon: k.icon, createdAt: rec.createdAt || '', date: String(rec.createdAt || '').slice(0, 10) };
+                    });
+                });
+            }).catch(function () { return []; });
+        })).then(function (groups) {
+            var items = [];
+            groups.forEach(function (g) { items = items.concat(g); });
+            linkedFormsCache[num] = items;
+            // البطاقة قد تكون أُغلقت أو استُبدلت أثناء الجلب
+            var h2 = document.getElementById('smapLinkedForms');
+            if (h2 && h2.getAttribute('data-incident') === String(num)) render(items);
+        }).catch(function () {
+            var h3 = document.getElementById('smapLinkedForms');
+            if (h3) { var b3 = h3.querySelector('.smap-lf-body'); if (b3) b3.textContent = 'تعذر التحميل'; }
+        });
     }
     function teamCardHtml(unit) {
         var t = state.teams && state.teams[unit];

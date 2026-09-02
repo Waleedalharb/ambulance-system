@@ -1,30 +1,29 @@
 <!-- ===== نموذج E - حالات توقف قلب وتنفس ===== -->
+<!-- L-2 (اعتماد المالك 2026-09-02 — FORMS-LOOKUP-L2-SPEC.md): رقم البلاغ أصبح
+     بحثًا موثّقًا عبر مكوّن IncidentLookup (L-1) — بيانات CAD تُعرض read-only
+     بوسم «من CAD»، والفرقة تُختار من مشاركات البلاغ الفعلية المحتسبة فقط.
+     زمن الاستجابة لم يعد حقلًا يدويًا: يُعرض من الحساب المركزي للفرقة المختارة. -->
 <div class="form-card">
     <div class="form-card-title">
         <i class="fas fa-heartbeat" style="color:var(--coral);"></i>
         معلومات البلاغ
     </div>
-    <div class="form-row-grid">
+    <div id="eIncidentLookup"></div>
+    <div class="form-row-grid" style="margin-top:12px;">
         <div class="form-group">
-            <label><i class="fas fa-hashtag" style="color:var(--primary-700);"></i> رقم البلاغ:</label>
-            <input type="text" id="eReportNumber" placeholder="مثال: 2025-E-001">
+            <label><i class="fas fa-calendar-clock" style="color:var(--gold);"></i> تاريخ ووقت البلاغ: <span class="e-cad-tag">من CAD</span></label>
+            <input type="datetime-local" id="eDateTime" readonly tabindex="-1" title="يُعبأ تلقائيًا من بيانات البلاغ الموثّق">
         </div>
         <div class="form-group">
-            <label><i class="fas fa-calendar-clock" style="color:var(--gold);"></i> تاريخ ووقت البلاغ:</label>
-            <input type="datetime-local" id="eDateTime">
+            <label><i class="fas fa-map-marker-alt" style="color:var(--coral);"></i> موقع الحالة: <span class="e-cad-tag">من CAD</span></label>
+            <input type="text" id="eLocation" readonly tabindex="-1" placeholder="يُعبأ تلقائيًا من بيانات البلاغ الموثّق" title="يُعبأ تلقائيًا من بيانات البلاغ الموثّق">
         </div>
     </div>
     <div class="form-row-grid">
-        <div class="form-group">
-            <label><i class="fas fa-map-marker-alt" style="color:var(--coral);"></i> موقع الحالة:</label>
-            <input type="text" id="eLocation" placeholder="الموقع بالتفصيل">
-        </div>
         <div class="form-group">
             <label><i class="fas fa-user" style="color:var(--teal);"></i> عمر المريض:</label>
             <input type="number" id="eAge" placeholder="العمر" min="0">
         </div>
-    </div>
-    <div class="form-row-grid">
         <div class="form-group">
             <label><i class="fas fa-venus-mars" style="color:var(--primary-700);"></i> الجنس:</label>
             <select id="eGender">
@@ -33,35 +32,13 @@
                 <option value="أنثى">أنثى</option>
             </select>
         </div>
-        <div class="form-group">
-            <label><i class="fas fa-ambulance" style="color:var(--teal);"></i> الفرقة المستجيبة:</label>
-            <select id="eUnit">
-                <option value="">-- اختر الفرقة --</option>
-                <option value="سريع 1">سريع 1</option>
-                <option value="سريع 2">سريع 2</option>
-                <option value="سريع 3">سريع 3</option>
-                <option value="سريع 4">سريع 4</option>
-                <option value="جنوب 1">جنوب 1</option>
-                <option value="جنوب 2">جنوب 2</option>
-                <option value="جنوب 3">جنوب 3</option>
-                <option value="جنوب 4">جنوب 4</option>
-                <option value="جنوب 5">جنوب 5</option>
-                <option value="جنوب 6">جنوب 6</option>
-                <option value="جنوب 7">جنوب 7</option>
-                <option value="جنوب 8">جنوب 8</option>
-                <option value="جنوب 9">جنوب 9</option>
-                <option value="جنوب 10">جنوب 10</option>
-                <option value="جنوب 11">جنوب 11</option>
-                <option value="جنوب 12">جنوب 12</option>
-                <option value="جنوب 13">جنوب 13</option>
-                <option value="جنوب 14">جنوب 14</option>
-                <option value="جنوب 15">جنوب 15</option>
-                <option value="جنوب 16">جنوب 16</option>
-                <option value="جنوب 17">جنوب 17</option>
-                <option value="جنوب 18">جنوب 18</option>
-                <option value="جنوب 19">جنوب 19</option>
-            </select>
-        </div>
+    </div>
+    <div class="form-group">
+        <label><i class="fas fa-ambulance" style="color:var(--teal);"></i> الفرقة المستجيبة الفعلية:</label>
+        <select id="eUnit" disabled>
+            <option value="">-- ابحث عن البلاغ أولًا --</option>
+        </select>
+        <small style="color:var(--pi-ink-dim,#9AA7C4); font-size:0.75rem;">تُملأ من الفرق التي باشرت البلاغ فعليًا — الملغاة/المسحوبة لا تُختار.</small>
     </div>
 </div>
 
@@ -73,7 +50,7 @@
     <div class="form-row-grid">
         <div class="form-group">
             <label><i class="fas fa-clock" style="color:var(--gold);"></i> وقت الاستجابة (دقائق):</label>
-            <input type="number" id="eResponseTime" placeholder="عدد الدقائق" min="0">
+            <div id="eResponseTimeView" class="e-response-view" style="padding:10px 12px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.12);border-radius:10px;color:var(--text-muted,#9aa3b2);font-size:.95rem;">— سيظهر من CAD بعد تحديد الفرقة</div>
         </div>
         <div class="form-group">
             <label><i class="fas fa-hospital" style="color:var(--coral);"></i> المستشفى المستلم:</label>

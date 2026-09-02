@@ -5411,6 +5411,25 @@ app.get('/api/cad-reports/:number/place-suggestion', authenticate, authorizePerm
     }
 });
 
+// L-1 — Incident Lookup (اعتماد المالك 2026-09-01، مواصفة FORMS-LOOKUP-L1-SPEC.md):
+// بحث خفيف عن بلاغ برقمه لمكوّن النماذج. الحراسة = نفس صلاحية النماذج القائمة
+// (ops.forms — بلا Permission جديدة). قراءة صِرفة: لا كتابة، لا إعادة حساب
+// أزمنة، وcaller_number لا يخرج إطلاقًا. التكرار عبر المناوبات يُعاد صراحةً.
+app.get('/api/incidents/lookup', authenticate, authorizePerm('ops.forms'), async (req, res) => {
+    try {
+        if (!reportService) return res.status(503).json({ error: 'Engine unavailable' });
+        const number = String(req.query.number || '').trim();
+        if (!number) return res.status(400).json({ error: 'number مطلوب' });
+        if (!CAD_NUMBER_RE.test(number)) return res.status(400).json({ error: 'صيغة رقم بلاغ غير صالحة' });
+        const data = await reportService.getIncidentLookup(number);
+        if (!data) return res.status(404).json({ found: false, number });
+        res.json({ success: true, found: true, ...data });
+    } catch (error) {
+        console.error('[IncidentLookup] error:', error.message);
+        res.status(500).json({ error: 'فشل في البحث عن البلاغ' });
+    }
+});
+
 app.post('/api/cad-reports/:number/crews/:unit/restore', authenticate, authorizePerm('ops.dispatch'), (req, res) => handleCrewManualCancel(req, res, false));
 
 // ============================================

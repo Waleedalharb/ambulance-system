@@ -1,0 +1,63 @@
+/* ═══ IncidentLookup (L-1 — اعتماد المالك 2026-09-01) ═══
+   ثيم داكن من لوحة المنصة (نفس رموز جولة ثيم النماذج): زجاج داكن + نص pi-ink
+   + placeholder/hالات أهدأ + focus أزرق المنصة. ملف معزول — لا يُحمَّل في
+   index.html ضمن L-1 ولا يعدّل أي ورقة قائمة. */
+
+.il-root { direction: rtl; font-family: inherit; color: var(--pi-ink, #E8EDF8); }
+
+.il-search-row { display: flex; gap: 8px; align-items: stretch; }
+.il-input {
+    flex: 1; min-width: 0;
+    background: rgba(255,255,255,0.05); color: var(--pi-ink, #E8EDF8);
+    border: 1px solid rgba(255,255,255,0.1); border-radius: 10px;
+    padding: 10px 14px; font-size: 0.95rem; font-family: inherit;
+}
+.il-input::placeholder { color: var(--pi-ink-dim, #9AA7C4); opacity: 1; }
+.il-input:focus {
+    border-color: rgba(96,165,250,0.55); outline: none;
+    box-shadow: 0 0 0 3px rgba(96,165,250,0.14);
+}
+.il-input:disabled { opacity: 0.6; }
+.il-btn {
+    background: linear-gradient(150deg, #2F6BF0, #1D4FD7); color: #fff;
+    border: none; border-radius: 10px; padding: 10px 18px;
+    font-size: 0.9rem; font-weight: 700; font-family: inherit; cursor: pointer;
+    box-shadow: 0 10px 24px rgba(30,90,220,0.35); white-space: nowrap;
+}
+.il-btn:disabled { opacity: 0.6; cursor: default; }
+
+.il-status { margin-top: 10px; padding: 10px 14px; border-radius: 10px; font-size: 0.88rem; font-weight: 600; }
+.il-status-busy { background: rgba(96,165,250,0.1); color: #93C5FD; border: 1px solid rgba(96,165,250,0.25); }
+.il-status-err  { background: rgba(248,113,113,0.1); color: #FCA5A5; border: 1px solid rgba(248,113,113,0.25); }
+
+.il-card {
+    margin-top: 12px; border-radius: 12px; padding: 14px 16px;
+    background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+}
+.il-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+.il-head-num { color: var(--pi-ink-dim, #9AA7C4); font-size: 0.82rem; font-weight: 700; }
+.il-badge { padding: 5px 12px; border-radius: 999px; font-size: 0.8rem; font-weight: 700; }
+.il-badge-ok   { background: rgba(52,211,153,0.12); color: #6EE7B7; border: 1px solid rgba(52,211,153,0.3); }
+.il-badge-warn { background: rgba(245,158,11,0.12); color: #FBBF24; border: 1px solid rgba(245,158,11,0.3); }
+.il-dup {
+    margin-bottom: 10px; padding: 8px 12px; border-radius: 8px; font-size: 0.8rem;
+    background: rgba(96,165,250,0.08); color: #93C5FD; border: 1px solid rgba(96,165,250,0.2);
+}
+
+.il-grid { display: grid; gap: 4px; margin-bottom: 10px; }
+.il-row { display: flex; justify-content: space-between; gap: 12px; padding: 7px 10px; border-radius: 8px; background: rgba(255,255,255,0.03); font-size: 0.87rem; }
+.il-row-accent { background: rgba(96,165,250,0.08); border: 1px solid rgba(96,165,250,0.18); }
+.il-label { color: var(--pi-ink-dim, #9AA7C4); font-weight: 600; white-space: nowrap; }
+.il-value { color: var(--pi-ink, #E8EDF8); font-weight: 600; text-align: left; overflow-wrap: anywhere; }
+.il-missing { color: var(--pi-ink-faint, #7C8AAB) !important; font-weight: 500 !important; font-style: italic; }
+
+.il-units { display: grid; gap: 8px; margin-bottom: 10px; }
+.il-unit { border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 10px 12px; background: rgba(255,255,255,0.03); display: grid; gap: 4px; }
+.il-unit-excluded { opacity: 0.65; border-style: dashed; }
+.il-unit-empty { color: var(--pi-ink-faint, #7C8AAB); font-size: 0.85rem; text-align: center; padding: 8px; }
+.il-unit-title { font-weight: 800; font-size: 0.92rem; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.il-flag { font-size: 0.72rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: rgba(248,113,113,0.12); color: #FCA5A5; border: 1px solid rgba(248,113,113,0.3); }
+.il-phases { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.il-phase { font-size: 0.74rem; color: var(--pi-ink-dim, #9AA7C4); background: rgba(255,255,255,0.05); border-radius: 6px; padding: 3px 8px; }
+
+.il-best { font-size: 0.95rem; font-weight: 800; color: #6EE7B7; padding: 8px 12px; border-radius: 8px; background: rgba(52,211,153,0.08); border: 1px solid rgba(52,211,153,0.2); }

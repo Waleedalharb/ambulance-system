@@ -1,17 +1,22 @@
 <!-- ===== نموذج بلاغ حادث ===== -->
+<!-- L-3 (اعتماد المالك 2026-09-02 — FORMS-LOOKUP-L3-SPEC.md): رقم البلاغ أصبح
+     بحثًا موثّقًا عبر مكوّن IncidentLookup — الوقت/الموقع من CAD read-only بوسم
+     «من CAD»، والفرقة تُختار من مشاركات البلاغ المحتسبة فقط. نوع الحادث والمركز
+     وبيانات المريض تبقى يدوية (لا نظير محسوم لها في CAD الواصل). -->
 <div class="form-card">
     <div class="form-card-title">
         <i class="fas fa-car-crash" style="color:var(--primary-700);"></i>
         معلومات البلاغ
     </div>
-    <div class="form-row-grid">
+    <div id="incIncidentLookup"></div>
+    <div class="form-row-grid" style="margin-top:12px;">
         <div class="form-group">
-            <label><i class="fas fa-hashtag" style="color:var(--primary-700);"></i> رقم البلاغ</label>
-            <input type="text" id="incReportNumber" placeholder="E-2025-XXXX">
+            <label><i class="fas fa-calendar-clock" style="color:var(--gold);"></i> التاريخ والوقت <span class="e-cad-tag">من CAD</span></label>
+            <input type="datetime-local" id="incDateTime" readonly tabindex="-1" title="يُعبأ تلقائيًا من بيانات البلاغ الموثّق">
         </div>
         <div class="form-group">
-            <label><i class="fas fa-calendar-clock" style="color:var(--gold);"></i> التاريخ والوقت</label>
-            <input type="datetime-local" id="incDateTime">
+            <label><i class="fas fa-map-marker-alt" style="color:var(--coral);"></i> الموقع <span class="e-cad-tag">من CAD</span></label>
+            <input type="text" id="incLocation" readonly tabindex="-1" placeholder="يُعبأ تلقائيًا من بيانات البلاغ الموثّق" title="يُعبأ تلقائيًا من بيانات البلاغ الموثّق">
         </div>
     </div>
     <div class="form-row-grid">
@@ -31,40 +36,14 @@
                 <option value="أخرى">أخرى</option>
             </select>
         </div>
-        <div class="form-group">
-            <label><i class="fas fa-map-marker-alt" style="color:var(--coral);"></i> الموقع</label>
-            <input type="text" id="incLocation" placeholder="حي / شارع">
-        </div>
     </div>
     <div class="form-row-grid">
         <div class="form-group">
             <label><i class="fas fa-ambulance" style="color:var(--teal);"></i> الفرقة</label>
-            <select id="incUnit">
-                <option value="">-- اختر الفرقة --</option>
-                <option value="سريع 1">سريع 1</option>
-                <option value="سريع 2">سريع 2</option>
-                <option value="سريع 3">سريع 3</option>
-                <option value="سريع 4">سريع 4</option>
-                <option value="جنوب 1">جنوب 1</option>
-                <option value="جنوب 2">جنوب 2</option>
-                <option value="جنوب 3">جنوب 3</option>
-                <option value="جنوب 4">جنوب 4</option>
-                <option value="جنوب 5">جنوب 5</option>
-                <option value="جنوب 6">جنوب 6</option>
-                <option value="جنوب 7">جنوب 7</option>
-                <option value="جنوب 8">جنوب 8</option>
-                <option value="جنوب 9">جنوب 9</option>
-                <option value="جنوب 10">جنوب 10</option>
-                <option value="جنوب 11">جنوب 11</option>
-                <option value="جنوب 12">جنوب 12</option>
-                <option value="جنوب 13">جنوب 13</option>
-                <option value="جنوب 14">جنوب 14</option>
-                <option value="جنوب 15">جنوب 15</option>
-                <option value="جنوب 16">جنوب 16</option>
-                <option value="جنوب 17">جنوب 17</option>
-                <option value="جنوب 18">جنوب 18</option>
-                <option value="جنوب 19">جنوب 19</option>
+            <select id="incUnit" disabled>
+                <option value="">-- ابحث عن البلاغ أولًا --</option>
             </select>
+            <small style="color:var(--pi-ink-dim,#9AA7C4); font-size:0.75rem;">تُملأ من الفرق التي باشرت البلاغ فعليًا — الملغاة/المسحوبة لا تُختار.</small>
         </div>
         <div class="form-group">
             <label><i class="fas fa-hospital" style="color:var(--teal);"></i> المركز</label>

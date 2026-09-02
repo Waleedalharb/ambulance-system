@@ -309,6 +309,16 @@ class StorageAdapter {
             'SELECT * FROM incident_registry WHERE shift_id = ? AND number = ?', [shiftId, String(number)]);
     }
 
+    /** كل صفوف بلاغ برقمه عبر المناوبات — الأحدث إدراجًا أولًا (L-1 Incident
+        Lookup، اعتماد المالك 2026-09-01): الرقم يتكرر عبر المناوبات (135 رقمًا
+        فريدًا من 145 سجلًا عند التشخيص) فالبحث بالرقم وحده يعيد كل الظهور،
+        وقاعدة التعدد (الأحدث افتراضيًا + بقية المناوبات صراحةً) تُبنى عليه.
+        قراءة صِرفة — لا كتابة ولا تعديل على السجل. */
+    async getIncidentRowsByNumber(number) {
+        return this.db.all(
+            'SELECT * FROM incident_registry WHERE number = ? ORDER BY id DESC', [String(number)]);
+    }
+
     /** مشاركات بلاغ مفرد بكامل حقول الاحتساب (RC-6) — نفس SELECT الكبير في
         getIncidentHistoryData لكن مقيّدًا ببلاغ واحد، حتى تمرّ على قاعدة
         isParticipationCounted نفسها بلا أي استثناء. */

@@ -1320,6 +1320,63 @@ class ReportService {
         };
     }
 
+    /* ═══ L-1 — Incident Lookup (اعتماد المالك 2026-09-01، مواصفة
+       FORMS-LOOKUP-L1-SPEC.md): بحث خفيف بالرقم فقط لمكوّن النماذج. قراءة
+       صِرفة: الأزمنة تُقرأ كما خزّنها الحساب المركزي (_responseFor) — لا
+       إعادة حساب ولا منطق موازٍ. قاعدة الاحتساب isParticipationCounted
+       القائمة تُطبق كما هي: الملغاة/المسحوبة تُعرض موسومة وخارج «الأسرع».
+       caller_number لا يخرج من هنا إطلاقًا (بيانات شخصية لا تحتاجها
+       النماذج). النقص يُعاد صراحةً — لا صفر ولا قيمة وهمية. ═══ */
+    async getIncidentLookup(number) {
+        const rows = await this.engine.storage.getIncidentRowsByNumber(number);
+        if (!rows || rows.length === 0) return null;
+        const ic = rows[0]; // الأحدث افتراضيًا (ORDER BY id DESC)
+        const parts = await this.engine.storage.getIncidentParticipationRows(ic.shift_id, number);
+        const units = parts.map(p => {
+            let phases = null;
+            try { phases = p.phases ? JSON.parse(p.phases) : null; } catch (_) { phases = null; }
+            return {
+                unit: p.unit,
+                phases,
+                respArrivalMin: p.resp_arrival_min != null ? p.resp_arrival_min : null,
+                respMubasharaMin: p.resp_mubashara_min != null ? p.resp_mubashara_min : null,
+                counted: this.isParticipationCounted(p),
+                flags: {
+                    withdrawn: !!p.withdrawn,
+                    manualCancelled: !!p.manual_cancelled,
+                    manualCancelReason: p.manual_cancel_reason || null
+                }
+            };
+        });
+        const countedResp = units.filter(u => u.counted && u.respArrivalMin !== null).map(u => u.respArrivalMin);
+        const bestArrivalMin = countedResp.length ? Math.min(...countedResp) : null;
+        // اكتمال الحزمة الزمنية بصدق — يقود حالة «⚠️ موجود لكن بياناته ناقصة»
+        const missing = [];
+        if (!ic.cad_created_at) missing.push('cad_created_at');
+        const hasArrivalPhase = units.some(u => u.phases && u.phases['البحث']);
+        if (!hasArrivalPhase) missing.push('arrival_phase');
+        if (units.length > 0 && !units.some(u => u.counted)) missing.push('no_counted_participation');
+        return {
+            number: ic.number,
+            shiftId: ic.shift_id,
+            otherShifts: rows.slice(1).map(r => ({ shiftId: r.shift_id, createdAt: r.created_at, status: r.status || null })),
+            incident: {
+                number: ic.number, code: ic.code || null, type: ic.type || null,
+                cadCreatedAtRaw: ic.cad_created_at || null,
+                cadCreatedAtTs: this._cadDateTimeTs(ic.cad_created_at),
+                status: ic.status || 'active',
+                address: ic.address || null, district: ic.district || null,
+                street: ic.street || null, city: ic.city || null, region: ic.region || null,
+                lat: ic.lat ?? null, lng: ic.lng ?? null,
+                description: ic.description || null
+            },
+            units,
+            bestArrivalMin,
+            timeCompleteness: { state: missing.length === 0 ? 'complete' : (ic.cad_created_at ? 'partial' : 'missing'), missing }
+        };
+    }
+
+
     // ═══════════════ H4 — دعم القرار (اعتماد المالك 2026-08-24) ═══════════════
     /**
      * H4 — توصيات تمركز مرشحة + نوافذ تستحق إعادة التوزيع + محاكاة أثر افتراضية
