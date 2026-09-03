@@ -1238,6 +1238,70 @@ app.get('/api/auth/me/permissions', authenticate, async (req, res) => {
 // ═══ إدارة الصلاحيات — بنية المرحلة 0 (تُحمى بنفس المحرك الجديد إثباتًا) ═══
 const { PERMISSIONS: PERMISSIONS_CATALOG, ROLE_LABELS: ROLE_LABELS_MAP } = require('./config/permissions');
 
+// ════════════════════════════════════════════════════════════════════════════
+// بوابة الموظف التشغيلية v1 (معتمدة 2026-09-04) — قراءة فقط صِرفة
+// الهوية تُشتق خادميًا من التوكن (username = employee_code) — يُمنع قبول أي
+// معرّف موظف من العميل. لا كتابة، لا migration، لا لمس لأنظمة الجداول/البلاغات.
+// ════════════════════════════════════════════════════════════════════════════
+let myPortalService = null;
+function getMyPortalService() {
+    if (!myPortalService && db) {
+        const MyPortalService = require('./services/my-portal-service');
+        myPortalService = new MyPortalService({ db });
+    }
+    return myPortalService;
+}
+const MY_PORTAL_NO_EMPLOYEE = { error: 'لا يوجد ملف موظف مرتبط بهذا الحساب', code: 'NO_EMPLOYEE' };
+
+app.get('/api/my/profile', authenticate, authorizePerm('ops.my_portal'), async (req, res) => {
+    try {
+        const out = await getMyPortalService().getProfile(req.user);
+        if (out.notFound) return res.status(404).json(MY_PORTAL_NO_EMPLOYEE);
+        res.json({ success: true, ...out });
+    } catch (error) {
+        console.error('[my-portal] profile error:', error);
+        res.status(500).json({ error: 'فشل في جلب الملف التشغيلي' });
+    }
+});
+
+app.get('/api/my/schedule', authenticate, authorizePerm('ops.my_portal'), async (req, res) => {
+    try {
+        const month = parseInt(req.query.month, 10);
+        const year = parseInt(req.query.year, 10);
+        if (!Number.isInteger(month) || month < 1 || month > 12 || !Number.isInteger(year) || year < 2000 || year > 2100) {
+            return res.status(422).json({ error: 'شهر أو سنة غير صالحة' });
+        }
+        const out = await getMyPortalService().getSchedule(req.user, month, year);
+        if (out.notFound) return res.status(404).json(MY_PORTAL_NO_EMPLOYEE);
+        res.json({ success: true, ...out });
+    } catch (error) {
+        console.error('[my-portal] schedule error:', error);
+        res.status(500).json({ error: 'فشل في جلب الجدول' });
+    }
+});
+
+app.get('/api/my/assignments', authenticate, authorizePerm('ops.my_portal'), async (req, res) => {
+    try {
+        const out = await getMyPortalService().getAssignments(req.user);
+        if (out.notFound) return res.status(404).json(MY_PORTAL_NO_EMPLOYEE);
+        res.json({ success: true, ...out });
+    } catch (error) {
+        console.error('[my-portal] assignments error:', error);
+        res.status(500).json({ error: 'فشل في جلب التكليفات' });
+    }
+});
+
+app.get('/api/my/team-incidents', authenticate, authorizePerm('ops.my_portal'), async (req, res) => {
+    try {
+        const out = await getMyPortalService().getTeamIncidents(req.user);
+        if (out.notFound) return res.status(404).json(MY_PORTAL_NO_EMPLOYEE);
+        res.json({ success: true, ...out });
+    } catch (error) {
+        console.error('[my-portal] team-incidents error:', error);
+        res.status(500).json({ error: 'فشل في جلب بلاغات الفرقة' });
+    }
+});
+
 app.get('/api/permissions/catalog', authenticate, authorizePerm('admin.users_manage'), async (req, res) => {
     res.json({ success: true, permissions: PERMISSIONS_CATALOG, roles: ROLE_LABELS_MAP });
 });

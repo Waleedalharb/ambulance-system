@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>بوابة الموظف التشغيلية — منصة الجنوب</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+<style>
+    /* هوية منصة الجنوب المعتمدة: كحلي داكن + زمردي + ذهبي — نفس وصفة الصفحات المستقلة */
+    :root {
+        --navy-900: #0B1E33;
+        --teal-id: #2E8B7A; --gold-id: #E8C84A;
+        --bg: #0A1728;
+        --surface: rgba(255,255,255,0.035);
+        --surface-2: rgba(255,255,255,0.05);
+        --border: rgba(255,255,255,0.08);
+        --border-soft: rgba(255,255,255,0.06);
+        --text: #F1F5F9; --text-2: #A9BACD; --muted: #8A9BB0;
+        --ops: #60A5FA; --emerald: #0EA47A; --lead-hi: #4FBF9A; --coral: #EF4444;
+        --th-bg: #0E2038;
+        --radius: 16px; --radius-md: 12px;
+        --shadow-card: inset 0 1px 0 rgba(255,255,255,0.045), 0 10px 30px rgba(0,0,0,0.30);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+        font-family: 'IBM Plex Sans Arabic', 'Tajawal', 'Segoe UI', Tahoma, sans-serif;
+        background: var(--bg); color: var(--text); min-height: 100vh;
+        padding: 16px 14px 60px;
+    }
+    body::before {
+        content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+        background:
+            radial-gradient(ellipse 60% 40% at 50% -10%, rgba(46,139,122,0.10), transparent 70%),
+            radial-gradient(ellipse 45% 32% at 50% 110%, rgba(232,200,74,0.05), transparent 70%),
+            linear-gradient(180deg, #0B1E33 0%, #0A1728 55%, #081220 100%);
+    }
+    .wrap { max-width: 720px; margin: 0 auto; }
+    .topbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+    .topbar h1 { font-size: 1.25rem; font-weight: 700; }
+    .topbar h1 .badge { color: var(--gold-id); }
+    .topbar .sub { color: var(--text-2); font-size: 0.78rem; margin-top: 3px; }
+    .home-link { color: var(--ops); text-decoration: none; font-size: 0.8rem; border: 1px solid var(--border); border-radius: 9px; padding: 7px 12px; background: var(--surface); }
+
+    .card { background: var(--surface); border: 1px solid var(--border-soft); border-radius: var(--radius); margin-bottom: 16px; overflow: hidden; box-shadow: var(--shadow-card); }
+    .card-head { padding: 13px 16px; font-weight: 700; font-size: 1rem; border-bottom: 1px solid var(--border-soft); display: flex; align-items: center; gap: 8px; }
+    .card-head::before { content: ''; width: 4px; height: 18px; border-radius: 4px; background: var(--teal-id); }
+    .card-head.incidents::before { background: var(--gold-id); }
+    .card-head.schedule::before { background: var(--ops); }
+    .card-body { padding: 14px 16px; }
+
+    .profile-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .p-item { background: var(--surface-2); border: 1px solid var(--border-soft); border-radius: var(--radius-md); padding: 10px 12px; }
+    .p-item .k { font-size: 0.72rem; color: var(--muted); margin-bottom: 4px; }
+    .p-item .v { font-size: 0.95rem; font-weight: 600; }
+    .p-item .v small { display: block; font-size: 0.72rem; color: var(--text-2); font-weight: 400; margin-top: 3px; }
+    .fallback-tag { display: inline-block; font-size: 0.68rem; color: #EADDA8; background: rgba(232,200,74,0.10); border: 1px solid rgba(232,200,74,0.30); border-radius: 8px; padding: 2px 8px; margin-top: 5px; }
+
+    .stat-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    .stat { background: var(--surface-2); border: 1px solid var(--border-soft); border-radius: var(--radius-md); padding: 12px 8px; text-align: center; }
+    .stat .n { font-size: 1.5rem; font-weight: 800; color: var(--gold-id); font-variant-numeric: tabular-nums; }
+    .stat .n.na { color: var(--muted); font-size: 1.1rem; }
+    .stat .l { font-size: 0.72rem; color: var(--text-2); margin-top: 4px; }
+    .incident-note { margin-top: 12px; font-size: 0.74rem; color: #EADDA8; background: rgba(232,200,74,0.07); border: 1px solid rgba(232,200,74,0.25); border-radius: var(--radius-md); padding: 9px 12px; line-height: 1.7; }
+    .breakdown-toggle { margin-top: 10px; width: 100%; background: var(--surface-2); color: var(--ops); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 9px; font-family: inherit; font-size: 0.82rem; font-weight: 600; cursor: pointer; }
+    .breakdown { margin-top: 10px; display: none; }
+    .breakdown.open { display: block; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+    th { background: var(--th-bg); color: var(--text-2); font-weight: 600; padding: 8px 6px; text-align: center; }
+    td { padding: 8px 6px; text-align: center; border-top: 1px solid var(--border-soft); }
+    td.num { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--gold-id); }
+
+    .month-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+    .month-nav button { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); border-radius: 9px; width: 36px; height: 32px; font-size: 1rem; cursor: pointer; font-family: inherit; }
+    .month-nav .m-title { font-weight: 700; font-size: 0.95rem; }
+    .coverage-warn { font-size: 0.76rem; color: #EADDA8; background: rgba(232,200,74,0.07); border: 1px solid rgba(232,200,74,0.25); border-radius: var(--radius-md); padding: 8px 12px; margin-bottom: 10px; }
+    .day-row { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: var(--radius-md); border: 1px solid transparent; }
+    .day-row:nth-child(odd) { background: rgba(255,255,255,0.02); }
+    .day-row.today { border-color: rgba(46,139,122,0.45); background: rgba(46,139,122,0.08); }
+    .day-row .d-date { width: 86px; font-size: 0.78rem; color: var(--text-2); font-variant-numeric: tabular-nums; }
+    .day-row .d-code { min-width: 44px; text-align: center; font-weight: 700; font-size: 0.78rem; background: var(--surface-2); border: 1px solid var(--border-soft); border-radius: 8px; padding: 3px 6px; }
+    .day-row .d-name { flex: 1; font-size: 0.8rem; }
+    .day-row .d-team { font-size: 0.74rem; color: var(--lead-hi); }
+    .day-row.off .d-code { color: var(--coral); }
+    .day-row.off .d-name { color: var(--muted); }
+
+    .empty { text-align: center; color: var(--muted); font-size: 0.85rem; padding: 22px 12px; }
+    .state-card { text-align: center; padding: 44px 20px; }
+    .state-card .t { font-size: 1.05rem; font-weight: 700; margin-bottom: 8px; }
+    .state-card .d { color: var(--text-2); font-size: 0.85rem; line-height: 1.8; }
+    .state-card a { color: var(--ops); }
+    .loading { text-align: center; color: var(--muted); padding: 40px; font-size: 0.9rem; }
+    @media (max-width: 420px) {
+        .profile-grid { grid-template-columns: 1fr; }
+        .stat .n { font-size: 1.25rem; }
+    }
+</style>
+</head>
+<body>
+<div class="wrap">
+    <div class="topbar">
+        <div>
+            <h1>بوابة الموظف التشغيلية <span class="badge">• الجنوب</span></h1>
+            <div class="sub" id="whoLine">بياناتك التشغيلية من المصدر مباشرة</div>
+        </div>
+        <a class="home-link" href="/">المنصة الرئيسية ←</a>
+    </div>
+    <div id="app"><div class="loading">جارٍ تحميل بياناتك…</div></div>
+</div>
+<script src="js/my-ems.js?v=1"></script>
+</body>
+</html>
