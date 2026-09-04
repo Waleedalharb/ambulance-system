@@ -17,7 +17,10 @@ const { createReadStream, createWriteStream } = require('fs');
 const zlib = require('zlib');
 const { pipeline } = require('stream/promises');
 
-const STORAGE_PATH = process.env.RENDER_DISK_PATH || path.join(__dirname, '..', 'data');
+// نفس تسلسل حسم المسار في db.js حرفًا (إصلاح 2026-09-05): كان يقرأ RENDER_DISK_PATH
+// فقط، فإن كانت القاعدة على DATA_DIR (كما في إنتاج Render) سقط إلى src/data المحلي
+// والتقط نسخة ناقصة بلا ambulance.db.
+const STORAGE_PATH = process.env.RENDER_DISK_PATH || process.env.DATA_DIR || path.join(__dirname, '..', 'data');
 const BACKUP_DIR = process.env.BACKUP_DIR || path.join(STORAGE_PATH, 'backups');
 
 const BACKUP_ITEMS = [
@@ -121,24 +124,55 @@ async function createBackup() {
             // Item doesn't exist, skip
         }
     }
-    
+
+    // إنذار صريح إن غابت القاعدة — نسخة بلا ambulance.db ليست نسخة مقبولة (2026-09-05)
+    if (existingItems.indexOf('ambulance.db') === -1) {
+        console.error(`❌ ambulance.db غير موجودة تحت ${STORAGE_PATH} — تحقق من المسار قبل المتابعة`);
+        throw new Error('ambulance.db missing from backup source: ' + STORAGE_PATH);
+    }
+
+    // لقطة متسقة للقاعدة (VACUUM INTO) بجانب الأرشيف — نسخ الملفات الخام أثناء عمل
+    // الخادم قد يلتقط حالة WAL وسطية؛ اللقطة متسقة معاملاتيًا بالضرورة.
+    let snapshotPath = null;
+    try {
+        const Database = require('better-sqlite3');
+        snapshotPath = path.join(BACKUP_DIR, `ambulance-snapshot-${timestamp}.db`);
+        const srcDb = new Database(path.join(STORAGE_PATH, 'ambulance.db'), { readonly: true, fileMustExist: true });
+        srcDb.exec(`VACUUM INTO '${snapshotPath.replace(/'/g, "''")}'`);
+        srcDb.close();
+        console.log(`📸 Consistent DB snapshot: ${snapshotPath}`);
+    } catch (e) {
+        console.warn('⚠️  تعذرت اللقطة المتسقة (يبقى النسخ الخام داخل الأرشيف):', e.message);
+        snapshotPath = null;
+    }
+
     // Create tar.gz using Node.js streams
     const tar = require('tar');
-    
+
     await tar.create({
         gzip: true,
         file: backupPath,
         cwd: STORAGE_PATH
     }, existingItems);
-    
+
+    // تحقق إلزامي بعد الإنشاء: محتويات الأرشيف فعلًا + وجود ambulance.db صراحة
+    const entries = [];
+    await tar.list({ file: backupPath, onentry: (e) => entries.push(String(e.path)) });
+    if (entries.indexOf('ambulance.db') === -1) {
+        console.error('❌ الأرشيف أُنشئ لكن ambulance.db ليست فيه — النسخة مرفوضة');
+        throw new Error('ambulance.db missing from created archive: ' + backupPath);
+    }
+
     const backupStat = await fs.stat(backupPath);
     const backupSizeMB = (backupStat.size / 1024 / 1024).toFixed(2);
-    
+
     console.log(`✅ Backup created: ${backupPath}`);
     console.log(`📦 Items backed up: ${existingItems.length}`);
     console.log(`📦 Backup size: ${backupSizeMB} MB`);
     console.log(`📦 Items: ${existingItems.join(', ')}`);
-    
+    console.log(`🔎 Archive entries: ${entries.length} — ambulance.db موجودة صراحة ✅`);
+    if (snapshotPath) console.log(`🔎 Consistent snapshot beside archive: ${path.basename(snapshotPath)}`);
+
     return backupPath;
 }
 
