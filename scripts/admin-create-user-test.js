@@ -80,6 +80,8 @@ async function api(method, url, { token, body } = {}) {
 
     const dbw = new Database(TMP_DB);
     dbw.pragma('journal_mode = WAL');
+    // تشديد admin.users_manage (قرار المالك 2026-09-04): النجمة وحدها لا تكفي — بذر منحة فردية لمدير الاختبار
+    dbw.prepare("INSERT INTO user_permissions (user_id, permission_key, granted, granted_by) VALUES ('emp-ADM1','admin.users_manage',1,'test-bootstrap')").run();
     dbw.prepare("INSERT INTO employees (employee_code, name, job_title, is_active) VALUES ('T501','موظف اختبار الإنشاء','فني اسعاف',1)").run();
     dbw.prepare("INSERT INTO employees (employee_code, name, job_title, is_active) VALUES ('T502','موظف غير نشط','فني اسعاف',0)").run();
     const auditCountBefore = dbw.prepare("SELECT COUNT(*) c FROM audit_log WHERE action='user_create'").get().c;

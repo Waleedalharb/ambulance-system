@@ -59,6 +59,8 @@ async function login(u, p) {
     src.close();
     fs.mkdirSync(TMP_DIR, { recursive: true });
     fs.copyFileSync(path.join(ROOT, 'data', 'users.json'), path.join(TMP_DIR, 'users.json'));
+    // تشديد admin.users_manage (قرار المالك 2026-09-04): النجمة وحدها لا تكفي — بذر منحة فردية للمدير 4252 (معرّفه الفعلي emp-4252)
+    { const w = new Database(TMP_DB); w.prepare("INSERT INTO user_permissions (user_id, permission_key, granted, granted_by) VALUES ('emp-4252','admin.users_manage',1,'test-bootstrap')").run(); w.close(); }
 
     const probe = new Database(TMP_DB, { readonly: true });
     const count = (t) => probe.prepare(`SELECT COUNT(*) c FROM ${t}`).get().c;
@@ -68,10 +70,11 @@ async function login(u, p) {
     const { PERMISSIONS, PERMISSION_KEYS, ROLES_PERMISSIONS } = require(path.join(ROOT, 'config', 'permissions.js'));
     console.log('\n🧪 الكتالوج بعد التفكيك:');
     const OPS10 = ['ops.completion', 'ops.dispatch', 'ops.reports', 'ops.report_revert', 'ops.report_detail', 'ops.deployments', 'ops.forms', 'ops.team_exit', 'ops.volunteers', 'ops.vehicles'];
-    check('الكتالوج 40 مفتاحًا (34 + 3 ربط العمليات + 3 العهد والأصول 2026-08-23)', PERMISSION_KEYS.length === 40, 'keys=' + PERMISSION_KEYS.length);
+    check('الكتالوج 42 مفتاحًا (40 + ops.my_portal + staff.phone_view — 2026-09-04)', PERMISSION_KEYS.length === 42, 'keys=' + PERMISSION_KEYS.length);
     check('مفاتيح التشغيل العشرة الدقيقة موجودة', OPS10.every(k => PERMISSION_KEYS.indexOf(k) !== -1));
     check('مفاتيح ربط العمليات الجديدة موجودة (vehicles/files/alerts)', ['ops.vehicles', 'ops.files', 'ops.alerts'].every(k => PERMISSION_KEYS.indexOf(k) !== -1));
     check('ops.files وops.alerts فرديتان — لا دور يحملهما إطلاقًا', Object.keys(ROLES_PERMISSIONS).every(r => ROLES_PERMISSIONS[r].indexOf('ops.files') === -1 && ROLES_PERMISSIONS[r].indexOf('ops.alerts') === -1));
+    check('staff.phone_view فردية حصرًا — لا دور يحملها إطلاقًا (قرار 2026-09-04)', Object.keys(ROLES_PERMISSIONS).every(r => ROLES_PERMISSIONS[r].indexOf('staff.phone_view') === -1));
     check('ops.execute الشامل باقٍ للتوافق', PERMISSION_KEYS.indexOf('ops.execute') !== -1);
     check('workflow.view أُضيف', PERMISSION_KEYS.indexOf('workflow.view') !== -1);
     check('§7: لا دور يحمل أي schedule.* إطلاقًا', Object.keys(ROLES_PERMISSIONS).every(r => !ROLES_PERMISSIONS[r].some(k => k.indexOf('schedule.') === 0)));
@@ -120,7 +123,10 @@ async function login(u, p) {
         const actorStill = await api('/api/auth/me', { token: T });
         check('جلسة الممثّل (4252) حيّة بعد إبطال جلسات الهدف', actorStill.status === 200 && actorStill.data.success === true);
         const actorPerms = await api('/api/permissions/user/4252', { token: T });
-        check('سجل 4252 الفردي بقي فارغًا (لا تسرّب)', actorPerms.status === 200 && actorPerms.data.permissions_granted.length === 0 && actorPerms.data.permissions_revoked.length === 0);
+        // تشديد 2026-09-04: السجل يحوي بذرة bootstrap المقصودة فقط (admin.users_manage) ولا شيء غيرها
+        check('سجل 4252 الفردي يحوي بذرة bootstrap فقط (لا تسرّب)', actorPerms.status === 200
+            && JSON.stringify(actorPerms.data.permissions_granted) === JSON.stringify(['admin.users_manage'])
+            && actorPerms.data.permissions_revoked.length === 0, JSON.stringify(actorPerms.data && actorPerms.data.permissions_granted));
         const stale = await api('/api/auth/me', { token: T2 });
         check('توكن الهدف القديم ميت (TOKEN_REVOKED)', stale.status === 403 && stale.data.code === 'TOKEN_REVOKED');
 

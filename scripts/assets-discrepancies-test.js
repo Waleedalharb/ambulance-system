@@ -48,6 +48,8 @@ async function api(p, { method = 'GET', token, body } = {}) {
     for (const t of ['asset_import_staging', 'asset_events', 'asset_replacements', 'inventory_items', 'inventory_sessions', 'inventory_cycles', 'assets', 'asset_types']) {
         try { wipe.prepare(`DELETE FROM ${t}`).run(); } catch (_) { }
     }
+    // تشديد admin.users_manage (قرار المالك 2026-09-04): النجمة وحدها لا تكفي لمسارات الإدارة — بذر منحة فردية للمدير 4252 (معرّفه الفعلي emp-4252)
+    wipe.prepare("INSERT INTO user_permissions (user_id, permission_key, granted, granted_by) VALUES ('emp-4252','admin.users_manage',1,'test-bootstrap')").run();
     wipe.close();
     const users = JSON.parse(fs.readFileSync(path.join(ROOT, 'data', 'users.json'), 'utf8'));
     users.push({ id: 'astw2-' + STAMP, username: 'astworker2', name: 'موظف جرد المرحلة 5', password: bcrypt.hashSync('w-pass', 10), role: 'user', isActive: true });

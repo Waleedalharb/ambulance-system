@@ -974,12 +974,22 @@ function getAuthResetService() {
     }
     return authResetService;
 }
+// عضوية صريحة بمفتاح (قرار المالك 2026-09-04): النجمة '*' وحدها لا تكفي — تُحتسب
+// المنح الفردية فقط لحامل '*'، وافتراضي الدور + المنح/السحب الفردية لغيره.
+function holdsExplicitPerm(eff, key) {
+    return eff.star ? eff.granted.indexOf(key) !== -1 : eff.effective.indexOf(key) !== -1;
+}
 function authorizePerm(permissionKey) {
     return async (req, res, next) => {
         if (!req.user) return res.status(401).json({ error: 'مطلوب تسجيل الدخول' });
         try {
             const svc = getPermissionService();
-            const ok = await svc.hasPermission(req.user.id, req.user.role, permissionKey);
+            // تشديد (قرار المالك 2026-09-04): admin.users_manage يتطلب عضوية صريحة في قراءاته
+            // وكتاباته معًا — مدير بالنجمة بلا منحة فردية لا يدير المستخدمين ولا الصلاحيات،
+            // ولا يستطيع منح نفسه أو غيره هذا المفتاح دون تفويض صحيح.
+            const ok = permissionKey === 'admin.users_manage'
+                ? holdsExplicitPerm(await svc.getEffective(req.user.id, req.user.role), permissionKey)
+                : await svc.hasPermission(req.user.id, req.user.role, permissionKey);
             if (!ok) return res.status(403).json({ error: 'ليس لديك الصلاحية', code: 'PERMISSION_DENIED', permission: permissionKey });
             next();
         } catch (e) {
@@ -10991,9 +11001,8 @@ app.delete('/api/report-entry', authenticate, authorize(['admin']), async (req, 
 async function employeeColumnsFor(req) {
     const svc = getPermissionService();
     const eff = await svc.getEffective(req.user.id, req.user.role);
-    const holds = (key) => eff.star ? eff.granted.indexOf(key) !== -1 : eff.effective.indexOf(key) !== -1;
-    const isAdminView = holds('admin.users_manage');
-    const canPhone = isAdminView || holds('staff.phone_view');
+    const isAdminView = holdsExplicitPerm(eff, 'admin.users_manage');
+    const canPhone = isAdminView || holdsExplicitPerm(eff, 'staff.phone_view');
     const cols = ['id', 'employee_code', 'name', 'job_title', 'symbol', 'is_active', 'pattern_code', 'created_at'];
     if (canPhone) cols.push('phone');
     if (isAdminView) cols.push('phone_verified', 'phone_verified_at', 'phone_verified_by');

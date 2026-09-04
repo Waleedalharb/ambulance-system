@@ -62,6 +62,8 @@ async function waitReady(tries = 60) {
         updated_at DATETIME,
         UNIQUE(user_id, permission_key)
     );`);
+    // تشديد admin.users_manage (قرار المالك 2026-09-04): النجمة وحدها لا تكفي — بذر منحة فردية للمدير 4252 (معرّفه الفعلي emp-4252)
+    probeW.prepare("INSERT INTO user_permissions (user_id, permission_key, granted, granted_by) VALUES ('emp-4252','admin.users_manage',1,'test-bootstrap')").run();
     probeW.close();
     const probe = new Database(TMP_DB, { readonly: true });
     const probeRW = new Database(TMP_DB); // للمحول الوحدوي (منح/سحب)
