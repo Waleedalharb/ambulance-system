@@ -111,8 +111,10 @@ class MyPortalService {
         const code = row && row.shift_code != null ? String(row.shift_code) : null;
         const codeRow = code ? codeMap.get(code) : null;
         const team = row ? this._teamView(teamById, row.team_id) : { teamId: null, teamName: null, center: null };
+        // created_at وليس updated_at: المخطط القانوني لـshift_roster (db.js:369-380) لا يحوي updated_at
+        // وإعادة الاستيراد تحذف الصفوف وتعيد إدراجها (server.js) فوقت الإنشاء = آخر كتابة فعلية
         const lastUpd = await this.db.get(
-            'SELECT MAX(updated_at) AS m FROM shift_roster WHERE employee_id = ?', [emp.id]);
+            'SELECT MAX(created_at) AS m FROM shift_roster WHERE employee_id = ?', [emp.id]);
 
         return {
             employee: { id: emp.id, code: emp.employee_code, name: emp.name, jobTitle: emp.job_title || null },
@@ -134,8 +136,9 @@ class MyPortalService {
         const emp = await this.resolveEmployee(user);
         if (!emp) return { notFound: true };
         const { teamById, codeMap } = await this._refs();
+        // created_at بدل updated_at — نفس سبب profile أعلاه (المخطط القانوني بلا updated_at)
         const rows = await this.db.all(
-            `SELECT shift_date, shift_code, team_id, updated_at FROM shift_roster
+            `SELECT shift_date, shift_code, team_id, created_at FROM shift_roster
              WHERE employee_id = ? AND month = ? AND year = ? ORDER BY shift_date`, [emp.id, month, year]);
 
         const days = rows.map(r => {
@@ -157,7 +160,7 @@ class MyPortalService {
         const elapsed = today && today < start ? 0 : daysBetween(start, effectiveEnd) + 1;
         const coveredDates = new Set(days.map(d => d.date)).size;
         const coverage = days.length === 0 ? 'none' : (coveredDates >= elapsed ? 'complete' : 'partial');
-        const lastUpd = rows.reduce((m, r) => (r.updated_at && r.updated_at > m ? r.updated_at : m), '');
+        const lastUpd = rows.reduce((m, r) => (r.created_at && r.created_at > m ? r.created_at : m), '');
 
         return { month, year, coverage, elapsedDays: elapsed, coveredDays: coveredDates, days, lastUpdate: lastUpd || null };
     }
