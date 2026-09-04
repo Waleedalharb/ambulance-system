@@ -1451,6 +1451,91 @@ app.post('/api/users/:id/role', authenticate, authorizePerm('admin.users_manage'
     }
 });
 
+// إنشاء حساب موظف جديد — مسار إداري مستقل (اعتماد المالك 2026-09-04)
+// عقد الهوية المثبت من الكود: username = الكود الوظيفي و id = 'emp-<code>'
+//   - initDefaultUsers أعلاه (server.js:656-699): الحسابات الـ19 كلها username=الكود الوظيفي
+//   - services/roster-sync-service.js: «employee_code هو مفتاح الهوية الوحيد»
+//   - services/my-portal-service.js (resolveEmployee): employees.employee_code = user.username
+app.post('/api/users', authenticate, authorizePerm('admin.users_manage'), validateBody({
+    username: { required: true, type: 'string', minLength: 1, maxLength: 50 },
+    name: { required: true, type: 'string', minLength: 1, maxLength: 120 },
+    role: { required: true, type: 'string', minLength: 1, maxLength: 30 },
+    employeeCode: { required: true, type: 'string', minLength: 1, maxLength: 50 }
+}), async (req, res) => {
+    try {
+        const username = String(req.body.username).trim();
+        const name = String(req.body.name).trim();
+        const role = req.body.role;
+        const employeeCode = String(req.body.employeeCode).trim();
+
+        // 1) الدور من القائمة المعتمدة فقط (نفس قائمة تغيير الدور أعلاه)
+        const NEW_ROLES = ['sysadmin', 'ops_supervisor', 'field_leadership', 'operator', 'viewer'];
+        const ALLOWED_ROLES = NEW_ROLES.concat(['admin', 'director', 'user']);
+        if (ALLOWED_ROLES.indexOf(role) === -1) {
+            return res.status(400).json({ error: 'الدور غير معتمد — الأدوار المتاحة: ' + ALLOWED_ROLES.join(', ') });
+        }
+
+        // 2) عقد الهوية: اسم المستخدم يجب أن يساوي الكود الوظيفي — يمنع ربط حساب بملف موظف آخر
+        if (username !== employeeCode) {
+            return res.status(400).json({ error: 'اسم المستخدم يجب أن يساوي الكود الوظيفي (عقد الهوية في النظام)', code: 'IDENTITY_MISMATCH' });
+        }
+
+        // 3) ملف الموظف موجود ونشط — لا يقبل المسار رقم موظف غير مثبت
+        const employee = await db.Employees.getByCode(employeeCode);
+        if (!employee) {
+            return res.status(404).json({ error: 'لا يوجد ملف موظف بهذا الكود', code: 'EMPLOYEE_NOT_FOUND' });
+        }
+        if (!employee.is_active) {
+            return res.status(404).json({ error: 'ملف الموظف غير نشط', code: 'EMPLOYEE_INACTIVE' });
+        }
+
+        // 4) منع التكرار: لا حساب بنفس username ولا ربط ثانٍ لنفس الموظف (id = 'emp-<code>')
+        const users = JSON.parse(await fs.readFile(USERS_PATH, 'utf8'));
+        const newId = 'emp-' + username;
+        if (users.some(u => u.username === username || String(u.id) === newId)) {
+            return res.status(409).json({ error: 'يوجد حساب مرتبط بهذا الموظف مسبقًا', code: 'ACCOUNT_EXISTS' });
+        }
+
+        // 5) كلمة المرور المؤقتة تُولَّد خادميًا ولا تُقبل من العميل إطلاقًا
+        //    ملاحظة: نظام المصادقة الحالي لا يدعم إلزام تغيير كلمة المرور عند أول دخول (تحفظ معتمد في المواصفة)
+        const tempPassword = crypto.randomBytes(8).toString('base64url').slice(0, 10);
+        const salt = await bcrypt.genSalt(12);
+        const hashedPassword = await bcrypt.hash(tempPassword, salt);
+
+        const newUser = {
+            id: newId,
+            username,
+            name,
+            password: hashedPassword,
+            role,
+            isActive: true
+        };
+        users.push(newUser);
+        await fs.writeFile(USERS_PATH, JSON.stringify(users, null, 2));
+
+        // 6) توثيق الإنشاء في AuditLog — دون كلمة المرور نهائيًا
+        if (db.AuditLog && db.AuditLog.create) {
+            await db.AuditLog.create({
+                user_id: req.user.id, user_name: req.user.name, action: 'user_create',
+                detail: `إنشاء حساب ${newUser.name} (${newUser.username}) · الدور: ${ROLE_LABELS_MAP[role] || role} · كلمة مرور مؤقتة (لم تُسجَّل) · صلاحيات ممنوحة: لا شيء`,
+                type: 'permissions'
+            });
+        }
+
+        // tempPassword تُعاد مرة واحدة في هذه الاستجابة فقط — تسليمها الآمن مسؤولية المنفذ
+        res.status(201).json({
+            success: true,
+            user: { id: newUser.id, username: newUser.username, name: newUser.name, role: newUser.role },
+            employee: { name: employee.name, jobTitle: employee.job_title },
+            tempPassword,
+            permissionsGranted: []
+        });
+    } catch (error) {
+        console.error('users/create error:', error);
+        res.status(500).json({ error: 'فشل في إنشاء الحساب' });
+    }
+});
+
 // Token refresh endpoint - exchanges refreshToken for a new accessToken
 app.post('/api/auth/refresh', async (req, res) => {
     try {
