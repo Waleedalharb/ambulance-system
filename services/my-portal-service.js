@@ -326,12 +326,23 @@ class MyPortalService {
             inventory = ((a && a.c) || 0) > 0 || ((s && s.c) || 0) > 0;
         }
 
+        // v3: قسم التشييك — roster اليوم فقط (كتابة = بلا احتياطي) + فرقة ميدانية معتمدة
+        let check = false;
+        {
+            const today = riyadhToday();
+            const rr = await this.db.get(
+                'SELECT team_id FROM shift_roster WHERE employee_id = ? AND shift_date = ?', [emp.id, today]);
+            const rt = rr && rr.team_id != null ? teamById.get(rr.team_id) : null;
+            check = this._isFieldTeam(rt);
+        }
+
         return {
             sections: {
                 profile: true, schedule: true, assignments: true,
                 incidents: hasFieldAssignment,
                 vehicle: this._isFieldTeam(todayTeam),
-                inventory
+                inventory,
+                check
             }
         };
     }

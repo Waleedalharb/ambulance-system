@@ -1339,6 +1339,47 @@ app.get('/api/my/inventory', authenticate, authorizePerm('ops.my_portal'), async
     }
 });
 
+// ── v3: إجراءات الاستلام والتسليم — سجل مشترك للمناوبة/الفرقة/المركبة ──
+// الهوية والفرقة والمركبة تُشتق خادميًا من التوكن + roster اليوم (بلا fallback — كتابة).
+// لا يُقبل أي معرّف جلسة أو مركبة أو أصل من العميل — منع التسرب بنيوي.
+let shiftCheckService = null;
+function getShiftCheckService() {
+    if (!shiftCheckService && db) {
+        const ShiftCheckService = require('./services/shift-check-service');
+        shiftCheckService = new ShiftCheckService({ db, getVehicleEventsService: () => vehicleEventsService });
+    }
+    return shiftCheckService;
+}
+function myCheckError(res, error, fallback) {
+    const status = error.statusCode || 500;
+    if (status >= 500) console.error('[shift-check]', error);
+    res.status(status).json({ error: status >= 500 ? fallback : error.message, code: error.code || undefined });
+}
+
+app.get('/api/my/check-session', authenticate, authorizePerm('ops.my_portal'), async (req, res) => {
+    try {
+        const out = await getShiftCheckService().getSession(req.user);
+        if (out.notFound) return res.status(404).json(MY_PORTAL_NO_EMPLOYEE);
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في جلب جلسة التشييك'); }
+});
+
+app.post('/api/my/check-session/items', authenticate, authorizePerm('ops.my_portal'), async (req, res) => {
+    try {
+        const out = await getShiftCheckService().checkItem(req.user, {
+            itemKey: req.body && req.body.item_key, result: req.body && req.body.result, note: req.body && req.body.note
+        });
+        res.json(out);
+    } catch (error) { myCheckError(res, error, 'فشل في تسجيل البند'); }
+});
+
+app.post('/api/my/check-session/confirm', authenticate, authorizePerm('ops.my_portal'), async (req, res) => {
+    try {
+        const out = await getShiftCheckService().confirm(req.user, { kind: req.body && req.body.kind });
+        res.json(out);
+    } catch (error) { myCheckError(res, error, 'فشل في تسجيل التأكيد'); }
+});
+
 app.get('/api/permissions/catalog', authenticate, authorizePerm('admin.users_manage'), async (req, res) => {
     res.json({ success: true, permissions: PERMISSIONS_CATALOG, roles: ROLE_LABELS_MAP });
 });

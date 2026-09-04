@@ -111,6 +111,148 @@
         </div>`;
     }
 
+    // ── إجراءات الاستلام والتسليم (v3) — سجل مشترك للفرقة/المناوبة ──
+    function renderCheck(d) {
+        const head = '<div class="card-head check">إجراءات الاستلام والتسليم</div>';
+        if (d.state === 'no_assignment') {
+            return `<div class="card" id="checkCard">${head}<div class="card-body">
+                <div class="empty">لا يوجد تكليف ميداني مسجل لك اليوم — تظهر إجراءات الاستلام والتسليم أيام التكليف.</div>
+            </div></div>`;
+        }
+        if (d.state === 'not_field_team') {
+            return `<div class="card" id="checkCard">${head}<div class="card-body">
+                <div class="empty">التشييك مخصص للفرق الميدانية.</div>
+            </div></div>`;
+        }
+        const completed = d.session && d.session.status === 'completed';
+        const meId = d.me.id;
+        const myConf = new Set((d.confirmations || []).filter(c => c.employee_id === meId).map(c => c.kind));
+
+        // الملاحظات المفتوحة من جلسات سابقة — لا تختفي إلا بفحص لاحق سليم
+        const openIssues = (d.openIssues || []).filter(o =>
+            !(d.items || []).some(i => i.itemKey === o.itemKey && i.result === 'ok'));
+        const issuesHtml = openIssues.length
+            ? `<div class="issue-banner">⚠ ملاحظات مفتوحة من تشييك سابق:<br>${openIssues.map(o =>
+                `• ${esc(o.label)}${o.note ? ' — ' + esc(o.note) : ''} <small>(${esc(o.byName || '')} · ${esc((o.at || '').slice(0, 10))})</small>`).join('<br>')}</div>`
+            : '';
+
+        const itemHtml = i => {
+            const okOn = i.result === 'ok' ? ' on-ok' : '';
+            const isOn = i.result === 'issue' ? ' on-issue' : '';
+            const meta = i.checkedByName ? `آخر فحص: ${esc(i.checkedByName)} · ${esc((i.checkedAt || '').slice(0, 16).replace('T', ' '))}` : 'لم يُفحص بعد';
+            const noteHtml = i.note
+                ? `<div class="chk-existing-note">📝 ${esc(i.note)}${i.reflected ? ' <small>· انعكست في النظام المختص ✓</small>' : ''}</div>` : '';
+            return `<div class="chk-item" data-key="${esc(i.itemKey)}">
+                <div class="chk-label">${esc(i.label)}</div>
+                <div class="chk-meta">${meta}</div>
+                ${noteHtml}
+                ${completed ? '' : `<div class="chk-actions">
+                    <button class="chk-btn${okOn}" data-act="ok">✓ تم التحقق</button>
+                    <button class="chk-btn${isOn}" data-act="issue">⚠ ملاحظة / نقص</button>
+                </div>
+                <div class="chk-note-editor" data-editor="${esc(i.itemKey)}">
+                    <textarea placeholder="اكتب الملاحظة أو النقص أو التلف…">${esc(i.note || '')}</textarea>
+                    <button data-save="${esc(i.itemKey)}">حفظ الملاحظة</button>
+                </div>`}
+            </div>`;
+        };
+        const med = (d.items || []).filter(i => i.domain === 'medical');
+        const mech = (d.items || []).filter(i => i.domain === 'mechanical');
+        const medHtml = med.length
+            ? `<div class="chk-sub">التشييك الطبي — الأصول المسجلة على الفرقة (${med.length})</div>`
+              + '<div class="chk-hint">لقطة من الأصول المسجلة على فرقتك في النظام لحظة إنشاء الجلسة — ليست إثباتًا بأن جميعها محمّل فعليًا على المركبة.</div>'
+              + med.map(itemHtml).join('')
+            : '<div class="chk-sub">التشييك الطبي — الأصول المسجلة على الفرقة</div><div class="empty">لا توجد أصول مسجلة على فرقتك حاليًا.</div>';
+        const mechHtml = d.vehicle
+            ? `<div class="chk-sub">التشييك الميكانيكي والتقني — ${esc(d.vehicle.name)}</div>` + mech.map(itemHtml).join('')
+            : '<div class="chk-sub">التشييك الميكانيكي والتقني</div><div class="empty">لا توجد مركبة مسندة حاليًا لفرقتك.</div>';
+
+        const confLabel = { ack: 'الاطلاع', checkin: 'الاستلام', checkout: 'التسليم' };
+        const membersHtml = (d.members || []).map(m => {
+            const kinds = new Set((d.confirmations || []).filter(c => c.employee_id === m.id).map(c => c.kind));
+            const marks = ['ack', 'checkin', 'checkout'].map(k => `${kinds.has(k) ? '✅' : '⬜'} ${confLabel[k]}`).join(' · ');
+            return `<div><b>${esc(m.name)}</b>: ${marks}</div>`;
+        }).join('');
+        const myBtns = ['ack', 'checkin', 'checkout']
+            .filter(k => !myConf.has(k))
+            .map(k => `<button class="conf-btn" data-conf="${k}">تأكيد ${confLabel[k]}</button>`).join('');
+
+        return `<div class="card" id="checkCard">${head}
+            <div class="card-body">
+                <div class="chip-row">
+                    <div class="chip">الفرقة: <b>${esc(d.team.teamName)}</b></div>
+                    <div class="chip">المركبة: <b>${d.vehicle ? esc(d.vehicle.name) : '—'}</b></div>
+                    <div class="chip">التاريخ: <b>${esc(d.today)}</b></div>
+                </div>
+                <div style="margin-top:8px" id="chkToastHolder"></div>
+                ${issuesHtml}
+                ${completed ? '<div class="chk-done">✅ اكتملت إجراءات الاستلام والتسليم لهذه المناوبة</div>' : ''}
+                ${medHtml}
+                ${mechHtml}
+                <div class="chk-sub">تأكيدات الفرقة (لكل موظف على حدة)</div>
+                <div class="conf-members">${membersHtml || '—'}</div>
+                ${completed ? '' : `<div class="conf-row">${myBtns || '<span style="font-size:0.78rem;color:var(--muted)">أكملت جميع تأكيداتك لهذه الجلسة</span>'}</div>`}
+            </div>
+        </div>`;
+    }
+
+    async function refreshCheck(warning) {
+        const old = document.getElementById('checkCard');
+        if (!old) return;
+        try {
+            const d = await api('/api/my/check-session');
+            const tmp = document.createElement('div');
+            tmp.innerHTML = renderCheck(d);
+            old.replaceWith(tmp.firstElementChild);
+            bindCheckEvents();
+            if (warning) {
+                const h = document.getElementById('chkToastHolder');
+                if (h) h.innerHTML = `<div class="chk-toast">⚠ ${esc(warning)}</div>`;
+            }
+        } catch (e) { /* تبقى البطاقة القديمة — لا انهيار */ }
+    }
+
+    function bindCheckEvents() {
+        const card = document.getElementById('checkCard');
+        if (!card) return;
+        card.addEventListener('click', async ev => {
+            const btn = ev.target.closest('button');
+            if (!btn) return;
+            const itemEl = btn.closest('.chk-item');
+            try {
+                if (btn.dataset.act === 'ok' && itemEl) {
+                    const r = await apiPost('/api/my/check-session/items', { item_key: itemEl.dataset.key, result: 'ok' });
+                    await refreshCheck(r.warning);
+                } else if (btn.dataset.act === 'issue' && itemEl) {
+                    const ed = card.querySelector(`[data-editor="${itemEl.dataset.key}"]`);
+                    if (ed) ed.classList.toggle('open');
+                } else if (btn.dataset.save) {
+                    const ed = btn.closest('.chk-note-editor');
+                    const note = ed ? ed.querySelector('textarea').value : '';
+                    const r = await apiPost('/api/my/check-session/items', { item_key: btn.dataset.save, result: 'issue', note });
+                    await refreshCheck(r.warning);
+                } else if (btn.dataset.conf) {
+                    const r = await apiPost('/api/my/check-session/confirm', { kind: btn.dataset.conf });
+                    await refreshCheck(r.warning);
+                }
+            } catch (e) {
+                const h = document.getElementById('chkToastHolder');
+                if (h) h.innerHTML = `<div class="chk-toast">⚠ ${esc(e.message || 'تعذر الحفظ — تحقق من الاتصال وحاول مجددًا')}</div>`;
+            }
+        });
+    }
+
+    async function apiPost(path, body) {
+        const r = await fetch(path, {
+            method: 'POST',
+            headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+            body: JSON.stringify(body || {})
+        });
+        const b = await r.json().catch(() => ({}));
+        if (!r.ok) throw { state: r.status, message: b.error };
+        return b;
+    }
+
     // ── مركبتي (v2) — المركبات المعيّنة حاليًا لفرقة اليوم ──
     function renderVehicle(d) {
         let body;
@@ -229,17 +371,20 @@
                 curYear = t ? +t.slice(0, 4) : new Date().getFullYear();
                 curMonth = t ? +t.slice(5, 7) : new Date().getMonth() + 1;
             }
-            const [schedule, incidents, vehicle, inventory] = await Promise.all([
+            const [schedule, incidents, vehicle, inventory, checkData] = await Promise.all([
                 api(`/api/my/schedule?month=${curMonth}&year=${curYear}`),
                 sec.incidents ? api('/api/my/team-incidents') : Promise.resolve(null),
                 sec.vehicle ? api('/api/my/vehicle') : Promise.resolve(null),
-                sec.inventory ? api('/api/my/inventory') : Promise.resolve(null)]);
+                sec.inventory ? api('/api/my/inventory') : Promise.resolve(null),
+                sec.check ? api('/api/my/check-session') : Promise.resolve(null)]);
             app.innerHTML = renderProfile(profile)
+                + (checkData ? renderCheck(checkData) : '')
                 + (incidents ? renderIncidents(incidents) : '')
                 + (vehicle ? renderVehicle(vehicle) : '')
                 + (inventory ? renderInventory(inventory, !!sec.inventoryCanOpen) : '')
                 + renderSchedule(schedule)
                 + renderAssignments(assignments);
+            if (checkData) bindCheckEvents();
 
             const bdToggle = document.getElementById('bdToggle');
             if (bdToggle) bdToggle.addEventListener('click', () => {

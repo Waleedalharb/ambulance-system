@@ -60,6 +60,31 @@
     .veh-status.st-breakdown, .veh-status.st-out_of_service { color: #FCA5A5; border-color: rgba(239,68,68,0.4); background: rgba(239,68,68,0.08); }
     .inv-open-btn { display: inline-block; margin-top: 12px; background: rgba(96,165,250,0.12); color: var(--ops); border: 1px solid rgba(96,165,250,0.35); border-radius: 10px; padding: 9px 16px; font-size: 0.82rem; font-weight: 700; text-decoration: none; }
     .inv-note { margin-top: 10px; font-size: 0.72rem; color: var(--muted); }
+
+    /* إجراءات الاستلام والتسليم (v3) */
+    .card-head.check::before { background: var(--teal-id); }
+    .chk-sub { font-size: 0.8rem; font-weight: 700; color: var(--lead-hi); margin: 12px 0 8px; }
+    .chk-hint { font-size: 0.68rem; color: var(--muted); margin: -4px 0 8px; line-height: 1.6; }
+    .chk-item { background: var(--surface-2); border: 1px solid var(--border-soft); border-radius: var(--radius-md); padding: 9px 11px; margin-bottom: 7px; }
+    .chk-item .chk-label { font-size: 0.82rem; font-weight: 600; }
+    .chk-item .chk-meta { font-size: 0.7rem; color: var(--muted); margin-top: 3px; }
+    .chk-actions { display: flex; gap: 7px; margin-top: 7px; }
+    .chk-btn { flex: 0 0 auto; background: var(--surface); color: var(--text-2); border: 1px solid var(--border); border-radius: 9px; padding: 6px 12px; font-family: inherit; font-size: 0.76rem; font-weight: 600; cursor: pointer; }
+    .chk-btn.on-ok { color: #7EE2B8; border-color: rgba(14,164,122,0.5); background: rgba(14,164,122,0.12); }
+    .chk-btn.on-issue { color: #FCA5A5; border-color: rgba(239,68,68,0.5); background: rgba(239,68,68,0.10); }
+    .chk-note-editor { margin-top: 8px; display: none; }
+    .chk-note-editor.open { display: block; }
+    .chk-note-editor textarea { width: 100%; min-height: 54px; background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 9px; padding: 8px 10px; font-family: inherit; font-size: 0.78rem; resize: vertical; }
+    .chk-note-editor button { margin-top: 6px; background: rgba(239,68,68,0.14); color: #FCA5A5; border: 1px solid rgba(239,68,68,0.4); border-radius: 9px; padding: 6px 14px; font-family: inherit; font-size: 0.76rem; font-weight: 700; cursor: pointer; }
+    .chk-existing-note { margin-top: 7px; font-size: 0.74rem; color: #EADDA8; background: rgba(232,200,74,0.07); border: 1px solid rgba(232,200,74,0.25); border-radius: 9px; padding: 7px 10px; }
+    .issue-banner { font-size: 0.76rem; color: #FCA5A5; background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.30); border-radius: var(--radius-md); padding: 9px 12px; margin-bottom: 10px; line-height: 1.8; }
+    .conf-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+    .conf-btn { background: rgba(46,139,122,0.12); color: #7EE2B8; border: 1px solid rgba(46,139,122,0.4); border-radius: 10px; padding: 8px 14px; font-family: inherit; font-size: 0.8rem; font-weight: 700; cursor: pointer; }
+    .conf-btn:disabled { opacity: 0.45; cursor: default; }
+    .conf-members { margin-top: 10px; font-size: 0.74rem; color: var(--text-2); line-height: 2; }
+    .conf-members b { color: var(--text); }
+    .chk-done { text-align: center; color: #7EE2B8; font-weight: 700; font-size: 0.9rem; padding: 14px; }
+    .chk-toast { font-size: 0.76rem; color: #EADDA8; background: rgba(232,200,74,0.10); border: 1px solid rgba(232,200,74,0.35); border-radius: 9px; padding: 8px 12px; margin-bottom: 10px; }
     .card-body { padding: 14px 16px; }
 
     .profile-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
@@ -121,6 +146,6 @@
     </div>
     <div id="app"><div class="loading">جارٍ تحميل بياناتك…</div></div>
 </div>
-<script src="js/my-ems.js?v=2"></script>
+<script src="js/my-ems.js?v=3"></script>
 </body>
 </html>

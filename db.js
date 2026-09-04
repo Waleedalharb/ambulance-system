@@ -4161,6 +4161,54 @@ async function migrateAssetRegistry() {
   )`);
   await exec(`CREATE INDEX IF NOT EXISTS idx_inventory_items_session ON inventory_items(session_id)`);
 
+  // ═══ إجراءات الاستلام والتسليم — بوابة الموظف v3 (معتمدة 2026-09-04) ═══
+  // سجل تشييك واحد مشترك لكل (مناوبة/فرقة/مركبة) — مرتبط بالسجلات المركزية
+  // وليس بديلًا عنها: الأصول من assets، والمركبة من operational_events.
+  // «تم التحقق» السليم يُحفظ هنا فقط؛ النقص/الملاحظة تنعكس في النظام المختص.
+  await exec(`CREATE TABLE IF NOT EXISTS shift_check_sessions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    shift_date TEXT NOT NULL,
+    team_id INTEGER NOT NULL,
+    team_name TEXT,
+    vehicle_id TEXT NOT NULL DEFAULT '',   -- '' = تكليف بلا مركبة (UNIQUE لا يميّز NULL)
+    vehicle_name TEXT,
+    center TEXT,
+    status TEXT NOT NULL DEFAULT 'open' CHECK(status IN ('open','completed')),
+    created_by TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    completed_at DATETIME,
+    UNIQUE(shift_date, team_id, vehicle_id)
+  )`);
+
+  await exec(`CREATE TABLE IF NOT EXISTS shift_check_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id INTEGER NOT NULL REFERENCES shift_check_sessions(id) ON DELETE CASCADE,
+    domain TEXT NOT NULL CHECK(domain IN ('medical','mechanical')),
+    item_key TEXT NOT NULL,                -- 'asset:<id>' أو 'mech:<key>' — لقطة الجلسة
+    item_label TEXT NOT NULL,
+    asset_id INTEGER REFERENCES assets(id),
+    result TEXT CHECK(result IN ('ok','issue')),
+    note TEXT,
+    reflected INTEGER NOT NULL DEFAULT 0,  -- 1 = انعكست في النظام المركزي المختص
+    checked_by TEXT,
+    checked_by_name TEXT,
+    checked_at DATETIME,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(session_id, item_key)
+  )`);
+  await exec(`CREATE INDEX IF NOT EXISTS idx_shift_check_items_session ON shift_check_items(session_id)`);
+
+  // تأكيد مستقل لكل موظف: اطلاع/استلام/تسليم — بلا إعادة فحص
+  await exec(`CREATE TABLE IF NOT EXISTS shift_check_confirmations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id INTEGER NOT NULL REFERENCES shift_check_sessions(id) ON DELETE CASCADE,
+    employee_id INTEGER NOT NULL,
+    employee_name TEXT,
+    kind TEXT NOT NULL CHECK(kind IN ('ack','checkin','checkout')),
+    confirmed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(session_id, employee_id, kind)
+  )`);
+
   await exec(`CREATE TABLE IF NOT EXISTS asset_import_staging (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     batch_no INTEGER NOT NULL,
