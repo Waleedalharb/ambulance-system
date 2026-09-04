@@ -544,6 +544,9 @@ window.addEventListener('load', function() {
             </div>
             <button id="loginBtn" class="ls-btn">دخول</button>
             <p id="loginError" class="ls-error"></p>
+            <p style="text-align:center;margin-top:12px">
+                <a href="#" id="forgotLink" style="color:var(--muted,#8ea0b5);font-size:0.82rem;text-decoration:none">نسيت كلمة المرور؟</a>
+            </p>
         </div>
         <p class="ls-slogan" aria-label="نسعى لنحييها"><span class="ls-word">نسعى</span><span class="ls-word">لنحييها</span></p>
         <div class="ls-footer">
@@ -551,6 +554,101 @@ window.addEventListener('load', function() {
         </div>
     </div>
 </div>
+
+<!-- استعادة كلمة المرور عبر الجوال الموثّق (معتمد 2026-09-04)
+     الرد الخارجي موحّد دائمًا — لا تكشف هذه النافذة وجود حساب أو حالة رقم.
+     رسالة «مراجعة مسؤول النظام» نص ثابت يظهر للجميع، وليست مشروطة بحالة حساب بعينه. -->
+<div id="resetOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;align-items:center;justify-content:center">
+    <div style="background:var(--card,#13212f);border:1px solid var(--border,#243447);border-radius:14px;padding:24px;width:min(420px,92vw);direction:rtl">
+        <h3 style="margin:0 0 14px;color:var(--text,#e8eef5);font-size:1.05rem">استعادة كلمة المرور</h3>
+
+        <div id="resetStep1">
+            <p style="color:var(--muted,#8ea0b5);font-size:0.82rem;margin:0 0 10px">أدخل رقمك الوظيفي (اسم المستخدم). إن كان حسابك مسجلًا وجوالك موثقًا، سيصلك رمز تحقق.</p>
+            <input type="text" id="resetIdentifier" class="ls-input" placeholder="الرقم الوظيفي" autocomplete="username" style="width:100%;margin-bottom:10px">
+            <button id="resetSendBtn" class="ls-btn" style="width:100%">إرسال رمز التحقق</button>
+        </div>
+
+        <div id="resetStep2" style="display:none">
+            <p style="color:var(--muted,#8ea0b5);font-size:0.82rem;margin:0 0 10px">أدخل رمز التحقق الذي وصل جوالك (صالح لدقائق محدودة).</p>
+            <input type="text" id="resetCode" class="ls-input" placeholder="رمز التحقق" inputmode="numeric" autocomplete="one-time-code" style="width:100%;margin-bottom:10px;text-align:center;letter-spacing:6px">
+            <button id="resetVerifyBtn" class="ls-btn" style="width:100%">تحقق من الرمز</button>
+        </div>
+
+        <div id="resetStep3" style="display:none">
+            <p style="color:var(--muted,#8ea0b5);font-size:0.82rem;margin:0 0 10px">عيّن كلمة مرور جديدة (8 أحرف على الأقل). ستُبطل كل جلساتك السابقة.</p>
+            <input type="password" id="resetPass1" class="ls-input" placeholder="كلمة المرور الجديدة" autocomplete="new-password" style="width:100%;margin-bottom:10px">
+            <input type="password" id="resetPass2" class="ls-input" placeholder="تأكيد كلمة المرور" autocomplete="new-password" style="width:100%;margin-bottom:10px">
+            <button id="resetCommitBtn" class="ls-btn" style="width:100%">تعيين كلمة المرور</button>
+        </div>
+
+        <p id="resetMsg" class="ls-error" style="min-height:1.2em"></p>
+        <p style="color:var(--muted,#8ea0b5);font-size:0.75rem;margin:8px 0 0">لم يصلك الرمز؟ قد يكون رقم جوالك غير موثق لدى النظام — يرجى مراجعة مسؤول النظام.</p>
+        <button id="resetClose" style="background:none;border:none;color:var(--muted,#8ea0b5);font-size:0.8rem;cursor:pointer;margin-top:8px">إغلاق</button>
+    </div>
+</div>
+<script>
+/* استعادة كلمة المرور — 3 خطوات، بلا أي كشف لوجود الحساب */
+(function () {
+    var overlay = document.getElementById('resetOverlay');
+    var msg = document.getElementById('resetMsg');
+    var token = null;
+    function show(step) {
+        ['resetStep1', 'resetStep2', 'resetStep3'].forEach(function (id, i) {
+            document.getElementById(id).style.display = (i + 1 === step) ? '' : 'none';
+        });
+        msg.textContent = ''; msg.style.color = '';
+    }
+    function say(t, ok) { msg.textContent = t; msg.style.color = ok ? '#4ade80' : ''; }
+    async function post(path, body) {
+        var r = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        return { status: r.status, data: await r.json().catch(function () { return {}; }) };
+    }
+    document.getElementById('forgotLink').onclick = function (e) {
+        e.preventDefault();
+        overlay.style.display = 'flex'; show(1);
+        var u = document.getElementById('loginUsername');
+        if (u && u.value) document.getElementById('resetIdentifier').value = u.value.trim();
+    };
+    document.getElementById('resetClose').onclick = function () { overlay.style.display = 'none'; };
+    document.getElementById('resetSendBtn').onclick = async function () {
+        var id = document.getElementById('resetIdentifier').value.trim();
+        if (!id) { say('أدخل الرقم الوظيفي'); return; }
+        this.disabled = true;
+        try {
+            var r = await post('/api/auth/forgot-password', { identifier: id });
+            say(r.data.message || r.data.error || 'تم');   // الرد موحّد دائمًا
+            if (r.data && r.data.success) show(2);
+        } catch (_) { say('تعذر الاتصال — حاول لاحقًا'); }
+        this.disabled = false;
+    };
+    document.getElementById('resetVerifyBtn').onclick = async function () {
+        var id = document.getElementById('resetIdentifier').value.trim();
+        var code = document.getElementById('resetCode').value.trim();
+        if (!code) { say('أدخل رمز التحقق'); return; }
+        this.disabled = true;
+        try {
+            var r = await post('/api/auth/verify-reset-code', { identifier: id, code: code });
+            if (r.data && r.data.success) { token = r.data.resetToken; show(3); }
+            else say((r.data && r.data.error) || 'الرمز غير صحيح');
+        } catch (_) { say('تعذر الاتصال — حاول لاحقًا'); }
+        this.disabled = false;
+    };
+    document.getElementById('resetCommitBtn').onclick = async function () {
+        var p1 = document.getElementById('resetPass1').value;
+        var p2 = document.getElementById('resetPass2').value;
+        if (p1 !== p2) { say('كلمتا المرور غير متطابقتين'); return; }
+        this.disabled = true;
+        try {
+            var r = await post('/api/auth/reset-password', { token: token, newPassword: p1 });
+            if (r.data && r.data.success) {
+                say(r.data.message, true);
+                setTimeout(function () { overlay.style.display = 'none'; }, 1800);
+            } else say((r.data && r.data.error) || 'فشل التعيين');
+        } catch (_) { say('تعذر الاتصال — حاول لاحقًا'); }
+        this.disabled = false;
+    };
+})();
+</script>
 <script>
 /* شريط حالة شاشة الدخول: الوقت والتاريخ عبر TimeRiyadh (المصدر الوحيد للتوقيت)،
    والطقس من Open-Meteo (بدون مفتاح) — يُخفى بهدوء عند تعذّر الجلب */

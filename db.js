@@ -1039,6 +1039,11 @@ async function runMigrations() {
   // تُعلَّم withdrawn=1 فتُستبعد من العدّادات والمؤقتات والتنبيهات والخريطة فورًا،
   // ويبقى سجلها في التفاصيل للتاريخ — additive وبقيمة افتراضية 0: السلوك القائم لا يتغير
   await ensureColumn('report_times', 'withdrawn', 'INTEGER DEFAULT 0');
+  // توثيق الجوال لاستعادة كلمة المرور (معتمد 2026-09-04): لا رقم موثق تلقائيًا —
+  // كل الأرقام القائمة تبدأ 0، والتوثيق فعل إداري موثّق في audit_log فقط
+  await ensureColumn('employees', 'phone_verified', 'INTEGER NOT NULL DEFAULT 0');
+  await ensureColumn('employees', 'phone_verified_at', 'DATETIME');
+  await ensureColumn('employees', 'phone_verified_by', 'TEXT');
   // حالة الوحدة في CAD (قرار المالك 2026-08-22 — قاعدة المشاركة الفعلية): حرف
   // unitRequestStatus المطبَّع (A/B/C/R) + علم الوصول/المباشرة الفعلية المشتق من
   // journeys[] بوقت حقيقي — قابلان للتتبع إلى استجابة event-dispatched/detail.
@@ -2419,7 +2424,13 @@ const Employees = {
     return get('SELECT * FROM employees WHERE employee_code = ?', [code]);
   },
   async updatePhone(code, phone) {
-    return run('UPDATE employees SET phone = ? WHERE employee_code = ?;', [phone, code]);
+    // تعديل الرقم يصفّر التوثيق ذريًا في العبارة نفسها (تعديل المالك رقم 3):
+    // يستحيل أن يتغير phone ويبقى phone_verified=1 بفشل جزئي
+    return run(`UPDATE employees SET phone = ?,
+      phone_verified = CASE WHEN phone IS NOT ? THEN 0 ELSE phone_verified END,
+      phone_verified_at = CASE WHEN phone IS NOT ? THEN NULL ELSE phone_verified_at END,
+      phone_verified_by = CASE WHEN phone IS NOT ? THEN NULL ELSE phone_verified_by END
+      WHERE employee_code = ?;`, [phone, phone, phone, phone, code]);
   },
   async getActive() {
     return all('SELECT * FROM employees WHERE is_active = 1 ORDER BY name');
@@ -2429,7 +2440,18 @@ const Employees = {
     return result.id;
   },
   async update(id, data) {
-    return run('UPDATE employees SET employee_code = ?, name = ?, phone = ?, job_title = ?, is_active = ? WHERE id = ?;', [data.employee_code, data.name, data.phone, data.job_title, data.is_active !== undefined ? (data.is_active ? 1 : 0) : 1, id]);
+    // أي تغيير في قيمة الرقم (حتى الشكلي) يصفّر التوثيق في نفس العبارة — ذريًا
+    return run(`UPDATE employees SET employee_code = ?, name = ?, phone = ?, job_title = ?, is_active = ?,
+      phone_verified = CASE WHEN phone IS NOT ? THEN 0 ELSE phone_verified END,
+      phone_verified_at = CASE WHEN phone IS NOT ? THEN NULL ELSE phone_verified_at END,
+      phone_verified_by = CASE WHEN phone IS NOT ? THEN NULL ELSE phone_verified_by END
+      WHERE id = ?;`,
+      [data.employee_code, data.name, data.phone, data.job_title, data.is_active !== undefined ? (data.is_active ? 1 : 0) : 1, data.phone, data.phone, data.phone, id]);
+  },
+  // توثيق/إلغاء توثيق الجوال — فعل إداري موثّق (المسار في server.js يسجّل audit_log)
+  async setPhoneVerification(id, verified, verifiedBy) {
+    return run('UPDATE employees SET phone_verified = ?, phone_verified_at = ?, phone_verified_by = ? WHERE id = ?;',
+      [verified ? 1 : 0, verified ? new Date().toISOString() : null, verified ? (verifiedBy || null) : null, id]);
   },
   async delete(id) {
     return run('DELETE FROM employees WHERE id = ?', [id]);
@@ -2970,6 +2992,32 @@ const AuthLogs = {
   },
   async getByUser(userId) {
     return all('SELECT * FROM auth_logs WHERE user_id = ? ORDER BY created_at DESC', [userId]);
+  }
+};
+
+// ============================================
+// CRUD: PASSWORD RESET TOKENS (استعادة كلمة المرور — معتمد 2026-09-04)
+// الرموز تُخزَّن مجزّأة فقط (sha256) — لا يوجد أي رقم سري صريح في القاعدة.
+// ============================================
+const PasswordResetTokens = {
+  async create(userId, tokenHash, phoneFingerprint, expiresAt) {
+    const result = await run(
+      'INSERT INTO password_reset_tokens (user_id, token_hash, phone_fingerprint, expires_at) VALUES (?, ?, ?, ?);',
+      [userId, tokenHash, phoneFingerprint, expiresAt]);
+    return { id: result.id };
+  },
+  async getByHash(tokenHash) {
+    return get('SELECT * FROM password_reset_tokens WHERE token_hash = ?', [tokenHash]);
+  },
+  async markUsed(id) {
+    return run('UPDATE password_reset_tokens SET used = 1 WHERE id = ?;', [id]);
+  },
+  async incrementAttempts(id) {
+    return run('UPDATE password_reset_tokens SET attempts = attempts + 1 WHERE id = ?;', [id]);
+  },
+  // إبطال كل رموز المستخدم المفتوحة (عند نجاح استعادة أو طلب جديد)
+  async invalidateOpenForUser(userId) {
+    return run('UPDATE password_reset_tokens SET used = 1 WHERE user_id = ? AND used = 0;', [userId]);
   }
 };
 
@@ -4209,6 +4257,22 @@ async function migrateAssetRegistry() {
     UNIQUE(session_id, employee_id, kind)
   )`);
 
+  // ═══ استعادة كلمة المرور (معتمد 2026-09-04) ═══
+  // رموز الاستعادة الخادمية: تُخزَّن مجزّأة (sha256) فقط، مرة واحدة، 10 دقائق.
+  // phone_fingerprint = بصمة الرقم الموثق وقت الطلب — أي تغيير/تصفير للرقم
+  // أثناء الدورة يُبطل الرمز (تعديل المالك الإلزامي رقم 4).
+  await exec(`CREATE TABLE IF NOT EXISTS password_reset_tokens (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT NOT NULL,
+    token_hash TEXT NOT NULL UNIQUE,
+    phone_fingerprint TEXT NOT NULL,
+    expires_at DATETIME NOT NULL,
+    used INTEGER NOT NULL DEFAULT 0,
+    attempts INTEGER NOT NULL DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+  await exec(`CREATE INDEX IF NOT EXISTS idx_prt_user ON password_reset_tokens(user_id)`);
+
   await exec(`CREATE TABLE IF NOT EXISTS asset_import_staging (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     batch_no INTEGER NOT NULL,
@@ -4576,6 +4640,7 @@ module.exports = {
   TokenBlacklist,
   AuthSessions,
   AuthLogs,
+  PasswordResetTokens,
   ShiftForms,
   KBDocuments,
   KBChunks,

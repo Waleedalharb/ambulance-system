@@ -285,6 +285,12 @@ function renderPanel() {
         '<button class="btn small" id="roleSave" ' + (isSelf ? 'disabled' : '') + '>حفظ الدور</button>' +
         '</div>';
 
+    // توثيق جوال الموظف (شرط استعادة كلمة المرور) — لحسابات الموظفين المرتبطة فقط
+    if (String(d.user.id).indexOf('emp-') === 0) {
+        html += '<div class="section" id="phoneVerifySection"><h3>📱 توثيق الجوال (استعادة كلمة المرور)</h3>' +
+            '<div class="loading">جارٍ جلب ملف الموظف…</div></div>';
+    }
+
     SECTIONS.forEach(sec => {
         const keys = Object.keys(CATALOG).filter(k => CATALOG[k].domain === sec.key);
         if (!keys.length) return;
@@ -326,6 +332,47 @@ function renderPanel() {
             else toast('❌ ' + (r && r.error || 'فشل'));
         };
     });
+
+    // ── توثيق الجوال: يُحمَّل ملف الموظف بمطابقة تامة (عقد الهوية: id = emp-<employee_code>) ──
+    (async function loadPhoneVerify() {
+        const sec = document.getElementById('phoneVerifySection');
+        if (!sec) return;
+        const empCode = String(d.user.id).slice(4); // 'emp-<code>' — المسار لا يعيد username
+        try {
+            const res = await api('/api/employees');
+            const emp = (res.employees || []).find(e => String(e.employee_code) === empCode);
+            if (!emp) { sec.innerHTML = '<h3>📱 توثيق الجوال</h3><div style="color:var(--muted);font-size:13px">لا يوجد ملف موظف مرتبط بهذا الحساب.</div>'; return; }
+            const verified = !!emp.phone_verified;
+            const phoneTxt = emp.phone ? esc(emp.phone) : '<span style="color:var(--muted)">لا يوجد رقم مسجل</span>';
+            sec.innerHTML = '<h3>📱 توثيق الجوال (استعادة كلمة المرور)</h3>' +
+                '<div class="perm-row"><span class="label">الرقم المسجل: <b>' + phoneTxt + '</b></span>' +
+                '<span class="badge ' + (verified ? 'on-grant' : 'src-none') + '">' + (verified ? 'موثق ✓' : 'غير موثق') + '</span></div>' +
+                (verified && emp.phone_verified_by ? '<div style="color:var(--muted);font-size:12px;margin:2px 0 6px">وثّقه: ' + esc(emp.phone_verified_by) + (emp.phone_verified_at ? ' · ' + esc(emp.phone_verified_at) : '') + '</div>' : '') +
+                '<div class="perm-row"><span class="actions">' +
+                (verified
+                    ? '<button id="unverifyPhoneBtn">إلغاء التوثيق</button>'
+                    : '<button id="verifyPhoneBtn" class="on-grant" ' + (emp.phone ? '' : 'disabled') + '>توثيق الرقم</button>') +
+                '</span></div>' +
+                '<div style="color:var(--muted);font-size:12px;margin-top:4px">التوثيق يعني أنك تحققت عمليًا من أن الرقم يعود للموظف. يُسجَّل اسمك ووقتك في سجل التدقيق.</div>';
+
+            const vb = document.getElementById('verifyPhoneBtn');
+            if (vb) vb.onclick = async () => {
+                if (!window.confirm('تم التحقق من أن الرقم يعود للموظف، وأتحمل مسؤولية اعتماده.')) return;
+                const r = await api('/api/employees/' + emp.id + '/verify-phone', { method: 'POST', body: JSON.stringify({ confirmResponsibility: true }) });
+                if (r && r.success) { toast('✅ وُثّق جوال ' + emp.name); renderPanel(); }
+                else toast('❌ ' + (r && r.error || 'فشل'));
+            };
+            const ub = document.getElementById('unverifyPhoneBtn');
+            if (ub) ub.onclick = async () => {
+                if (!window.confirm('إلغاء توثيق هذا الرقم؟ لن يستطيع الموظف استعادة كلمة مروره حتى يُوثَّق رقم جديد.')) return;
+                const r = await api('/api/employees/' + emp.id + '/unverify-phone', { method: 'POST', body: '{}' });
+                if (r && r.success) { toast('✅ أُلغي التوثيق'); renderPanel(); }
+                else toast('❌ ' + (r && r.error || 'فشل'));
+            };
+        } catch (e) {
+            sec.innerHTML = '<h3>📱 توثيق الجوال</h3><div style="color:var(--muted);font-size:13px">تعذر جلب ملف الموظف.</div>';
+        }
+    })();
 }
 
 (async function init() {

@@ -957,6 +957,23 @@ function getPermissionService() {
     }
     return permissionService;
 }
+
+// استعادة كلمة المرور عبر الجوال الموثّق (معتمدة 2026-09-04) — تركيب كسول:
+// المزوّد من OTP_PROVIDER (disabled افتراضيًا في الإنتاج حتى تُضبط بيانات Unifonic)
+let authResetService = null;
+function getAuthResetService() {
+    if (!authResetService && db) {
+        const { AuthResetService } = require('./services/auth-reset-service');
+        const { getOtpProvider } = require('./services/otp-provider');
+        authResetService = new AuthResetService({
+            db,
+            usersPath: USERS_PATH,
+            otpProvider: getOtpProvider(),
+            revokeUserSessions: (userId) => getPermissionService().revokeUserSessions(userId)
+        });
+    }
+    return authResetService;
+}
 function authorizePerm(permissionKey) {
     return async (req, res, next) => {
         if (!req.user) return res.status(401).json({ error: 'مطلوب تسجيل الدخول' });
@@ -1813,6 +1830,33 @@ app.post('/api/auth/change-password', authenticate, async (req, res) => {
         console.error('Change password error:', error);
         res.status(500).json({ error: 'فشل في تغيير كلمة المرور' });
     }
+});
+
+// ── استعادة كلمة المرور عبر الجوال الموثّق (معتمدة 2026-09-04) ──
+// مسارات عامة (بلا جلسة) بمحدّد معدل أصرم من الدخول — الرد موحّد لا يكشف
+// وجود الحساب ولا حالة توثيق الرقم. لا يُقبل رقم جوال من العميل إطلاقًا.
+const resetLimiter = rateLimit({
+    windowMs: RATE_LIMIT_WINDOW_MS,
+    max: parseInt(process.env.RESET_RATE_LIMIT_MAX, 10) || 10, // للاختبارات: يُرفع عبر env — الإنتاج يبقى 10
+    message: { error: 'عدد الطلبات مرتفع جداً. الرجاء المحاولة لاحقاً.' },
+    standardHeaders: true,
+    legacyHeaders: false,
+    validate: { xForwardedForHeader: false }
+});
+
+app.post('/api/auth/forgot-password', resetLimiter, async (req, res) => {
+    const out = await getAuthResetService().requestReset({ identifier: req.body && req.body.identifier, ip: req.ip });
+    res.status(out.status).json(out.body);
+});
+
+app.post('/api/auth/verify-reset-code', resetLimiter, async (req, res) => {
+    const out = await getAuthResetService().verifyCode({ identifier: req.body && req.body.identifier, code: req.body && req.body.code, ip: req.ip });
+    res.status(out.status).json(out.body);
+});
+
+app.post('/api/auth/reset-password', resetLimiter, async (req, res) => {
+    const out = await getAuthResetService().resetPassword({ token: req.body && req.body.token, newPassword: req.body && req.body.newPassword, ip: req.ip });
+    res.status(out.status).json(out.body);
 });
 
 app.get('/api/users', authenticate, authorize(['admin']), async (req, res) => {
@@ -11000,6 +11044,56 @@ app.put('/api/employees/:id', authenticate, authorize(['admin']), async (req, re
     } catch (error) {
         console.error('Employee PUT error:', error);
         res.status(500).json({ error: 'فشل في تحديث المسعف' });
+    }
+});
+
+// ── توثيق جوال الموظف (معتمد 2026-09-04): فعل إداري مسؤول، شرط لاستعادة كلمة المرور ──
+// يتطلب تأكيد المسؤولية صراحة، ويسجّل: المدير، الموظف، الرقم وقت التوثيق، الوقت، IP، القيمة السابقة/الجديدة
+app.post('/api/employees/:id/verify-phone', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        if (!req.body || req.body.confirmResponsibility !== true) {
+            return res.status(400).json({ error: 'يلزم تأكيد المسؤولية: «تم التحقق من أن الرقم يعود للموظف، وأتحمل مسؤولية اعتماده»', code: 'CONFIRM_REQUIRED' });
+        }
+        const emp = await db.Employees.getById(req.params.id);
+        if (!emp) return res.status(404).json({ error: 'المسعف غير موجود' });
+        if (!emp.phone || String(emp.phone).trim().length < 9) {
+            return res.status(400).json({ error: 'لا يوجد رقم جوال صالح في ملف الموظف — حدّث الرقم أولًا', code: 'NO_PHONE' });
+        }
+        const before = { phone_verified: emp.phone_verified ? 1 : 0, phone: emp.phone };
+        await db.Employees.setPhoneVerification(emp.id, true, req.user.username);
+        if (db.AuditLog && db.AuditLog.create) {
+            await db.AuditLog.create({
+                user_id: req.user.id, user_name: req.user.name, action: 'phone_verify',
+                detail: `توثيق جوال الموظف ${emp.name} (${emp.employee_code}) · الرقم وقت التوثيق: ${emp.phone} · ` +
+                    `التوثيق: ${before.phone_verified} ← 1 · المدير: ${req.user.name} (${req.user.username}) · ` +
+                    `IP: ${req.ip || 'unknown'} · بتأكيد مسؤولية صريح`,
+                type: 'permissions'
+            });
+        }
+        res.json({ success: true, phone_verified: 1, phone_verified_by: req.user.username });
+    } catch (error) {
+        console.error('Employee verify-phone error:', error);
+        res.status(500).json({ error: 'فشل في توثيق الجوال' });
+    }
+});
+
+app.post('/api/employees/:id/unverify-phone', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        const emp = await db.Employees.getById(req.params.id);
+        if (!emp) return res.status(404).json({ error: 'المسعف غير موجود' });
+        await db.Employees.setPhoneVerification(emp.id, false, null);
+        if (db.AuditLog && db.AuditLog.create) {
+            await db.AuditLog.create({
+                user_id: req.user.id, user_name: req.user.name, action: 'phone_unverify',
+                detail: `إلغاء توثيق جوال الموظف ${emp.name} (${emp.employee_code}) · الرقم: ${emp.phone} · ` +
+                    `التوثيق: 1 ← 0 · المدير: ${req.user.name} (${req.user.username}) · IP: ${req.ip || 'unknown'}`,
+                type: 'permissions'
+            });
+        }
+        res.json({ success: true, phone_verified: 0 });
+    } catch (error) {
+        console.error('Employee unverify-phone error:', error);
+        res.status(500).json({ error: 'فشل في إلغاء التوثيق' });
     }
 });
 
