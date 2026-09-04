@@ -10981,9 +10981,23 @@ app.delete('/api/report-entry', authenticate, authorize(['admin']), async (req, 
 // ============================================
 // API: Employees
 // ============================================
+// طبقات ظهور بيانات الموظفين (معتمدة 2026-09-04): أعمدة صريحة في الاستعلام — لا SELECT * ثم إخفاء.
+// أساسية لأي مستخدم مسجّل (حقول غير حساسة كانت ظاهرة أصلًا) · +phone لحامل staff.phone_view
+// · +حقول توثيق الجوال phone_verified* لحامل admin.users_manage فقط (مدراء النجمة * يمرون تلقائيًا).
+async function employeeColumnsFor(req) {
+    const svc = getPermissionService();
+    const isAdminView = await svc.hasPermission(req.user.id, req.user.role, 'admin.users_manage');
+    const canPhone = isAdminView || await svc.hasPermission(req.user.id, req.user.role, 'staff.phone_view');
+    const cols = ['id', 'employee_code', 'name', 'job_title', 'symbol', 'is_active', 'pattern_code', 'created_at'];
+    if (canPhone) cols.push('phone');
+    if (isAdminView) cols.push('phone_verified', 'phone_verified_at', 'phone_verified_by');
+    return cols;
+}
+
 app.get('/api/employees', authenticate, async (req, res) => {
     try {
-        const employees = await db.Employees.getAll();
+        const cols = await employeeColumnsFor(req);
+        const employees = await db.all(`SELECT ${cols.join(', ')} FROM employees ORDER BY name`);
         res.json({ success: true, employees });
     } catch (error) {
         console.error('Employees GET error:', error);
@@ -11000,8 +11014,9 @@ app.get('/api/employees/search', authenticate, async (req, res) => {
         if (!q) return res.json({ success: true, results: [] });
         if (q.length > 100) return res.status(400).json({ error: 'استعلام طويل' });
         const like = '%' + q + '%';
+        const cols = await employeeColumnsFor(req);
         const results = await db.all(
-            `SELECT e.id, e.employee_code, e.name, e.phone, e.job_title, e.symbol, e.pattern_code
+            `SELECT ${cols.map(c => 'e.' + c).join(', ')}
              FROM employees e
              WHERE e.is_active = 1 AND (e.name LIKE ? OR e.employee_code LIKE ?)
              ORDER BY e.name LIMIT 15`, [like, like]);
@@ -11014,7 +11029,8 @@ app.get('/api/employees/search', authenticate, async (req, res) => {
 
 app.get('/api/employees/:id', authenticate, async (req, res) => {
     try {
-        const employee = await db.Employees.getById(req.params.id);
+        const cols = await employeeColumnsFor(req);
+        const employee = await db.get(`SELECT ${cols.join(', ')} FROM employees WHERE id = ?`, [req.params.id]);
         if (!employee) return res.status(404).json({ error: 'المسعف غير موجود' });
         res.json({ success: true, employee });
     } catch (error) {
