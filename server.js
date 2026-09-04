@@ -10983,11 +10983,17 @@ app.delete('/api/report-entry', authenticate, authorize(['admin']), async (req, 
 // ============================================
 // طبقات ظهور بيانات الموظفين (معتمدة 2026-09-04): أعمدة صريحة في الاستعلام — لا SELECT * ثم إخفاء.
 // أساسية لأي مستخدم مسجّل (حقول غير حساسة كانت ظاهرة أصلًا) · +phone لحامل staff.phone_view
-// · +حقول توثيق الجوال phone_verified* لحامل admin.users_manage فقط (مدراء النجمة * يمرون تلقائيًا).
+// · +حقول توثيق الجوال phone_verified* لحامل admin.users_manage فقط.
+// تشديد (قرار المالك 2026-09-04): النجمة '*' وحدها لا تكفي لهاتين الطبقتين — تتطلبان عضوية
+// صريحة بالمفتاح (افتراضي دور أو منحة فردية). المنحة الفردية تُحتسب حتى لحامل '*'
+// (getEffective تُرجع granted[] لحاملي النجمة أيضًا)، فمدير بلا منحة admin.users_manage
+// لا يرى الحقول الإدارية، ومدير بلا منحة staff.phone_view لا يرى الجوال.
 async function employeeColumnsFor(req) {
     const svc = getPermissionService();
-    const isAdminView = await svc.hasPermission(req.user.id, req.user.role, 'admin.users_manage');
-    const canPhone = isAdminView || await svc.hasPermission(req.user.id, req.user.role, 'staff.phone_view');
+    const eff = await svc.getEffective(req.user.id, req.user.role);
+    const holds = (key) => eff.star ? eff.granted.indexOf(key) !== -1 : eff.effective.indexOf(key) !== -1;
+    const isAdminView = holds('admin.users_manage');
+    const canPhone = isAdminView || holds('staff.phone_view');
     const cols = ['id', 'employee_code', 'name', 'job_title', 'symbol', 'is_active', 'pattern_code', 'created_at'];
     if (canPhone) cols.push('phone');
     if (isAdminView) cols.push('phone_verified', 'phone_verified_at', 'phone_verified_by');
