@@ -73,6 +73,8 @@ async function waitReady(tries = 60) {
     // ── وحدات مباشرة على القاعدة المؤقتة (إثباتات 2/4/5/6 على مستوى الخدمة) ──
     const { PERMISSION_KEYS, ROLES_PERMISSIONS } = require(path.join(ROOT, 'config', 'permissions.js'));
     const adapter = {
+        // معاملات no-op — تكيّف مع ذرية setPermission (قرار 2026-09-05)؛ الذرية الفعلية تُختبر على db.js الحقيقي في session-revocation-atomicity-test
+        beginTransaction() { }, commitTransaction() { }, rollbackTransaction() { },
         UserPermissions: {
             async getByUser(uid) { return probeRW.prepare('SELECT * FROM user_permissions WHERE user_id = ?').all(String(uid)); },
             async getAll() { return probeRW.prepare('SELECT * FROM user_permissions').all(); },

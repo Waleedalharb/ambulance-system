@@ -2946,7 +2946,9 @@ const TokenBlacklist = {
       const d = new Date(expiresAt);
       if (!isNaN(d.getTime())) exp = d.toISOString().replace('T', ' ').slice(0, 19);
     }
-    const result = await run('INSERT INTO token_blacklist (token_hash, expires_at) VALUES (?, ?)', [tokenHash, exp]);
+    // idempotent (قرار المالك 2026-09-05): بصمة محظورة سابقًا قد تصل مجددًا من مسارات
+    // متداخلة (إبطال جلسات قديمة لم تُصفَّر is_active) — التكرار لا يُسقط العملية.
+    const result = await run('INSERT OR IGNORE INTO token_blacklist (token_hash, expires_at) VALUES (?, ?)', [tokenHash, exp]);
     return result.id;
   },
   async isBlacklisted(tokenHash) {

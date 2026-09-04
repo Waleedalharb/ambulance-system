@@ -69,14 +69,24 @@ class PermissionService {
         if (!this.isValidKey(key)) throw new Error('مفتاح صلاحية غير معروف: ' + key);
         const before = await this.db.UserPermissions.getByUser(targetUserId);
         const prev = before.find(r => r.permission_key === key);
-        await this.db.UserPermissions.set(targetUserId, key, granted, actor.name);
-        const sessionsRevoked = await this.revokeUserSessions(targetUserId);
-        if (this.db.AuditLog && this.db.AuditLog.create) {
-            await this.db.AuditLog.create({
-                user_id: actor.id, user_name: actor.name, action: granted ? 'permission_grant' : 'permission_revoke',
-                detail: `صلاحية ${key} للمستخدم ${targetUserId}: ${prev ? (prev.granted ? 'منحة' : 'سحب') : 'افتراضي الدور'} ← ${granted ? 'منحة' : 'سحب'} · أُبطلت ${sessionsRevoked} جلسة`,
-                type: 'permissions'
-            });
+        // ذرية (قرار المالك 2026-09-05): المنحة + إبطال الجلسات + التدقيق — كلها أو لا شيء.
+        // فشل إبطال الجلسات يُرجع صف المنحة، فلا تبقى حالة جزئية بلا تدقيق.
+        this.db.beginTransaction();
+        let sessionsRevoked = 0;
+        try {
+            await this.db.UserPermissions.set(targetUserId, key, granted, actor.name);
+            sessionsRevoked = await this.revokeUserSessions(targetUserId);
+            if (this.db.AuditLog && this.db.AuditLog.create) {
+                await this.db.AuditLog.create({
+                    user_id: actor.id, user_name: actor.name, action: granted ? 'permission_grant' : 'permission_revoke',
+                    detail: `صلاحية ${key} للمستخدم ${targetUserId}: ${prev ? (prev.granted ? 'منحة' : 'سحب') : 'افتراضي الدور'} ← ${granted ? 'منحة' : 'سحب'} · أُبطلت ${sessionsRevoked} جلسة`,
+                    type: 'permissions'
+                });
+            }
+            this.db.commitTransaction();
+        } catch (e) {
+            try { this.db.rollbackTransaction(); } catch (_) { }
+            throw e;
         }
         return { changed: true, sessionsRevoked };
     }
@@ -98,14 +108,18 @@ class PermissionService {
     /**
      * إبطال كل الجلسات النشطة لمستخدم — البنية الجاهزة لفرض التغيير فورًا.
      * تعتمد TokenBlacklist الموجودة (فحصها مدمج في authenticate أصلًا).
+     * جلسة بلا بصمة توكن (جلسات قديمة سبقت تخزين البصمات) لا يمكن حظرها،
+     * لكنها تُعطَّل بتحديث is_active — لا تُترك نشطة (قرار المالك 2026-09-05).
      */
     async revokeUserSessions(userId) {
         if (!this.db.AuthSessions || !this.db.TokenBlacklist) return 0;
         const sessions = await this.db.AuthSessions.getByUser(userId);
         let n = 0;
         for (const s of (sessions || [])) {
-            if (!s.is_active || !s.access_token_hash) continue;
-            await this.db.TokenBlacklist.add(s.access_token_hash, s.session_expires || null);
+            if (!s.is_active) continue;
+            if (s.access_token_hash) {
+                await this.db.TokenBlacklist.add(s.access_token_hash, s.session_expires || null);
+            }
             await this.db.AuthSessions.update(s.id, { is_active: 0, logout_time: new Date().toISOString(), logout_reason: 'permissions_changed' });
             n++;
         }
