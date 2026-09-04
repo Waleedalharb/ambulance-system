@@ -46,6 +46,20 @@
     .card-head::before { content: ''; width: 4px; height: 18px; border-radius: 4px; background: var(--teal-id); }
     .card-head.incidents::before { background: var(--gold-id); }
     .card-head.schedule::before { background: var(--ops); }
+    .card-head.vehicle::before { background: var(--lead-hi); }
+    .card-head.inventory::before { background: #B794F6; }
+    .chip-row { display: flex; flex-wrap: wrap; gap: 8px; }
+    .chip { background: var(--surface-2); border: 1px solid var(--border-soft); border-radius: 10px; padding: 7px 12px; font-size: 0.76rem; }
+    .chip b { color: var(--gold-id); font-variant-numeric: tabular-nums; }
+    .veh-item { background: var(--surface-2); border: 1px solid var(--border-soft); border-radius: var(--radius-md); padding: 11px 13px; margin-bottom: 8px; }
+    .veh-item .v-name { font-weight: 700; font-size: 0.95rem; }
+    .veh-item .v-meta { font-size: 0.74rem; color: var(--text-2); margin-top: 4px; }
+    .veh-status { display: inline-block; font-size: 0.7rem; border-radius: 8px; padding: 2px 9px; margin-inline-start: 8px; border: 1px solid var(--border); }
+    .veh-status.st-active { color: #7EE2B8; border-color: rgba(14,164,122,0.4); background: rgba(14,164,122,0.10); }
+    .veh-status.st-reserve { color: #A9BACD; }
+    .veh-status.st-breakdown, .veh-status.st-out_of_service { color: #FCA5A5; border-color: rgba(239,68,68,0.4); background: rgba(239,68,68,0.08); }
+    .inv-open-btn { display: inline-block; margin-top: 12px; background: rgba(96,165,250,0.12); color: var(--ops); border: 1px solid rgba(96,165,250,0.35); border-radius: 10px; padding: 9px 16px; font-size: 0.82rem; font-weight: 700; text-decoration: none; }
+    .inv-note { margin-top: 10px; font-size: 0.72rem; color: var(--muted); }
     .card-body { padding: 14px 16px; }
 
     .profile-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
@@ -103,10 +117,10 @@
             <h1>بوابة الموظف التشغيلية <span class="badge">• الجنوب</span></h1>
             <div class="sub" id="whoLine">بياناتك التشغيلية من المصدر مباشرة</div>
         </div>
-        <a class="home-link" href="/">المنصة الرئيسية ←</a>
+        <a class="home-link" id="homeLink" href="/" style="display:none">المنصة الرئيسية ←</a>
     </div>
     <div id="app"><div class="loading">جارٍ تحميل بياناتك…</div></div>
 </div>
-<script src="js/my-ems.js?v=1"></script>
+<script src="js/my-ems.js?v=2"></script>
 </body>
 </html>

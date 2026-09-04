@@ -1,14 +1,17 @@
 /**
- * ═══ my-portal-service.js — بوابة الموظف التشغيلية v1 (معتمدة 2026-09-04) ═══
+ * ═══ my-portal-service.js — بوابة الموظف التشغيلية v1+v2 (معتمدة 2026-09-04) ═══
  *
  * قراءة فقط صِرفة: لا INSERT/UPDATE/DELETE، لا جداول جديدة، لا منطق تشييك.
  * كل حقل مشتق من مصادر قائمة:
  *   الهوية:        users.username = employees.employee_code
  *   التكليف/الجدول: shift_roster(employee_id, shift_date, team_id, shift_code)
  *   أسماء الرموز:   shift_codes (السجل الرسمي — لا تفسير ذاتي للرموز)
- *   الفرقة/المركز:  teams(id, name, center)
+ *   الفرقة/المركز:  teams(id, name, center, team_type)
  *   بلاغات الفرقة:  report_times × reports(unit) × shifts(shift_date)
  *                   مع استبعاد withdrawn/manual_cancelled (نفس قاعدة server.js:5069)
+ *   مركبتي (v2):    VehicleEventsService.getTeamVehicles — نفس اشتقاق getBoard حرفيًا
+ *   الجرد (v2):     assets(team_name, archived_at) + inventory_sessions(team_name)
+ *                   — العرض بالارتباط بالبيانات، والإجراء (canOpen) يُحسب في المسار
  *
  * قرارات المالك المثبتة هنا:
  *   ① احتياطي team_assignments.is_primary لليوم الحالي فقط وموسوم primary_fallback.
@@ -17,6 +20,9 @@
  *   ④ تفصيل العداد حسب الفرقة مع فترة التكليف داخل الشهر.
  *   ⑤ coverage: complete/partial/none — لا أصفار مموّهة عند غياب التغطية.
  *   ⑥ العداد يُحسب فقط داخل أيام التكليف الفعلية مع الفرقة نفسها.
+ *   ⑦ (v2) «فرقة ميدانية معتمدة» = قائمة صريحة: جنوب/دعم/سريع (قرار المالك —
+ *      ليست «كل ما عدا عمليات»). قيادة وعمليات وأي نوع غير مدرج = غير ميداني.
+ *   ⑧ (v2) الأقسام تتكيّف بالتكليف الفعلي والارتباط بالبيانات — لا بطاقات فارغة.
  */
 'use strict';
 
@@ -60,7 +66,11 @@ function monthBounds(year, month) {
 }
 
 class MyPortalService {
-    constructor({ db }) { this.db = db; }
+    constructor({ db, getVehicleEventsService }) {
+        this.db = db;
+        // مزوّد كسول لخدمة أحداث المركبات (تُنشأ مع محرك العمليات) — v2
+        this.getVehicleEventsService = typeof getVehicleEventsService === 'function' ? getVehicleEventsService : null;
+    }
 
     /** هوية الموظف من الحساب: username = employee_code (🟢 قاعدة مثبتة 19/23). */
     async resolveEmployee(user) {
@@ -72,12 +82,37 @@ class MyPortalService {
 
     /** مراجع مشتركة: الفرق + سجل الرموز الرسمي. */
     async _refs() {
-        const teams = await this.db.all('SELECT id, name, center FROM teams');
+        const teams = await this.db.all('SELECT id, name, center, team_type FROM teams');
         const codes = await this.db.ShiftCodes.getAll();
         const teamById = new Map(teams.map(t => [t.id, t]));
         const teamIdByName = new Map(teams.map(t => [String(t.name), t.id]));
         const codeMap = new Map((codes || []).map(c => [String(c.code), c]));
         return { teamById, teamIdByName, codeMap };
+    }
+
+    /** قرار ⑦ (معدّل بقرار المالك 2026-09-04): «فرقة ميدانية معتمدة» = قائمة صريحة
+     *  (جنوب/دعم/سريع) — ليست «كل ما عدا عمليات». قيادة وعمليات وأي نوع مستقبلي
+     *  غير مدرج = غير ميداني. لا مطابقة جزئية ولا تفسير ذاتي. */
+    static FIELD_TEAM_TYPES = ['جنوب', 'دعم', 'سريع'];
+    _isFieldTeam(team) { return !!team && MyPortalService.FIELD_TEAM_TYPES.indexOf(team.team_type) !== -1; }
+
+    /** تكليف اليوم: roster أولًا ثم احتياطي is_primary موسومًا (قرار ①) — مشترك بين الأقسام. */
+    async _resolveTodayAssignment(emp) {
+        const today = riyadhToday();
+        let source = 'none';
+        let row = await this.db.get(
+            'SELECT shift_code, team_id FROM shift_roster WHERE employee_id = ? AND shift_date = ?',
+            [emp.id, today]);
+        if (row) {
+            source = 'roster';
+        } else {
+            const fb = await this.db.get(
+                `SELECT team_id FROM team_assignments
+                 WHERE employee_id = ? AND is_primary = 1 AND (end_date IS NULL OR end_date >= ?)
+                 ORDER BY id DESC LIMIT 1`, [emp.id, today]);
+            if (fb) { row = { shift_code: null, team_id: fb.team_id }; source = 'primary_fallback'; }
+        }
+        return { today, row, source };
     }
 
     _teamView(teamById, teamId) {
@@ -91,22 +126,7 @@ class MyPortalService {
         const emp = await this.resolveEmployee(user);
         if (!emp) return { notFound: true };
         const { teamById, codeMap } = await this._refs();
-        const today = riyadhToday();
-
-        let source = 'none';
-        let row = await this.db.get(
-            'SELECT shift_code, team_id FROM shift_roster WHERE employee_id = ? AND shift_date = ?',
-            [emp.id, today]);
-        if (row) {
-            source = 'roster';
-        } else {
-            // قرار ①: الاحتياطي لليوم الحالي فقط، ويُوسم صراحة primary_fallback
-            const fb = await this.db.get(
-                `SELECT team_id FROM team_assignments
-                 WHERE employee_id = ? AND is_primary = 1 AND (end_date IS NULL OR end_date >= ?)
-                 ORDER BY id DESC LIMIT 1`, [emp.id, today]);
-            if (fb) { row = { shift_code: null, team_id: fb.team_id }; source = 'primary_fallback'; }
-        }
+        const { today, row, source } = await this._resolveTodayAssignment(emp);
 
         const code = row && row.shift_code != null ? String(row.shift_code) : null;
         const codeRow = code ? codeMap.get(code) : null;
@@ -275,6 +295,87 @@ class MyPortalService {
             byTeam,
             unmatchedUnits, // وحدات CAD لا تطابق اسم فرقة — تُعرض بصراحة ولا تُخفى
             note: 'تُحسب البلاغات المسجلة على الفرقة خلال الأيام التي كنت مكلّفًا فيها معها، ولا تمثل بالضرورة البلاغات التي باشرتها شخصيًا.'
+        };
+    }
+
+    /**
+     * v2: خريطة الأقسام — العرض بالتكليف الفعلي والارتباط بالبيانات (قرار ⑧).
+     * profile/schedule/assignments ثابتة؛ البقية مشروطة:
+     *   incidents ← أي تكليف roster فعلي بفرقة ميدانية (قرار ⑦).
+     *   vehicle   ← فرقة اليوم (roster/احتياطي موسوم) ميدانية.
+     *   inventory ← أصول غير مؤرشفة أو جلسة جرد مرتبطة بفرقة اليوم (assets.team_name).
+     * canOpen للجرد يُحسب في المسار (صلاحية assets.inventory) — ليس هنا.
+     */
+    async getSections(user) {
+        const emp = await this.resolveEmployee(user);
+        if (!emp) return { notFound: true };
+        const { teamById } = await this._refs();
+        const { row } = await this._resolveTodayAssignment(emp);
+        const todayTeam = row && row.team_id != null ? teamById.get(row.team_id) : null;
+
+        const rosterTeams = await this.db.all(
+            'SELECT DISTINCT team_id FROM shift_roster WHERE employee_id = ? AND team_id IS NOT NULL', [emp.id]);
+        const hasFieldAssignment = rosterTeams.some(r => this._isFieldTeam(teamById.get(r.team_id)));
+
+        let inventory = false;
+        if (todayTeam) {
+            const a = await this.db.get(
+                'SELECT COUNT(*) AS c FROM assets WHERE team_name = ? AND archived_at IS NULL', [todayTeam.name]);
+            const s = await this.db.get(
+                'SELECT COUNT(*) AS c FROM inventory_sessions WHERE team_name = ?', [todayTeam.name]);
+            inventory = ((a && a.c) || 0) > 0 || ((s && s.c) || 0) > 0;
+        }
+
+        return {
+            sections: {
+                profile: true, schedule: true, assignments: true,
+                incidents: hasFieldAssignment,
+                vehicle: this._isFieldTeam(todayTeam),
+                inventory
+            }
+        };
+    }
+
+    /** v2: مركبتي — مركبات فرقة اليوم المعيّنة حاليًا (اشتقاق getBoard نفسه عبر الخدمة الرسمية). */
+    async getMyVehicle(user) {
+        const emp = await this.resolveEmployee(user);
+        if (!emp) return { notFound: true };
+        const { teamById } = await this._refs();
+        const { row, source } = await this._resolveTodayAssignment(emp);
+        const team = row && row.team_id != null ? teamById.get(row.team_id) : null;
+        const view = team ? this._teamView(teamById, team.id) : { teamId: null, teamName: null, center: null };
+        if (!this._isFieldTeam(team)) {
+            return { team: view, assignmentSource: source, vehicles: [], available: true, reason: team ? 'ops_team' : 'no_team' };
+        }
+        const ves = this.getVehicleEventsService ? this.getVehicleEventsService() : null;
+        if (!ves) return { team: view, assignmentSource: source, vehicles: [], available: false, reason: 'service_unavailable' };
+        const vehicles = await ves.getTeamVehicles(team.id);
+        return { team: view, assignmentSource: source, vehicles, available: true, reason: vehicles.length ? null : 'no_current_vehicle' };
+    }
+
+    /** v2: جرد فرقتي — ملخص الأصول غير المؤرشفة + آخر جلسة. قراءة فقط؛ الإجراء في المسار. */
+    async getMyInventory(user) {
+        const emp = await this.resolveEmployee(user);
+        if (!emp) return { notFound: true };
+        const { teamById } = await this._refs();
+        const { row, source } = await this._resolveTodayAssignment(emp);
+        const team = row && row.team_id != null ? teamById.get(row.team_id) : null;
+        const view = team ? this._teamView(teamById, team.id) : { teamId: null, teamName: null, center: null };
+        if (!team) return { team: view, assignmentSource: source, hasData: false, assets: null, lastSession: null };
+
+        const byStatus = {};
+        let total = 0;
+        const rows = await this.db.all(
+            'SELECT status, COUNT(*) AS c FROM assets WHERE team_name = ? AND archived_at IS NULL GROUP BY status', [team.name]);
+        for (const r of rows) { byStatus[r.status] = r.c; total += r.c; }
+        const lastSession = await this.db.get(
+            `SELECT id, status, started_at, submitted_at, approved_at, conductor_name
+             FROM inventory_sessions WHERE team_name = ? ORDER BY id DESC LIMIT 1`, [team.name]);
+        return {
+            team: view, assignmentSource: source,
+            hasData: total > 0 || !!lastSession,
+            assets: { total, byStatus },
+            lastSession: lastSession || null
         };
     }
 }

@@ -407,6 +407,36 @@ class VehicleEventsService {
     }
 
     /**
+     * بوابة الموظف v2 (معتمدة 2026-09-04): المركبات المعيّنة حاليًا لفريق معيّن —
+     * آخر assignment مفتوح عبر كامل خط المركبة الزمني (نفس اشتقاق getBoard حرفيًا:
+     * foldEvents + آخر تعيين مفتوح + آخر حالة). قراءة فقط صِرفة، بلا ختم مناوبة.
+     * بلا تعيين مفتوح = قائمة فارغة — لا تُعرض مركبة منتهية التعيين كأنها حالية.
+     */
+    async getTeamVehicles(teamId) {
+        if (teamId == null || teamId === '') return [];
+        const registry = await this.storage.getVehicles();
+        const out = [];
+        for (const v of registry) {
+            const events = await this.storage.getOperationalEventsByEntity(DOMAIN, v.id);
+            const f = foldEvents(events, DOMAIN)[0] || null;
+            const openAssignment = f ? [...f.open].reverse().find(o => o.event_type === 'assignment') : null;
+            if (!openAssignment || String(openAssignment.team_id) !== String(teamId)) continue;
+            const lastStatus = f ? [...f.open].reverse().find(o => o.status) : null;
+            out.push({
+                vehicleId: v.id,
+                name: v.call_sign || v.plate_number,
+                plateNumber: v.plate_number || null,
+                callSign: v.call_sign || null,
+                vehicleType: v.vehicle_type || null,
+                status: lastStatus ? lastStatus.status : null,      // active|reserve|breakdown|out_of_service|null
+                statusSince: lastStatus ? lastStatus.created_at : null,
+                assignedAt: openAssignment.created_at
+            });
+        }
+        return out;
+    }
+
+    /**
      * لوحة المركبات — السجل المرجعي (هوية ثابتة) + الحالة المشتقة من
      * operational_events فقط. لا يُحفظ أي وضع حالي في أي جدول (SSOT).
      * V-A (v9 + قرار المالك 1): صفر تغيير مرئي — تُعرض المركبات المعيّنة فقط

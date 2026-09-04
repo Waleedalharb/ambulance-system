@@ -216,6 +216,31 @@ document.addEventListener('DOMContentLoaded', function() {
         document.body.style.overflow = '';
     }
 
+    // ── بوابة الموظف v2 (معتمدة 2026-09-04): قرار الهبوط — القاعدة الرباعية ──
+    // المصدر الوحيد: /api/auth/me/permissions (المنح الفردية + الفعلية + '*')
+    // لا اعتماد على اسم الدور إطلاقًا. فشل الجلب = بقاء في المنصة (السلوك القائم).
+    //   portal ← منحة فردية موثقة لـops.my_portal، أو «بوابة-فقط» (يملكها فعليًا
+    //            بلا أي مفتاح منصة آخر عدا ops.execute التوافقي).
+    //   sticky ← «بوابة-فقط» يُعاد توجيهه من المنصة دائمًا؛ أما admin بـ'*' + منحة
+    //            فيهبط على البوابة عند الدخول فقط ويستطيع العودة للمنصة بعدها.
+    async function myPortalLandingDecision() {
+        var none = { portal: false, sticky: false };
+        try {
+            var tok = localStorage.getItem('auth_access_token') || localStorage.getItem('authToken');
+            if (!tok) return none;
+            var r = await fetch('/api/auth/me/permissions', { headers: { Authorization: 'Bearer ' + tok } });
+            if (!r.ok) return none;
+            var p = await r.json();
+            var granted = p.permissions_granted || [];
+            var effective = p.permissions || [];
+            var star = !!p.permissions_star;
+            var hasGrant = granted.indexOf('ops.my_portal') !== -1;
+            var platformKeys = effective.filter(function (k) { return k !== 'ops.my_portal' && k !== 'ops.execute'; });
+            var portalOnly = !star && effective.indexOf('ops.my_portal') !== -1 && platformKeys.length === 0;
+            return { portal: hasGrant || portalOnly, sticky: portalOnly };
+        } catch (e) { return none; }
+    }
+
     async function doLogin() {
         var username = loginUsername.value.trim();
         var password = loginPassword.value.trim();
@@ -227,11 +252,13 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             var data = await AuthManager.login(username, password);
             currentUser = data.user;
+            addAuditEntry('system', 'تسجيل دخول', 'المستخدم ' + (data.user.name || data.user.username || 'غير معروف') + ' سجل الدخول إلى النظام', getCurrentUserName());
+            var land = await myPortalLandingDecision();
+            if (land.portal) { location.replace('/my-ems.html'); return; } // هبوط البوابة (v2)
             hideLogin();
             applyUserPermissions(data.user);
             if (userDisplay) userDisplay.textContent = (data.user.name || 'مستخدم') + ' (' + roleLabel(data.user.role) + ')';
             AuthGate.start(); // الإقلاع التشغيلي الموحّد (loadAllData + loadNotifications + SSE + المؤقتات) عبر البوابة
-            addAuditEntry('system', 'تسجيل دخول', 'المستخدم ' + (data.user.name || data.user.username || 'غير معروف') + ' سجل الدخول إلى النظام', getCurrentUserName());
         } catch (e) {
             loginError.textContent = e.message || 'فشل في تسجيل الدخول';
             loginError.style.display = 'block';
@@ -257,10 +284,14 @@ document.addEventListener('DOMContentLoaded', function() {
         var user = AuthManager.getUser();
         if (user) {
             currentUser = user;
-            hideLogin();
-            applyUserPermissions(user);
-            if (userDisplay) userDisplay.textContent = (user.name || 'مستخدم') + ' (' + roleLabel(user.role) + ')';
-            AuthGate.start(); // جلسة صالحة عند تحميل الصفحة — الإقلاع التشغيلي عبر البوابة
+            // v2: «بوابة-فقط» (بلا أي مفتاح منصة) يُعاد توجيهه دائمًا — بقية الحالات تكمل المنصة
+            myPortalLandingDecision().then(function (land) {
+                if (land.sticky) { location.replace('/my-ems.html'); return; }
+                hideLogin();
+                applyUserPermissions(user);
+                if (userDisplay) userDisplay.textContent = (user.name || 'مستخدم') + ' (' + roleLabel(user.role) + ')';
+                AuthGate.start(); // جلسة صالحة عند تحميل الصفحة — الإقلاع التشغيلي عبر البوابة
+            });
         } else {
             hideSkeleton();
             showLogin();

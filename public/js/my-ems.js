@@ -1,7 +1,9 @@
 /**
- * ═══ my-ems.js — بوابة الموظف التشغيلية v1 (معتمدة 2026-09-04) ═══
+ * ═══ my-ems.js — بوابة الموظف التشغيلية v1+v2 (معتمدة 2026-09-04) ═══
  * عرض فقط: لا Business Logic. كل الحساب في الخادم (my-portal-service).
  * الهوية من التوكن — لا يُرسل أي معرّف موظف.
+ * v2: الأقسام تُبنى من خريطة /api/my/sections (لا بطاقات فارغة) + مركبتي + الجرد.
+ *     رابط «المنصة الرئيسية» يظهر فقط لمن يملك صلاحية منصة فعلية.
  */
 'use strict';
 
@@ -11,6 +13,11 @@
 
     const AR_MONTHS = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
     const AR_DAYS = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+
+    // تسميات عرض — المصدر الرسمي للقيم: operational-events-core (المركبات) ومخطط db.js (الأصول/الجلسات)
+    const VEH_STATUS = { active: 'عاملة', reserve: 'احتياط', breakdown: 'متعطلة', out_of_service: 'خارج الخدمة' };
+    const ASSET_STATUS = { working: 'سليم', damaged: 'تالف', missing: 'مفقود', replaced: 'مستبدَل', recalled: 'مسترجَع', out_of_service: 'خارج الخدمة', unknown: 'غير محدد' };
+    const SESSION_STATUS = { open: 'مفتوحة', submitted: 'مُرسلة للاعتماد', approved: 'معتمدة' };
 
     function riyadhToday() {
         try {
@@ -104,6 +111,57 @@
         </div>`;
     }
 
+    // ── مركبتي (v2) — المركبات المعيّنة حاليًا لفرقة اليوم ──
+    function renderVehicle(d) {
+        let body;
+        if (d.available === false) {
+            body = '<div class="empty">بيانات المركبات غير متاحة حاليًا من النظام.</div>';
+        } else if (!d.vehicles || d.vehicles.length === 0) {
+            // آخر حالة assignment_end أو بلا تعيين أصلًا — رسالة صادقة بلا مركبة قديمة
+            body = '<div class="empty">لا توجد مركبة مسندة حاليًا لفرقتك' + (d.team && d.team.teamName ? ' (' + esc(d.team.teamName) + ')' : '') + '.</div>';
+        } else {
+            body = d.vehicles.map(v => {
+                const st = v.status ? `<span class="veh-status st-${esc(v.status)}">${esc(VEH_STATUS[v.status] || v.status)}</span>` : '';
+                const meta = [
+                    v.plateNumber ? 'لوحة: ' + esc(v.plateNumber) : null,
+                    v.vehicleType ? esc(v.vehicleType) : null,
+                    v.statusSince ? 'منذ: ' + esc(v.statusSince.slice(0, 10)) : null
+                ].filter(Boolean).join(' · ');
+                return `<div class="veh-item"><div class="v-name">${esc(v.name)}${st}</div><div class="v-meta">${meta}</div></div>`;
+            }).join('');
+        }
+        return `<div class="card">
+            <div class="card-head vehicle">مركبتي</div>
+            <div class="card-body">${body}</div>
+        </div>`;
+    }
+
+    // ── جرد فرقتي (v2) — العرض بالارتباط بالبيانات، والإجراء بالصلاحية ──
+    function renderInventory(d, canOpen) {
+        const chips = [];
+        if (d.assets && d.assets.total > 0) {
+            for (const k of Object.keys(ASSET_STATUS)) {
+                const c = d.assets.byStatus[k];
+                if (c) chips.push(`<div class="chip">${ASSET_STATUS[k]}: <b>${c}</b></div>`);
+            }
+        }
+        const s = d.lastSession;
+        const sessionLine = s
+            ? `<div class="chip">آخر جلسة جرد: <b>${esc(SESSION_STATUS[s.status] || s.status)}</b> · ${esc((s.approved_at || s.submitted_at || s.started_at || '').slice(0, 10))}${s.conductor_name ? ' · ' + esc(s.conductor_name) : ''}</div>`
+            : '<div class="chip">لا توجد جلسة جرد مسجلة لفرقتك بعد</div>';
+        const openBtn = canOpen
+            ? '<a class="inv-open-btn" href="/assets-inventory.html">فتح الجرد ←</a>'
+            : '<div class="inv-note">تنفيذ الجرد يتطلب صلاحية «تنفيذ جلسات الجرد» — تُمنح فرديًا من إدارة النظام.</div>';
+        return `<div class="card">
+            <div class="card-head inventory">الجرد — عهد فرقتي</div>
+            <div class="card-body">
+                <div class="chip-row">${chips.join('')}</div>
+                <div class="chip-row" style="margin-top:8px">${sessionLine}</div>
+                ${openBtn}
+            </div>
+        </div>`;
+    }
+
     // ── جدولي ──
     function renderSchedule(s) {
         const today = riyadhToday();
@@ -119,7 +177,7 @@
                 <div class="d-team">${esc(d.teamName || '')}</div>
             </div>`;
         }).join('');
-        return `<div class="card">
+        return `<div class="card" id="schedCard">
             <div class="card-head schedule">جدولي</div>
             <div class="card-body">
                 <div class="month-nav">
@@ -153,16 +211,35 @@
     async function load() {
         if (!token) { stateCard('مطلوب تسجيل الدخول', 'سجّل دخولك من الصفحة الرئيسية ثم عد إلى هذه الصفحة.', true); return; }
         try {
-            const [profile, incidents, assignments] = await Promise.all([
-                api('/api/my/profile'), api('/api/my/team-incidents'), api('/api/my/assignments')]);
+            // رابط «المنصة الرئيسية»: يظهر فقط لمن يملك صلاحية منصة فعلية (v2)
+            try {
+                const me = await api('/api/auth/me/permissions');
+                const eff = me.permissions || [];
+                const hasPlatform = !!me.permissions_star || eff.some(k => k !== 'ops.my_portal' && k !== 'ops.execute');
+                if (hasPlatform) document.getElementById('homeLink').style.display = '';
+            } catch (_) { /* فشل الجلب ← يبقى الرابط مخفيًا */ }
+
+            // خريطة الأقسام من الخادم — لا بطاقات فارغة (قرار ⑧)
+            const [sectionsRes, profile, assignments] = await Promise.all([
+                api('/api/my/sections'), api('/api/my/profile'), api('/api/my/assignments')]);
+            const sec = sectionsRes.sections || {};
             document.getElementById('whoLine').textContent = profile.employee.name + ' — ' + (profile.employee.jobTitle || '');
             if (curMonth === null) {
                 const t = riyadhToday();
                 curYear = t ? +t.slice(0, 4) : new Date().getFullYear();
                 curMonth = t ? +t.slice(5, 7) : new Date().getMonth() + 1;
             }
-            const schedule = await api(`/api/my/schedule?month=${curMonth}&year=${curYear}`);
-            app.innerHTML = renderProfile(profile) + renderIncidents(incidents) + renderSchedule(schedule) + renderAssignments(assignments);
+            const [schedule, incidents, vehicle, inventory] = await Promise.all([
+                api(`/api/my/schedule?month=${curMonth}&year=${curYear}`),
+                sec.incidents ? api('/api/my/team-incidents') : Promise.resolve(null),
+                sec.vehicle ? api('/api/my/vehicle') : Promise.resolve(null),
+                sec.inventory ? api('/api/my/inventory') : Promise.resolve(null)]);
+            app.innerHTML = renderProfile(profile)
+                + (incidents ? renderIncidents(incidents) : '')
+                + (vehicle ? renderVehicle(vehicle) : '')
+                + (inventory ? renderInventory(inventory, !!sec.inventoryCanOpen) : '')
+                + renderSchedule(schedule)
+                + renderAssignments(assignments);
 
             const bdToggle = document.getElementById('bdToggle');
             if (bdToggle) bdToggle.addEventListener('click', () => {
@@ -183,10 +260,10 @@
     async function refreshSchedule() {
         try {
             const schedule = await api(`/api/my/schedule?month=${curMonth}&year=${curYear}`);
-            const cards = app.querySelectorAll('.card');
             const tmp = document.createElement('div');
             tmp.innerHTML = renderSchedule(schedule);
-            cards[2].replaceWith(tmp.firstElementChild);
+            const old = document.getElementById('schedCard');
+            if (old) old.replaceWith(tmp.firstElementChild); // بدل الاعتماد على ترتيب البطاقات (v2)
             document.getElementById('mPrev').addEventListener('click', () => { curMonth--; if (curMonth < 1) { curMonth = 12; curYear--; } refreshSchedule(); });
             document.getElementById('mNext').addEventListener('click', () => { curMonth++; if (curMonth > 12) { curMonth = 1; curYear++; } refreshSchedule(); });
         } catch (e) { /* تبقى البطاقة القديمة — لا انهيار */ }

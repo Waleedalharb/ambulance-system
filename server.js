@@ -1247,7 +1247,8 @@ let myPortalService = null;
 function getMyPortalService() {
     if (!myPortalService && db) {
         const MyPortalService = require('./services/my-portal-service');
-        myPortalService = new MyPortalService({ db });
+        // مزوّد كسول لخدمة أحداث المركبات — تُنشأ لاحقًا مع محرك العمليات (v2: مركبتي)
+        myPortalService = new MyPortalService({ db, getVehicleEventsService: () => vehicleEventsService });
     }
     return myPortalService;
 }
@@ -1299,6 +1300,42 @@ app.get('/api/my/team-incidents', authenticate, authorizePerm('ops.my_portal'), 
     } catch (error) {
         console.error('[my-portal] team-incidents error:', error);
         res.status(500).json({ error: 'فشل في جلب بلاغات الفرقة' });
+    }
+});
+
+// ── v2: خريطة الأقسام + مركبتي + جرد فرقتي (قراءة فقط — نفس الحارس) ──
+app.get('/api/my/sections', authenticate, authorizePerm('ops.my_portal'), async (req, res) => {
+    try {
+        const out = await getMyPortalService().getSections(req.user);
+        if (out.notFound) return res.status(404).json(MY_PORTAL_NO_EMPLOYEE);
+        // الإجراء بالصلاحية: زر «فتح الجرد» لا يُعرض إلا لمن يملك assets.inventory فعليًا
+        const canOpenInventory = await getPermissionService().hasPermission(req.user.id, req.user.role, 'assets.inventory');
+        res.json({ success: true, sections: { ...out.sections, inventoryCanOpen: !!canOpenInventory } });
+    } catch (error) {
+        console.error('[my-portal] sections error:', error);
+        res.status(500).json({ error: 'فشل في جلب خريطة الأقسام' });
+    }
+});
+
+app.get('/api/my/vehicle', authenticate, authorizePerm('ops.my_portal'), async (req, res) => {
+    try {
+        const out = await getMyPortalService().getMyVehicle(req.user);
+        if (out.notFound) return res.status(404).json(MY_PORTAL_NO_EMPLOYEE);
+        res.json({ success: true, ...out });
+    } catch (error) {
+        console.error('[my-portal] vehicle error:', error);
+        res.status(500).json({ error: 'فشل في جلب مركبة الفرقة' });
+    }
+});
+
+app.get('/api/my/inventory', authenticate, authorizePerm('ops.my_portal'), async (req, res) => {
+    try {
+        const out = await getMyPortalService().getMyInventory(req.user);
+        if (out.notFound) return res.status(404).json(MY_PORTAL_NO_EMPLOYEE);
+        res.json({ success: true, ...out });
+    } catch (error) {
+        console.error('[my-portal] inventory error:', error);
+        res.status(500).json({ error: 'فشل في جلب جرد الفرقة' });
     }
 });
 
