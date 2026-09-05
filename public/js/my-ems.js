@@ -57,6 +57,36 @@
         </div></div>`;
     }
 
+    // ── تسجيل الخروج — إبطال خادمي حقيقي، لا مسحًا شكليًا (قرار المالك 2026-09-05) ──
+    // المسار الخادمي /api/auth/logout يحظر توكن الوصول والتحديث في TokenBlacklist
+    // ويعطّل الجلسة في auth_sessions ويدقق الحدث — نفس آلية المنصة الرئيسية حرفًا.
+    async function logout() {
+        const btn = document.getElementById('logoutBtn');
+        if (btn) { btn.disabled = true; btn.textContent = 'جارٍ تسجيل الخروج…'; }
+        try {
+            await fetch('/api/auth/logout', {
+                method: 'POST',
+                headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' }
+            });
+            // جلسة منتهية أصلًا ← 401 من الخادم: الحالة متوقعة، نكمل المسح المحلي بلا خطأ
+        } catch (_) { /* انقطاع الشبكة لا يمنع إكمال الخروج محليًا */ }
+        // نفس المفاتيح التي يمسحها AuthManager في المنصة الرئيسية
+        ['auth_access_token', 'auth_refresh_token', 'auth_user', 'auth_token_expires', 'authToken', 'currentUser']
+            .forEach(k => localStorage.removeItem(k));
+        // replace وليس href: لا تبقى البوابة في سجل التنقل — زر Back لا يعيدها
+        location.replace('/');
+    }
+
+    // bfcache: صفحة محفوظة تُستعاد بزر Back بعد الخروج — التوكن مسحوب محليًا ← إعادة توجيه فورية
+    window.addEventListener('pageshow', function (ev) {
+        if (ev.persisted && !localStorage.getItem('auth_access_token') && !localStorage.getItem('authToken')) {
+            location.replace('/');
+        }
+    });
+
+    const logoutBtn = document.getElementById('logoutBtn');
+    if (logoutBtn) logoutBtn.addEventListener('click', logout);
+
     // ── ملفي التشغيلي ──
     function renderProfile(p) {
         const t = p.today || {};
@@ -385,6 +415,7 @@
                 + renderSchedule(schedule)
                 + renderAssignments(assignments);
             if (checkData) bindCheckEvents();
+            if (logoutBtn) logoutBtn.style.display = ''; // نجاح التحميل ← الزر يظهر في الشريط العلوي الثابت
 
             const bdToggle = document.getElementById('bdToggle');
             if (bdToggle) bdToggle.addEventListener('click', () => {

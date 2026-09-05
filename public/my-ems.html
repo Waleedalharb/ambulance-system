@@ -40,6 +40,10 @@
     .topbar h1 .badge { color: var(--gold-id); }
     .topbar .sub { color: var(--text-2); font-size: 0.78rem; margin-top: 3px; }
     .home-link { color: var(--ops); text-decoration: none; font-size: 0.8rem; border: 1px solid var(--border); border-radius: 9px; padding: 7px 12px; background: var(--surface); }
+    .topbar-actions { display: flex; align-items: center; gap: 8px; }
+    .logout-btn { color: #FCA5A5; font-family: inherit; font-size: 0.8rem; font-weight: 700; border: 1px solid rgba(239,68,68,0.35); border-radius: 9px; padding: 7px 12px; background: rgba(239,68,68,0.08); cursor: pointer; }
+    .logout-btn:hover { background: rgba(239,68,68,0.16); }
+    .logout-btn:disabled { opacity: 0.5; cursor: default; }
 
     .card { background: var(--surface); border: 1px solid var(--border-soft); border-radius: var(--radius); margin-bottom: 16px; overflow: hidden; box-shadow: var(--shadow-card); }
     .card-head { padding: 13px 16px; font-weight: 700; font-size: 1rem; border-bottom: 1px solid var(--border-soft); display: flex; align-items: center; gap: 8px; }
@@ -142,10 +146,13 @@
             <h1>بوابة الموظف التشغيلية <span class="badge">• الجنوب</span></h1>
             <div class="sub" id="whoLine">بياناتك التشغيلية من المصدر مباشرة</div>
         </div>
-        <a class="home-link" id="homeLink" href="/" style="display:none">المنصة الرئيسية ←</a>
+        <div class="topbar-actions">
+            <a class="home-link" id="homeLink" href="/" style="display:none">المنصة الرئيسية ←</a>
+            <button class="logout-btn" id="logoutBtn" type="button" style="display:none">تسجيل الخروج ⎋</button>
+        </div>
     </div>
     <div id="app"><div class="loading">جارٍ تحميل بياناتك…</div></div>
 </div>
-<script src="js/my-ems.js?v=3"></script>
+<script src="js/my-ems.js?v=4"></script>
 </body>
 </html>
