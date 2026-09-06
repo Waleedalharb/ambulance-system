@@ -4,6 +4,15 @@
  * يغطي حالات المالك الأحد عشر + قاعدة «الفحص السليم لا يولّد أحداثًا مركزية»
  * + الانعكاس في النظامين المختصين (asset_events / operational_events).
  *
+ * توثيق تغيير التوقعات (اعتماد v4.2 المبدئي 2026-09-06 — تغييرات مقصودة، ليست انحدارًا):
+ *   · الجلسات الجديدة schema_version=2 تُبنى من القالب المركزي: 26 بندًا ميكانيكيًا
+ *     (بدل 7 العامة) + 65 بندًا طبيًا BLS (بدل صفر) + الأصول (17) = 82 طبيًا/26 ميكانيكيًا
+ *     في اختبار 2، و65+أصول سريع 1 في اختبار 4.
+ *   · عنوان البطاقة في الواجهة أصبح «🚑 جاهزية الفرقة» بقرار المالك (اختبار 14)،
+ *     والجلسة المكتملة تعرض كل البنود (108) بدل 24.
+ *   · لم يتغير أي سلوك جوهري لـv3: عدم توليد الأحداث عند السليم، الانعكاس عند الملاحظة،
+ *     المشاركة، التأكيدات، الاكتمال، منع التسرب — كلها تُختبر كما هي.
+ *
  * التشغيل: node scripts/shift-check-test.js
  */
 'use strict';
@@ -231,9 +240,9 @@ const pad2 = v => String(v).padStart(2, '0');
         const medItems = (b1.items || []).filter(i => i.domain === 'medical');
         const mechItems = (b1.items || []).filter(i => i.domain === 'mechanical');
         const openKeys = (b1.openIssues || []).map(o => o.itemKey);
-        check('2) تكليف+مركبة+عهدة: جلسة جنوب 1/veh_000001 + 17 بندًا طبيًا + 7 ميكانيكية + عضوان + ملاحظتا الأمس المفتوحتان',
+        check('2) تكليف+مركبة+عهدة: جلسة جنوب 1/veh_000001 + v4.2: 65 بند قالب طبي + 17 أصلًا + 26 ميكانيكيًا + عضوان + ملاحظتا الأمس المفتوحتان',
             s1.status === 200 && b1.session && b1.session.team_id === TEAM_A && b1.session.vehicle_id === 'veh_000001'
-            && b1.session.status === 'open' && medItems.length === 17 && mechItems.length === 7
+            && b1.session.status === 'open' && medItems.length === 82 && mechItems.length === 26
             && (b1.members || []).length === 2
             && openKeys.includes('mech:tires') && openKeys.includes('asset:' + ASSET_ISSUE.id),
             JSON.stringify({ med: medItems.length, mech: mechItems.length, m: (b1.members || []).length, openKeys }));
@@ -253,10 +262,10 @@ const pad2 = v => String(v).padStart(2, '0');
         // ── 4) حالة: تكليف دون مركبة ──
         const s3 = await apiGet('/api/my/check-session', tok3);
         const b3 = s3.body;
-        check('4) تكليف دون مركبة: جلسة سريع 1 بلا مركبة + صفر بنود ميكانيكية + بنوده الطبية = أصول سريع 1 فقط',
+        check('4) تكليف دون مركبة: جلسة سريع 1 بلا مركبة + صفر بنود ميكانيكية + v4.2: 65 قالبًا طبيًا + أصول سريع 1',
             s3.status === 200 && b3.session && b3.session.vehicle_id === '' && b3.vehicle === null
             && (b3.items || []).filter(i => i.domain === 'mechanical').length === 0
-            && (b3.items || []).filter(i => i.domain === 'medical').length === teamBAssetCount,
+            && (b3.items || []).filter(i => i.domain === 'medical').length === 65 + teamBAssetCount,
             JSON.stringify({ veh: b3.session && b3.session.vehicle_id, med: (b3.items || []).length, teamBAssetCount }));
 
         // ── 5) عدم التسرب: بنود C003 لا تمس جنوب 1 + بند فرقة أخرى ← 404 ──
@@ -399,15 +408,15 @@ const pad2 = v => String(v).padStart(2, '0');
         await cdp('Page.navigate', { url: BASE + '/my-ems.html' });
         await sleep(4500);
         const uiCheck = await evalJs(`(() => ({
-            hasSection: document.body.textContent.includes('إجراءات الاستلام والتسليم'),
+            hasSection: document.body.textContent.includes('جاهزية الفرقة'),
             completed: document.body.textContent.includes('اكتملت إجراءات الاستلام والتسليم'),
             medItems: [...document.querySelectorAll('.chk-item')].length,
             issueNote: document.body.textContent.includes('عبوة ناقصة'),
             reflectedTag: document.body.textContent.includes('انعكست في النظام المختص'),
             membersLine: document.body.textContent.includes('مسعف ثانٍ تجريبي')
         }))()`);
-        check('14) الواجهة: قسم التشييك مكتمل الحالة + 24 بندًا + الملاحظة المنعكسة موسومة + تأكيدات العضوين',
-            uiCheck.hasSection && uiCheck.completed && uiCheck.medItems === 24 && uiCheck.issueNote && uiCheck.reflectedTag && uiCheck.membersLine,
+        check('14) الواجهة v4.2: بطاقة جاهزية الفرقة مكتملة الحالة + 108 بنود + الملاحظة المنعكسة موسومة + تأكيدات العضوين',
+            uiCheck.hasSection && uiCheck.completed && uiCheck.medItems === 108 && uiCheck.issueNote && uiCheck.reflectedTag && uiCheck.membersLine,
             JSON.stringify(uiCheck));
         await shot('v3-1-check-section-completed');
 

@@ -1394,10 +1394,42 @@ app.get('/api/my/check-session', authenticate, authorizePerm('ops.my_portal'), a
 app.post('/api/my/check-session/items', authenticate, authorizePerm('ops.my_portal'), async (req, res) => {
     try {
         const out = await getShiftCheckService().checkItem(req.user, {
-            itemKey: req.body && req.body.item_key, result: req.body && req.body.result, note: req.body && req.body.note
+            itemKey: req.body && req.body.item_key, result: req.body && req.body.result, note: req.body && req.body.note,
+            statusDetail: req.body && req.body.status_detail, qtyAvailable: req.body && req.body.qty_available
         });
         res.json(out);
     } catch (error) { myCheckError(res, error, 'فشل في تسجيل البند'); }
+});
+
+// v4.2 — «لا تغيير»: تأكيد فعلي مسجل (لا اعتماد أعمى)، بشروط الأهلية المشددة
+app.post('/api/my/check-session/no-change', authenticate, authorizePerm('ops.my_portal'), async (req, res) => {
+    try {
+        const out = await getShiftCheckService().noChange(req.user);
+        res.json(out);
+    } catch (error) { myCheckError(res, error, 'فشل في تأكيد «لا تغيير»'); }
+});
+
+// v4.2 — حقول المركبة الثابتة (عداد/وقود/نظافة/مفتاح/شريحة)
+app.post('/api/my/check-session/vehicle-fields', authenticate, authorizePerm('ops.my_portal'), async (req, res) => {
+    try {
+        const out = await getShiftCheckService().vehicleFields(req.user, req.body || {});
+        res.json(out);
+    } catch (error) { myCheckError(res, error, 'فشل في حفظ بيانات المركبة'); }
+});
+
+// v4.2 — جاهزية اليوم: قراءة فقط لشاشات العمليات (شارة إعلامية — لا تمنع التعيين)
+const OPS_READINESS_VIEW = authorizeAnyPerm('ops.completion', 'ops.dispatch', 'ops.vehicles', 'ops.reports', 'admin.users_manage');
+app.get('/api/ops/readiness/today', authenticate, OPS_READINESS_VIEW, async (req, res) => {
+    try {
+        res.json(await getShiftCheckService().getTodayReadiness());
+    } catch (error) { myCheckError(res, error, 'فشل في جلب جاهزية اليوم'); }
+});
+
+// v4.2 — تفاصيل جلسة للمشرف/العمليات (قراءة فقط صِرفة)
+app.get('/api/ops/readiness/session/:id', authenticate, OPS_READINESS_VIEW, async (req, res) => {
+    try {
+        res.json({ success: true, ...(await getShiftCheckService().getSessionDetail(req.params.id)) });
+    } catch (error) { myCheckError(res, error, 'فشل في جلب تفاصيل الجلسة'); }
 });
 
 app.post('/api/my/check-session/confirm', authenticate, authorizePerm('ops.my_portal'), async (req, res) => {
@@ -5204,10 +5236,14 @@ archiveEngine.snapshot.placeIntel = placeIntel;
 const { MapboxSearchBoxProvider } = require('./services/place-providers/mapbox-searchbox');
 const { PlaceDiscoveryCache } = require('./services/place-discovery-cache');
 const { makeDiscoveryHook } = require('./services/place-discovery-hook');
+const { makeDiscoveryQueue } = require('./services/place-discovery-queue');
 const placeDiscoveryProvider = process.env.MAPBOX_SEARCH_TOKEN
     ? new MapboxSearchBoxProvider({ token: process.env.MAPBOX_SEARCH_TOKEN }) : null;
 const placeDiscoveryCache = new PlaceDiscoveryCache();
-const placeDiscoveryHook = makeDiscoveryHook({ provider: placeDiscoveryProvider, cache: placeDiscoveryCache });
+// PI-10 (اعتماد المالك 2026-08-31): الطابور الموحّد هو المصدر الوحيد لتشغيل
+// استعلامات المزود — concurrency محدود + dedupe + إيقاف/استئناف القاطع.
+const placeDiscoveryQueue = makeDiscoveryQueue({ provider: placeDiscoveryProvider, cache: placeDiscoveryCache });
+const placeDiscoveryHook = makeDiscoveryHook({ provider: placeDiscoveryProvider, cache: placeDiscoveryCache, queue: placeDiscoveryQueue });
 // حاجز ①: طابور تسلسلي — الاستجابة لا تنتظر الحسم، والكتابة ذرّية بلا lost update
 // onResolved (PI-7): Discovery يركب نفس السلسلة بعد الحسم مباشرة
 const placeResolutionHook = makeResolutionHook(placeIntel, console, placeDiscoveryHook.onResolved);
@@ -5657,6 +5693,8 @@ app.get('/api/cad-reports/:number/place-suggestion', authenticate, authorizePerm
         const number = String(req.params.number || '').trim();
         if (!CAD_NUMBER_RE.test(number)) return res.status(400).json({ error: 'رقم البلاغ غير صالح' });
 
+        // PI-10 (اعتماد المالك 2026-08-31): كاش ← طابور ← pending/retryAfter.
+        // لا يُستدعى المزود متزامنًا من هنا إطلاقًا — الرد مللي-ثوانٍ دائمًا.
         const cached = placeDiscoveryCache.get(number);
         if (cached) return res.json({ success: true, ...cached });
 
@@ -5664,28 +5702,38 @@ app.get('/api/cad-reports/:number/place-suggestion', authenticate, authorizePerm
         if (!incident) return res.status(404).json({ error: 'البلاغ غير موجود' });
 
         // تقاسم خلوي: نتيجة موقع قريب (~55م) محفوظة تكفي — بلا استعلام جديد
-        const cellHit = (typeof incident.lat === 'number') ? placeDiscoveryCache.getCell(incident.lat, incident.lng) : null;
+        const { isValidLatLng } = require('./services/place-providers/provider-interface');
+        const hasCoords = isValidLatLng(incident.lat, incident.lng);
+        const cellHit = hasCoords ? placeDiscoveryCache.getCell(incident.lat, incident.lng) : null;
         if (cellHit) { placeDiscoveryCache.set(number, cellHit); return res.json({ success: true, ...cellHit }); }
 
+        const fetchedAt = new Date().toISOString();
         if (!placeDiscoveryProvider)
             return res.json({ success: true, outcome: 'disabled', suggestions: [], provider: null,
-                fetchedAt: new Date().toISOString(), reason: 'مزود البحث غير مفعّل (MAPBOX_SEARCH_TOKEN)' });
+                fetchedAt, reason: 'مزود البحث غير مفعّل (MAPBOX_SEARCH_TOKEN)' });
+        if (!hasCoords)
+            return res.json({ success: true, outcome: 'no-coords', suggestions: [],
+                provider: placeDiscoveryProvider.id, fetchedAt, reason: 'لا إحداثية صالحة' });
 
-        if (!placeDiscoveryCache.allowProviderCall())
+        // قاطع مفتوح ← انتظار حقيقي: يُدرج (idempotent) ويُستكمل تلقائيًا عند الإغلاق
+        const circuitMs = placeDiscoveryCache.circuitOpenRemainingMs();
+        if (circuitMs > 0) {
+            placeDiscoveryQueue.submit(number, incident);
+            return res.json({ success: true, outcome: 'provider-paused', suggestions: [],
+                provider: placeDiscoveryProvider.id, fetchedAt,
+                retryAfter: Math.ceil(circuitMs / 1000),
+                reason: 'مزود البحث متوقف مؤقتًا — سيُستكمل تلقائيًا عند عودته' });
+        }
+        if (placeDiscoveryCache.budgetExhausted())
             return res.json({ success: true, outcome: 'budget-exhausted', suggestions: [],
-                provider: placeDiscoveryProvider.id, fetchedAt: new Date().toISOString(),
-                reason: 'الميزانية اليومية مستنفدة أو القاطع مفتوح' });
+                provider: placeDiscoveryProvider.id, fetchedAt, reason: 'الميزانية اليومية مستنفدة' });
 
-        placeDiscoveryCache.noteProviderCall();
-        const { discover } = require('./services/place-discovery-orchestrator');
-        const result = await discover(placeDiscoveryProvider, {
-            lat: incident.lat, lng: incident.lng,
-            address: incident.address, description: incident.description
-        });
-        if (result.errorKind === 'rate-limited') placeDiscoveryCache.noteRateLimited();
-        placeDiscoveryCache.set(number, result);
-        if (typeof incident.lat === 'number') placeDiscoveryCache.setCell(incident.lat, incident.lng, result);
-        res.json({ success: true, ...result });
+        // إدراج idempotent ثم pending — الواجهة تعيد الاستعلام بعد retryAfter
+        placeDiscoveryQueue.submit(number, incident);
+        return res.json({ success: true, outcome: 'pending', suggestions: [],
+            provider: placeDiscoveryProvider.id, fetchedAt,
+            retryAfter: placeDiscoveryQueue.retryAfterFor(number),
+            reason: 'جارٍ التعرف على هوية الموقع' });
     } catch (error) {
         console.error('[PlaceSuggestion] error:', error.message);
         res.status(500).json({ error: 'فشل في جلب اقتراح الموقع' });

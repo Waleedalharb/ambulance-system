@@ -141,12 +141,31 @@
         </div>`;
     }
 
-    // ── إجراءات الاستلام والتسليم (v3) — سجل مشترك للفرقة/المناوبة ──
+    // ── جاهزية الفرقة — نظام التشييك الذكي v4.2 (معتمد مبدئيًا 2026-09-06) ──
+    // تدفق المسعف: سؤال واحد ← «لا تغيير» مؤكد / مشكلة / تشييك جديد ← حقول المركبة ← الجاهزية مشتقة.
+    let checkView = 'home';      // home | groups | vehicle
+    let checkGroupOpen = null;   // مفتاح المجموعة المفتوحة حاليًا
+    const checkSel = {};         // اختيارات الحالة المؤقتة لكل بند (قبل الحفظ)
+
+    const STATUS_LABELS = { complete: 'مكتمل', shortage: 'ناقص', damaged: 'تالف', unavailable: 'غير متوفر', follow_up: 'يحتاج متابعة' };
+    const NC_REASON_LABELS = { open_issues: 'توجد ملاحظات مفتوحة — افحص التفاصيل', no_previous_check: 'لا يوجد فحص سابق لهذه المركبة', stale_check: 'آخر فحص قديم (تجاوز المدة المعتمدة)', vehicle_changed: 'تغيّرت المركبة منذ آخر فحص' };
+
+    function readinessBadge(d) {
+        const map = {
+            green: { t: '🟢 جاهزة', c: 'rdy-green' },
+            yellow: { t: '🟡 جاهزة مع ملاحظة', c: 'rdy-yellow' },
+            red: { t: '🔴 غير جاهزة', c: 'rdy-red' }
+        };
+        if (!d.readiness) return '<div class="rdy-badge rdy-pending">⏳ لم تُستكمل الجاهزية بعد</div>';
+        const m = map[d.readiness];
+        return `<div class="rdy-badge ${m.c}">${m.t}${d.readinessReason ? `<small>${esc(d.readinessReason)}</small>` : ''}</div>`;
+    }
+
     function renderCheck(d) {
-        const head = '<div class="card-head check">إجراءات الاستلام والتسليم</div>';
+        const head = '<div class="card-head check">🚑 جاهزية الفرقة</div>';
         if (d.state === 'no_assignment') {
             return `<div class="card" id="checkCard">${head}<div class="card-body">
-                <div class="empty">لا يوجد تكليف ميداني مسجل لك اليوم — تظهر إجراءات الاستلام والتسليم أيام التكليف.</div>
+                <div class="empty">لا يوجد تكليف ميداني مسجل لك اليوم — تظهر جاهزية الفرقة أيام التكليف.</div>
             </div></div>`;
         }
         if (d.state === 'not_field_team') {
@@ -154,11 +173,149 @@
                 <div class="empty">التشييك مخصص للفرق الميدانية.</div>
             </div></div>`;
         }
+        // الجلسات القديمة (v1): العرض الكلاسيكي بلا تغيير
+        if (!d.session || (d.session.schema_version || 1) < 2) return renderCheckLegacy(d, head);
+
+        const completed = d.session.status === 'completed';
+        const meId = d.me.id;
+        const myConf = new Set((d.confirmations || []).filter(c => c.employee_id === meId).map(c => c.kind));
+
+        // الملاحظات المفتوحة — تُعرض إلزاميًا قبل أي تأكيد (قاعدة المالك)
+        const openIssues = (d.openIssues || []).filter(o =>
+            !(d.items || []).some(i => i.itemKey === o.itemKey && i.result === 'ok'));
+        const issuesHtml = openIssues.length
+            ? `<div class="issue-banner">⚠ ملاحظات مفتوحة من تشييك سابق — يجب الاطلاع عليها قبل التأكيد:<br>${openIssues.map(o =>
+                `• ${esc(o.label)}${o.note ? ' — ' + esc(o.note) : ''} <small>(${esc(o.byName || '')} · ${esc((o.at || '').slice(0, 10))})</small>`).join('<br>')}</div>`
+            : '';
+
+        // عنصر بند v4.2: الحالة بالضغط + الكمية المطلوبة + المتاح عند النقص
+        const itemHtml = i => {
+            const sel = checkSel[i.itemKey];
+            const st = i.statusDetail;
+            const meta = i.noChange
+                ? `✓ لا تغيير — أكده ${esc(i.checkedByName || '')} · ${esc((i.checkedAt || '').slice(0, 16).replace('T', ' '))}`
+                : (i.checkedByName ? `آخر فحص: ${esc(i.checkedByName)} · ${esc((i.checkedAt || '').slice(0, 16).replace('T', ' '))}` : 'لم يُفحص بعد');
+            const stTag = st && !i.noChange ? ` <b class="st-tag st-${st}">${STATUS_LABELS[st] || ''}</b>` : '';
+            const qty = i.qtyRequired ? ` <small class="chk-qty">المطلوب: ${esc(i.qtyRequired)}</small>` : '';
+            const qtyAv = i.qtyAvailable != null ? ` <small class="chk-qty">المتاح: ${esc(i.qtyAvailable)}</small>` : '';
+            const noteHtml = i.note
+                ? `<div class="chk-existing-note">📝 ${esc(i.note)}${i.reflected ? ' <small>· انعكست في النظام المختص ✓</small>' : ''}</div>` : '';
+            const editor = (!completed && sel) ? `<div class="chk-note-editor open">
+                ${sel === 'shortage' && i.qtyRequired ? `<div class="chk-qty-row">المطلوب ${esc(i.qtyRequired)} — المتاح: <input type="text" inputmode="numeric" class="chk-qty-input" data-qty="${esc(i.itemKey)}" placeholder="0" style="width:64px"></div>` : ''}
+                <textarea placeholder="ملاحظة قصيرة (اختياري)…"></textarea>
+                <button data-save="${esc(i.itemKey)}" data-status="${esc(sel)}">حفظ «${STATUS_LABELS[sel]}»</button>
+            </div>` : '';
+            const btns = completed ? '' : `<div class="chk-actions st-row">
+                ${(d.itemStatuses || []).map(s =>
+                    `<button class="st-btn st-${s}${(st === s && !i.noChange) || sel === s ? ' on' : ''}" data-st="${s}" data-key="${esc(i.itemKey)}">${STATUS_LABELS[s]}</button>`).join('')}
+            </div>`;
+            return `<div class="chk-item" data-key="${esc(i.itemKey)}">
+                <div class="chk-label">${esc(i.label)}${stTag}${qty}${qtyAv}</div>
+                <div class="chk-meta">${meta}</div>
+                ${noteHtml}${btns}${editor}
+            </div>`;
+        };
+
+        // بطاقة مجموعة: «كلها سليمة» / «توجد مشكلة»
+        const groupHtml = g => {
+            const total = g.items.length;
+            const done = g.items.filter(i => i.result === 'ok' || i.noChange).length;
+            const issues = g.items.filter(i => i.result === 'issue').length;
+            const open = checkGroupOpen === g.key;
+            const stateTxt = issues ? `<span class="grp-iss">⚠ ${issues} ملاحظة</span>` : (done === total ? '<span class="grp-ok">✓ مكتملة</span>' : `<span class="grp-pend">${done}/${total}</span>`);
+            const hint = g.isAssets ? '<div class="chk-hint">لقطة من الأصول المسجلة على فرقتك لحظة إنشاء الجلسة — ليست إثباتًا بأن جميعها محمّل فعليًا على المركبة.</div>' : '';
+            const actions = completed ? '' : `<div class="grp-actions">
+                <button class="chk-btn" data-group-ok="${esc(g.key)}">✓ كلها سليمة</button>
+                <button class="chk-btn" data-group-open="${esc(g.key)}">${open ? 'إغلاق التفاصيل' : '⚠ توجد مشكلة / تفاصيل'}</button>
+            </div>`;
+            return `<div class="grp-card${open ? ' open' : ''}">
+                <div class="grp-head"><b>${esc(g.label)}</b> ${stateTxt}</div>
+                ${hint}${actions}
+                ${open || completed ? '<div class="grp-items">' + g.items.map(itemHtml).join('') + '</div>' : ''}
+            </div>`;
+        };
+
+        // الشاشة الرئيسية: سؤال واحد (تجربة «نظام جاهزية ذكي» — قرار المالك)
+        const nc = d.noChange || {};
+        const ncReasons = (nc.reasons || []).map(r => NC_REASON_LABELS[r] || r).join(' · ');
+        const lastTxt = nc.lastCheck ? `آخر تشييك مكتمل: ${esc((nc.lastCheck.at || '').slice(0, 16).replace('T', ' '))}${nc.lastCheck.vehicleName ? ' · ' + esc(nc.lastCheck.vehicleName) : ''}` : 'لا يوجد تشييك سابق مكتمل';
+        const homeHtml = `
+            <div class="chk-question">هل توجد أي تغييرات منذ آخر تشييك؟</div>
+            <div class="chk-last">${lastTxt}</div>
+            <div class="conf-row">
+                <button class="conf-btn" data-nc="1" ${nc.eligible ? '' : 'disabled'}>✓ لا، كل شيء كما هو</button>
+                <button class="conf-btn chk-btn-warn" data-view="groups">⚠ نعم، توجد مشكلة</button>
+                <button class="conf-btn chk-btn-neutral" data-view="groups">🔄 بدء تشييك جديد</button>
+            </div>
+            ${nc.eligible ? '' : `<div class="chk-hint" style="margin-top:6px">لا يتاح «لا تغيير»: ${esc(ncReasons)}</div>`}`;
+
+        // حقول المركبة الثابتة (عداد/وقود/نظافة/مفتاح/شريحة)
+        const vf = d.vehicleFields || {};
+        const fuelOpts = [['100', '100%'], ['75', '75%'], ['50', '50%'], ['25', '25%'], ['under25', 'أقل من 25%']];
+        const slTag = d.vehicle ? (d.serviceLevelConfirmed
+            ? ` · ${esc(d.serviceLevel)}` : ' · <span class="chk-qty">تصنيف ALS/BLS غير مؤكد — تُعرض كـBLS مؤقتًا</span>') : '';
+        const vehicleHtml = d.vehicle ? `
+            <div class="chk-sub">بيانات المركبة — ${esc(d.vehicle.name)}${d.vehicleType ? ' · ' + esc(d.vehicleType) : ''}${slTag}</div>
+            <div class="vf-grid">
+                <label>قراءة العداد: <input type="number" min="0" class="vf-input" id="vfOdometer" value="${vf.odometer != null ? vf.odometer : ''}" placeholder="كم"></label>
+                <div class="vf-row">كمية الوقود: ${fuelOpts.map(o => `<button class="st-btn vf-fuel${vf.fuel_level === o[0] ? ' on' : ''}" data-vf-fuel="${o[0]}">${o[1]}</button>`).join('')}</div>
+                <div class="vf-row">النظافة: <button class="st-btn vf-clean${vf.cleanliness === 'clean' ? ' on' : ''}" data-vf-clean="clean">نظيفة</button><button class="st-btn vf-clean${vf.cleanliness === 'dirty' ? ' on' : ''}" data-vf-clean="dirty">غير نظيفة</button></div>
+                <div class="vf-row">المفتاح الأساسي: <button class="st-btn vf-key${vf.master_key === 1 ? ' on' : ''}" data-vf-key="1">موجود</button><button class="st-btn vf-key${vf.master_key === 0 ? ' on' : ''}" data-vf-key="0">غير موجود</button></div>
+                <div class="vf-row">شريحة الوقود: <button class="st-btn vf-card${vf.fuel_card === 1 ? ' on' : ''}" data-vf-card="1">موجودة</button><button class="st-btn vf-card${vf.fuel_card === 0 ? ' on' : ''}" data-vf-card="0">غير موجودة</button></div>
+            </div>
+            ${completed ? '' : '<div class="conf-row"><button class="conf-btn" data-vf-save="1">حفظ بيانات المركبة</button></div>'}` : '';
+
+        // تأكيدات الفرقة (كما في v3)
+        const confLabel = { ack: 'الاطلاع', checkin: 'الاستلام', checkout: 'التسليم' };
+        const membersHtml = (d.members || []).map(m => {
+            const kinds = new Set((d.confirmations || []).filter(c => c.employee_id === m.id).map(c => c.kind));
+            const marks = ['ack', 'checkin', 'checkout'].map(k => `${kinds.has(k) ? '✅' : '⬜'} ${confLabel[k]}`).join(' · ');
+            return `<div><b>${esc(m.name)}</b>: ${marks}</div>`;
+        }).join('');
+        const myBtns = ['ack', 'checkin', 'checkout']
+            .filter(k => !myConf.has(k))
+            .map(k => `<button class="conf-btn" data-conf="${k}">تأكيد ${confLabel[k]}</button>`).join('');
+
+        const modeTag = d.checkMode === 'no_change' ? '<div class="chip">النمط: <b>تأكيد لا تغيير</b></div>' : (d.checkMode ? `<div class="chip">النمط: <b>${d.checkMode === 'full' ? 'تشييك كامل' : 'تشييك جزئي'}</b></div>` : '');
+
+        let bodyMain = '';
+        if (completed) {
+            bodyMain = '<div class="chk-done">✅ اكتملت إجراءات الاستلام والتسليم لهذه المناوبة</div>' + (d.groups || []).map(groupHtml).join('');
+        } else if (checkView === 'groups') {
+            bodyMain = `<div class="conf-row" style="margin-bottom:8px"><button class="chk-btn" data-view="home">→ رجوع</button><button class="chk-btn" data-view="vehicle">بيانات المركبة ←</button></div>`
+                + (d.groups || []).map(groupHtml).join('');
+        } else if (checkView === 'vehicle') {
+            bodyMain = `<div class="conf-row" style="margin-bottom:8px"><button class="chk-btn" data-view="home">→ رجوع</button></div>` + vehicleHtml;
+        } else {
+            bodyMain = homeHtml;
+        }
+
+        return `<div class="card" id="checkCard">${head}
+            <div class="card-body">
+                <div class="chip-row">
+                    <div class="chip">الفرقة: <b>${esc(d.team.teamName)}</b></div>
+                    <div class="chip">المركبة: <b>${d.vehicle ? esc(d.vehicle.name) : '—'}</b></div>
+                    <div class="chip">التاريخ: <b>${esc(d.today)}</b></div>
+                    ${modeTag}
+                </div>
+                ${readinessBadge(d)}
+                <div style="margin-top:8px" id="chkToastHolder"></div>
+                ${issuesHtml}
+                ${bodyMain}
+                ${checkView === 'home' && !completed ? vehicleHtml : ''}
+                <div class="chk-sub">تأكيدات الفرقة (لكل موظف على حدة)</div>
+                <div class="conf-members">${membersHtml || '—'}</div>
+                ${completed ? '' : `<div class="conf-row">${myBtns || '<span style="font-size:0.78rem;color:var(--muted)">أكملت جميع تأكيداتك لهذه الجلسة</span>'}</div>`}
+            </div>
+        </div>`;
+    }
+
+    // العرض الكلاسيكي للجلسات القديمة v1 — بلا تغيير عن v3
+    function renderCheckLegacy(d, head) {
         const completed = d.session && d.session.status === 'completed';
         const meId = d.me.id;
         const myConf = new Set((d.confirmations || []).filter(c => c.employee_id === meId).map(c => c.kind));
 
-        // الملاحظات المفتوحة من جلسات سابقة — لا تختفي إلا بفحص لاحق سليم
         const openIssues = (d.openIssues || []).filter(o =>
             !(d.items || []).some(i => i.itemKey === o.itemKey && i.result === 'ok'));
         const issuesHtml = openIssues.length
@@ -249,7 +406,68 @@
             const btn = ev.target.closest('button');
             if (!btn) return;
             const itemEl = btn.closest('.chk-item');
+            const toast = m => { const h = document.getElementById('chkToastHolder'); if (h) h.innerHTML = `<div class="chk-toast">⚠ ${esc(m)}</div>`; };
             try {
+                // v4.2 — التنقل بين الشاشات
+                if (btn.dataset.view) { checkView = btn.dataset.view; if (btn.dataset.view !== 'groups') checkGroupOpen = null; await refreshCheck(); return; }
+                // v4.2 — «لا تغيير» (تأكيد فعلي مسجل)
+                if (btn.dataset.nc) { const r = await apiPost('/api/my/check-session/no-change', {}); await refreshCheck(r.warning); return; }
+                // v4.2 — فتح/إغلاق تفاصيل مجموعة
+                if (btn.dataset.groupOpen) { checkGroupOpen = checkGroupOpen === btn.dataset.groupOpen ? null : btn.dataset.groupOpen; await refreshCheck(); return; }
+                // v4.2 — «كلها سليمة» لمجموعة كاملة
+                if (btn.dataset.groupOk) {
+                    const gk = btn.dataset.groupOk;
+                    const d = await api('/api/my/check-session');
+                    const g = (d.groups || []).find(x => x.key === gk);
+                    if (!g) return;
+                    btn.disabled = true;
+                    for (const it of g.items) {
+                        if (it.result || it.noChange) continue;
+                        const r = await apiPost('/api/my/check-session/items', { item_key: it.itemKey, status_detail: 'complete' });
+                        if (r.warning) toast(r.warning);
+                    }
+                    await refreshCheck(); return;
+                }
+                // v4.2 — اختيار حالة بند (يفتح محرر الحفظ)
+                if (btn.dataset.st && btn.dataset.key) {
+                    checkSel[btn.dataset.key] = checkSel[btn.dataset.key] === btn.dataset.st ? null : btn.dataset.st;
+                    await refreshCheck(); return;
+                }
+                // v4.2 — حفظ حالة بند (مع المتاح عند النقص)
+                if (btn.dataset.save && btn.dataset.status) {
+                    const ed = btn.closest('.chk-note-editor');
+                    const note = ed ? ed.querySelector('textarea').value : '';
+                    const qtyIn = ed ? ed.querySelector('.chk-qty-input') : null;
+                    const r = await apiPost('/api/my/check-session/items', {
+                        item_key: btn.dataset.save, status_detail: btn.dataset.status, note,
+                        qty_available: qtyIn ? qtyIn.value : undefined
+                    });
+                    delete checkSel[btn.dataset.save];
+                    await refreshCheck(r.warning); return;
+                }
+                // v4.2 — حفظ بيانات المركبة
+                if (btn.dataset.vfSave) {
+                    const odo = card.querySelector('#vfOdometer');
+                    const fuel = card.querySelector('.vf-fuel.on');
+                    const clean = card.querySelector('.vf-clean.on');
+                    const key = card.querySelector('.vf-key.on');
+                    const crd = card.querySelector('.vf-card.on');
+                    const r = await apiPost('/api/my/check-session/vehicle-fields', {
+                        odometer: odo && odo.value !== '' ? Number(odo.value) : undefined,
+                        fuel_level: fuel ? fuel.dataset.vfFuel : undefined,
+                        cleanliness: clean ? clean.dataset.vfClean : undefined,
+                        master_key: key ? Number(key.dataset.vfKey) : undefined,
+                        fuel_card: crd ? Number(crd.dataset.vfCard) : undefined
+                    });
+                    await refreshCheck(r.warning); return;
+                }
+                // v4.2 — أزرار حقول المركبة (تحديد بصري فقط، الحفظ بزر الحفظ)
+                if (btn.dataset.vfFuel || btn.dataset.vfClean || btn.dataset.vfKey || btn.dataset.vfCard) {
+                    const cls = btn.dataset.vfFuel ? '.vf-fuel' : btn.dataset.vfClean ? '.vf-clean' : btn.dataset.vfKey ? '.vf-key' : '.vf-card';
+                    card.querySelectorAll(cls).forEach(b => b.classList.remove('on'));
+                    btn.classList.add('on'); return;
+                }
+                // v1 القديم — بلا تغيير
                 if (btn.dataset.act === 'ok' && itemEl) {
                     const r = await apiPost('/api/my/check-session/items', { item_key: itemEl.dataset.key, result: 'ok' });
                     await refreshCheck(r.warning);
@@ -266,8 +484,7 @@
                     await refreshCheck(r.warning);
                 }
             } catch (e) {
-                const h = document.getElementById('chkToastHolder');
-                if (h) h.innerHTML = `<div class="chk-toast">⚠ ${esc(e.message || 'تعذر الحفظ — تحقق من الاتصال وحاول مجددًا')}</div>`;
+                toast(e.message || 'تعذر الحفظ — تحقق من الاتصال وحاول مجددًا');
             }
         });
     }

@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>تفاصيل جاهزية الفرقة — عرض المشرف</title>
+<style>
+  :root { --bg:#0b1526; --surface:#101d33; --surface-2:#16263f; --text:#e8eef7; --text-2:#b8c4d6; --muted:#8b98a9; --border:#2a3a52; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font-family:'Segoe UI',Tahoma,sans-serif; padding:18px; }
+  h1 { font-size:1.15rem; margin:0 0 4px; }
+  .sub { color:var(--muted); font-size:.76rem; margin-bottom:14px; }
+  .badge { display:inline-block; font-weight:800; border-radius:10px; padding:8px 14px; margin:8px 0; font-size:.92rem; }
+  .b-green { color:#7EE2B8; background:rgba(14,164,122,.12); border:1px solid rgba(14,164,122,.45); }
+  .b-yellow { color:#EADDA8; background:rgba(232,200,74,.10); border:1px solid rgba(232,200,74,.4); }
+  .b-red { color:#FCA5A5; background:rgba(239,68,68,.12); border:1px solid rgba(239,68,68,.45); }
+  .b-none { color:var(--muted); background:var(--surface-2); border:1px dashed var(--border); }
+  .reason { font-size:.74rem; color:var(--text-2); margin-bottom:12px; }
+  .chips { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; }
+  .chip { background:var(--surface-2); border:1px solid var(--border); border-radius:9px; padding:6px 11px; font-size:.76rem; }
+  .group { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:12px 14px; margin-bottom:10px; }
+  .group h2 { font-size:.88rem; margin:0 0 8px; color:#9fc1e8; }
+  table { width:100%; border-collapse:collapse; font-size:.76rem; }
+  th, td { text-align:right; padding:6px 8px; border-bottom:1px solid var(--border); }
+  th { color:var(--muted); font-weight:600; font-size:.7rem; }
+  .st-complete { color:#7EE2B8; } .st-shortage,.st-damaged,.st-unavailable { color:#FCA5A5; } .st-follow_up { color:#EADDA8; }
+  .nc { color:#7EE2B8; font-size:.7rem; }
+  .note { color:#EADDA8; font-size:.7rem; }
+  .issue-box { background:rgba(239,68,68,.08); border:1px solid rgba(239,68,68,.3); border-radius:10px; padding:9px 12px; margin-bottom:12px; font-size:.76rem; color:#FCA5A5; line-height:1.8; }
+  .conf { font-size:.76rem; color:var(--text-2); line-height:2; }
+  .conf b { color:var(--text); }
+  .back { color:#9fc1e8; font-size:.8rem; text-decoration:none; }
+  .err { color:#FCA5A5; padding:30px; text-align:center; }
+</style>
+</head>
+<body>
+<a class="back" href="javascript:history.back()">→ رجوع</a>
+<h1>تفاصيل جاهزية الفرقة <small style="font-size:.7rem;color:var(--muted)">(عرض فقط — لا إدخال من هذه الشاشة)</small></h1>
+<div class="sub">نظام التشييك الذكي v4.2 — كل الأرقام قابلة للتتبع إلى مصدرها (الجلسة والبنود والتأكيدات)</div>
+<div id="app">جاري التحميل…</div>
+
+<script>
+(function () {
+  const STATUS_LABELS = { complete: 'مكتمل', shortage: 'ناقص', damaged: 'تالف', unavailable: 'غير متوفر', follow_up: 'يحتاج متابعة' };
+  const CONF_LABELS = { ack: 'الاطلاع', checkin: 'الاستلام', checkout: 'التسليم' };
+  const RDY = { green: ['🟢 جاهزة', 'b-green'], yellow: ['🟡 جاهزة مع ملاحظة', 'b-yellow'], red: ['🔴 غير جاهزة', 'b-red'] };
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const token = () => (window.AuthCore && AuthCore.getToken) ? AuthCore.getToken() : (localStorage.getItem('auth_access_token') || localStorage.getItem('authToken'));
+  const app = document.getElementById('app');
+
+  (async () => {
+    const id = new URLSearchParams(location.search).get('session');
+    if (!id) { app.innerHTML = '<div class="err">معرّف الجلسة مفقود</div>'; return; }
+    const r = await fetch('/api/ops/readiness/session/' + encodeURIComponent(id), { headers: { Authorization: 'Bearer ' + token() } });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) { app.innerHTML = '<div class="err">' + esc(d.error || ('خطأ ' + r.status)) + '</div>'; return; }
+
+    const s = d.session;
+    const labels = d.groupLabels || {};
+    const rdy = RDY[s.readiness] || ['⏳ لم تُستكمل الجاهزية بعد', 'b-none'];
+
+    // تجميع البنود
+    const groups = new Map();
+    for (const i of d.items) {
+      const gk = i.groupKey || (i.domain === 'mechanical' ? '_mech' : '_assets');
+      if (!groups.has(gk)) groups.set(gk, []);
+      groups.get(gk).push(i);
+    }
+
+    const vf = [];
+    if (s.odometer != null) vf.push('العداد: ' + s.odometer + ' كم');
+    if (s.fuel_level) vf.push('الوقود: ' + (s.fuel_level === 'under25' ? 'أقل من 25%' : s.fuel_level + '%'));
+    if (s.cleanliness) vf.push('النظافة: ' + (s.cleanliness === 'clean' ? 'نظيفة' : 'غير نظيفة'));
+    if (s.master_key != null) vf.push('المفتاح: ' + (s.master_key ? 'موجود' : 'غير موجود'));
+    if (s.fuel_card != null) vf.push('الشريحة: ' + (s.fuel_card ? 'موجودة' : 'غير موجودة'));
+
+    let html = '<div class="chips">'
+      + '<div class="chip">الفرقة: <b>' + esc(s.team_name) + '</b></div>'
+      + '<div class="chip">المركبة: <b>' + esc(s.vehicle_name || '—') + '</b></div>'
+      + '<div class="chip">التاريخ: <b>' + esc(s.shift_date) + '</b></div>'
+      + '<div class="chip">الحالة: <b>' + (s.status === 'completed' ? 'مكتملة' : 'مفتوحة') + '</b></div>'
+      + (s.check_mode ? '<div class="chip">النمط: <b>' + ({ no_change: 'تأكيد لا تغيير', full: 'تشييك كامل', partial: 'تشييك جزئي' }[s.check_mode] || s.check_mode) + '</b></div>' : '')
+      + '</div>'
+      + '<div class="badge ' + rdy[1] + '">' + rdy[0] + '</div>'
+      + (s.readiness_reason ? '<div class="reason">السبب: ' + esc(s.readiness_reason) + '</div>' : '')
+      + (vf.length ? '<div class="chips">' + vf.map(v => '<div class="chip">' + esc(v) + '</div>').join('') + '</div>' : '');
+
+    if ((d.openIssues || []).length) {
+      html += '<div class="issue-box">⚠ ملاحظات مفتوحة:<br>' + d.openIssues.map(o =>
+        '• ' + esc(o.label) + (o.note ? ' — ' + esc(o.note) : '') + ' <small>(' + esc(o.byName || '') + ' · ' + esc((o.at || '').slice(0, 10)) + ')</small>').join('<br>') + '</div>';
+    }
+
+    for (const [gk, items] of groups) {
+      html += '<div class="group"><h2>' + esc(labels[gk] || (gk === '_mech' ? 'التشييك الميكانيكي' : 'الأصول المسجلة على الفرقة')) + '</h2><table>'
+        + '<tr><th>البند</th><th>المطلوب</th><th>المتاح</th><th>الحالة</th><th>فحصه</th><th>الوقت</th></tr>'
+        + items.map(i => {
+          const st = i.noChange ? '<span class="nc">✓ لا تغيير' + (i.refCheckedAt ? ' (مرجع: ' + esc(i.refCheckedAt.slice(0, 16).replace('T', ' ')) + ')' : '') + '</span>'
+            : (i.statusDetail ? '<span class="st-' + i.statusDetail + '">' + (STATUS_LABELS[i.statusDetail] || '') + '</span>' : '—');
+          return '<tr><td>' + esc(i.label) + (i.note ? '<div class="note">📝 ' + esc(i.note) + (i.reflected ? ' · انعكست ✓' : '') + '</div>' : '') + '</td>'
+            + '<td>' + esc(i.qtyRequired || '—') + '</td><td>' + esc(i.qtyAvailable || '—') + '</td><td>' + st + '</td>'
+            + '<td>' + esc(i.checkedByName || '—') + '</td><td>' + esc((i.checkedAt || '').slice(0, 16).replace('T', ' ') || '—') + '</td></tr>';
+        }).join('') + '</table></div>';
+    }
+
+    html += '<div class="group"><h2>تأكيدات الفرقة</h2><div class="conf">'
+      + ((d.confirmations || []).map(c => '<div><b>' + esc(c.employee_name) + '</b>: ' + esc(CONF_LABELS[c.kind] || c.kind) + ' · ' + esc((c.confirmed_at || '').slice(0, 16).replace('T', ' ')) + '</div>').join('') || 'لا تأكيدات بعد')
+      + '</div></div>';
+
+    app.innerHTML = html;
+  })().catch(e => { app.innerHTML = '<div class="err">تعذر التحميل: ' + esc(e.message) + '</div>'; });
+})();
+</script>
+</body>
+</html>

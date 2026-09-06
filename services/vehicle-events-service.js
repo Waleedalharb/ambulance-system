@@ -428,6 +428,7 @@ class VehicleEventsService {
                 plateNumber: v.plate_number || null,
                 callSign: v.call_sign || null,
                 vehicleType: v.vehicle_type || null,
+                serviceLevel: v.service_level || null,   // v4.2: ALS/BLS الصريح — NULL = غير مؤكد
                 status: lastStatus ? lastStatus.status : null,      // active|reserve|breakdown|out_of_service|null
                 statusSince: lastStatus ? lastStatus.created_at : null,
                 assignedAt: openAssignment.created_at

@@ -1821,6 +1821,10 @@ async function migrateFleetVA() {
   // (ensureColumn يقرأ PRAGMA table_info؛ آمن على القواعد القائمة والجديدة).
   await ensureColumn('vehicles', 'notes', 'TEXT');
 
+  // v4.2: مستوى الخدمة ALS/BLS — المصدر الصريح الوحيد لتصنيف المركبة (قرار المالك:
+  // لا مطابقة نصية على الموديل). NULL = غير مؤكد ← يُعامل BLS مؤقتًا ويُوسم «غير مؤكد».
+  await ensureColumn('vehicles', 'service_level', "TEXT CHECK(service_level IN ('ALS','BLS'))");
+
   // ── زرع السجل الرسمي (فقط إذا كان الجدول فارغًا) ──
   const vehiclesCount = await get('SELECT COUNT(*) AS c FROM vehicles');
   if (vehiclesCount.c === 0) {
@@ -4258,6 +4262,26 @@ async function migrateAssetRegistry() {
     confirmed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(session_id, employee_id, kind)
   )`);
+
+  // ═══ نظام التشييك الذكي v4.2 (معتمد مبدئيًا 2026-09-06) ═══
+  // أعمدة إضافية فقط (ensureColumn idempotent) — بيانات وجلسات v3 لا تُمس:
+  // الجلسات القديمة تكمل بقواعدها (schema_version=1)، والجديدة على قالب v4.2.
+  await ensureColumn('shift_check_sessions', 'schema_version', 'INTEGER NOT NULL DEFAULT 1');
+  await ensureColumn('shift_check_sessions', 'readiness', "TEXT CHECK(readiness IN ('green','yellow','red'))");
+  await ensureColumn('shift_check_sessions', 'readiness_reason', 'TEXT');
+  await ensureColumn('shift_check_sessions', 'check_mode', "TEXT CHECK(check_mode IN ('no_change','partial','full'))");
+  await ensureColumn('shift_check_sessions', 'odometer', 'INTEGER');
+  await ensureColumn('shift_check_sessions', 'fuel_level', 'TEXT');
+  await ensureColumn('shift_check_sessions', 'cleanliness', 'TEXT');
+  await ensureColumn('shift_check_sessions', 'master_key', 'INTEGER');
+  await ensureColumn('shift_check_sessions', 'fuel_card', 'INTEGER');
+  await ensureColumn('shift_check_sessions', 'readiness_at', 'TEXT');
+  await ensureColumn('shift_check_items', 'group_key', 'TEXT');
+  await ensureColumn('shift_check_items', 'qty_required', 'TEXT');
+  await ensureColumn('shift_check_items', 'qty_available', 'TEXT');
+  await ensureColumn('shift_check_items', 'status_detail', "TEXT CHECK(status_detail IN ('complete','shortage','damaged','unavailable','follow_up'))");
+  await ensureColumn('shift_check_items', 'no_change', 'INTEGER NOT NULL DEFAULT 0');
+  await ensureColumn('shift_check_items', 'ref_checked_at', 'TEXT');
 
   // ═══ استعادة كلمة المرور (معتمد 2026-09-04) ═══
   // رموز الاستعادة الخادمية: تُخزَّن مجزّأة (sha256) فقط، مرة واحدة، 10 دقائق.
