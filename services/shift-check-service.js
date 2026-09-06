@@ -541,6 +541,60 @@ class ShiftCheckService {
         };
     }
 
+    /**
+     * لوحة استعداد الفرق v4.3 (قراءة فقط صِرفة — لا حساب جاهزية هنا):
+     * كل الفرق الميدانية المكلّفة اليوم (roster + قائمة الأنواع الصريحة نفسها)
+     * × جلستها المحسوبة إن وُجدت. الفرقة بلا جلسة أو بلا جاهزية محسوبة ←
+     * «لم تُسجّل» — لا يُستدل على الجاهزية من مجرد وجود جلسة (قرار المالك).
+     * المركبة: من الجلسة أولًا، وإلا التعيين الحالي عبر الخدمة الرسمية نفسها.
+     */
+    async getTeamsReadinessBoard() {
+        const today = riyadhToday();
+        const teams = await this.db.all(
+            `SELECT DISTINCT t.id, t.name, t.center, t.team_type
+             FROM shift_roster r JOIN teams t ON t.id = r.team_id
+             WHERE r.shift_date = ? AND t.team_type IN ('جنوب', 'دعم', 'سريع')
+             ORDER BY t.name`, [today]);
+        const sessions = await this.db.all(
+            `SELECT id, team_id, team_name, vehicle_id, vehicle_name, center, status,
+                    schema_version, readiness, readiness_reason, readiness_at, check_mode
+             FROM shift_check_sessions WHERE shift_date = ?`, [today]);
+        const byTeam = new Map(sessions.map(s => [s.team_id, s]));
+        const ves = this.getVehicleEventsService ? this.getVehicleEventsService() : null;
+
+        const rows = [];
+        for (const t of teams) {
+            const s = byTeam.get(t.id) || null;
+            let vehicleName = s && s.vehicle_name ? s.vehicle_name : null;
+            if (!vehicleName && ves) {
+                try {
+                    const vs = await ves.getTeamVehicles(t.id);
+                    if (vs && vs.length && vs[0].name) vehicleName = vs[0].name;
+                } catch (_) { /* قراءة فقط — غياب المركبة لا يُسقط اللوحة */ }
+            }
+            // حالة التشييك النصية: صادقة ولا توهم اكتمالًا لم يحدث
+            let checkState = 'لم يبدأ';
+            if (s) {
+                if (s.check_mode === 'no_change') checkState = 'لا تغيير';
+                else if (s.status === 'completed') checkState = (s.schema_version || 1) < 2 ? 'مكتمل (نظام سابق)' : 'مكتمل';
+                else checkState = 'قيد التنفيذ';
+            }
+            rows.push({
+                teamId: t.id, teamName: t.name, center: (s && s.center) || t.center || null,
+                teamType: t.team_type,
+                sessionId: s ? s.id : null,
+                vehicleName,
+                checkState,
+                readiness: s ? (s.readiness || null) : null,
+                readinessReason: s ? (s.readiness_reason || null) : null,
+                lastUpdate: s ? (s.readiness_at || null) : null
+            });
+        }
+        const summary = { green: 0, yellow: 0, red: 0, unrecorded: 0 };
+        for (const r of rows) summary[r.readiness || 'unrecorded']++;
+        return { today, summary, rows };
+    }
+
     /** تأكيد مستقل لكل موظف: ack/checkin/checkout — UNIQUE يمنع التكرار. */
     async confirm(user, { kind }) {
         if (!['ack', 'checkin', 'checkout'].includes(kind)) throw this._err(422, 'نوع تأكيد غير صالح', 'BAD_INPUT');

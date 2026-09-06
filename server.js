@@ -1432,6 +1432,14 @@ app.get('/api/ops/readiness/session/:id', authenticate, OPS_READINESS_VIEW, asyn
     } catch (error) { myCheckError(res, error, 'فشل في جلب تفاصيل الجلسة'); }
 });
 
+// v4.3 — لوحة استعداد الفرق: كل الفرق الميدانية المكلّفة اليوم + جلستها إن وُجدت
+// (قراءة فقط صِرفة — الفرقة بلا جاهزية محسوبة تظهر «لم تُسجّل»، لا استنتاج)
+app.get('/api/ops/readiness/teams', authenticate, OPS_READINESS_VIEW, async (req, res) => {
+    try {
+        res.json(await getShiftCheckService().getTeamsReadinessBoard());
+    } catch (error) { myCheckError(res, error, 'فشل في جلب لوحة استعداد الفرق'); }
+});
+
 app.post('/api/my/check-session/confirm', authenticate, authorizePerm('ops.my_portal'), async (req, res) => {
     try {
         const out = await getShiftCheckService().confirm(req.user, { kind: req.body && req.body.kind });
