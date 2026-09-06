@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>استعداد الفرق الإسعافية</title>
+<style>
+    body{margin:0;background:#0f141b;color:#c9d6e4;font-family:'Segoe UI',Tahoma,Arial,sans-serif;min-height:100vh}
+    .rdb-page-bar{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid rgba(255,255,255,.08)}
+    .rdb-page-bar h1{font-size:1.05rem;margin:0;color:#e6eef7}
+    .rdb-back{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);color:#c9d6e4;border-radius:8px;padding:6px 14px;font-size:.8rem;font-weight:700;cursor:pointer;text-decoration:none}
+    .rdb-back:hover{background:rgba(255,255,255,.12)}
+    .rdb-note{color:#8b98a9;font-size:.72rem;margin-inline-start:auto}
+</style>
+</head>
+<body>
+<div class="rdb-page-bar">
+    <a class="rdb-back" href="/radio-completion.html">▸ رجوع إلى التكميل</a>
+    <h1>🚑 استعداد الفرق الإسعافية</h1>
+    <span class="rdb-note">قراءة فقط — المصدر: تشييك المسعف · تحديث تلقائي كل 60 ثانية</span>
+</div>
+
+<!-- وضع التفاصيل الكامل: الملخص + الجدول + زر تحديث يدوي -->
+<div id="readinessBoard" data-mode="full"></div>
+<script src="/js/readiness-board.js" defer></script>
+</body>
+</html>

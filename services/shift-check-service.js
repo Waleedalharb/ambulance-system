@@ -554,7 +554,9 @@ class ShiftCheckService {
             `SELECT DISTINCT t.id, t.name, t.center, t.team_type
              FROM shift_roster r JOIN teams t ON t.id = r.team_id
              WHERE r.shift_date = ? AND t.team_type IN ('جنوب', 'دعم', 'سريع')
-             ORDER BY t.name`, [today]);
+             ORDER BY CASE t.team_type WHEN 'جنوب' THEN 0 WHEN 'سريع' THEN 1 ELSE 2 END,
+                      CAST(substr(t.name, instr(t.name, ' ') + 1) AS INTEGER),
+                      t.name`, [today]);
         const sessions = await this.db.all(
             `SELECT id, team_id, team_name, vehicle_id, vehicle_name, center, status,
                     schema_version, readiness, readiness_reason, readiness_at, check_mode

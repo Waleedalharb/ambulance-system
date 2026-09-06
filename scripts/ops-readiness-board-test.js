@@ -20,6 +20,10 @@ const TMP_DB = path.join(os.tmpdir(), 'rdb-' + STAMP + '.db').replace(/\\/g, '/'
 const TMP_DIR = path.join(os.tmpdir(), 'rdb-data-' + STAMP).replace(/\\/g, '/');
 const PORT = 3132;
 const BASE = 'http://127.0.0.1:' + PORT;
+const CDP_PORT = 9486;
+const CHROME = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
+const CHROME_PROFILE = path.join(os.tmpdir(), 'rdb-profile-' + STAMP).replace(/\\/g, '/');
+const OUT_DIR = path.join(ROOT, 'test-output', 'readiness-board-' + STAMP);
 
 let passed = 0, failed = 0;
 const failures = [];
@@ -40,6 +44,7 @@ function riyadhTodayStr() {
 }
 
 (async () => {
+    fs.mkdirSync(OUT_DIR, { recursive: true });
     const Database = require(path.join(ROOT, 'node_modules', 'better-sqlite3'));
     const bcrypt = require(path.join(ROOT, 'node_modules', 'bcryptjs'));
 
@@ -160,6 +165,15 @@ function riyadhTodayStr() {
             && sum.green >= 1 && sum.yellow >= 1 && sum.red >= 1 && sum.unrecorded >= 1,
             JSON.stringify(sum));
 
+        // الترتيب المعتمد: جنوب رقميًا (2 قبل 10 — لا أبجديًا) ثم سريع ثم دعم
+        const order = rows.map(r => r.teamName);
+        const pos = n => order.indexOf(n);
+        check('9ب) الترتيب: جنوب رقميًا (جنوب 2 قبل جنوب 10) ثم التدخل السريع ثم الدعم',
+            pos('جنوب 1') !== -1 && pos('جنوب 1') < pos('جنوب 2') && pos('جنوب 2') < pos('جنوب 10')
+            && pos('جنوب 10') < pos('سريع 1') && pos('سريع 1') < pos('سريع 2')
+            && (pos('الدعم اللوجستي') === -1 || pos('سريع 3') < pos('الدعم اللوجستي')),
+            order.join(' · '));
+
         check('10) مستخدم بوابة فقط (ops.my_portal) ← 403', (await apiGet('/api/ops/readiness/teams', tokPortal)).status === 403);
         check('11) بلا توكن ← 401', (await apiGet('/api/ops/readiness/teams', null)).status === 401);
 
@@ -171,6 +185,95 @@ function riyadhTodayStr() {
         const greenSes = rows.find(r => r.teamId === TEAM_G);
         const detail = await apiGet('/api/ops/readiness/session/' + (greenSes && greenSes.sessionId), tokOps);
         check('13) انحدار: /api/ops/readiness/session/:id ← 200', detail.status === 200 && detail.body && detail.body.success === true);
+
+        // ── v4.3.1: فحوص سكونية للواجهة والتنقّل ──
+        const rcHtml = fs.readFileSync(path.join(ROOT, 'public', 'radio-completion.html'), 'utf8');
+        const boardJs = fs.readFileSync(path.join(ROOT, 'public', 'js', 'readiness-board.js'), 'utf8');
+        const boardHtml = fs.readFileSync(path.join(ROOT, 'public', 'readiness-board.html'), 'utf8');
+        check('14) التكميل يركّب البطاقة المختصرة + صفحة التفاصيل موجودة بوضع full ورابط رجوع للتكميل',
+            rcHtml.includes('id="readinessBoard"') && rcHtml.includes('/js/readiness-board.js')
+            && boardHtml.includes('data-mode="full"') && boardHtml.includes('/radio-completion.html')
+            && boardHtml.includes('استعداد الفرق الإسعافية'));
+        check('15) لا تبويب جديد ولا كتابة: صِفر _blank في لوحة الاستعداد + fetch وحيد GET بلا POST',
+            !boardJs.includes('_blank')
+            && (boardJs.match(/fetch\(/g) || []).length === 1 && !boardJs.includes("method: 'POST'") && !boardJs.includes('method:"POST"'));
+
+        // ── v4.3.1: لقطات الواجهة — صفحة التفاصيل + بطاقة التكميل + تنقّل نفس التبويب ──
+        const chrome = spawn(CHROME, ['--headless=new', '--remote-debugging-port=' + CDP_PORT,
+            '--window-size=1100,900', '--no-first-run', '--disable-gpu',
+            '--user-data-dir=' + CHROME_PROFILE, 'about:blank'], { stdio: 'ignore' });
+        try {
+            let targets = null;
+            for (let i = 0; i < 30; i++) { await sleep(500); try { const r = await fetch('http://127.0.0.1:' + CDP_PORT + '/json'); targets = await r.json(); break; } catch (_) { } }
+            if (!targets) throw new Error('CDP غير متاح');
+            const page = targets.find(t => t.type === 'page');
+            const ws = new WebSocket(page.webSocketDebuggerUrl);
+            await new Promise((res, rej) => { ws.onopen = res; ws.onerror = rej; });
+            let msgId = 0; const pendingCdp = new Map();
+            ws.onmessage = ev => {
+                try {
+                    const m = JSON.parse(ev.data);
+                    if (m.id && pendingCdp.has(m.id)) { const p = pendingCdp.get(m.id); pendingCdp.delete(m.id); m.error ? p.reject(new Error(m.error.message)) : p.resolve(m.result); }
+                } catch (_) { }
+            };
+            const cdp = (method, params = {}) => new Promise((resolve, reject) => {
+                const id = ++msgId; pendingCdp.set(id, { resolve, reject });
+                ws.send(JSON.stringify({ id, method, params }));
+                setTimeout(() => { if (pendingCdp.has(id)) { pendingCdp.delete(id); reject(new Error('CDP timeout: ' + method)); } }, 30000);
+            });
+            const evalJs = async (expr) => {
+                const r = await cdp('Runtime.evaluate', { expression: expr, returnByValue: true, awaitPromise: true });
+                if (r.exceptionDetails) throw new Error('eval failed: ' + JSON.stringify(r.exceptionDetails).slice(0, 300));
+                return r.result ? r.result.value : undefined;
+            };
+            const shot = async (name) => {
+                const r = await cdp('Page.captureScreenshot', { format: 'png' });
+                fs.writeFileSync(path.join(OUT_DIR, name + '.png'), Buffer.from(r.data, 'base64'));
+                console.log('  📸 ' + name + '.png');
+            };
+            await cdp('Page.enable'); await cdp('Runtime.enable');
+            await cdp('Page.addScriptToEvaluateOnNewDocument', { source: "try{localStorage.setItem('auth_access_token','" + tokOps + "');}catch(e){}" });
+
+            // صفحة التفاصيل: جدول + ملخص + زر تحديث يدوي
+            await cdp('Page.navigate', { url: BASE + '/readiness-board.html' });
+            await sleep(3500);
+            const full = await evalJs(`(() => ({
+                title: document.body.textContent.includes('استعداد الفرق الإسعافية'),
+                rows: document.querySelectorAll('#readinessBoard .rdb-table tbody tr').length,
+                chips: document.querySelectorAll('#readinessBoard .rdb-sum').length,
+                refreshBtn: !!document.getElementById('rdbRefresh'),
+                back: document.body.textContent.includes('رجوع إلى التكميل')
+            }))()`);
+            check('16) صفحة التفاصيل: العنوان + جدول الفرق + 4 عدّادات + زر تحديث يدوي + رجوع للتكميل',
+                full && full.title && full.rows >= 4 && full.chips === 4 && full.refreshBtn && full.back,
+                JSON.stringify(full));
+            await shot('board-1-details-page');
+
+            // بطاقة التكميل المختصرة: عدّادات فقط — بلا جدول داخل صفحة التكميل
+            await cdp('Page.navigate', { url: BASE + '/radio-completion.html' });
+            await sleep(5000);
+            const card = await evalJs(`(() => ({
+                title: document.body.textContent.includes('استعداد الفرق الآن'),
+                hint: document.body.textContent.includes('اضغط لعرض التفاصيل'),
+                chips: document.querySelectorAll('#readinessBoard .rdb-sum').length,
+                noTable: document.querySelectorAll('#readinessBoard .rdb-table').length === 0
+            }))()`);
+            check('17) بطاقة التكميل: «استعداد الفرق الآن» + عدّادات + تلميح الضغط — بلا جدول داخل الصفحة',
+                card && card.title && card.hint && card.chips === 4 && card.noTable,
+                JSON.stringify(card));
+            await shot('board-2-completion-card');
+
+            // التنقّل: الضغط على البطاقة ← صفحة التفاصيل في نفس التبويب
+            await evalJs(`(function(){ const m = document.querySelector('#readinessBoard .rdb-mini'); if (m) m.click(); return true; })()`);
+            await sleep(3000);
+            const nav = await evalJs('window.location.pathname');
+            check('18) الضغط على البطاقة ينقل لصفحة التفاصيل في نفس التبويب (زر الرجوع يعمل)',
+                nav === '/readiness-board.html', String(nav));
+            await shot('board-3-same-tab-navigation');
+            ws.close();
+        } finally {
+            chrome.kill();
+        }
     } catch (e) {
         check('سير الاختبار بلا استثناء', false, e.message);
     }
