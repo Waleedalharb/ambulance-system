@@ -124,6 +124,11 @@ body { font-family:'Segoe UI',Tahoma,sans-serif; background:var(--bg); color:var
 .late-rec { display:block; font-size:0.62rem; color:#FBBF24; line-height:1.7; background:rgba(245,158,11,0.10); border-radius:6px; padding:2px 6px; margin-top:2px; }
 .late-rec .edit-time { border:none; background:none; cursor:pointer; font-size:0.62rem; padding:0 2px; }
 
+/* بند «تصحيح الحالة» (2026-09-08): قائمة تصحيح سجل الحضور — خيارات مستقلة */
+.corr-options { display:flex; flex-direction:column; gap:6px; margin:8px 0; }
+.corr-options .corr-opt { border:1px solid var(--gray-light, #e5e7eb); background:var(--gray-light, #f3f4f6); border-radius:10px; padding:9px 12px; font-size:0.8rem; font-weight:700; font-family:inherit; cursor:pointer; text-align:right; transition:filter 0.15s; }
+.corr-options .corr-opt:hover { filter:brightness(0.94); }
+
 /* أزرار البطاقة الثلاثة — ضغطة واحدة = إجراء واحد */
 .actions-bar { display:flex; gap:0.4rem; margin-top:0.6rem; }
 .actions-bar .btn { flex:1; font-size:0.68rem; padding:6px 4px; border-radius:8px; border:none; cursor:pointer; font-weight:700; font-family:inherit; transition:filter 0.15s; }
@@ -1548,6 +1553,27 @@ function navigateToPage(url) {
     </div>
 </div>
 
+<!-- بند «تصحيح الحالة» (اعتماد المالك 2026-09-08): قائمة تصحيح سجل حضور الزميل —
+     تصحيح موثّق (correction) لا حذف للسجل؛ الخادم يشتق الحالة ويحفظ أثر التدقيق -->
+<div class="modal-overlay" id="correctionModal">
+    <div class="modal-box">
+        <h3 id="correctionTitle">تصحيح الحالة</h3>
+        <div id="correctionOptions" class="corr-options"></div>
+        <div id="correctionTimeWrap" style="display:none">
+            <label for="correctionTime"><i class="fas fa-clock"></i> وقت الحضور الصحيح</label>
+            <input id="correctionTime" type="time">
+        </div>
+        <div id="correctionReasonWrap" style="display:none">
+            <label for="correctionReason"><i class="fas fa-circle-question"></i> سبب الغياب</label>
+            <input id="correctionReason" placeholder="مثال: ظرف طارئ">
+        </div>
+        <div class="mm-actions">
+            <button class="mm-save" id="correctionConfirm" style="display:none" onclick="confirmCorrectionInput()"><i class="fas fa-check"></i> تنفيذ التصحيح</button>
+            <button class="mm-cancel" onclick="closeCorrectionModal()"><i class="fas fa-times"></i> إلغاء التصحيح</button>
+        </div>
+    </div>
+</div>
+
 <!-- التغطية التشغيلية (بند 17) — توثيق من غطّى النقص: الاسم/الرقم/المركز/النوع -->
 <div class="modal-overlay" id="coverageModal">
     <div class="modal-box">
@@ -2279,16 +2305,18 @@ function renderMiniLogs() {
         var lateHtml = lateRecords.filter(function(r) { return r.teamId === key; }).map(function(r) {
             var nm = String(r.employee).replace(/'/g, "\\'");
             var start = TimeRiyadh.formatTime(r.startedAt);
+            // بند «تصحيح الحالة» (2026-09-08): الزر على النوعين (حاضر متأخر/لم يحضر)
+            // يفتح قائمة التصحيح — تصحيح موثّق لا حذف، والخادم يشتق الحالة.
+            var corrBtn = ' <button class="edit-time" title="تصحيح الحالة" onclick="openCorrectionMenu(\'' + teamId + '\', \'' + nm + '\')">✏️</button>';
             // تفويض «المرحلة الأخيرة قبل الاعتماد الرسمي» (2026-08): الغائب/المتأخر الذي
             // يحضر تُعرض حالته «حاضر متأخر» — والمدة محسوبة سيرفريًا من بداية المناوبة.
             if (r.status === 'arrived') {
                 var arr = TimeRiyadh.formatTime(r.arrivedAt);
                 return '<span class="late-rec">⏰ ' + escapeHtml(r.employee) + ' — حاضر متأخر<br>' +
-                    'بدأ: ' + start + ' · حضر: ' + arr + ' · مدة التأخير: ' + r.durationMinutes + ' دقيقة' +
-                    ' <button class="edit-time" title="تعديل وقت الحضور" onclick="editArrivalTime(\'' + teamId + '\', \'' + nm + '\', \'' + arr + '\')">✏️</button></span>';
+                    'بدأ: ' + start + ' · حضر: ' + arr + ' · مدة التأخير: ' + r.durationMinutes + ' دقيقة' + corrBtn + '</span>';
             }
             return '<span class="late-rec">⏰ ' + escapeHtml(r.employee) + ' — تأخر<br>' +
-                'بدأ: ' + start + ' · الحالة: لم يحضر</span>';
+                'بدأ: ' + start + ' · الحالة: لم يحضر' + corrBtn + '</span>';
         }).join('');
         var eventsHtml = (byTeam[key] || []).slice(-3).map(function(e) {
             var t = TimeRiyadh.formatTime(e.created_at);
@@ -2449,23 +2477,135 @@ function personArrived(teamId, employee) {
     });
 }
 
-// ✏️ تعديل وقت الحضور (بند 15 — بصلاحية المشرف): تصحيح موثّق (correction) لا مسحًا للسجل.
-// الخادم يعيد حساب المدة — الواجهة ترسل الوقت المصحح فقط.
-function editArrivalTime(teamId, employee, currentHHMM) {
-    var input = prompt('تعديل وقت حضور ' + employee + ' (HH:MM)', currentHHMM || '');
-    if (!input) return;
-    var m = String(input).trim().match(/^([01]?\d|2[0-3]):([0-5]\d)$/);
-    if (!m) { showToast('⚠️ صيغة الوقت غير صحيحة — استخدم HH:MM', 'error'); return; }
-    // تفويض 2026-08 (توحيد التوقيت): التاريخ من ختم الخادم فقط (سياق المناوبة)،
-    // والتركيب بإزاحة +03:00 صريحة ثم UTC ISO — كان naive يُفسَّر بمنطقة الخادم.
-    var shiftDateForCorr = getShiftDate();
-    if (!shiftDateForCorr) { showToast('⚠️ تعذّر حلّ تاريخ المناوبة من الخادم — أعد المحاولة', 'error'); return; }
-    var composedCorr = new Date(shiftDateForCorr + 'T' + m[1].padStart(2, '0') + ':' + m[2] + ':00+03:00');
-    if (isNaN(composedCorr.getTime())) { showToast('⚠️ الوقت غير صالح', 'error'); return; }
-    var iso = composedCorr.toISOString();
-    postPersonEvents([{ type: 'correction', employeeName: employee, teamId: teamId, arrivalAt: iso }]).then(function(d) {
+// ------------------------------------
+// بند «تصحيح الحالة» (اعتماد المالك 2026-09-08) — قائمة تصحيح سجل حضور الزميل
+// تصحيح موثّق (correction append-only) لا حذفًا للسجل ولا إعادة تسجيل من الصفر:
+// لا يتكرر الاسم ولا تتضاعف الساعات، والخادم يشتق الحالة ويحفظ أثر التدقيق.
+// ------------------------------------
+var correctionCtx = null; // { teamId, employee, record, pending }
+
+function openCorrectionMenu(teamId, employee) {
+    var key = serverTeamKey(teamId);
+    var rec = null;
+    for (var i = lateRecords.length - 1; i >= 0; i--) { // الأحدث أولًا — نفس قاعدة «أحدث زوج»
+        if (lateRecords[i].employee === employee && lateRecords[i].teamId === key) { rec = lateRecords[i]; break; }
+    }
+    if (!rec) { showToast('⚠️ تعذّر العثور على سجل الحضور — حدّث الصفحة', 'error'); return; }
+    correctionCtx = { teamId: teamId, employee: employee, record: rec, pending: null };
+    document.getElementById('correctionTitle').textContent = 'تصحيح الحالة — ' + employee;
+    document.getElementById('correctionTimeWrap').style.display = 'none';
+    document.getElementById('correctionReasonWrap').style.display = 'none';
+    document.getElementById('correctionConfirm').style.display = 'none';
+    document.getElementById('correctionReason').value = '';
+    // الخيارات المستقلة حسب الحالة الراهنة (قرار المالك):
+    // إلغاء التأخير = يعود حاضرًا طبيعيًا بلا دقائق · لم يحضر = يبقى غير حاضر
+    // ويُسجَّل حضوره لاحقًا على نفس السجل · غائب = غياب واحد بلا ازدواج.
+    var opts = [];
+    if (rec.status === 'arrived') {
+        opts.push({ k: 'time', label: '🕒 تعديل وقت الحضور' });
+        if (rec.sourceEventType !== 'absence') opts.push({ k: 'late_void', label: '↩️ إلغاء التأخير — يعود حاضرًا طبيعيًا' });
+        else opts.push({ k: 'absence_void', label: '↩️ إلغاء الغياب — يعود حاضرًا طبيعيًا' });
+        opts.push({ k: 'arrival_void', label: '⏳ لم يحضر حتى الآن' });
+        opts.push({ k: 'absent', label: '🚫 غائب — يستبدل السجل بغياب واحد' });
+    } else if (rec.sourceEventType === 'late') {
+        opts.push({ k: 'arrived', label: '✋ حاضر — تسجيل حضوره الآن' });
+        opts.push({ k: 'late_void', label: '↩️ إلغاء التأخير — التسجيل خاطئ' });
+        opts.push({ k: 'absent', label: '🚫 تحويل إلى غائب' });
+    } else { // غياب مفتوح
+        opts.push({ k: 'arrived', label: '✋ حاضر — تسجيل حضوره الآن' });
+        opts.push({ k: 'absence_void', label: '↩️ إلغاء الغياب — التسجيل خاطئ' });
+    }
+    var html = '';
+    opts.forEach(function(o) {
+        html += '<button class="corr-opt" onclick="pickCorrectionOption(\'' + o.k + '\')">' + o.label + '</button>';
+    });
+    document.getElementById('correctionOptions').innerHTML = html;
+    document.getElementById('correctionModal').classList.add('active');
+}
+
+function closeCorrectionModal() {
+    document.getElementById('correctionModal').classList.remove('active');
+    correctionCtx = null;
+}
+
+function pickCorrectionOption(k) {
+    var ctx = correctionCtx;
+    if (!ctx) return;
+    var rec = ctx.record;
+    if (k === 'arrived') {
+        var teamId = ctx.teamId, employee = ctx.employee;
+        closeCorrectionModal();
+        personArrived(teamId, employee);
+        return;
+    }
+    if (k === 'time') { // تعديل وقت الحضور — إدخال الوقت داخل القائمة بدل الـ prompt القديم
+        document.getElementById('correctionReasonWrap').style.display = 'none';
+        document.getElementById('correctionTimeWrap').style.display = '';
+        document.getElementById('correctionConfirm').style.display = '';
+        document.getElementById('correctionTime').value = rec.arrivedAt ? TimeRiyadh.formatTime(rec.arrivedAt) : '';
+        correctionCtx.pending = 'time';
+        setTimeout(function() { document.getElementById('correctionTime').focus(); }, 50);
+        return;
+    }
+    if (k === 'absent') { // غائب — السبب إلزامي سيرفريًا
+        document.getElementById('correctionTimeWrap').style.display = 'none';
+        document.getElementById('correctionReasonWrap').style.display = '';
+        document.getElementById('correctionConfirm').style.display = '';
+        correctionCtx.pending = 'absent';
+        setTimeout(function() { document.getElementById('correctionReason').focus(); }, 50);
+        return;
+    }
+    // إلغاء التأخير/الغياب أو «لم يحضر حتى الآن» — إجراء مباشر بلا مدخلات،
+    // يستهدف حدثه بدقة (openEventId للفتح، arrivalEventId للوصول)
+    var targetId = (k === 'arrival_void') ? rec.arrivalEventId : rec.openEventId;
+    submitCorrectionBatch(
+        [{ type: 'correction', employeeName: ctx.employee, teamId: ctx.teamId, corrects: k, targetEventId: targetId }],
+        '✅ تم تصحيح حالة ' + ctx.employee
+    );
+}
+
+function confirmCorrectionInput() {
+    var ctx = correctionCtx;
+    if (!ctx || !ctx.pending) return;
+    var rec = ctx.record;
+    if (ctx.pending === 'time') {
+        // تفويض 2026-08 (توحيد التوقيت): التاريخ من ختم الخادم فقط (سياق المناوبة)،
+        // والتركيب بإزاحة +03:00 صريحة ثم UTC ISO — كان naive يُفسَّر بمنطقة الخادم.
+        var m = String(document.getElementById('correctionTime').value || '').trim().match(/^([01]?\d|2[0-3]):([0-5]\d)$/);
+        if (!m) { showToast('⚠️ صيغة الوقت غير صحيحة — استخدم HH:MM', 'error'); return; }
+        var shiftDateForCorr = getShiftDate();
+        if (!shiftDateForCorr) { showToast('⚠️ تعذّر حلّ تاريخ المناوبة من الخادم — أعد المحاولة', 'error'); return; }
+        var composedCorr = new Date(shiftDateForCorr + 'T' + m[1].padStart(2, '0') + ':' + m[2] + ':00+03:00');
+        if (isNaN(composedCorr.getTime())) { showToast('⚠️ الوقت غير صالح', 'error'); return; }
+        submitCorrectionBatch(
+            [{ type: 'correction', employeeName: ctx.employee, teamId: ctx.teamId, corrects: 'arrival_time', arrivalAt: composedCorr.toISOString(), targetEventId: rec.arrivalEventId }],
+            '✅ تم تصحيح وقت حضور ' + ctx.employee
+        );
+        return;
+    }
+    if (ctx.pending === 'absent') {
+        var reason = document.getElementById('correctionReason').value.trim();
+        if (!reason) { showToast('⚠️ اكتب سبب الغياب أولاً', 'error'); return; }
+        // غياب واحد بلا ازدواج: يُلغى الفتح الحالي (تأخر/غياب سابق وما اقترن به
+        // من وصول) ثم يُسجَّل الغياب الجديد — في دفعة واحدة تتسلسل سيرفريًا.
+        var batch = [];
+        if (rec.openEventId != null) {
+            batch.push({ type: 'correction', employeeName: ctx.employee, teamId: ctx.teamId, corrects: rec.sourceEventType === 'absence' ? 'absence_void' : 'late_void', targetEventId: rec.openEventId });
+        }
+        batch.push({ type: 'absence', employeeName: ctx.employee, teamId: ctx.teamId, reason: reason });
+        submitCorrectionBatch(batch, '🚫 سُجّل غياب ' + ctx.employee);
+        return;
+    }
+}
+
+function submitCorrectionBatch(batch, okMsg) {
+    var ctx = correctionCtx;
+    lockTeamCard(ctx.teamId, true);
+    postPersonEvents(batch).then(function(d) {
+        lockTeamCard(ctx.teamId, false);
         if (!d) return;
-        showToast('✅ تم تصحيح وقت حضور ' + employee, 'success');
+        closeCorrectionModal();
+        showToast(d.appended > 0 ? okMsg : 'لا يوجد ما يُصحَّح — الحالة محدّثة أصلًا', d.appended > 0 ? 'success' : '');
         afterTeamEvent();
     });
 }

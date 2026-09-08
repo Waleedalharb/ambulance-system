@@ -135,6 +135,90 @@ function normalizeRiyadhWallIso(v) {
     const d = new Date(s);
     return isNaN(d.getTime()) ? null : d.toISOString();
 }
+// ─── بند «تصحيح الحالة» (اعتماد المالك 2026-09-08) — تصحيحات الحضور append-only ───
+// حدث correction لا يحذف شيئًا: payload.corrects يحدد الدلالة، وpayload.targetEventId
+// يستهدف الحدث المصحَّح بدقة. المعالج يستبعد الأحداث المصحَّحة من مجرى الاشتقاق
+// فقط (تبقى في القاعدة وفي السجل الخام — أثر تدقيق)، فلا يتكرر الاسم ولا تتضاعف
+// الساعات، والتصحيح نفسه حدث موثّق بهوية المشرف ووقته:
+//   late_void    : إلغاء التأخير — يستبعد حدث late المستهدف وحدث arrival المقترن
+//                  به (إن وُجد) ⇒ الموظف حاضر طبيعي ولا تُحسب دقائق تأخير.
+//   absence_void : إلغاء الغياب — نفس القاعدة لحدث absence.
+//   arrival_void : «لم يحضر حتى الآن» — يستبعد حدث arrival وحده ⇒ يبقى الفتح
+//                  الأصلي (late/absence) مفتوحًا ويُقبل حضور لاحق على نفس السجل.
+// arrival_time (القائم) لا يستبعد شيئًا — يعالجه deriveLateRecords كما كان.
+// operational-events-core.js لا يُمس: الاستبعاد طبقة staffing خالصة.
+function sortChrono(events) {
+    return (events || []).slice().sort((a, b) =>
+        String(a.created_at).localeCompare(String(b.created_at)) || ((a.id || 0) - (b.id || 0)));
+}
+// فهرسة اقتران الوصول بالفتح (نفس قاعدة deriveLateRecords: arrival يُغلق أقدم فتح)
+function pairArrivalsWithOpens(sorted) {
+    const openQueues = {};
+    const arrivalToOpen = new Map();  // arrivalEventId -> open event
+    const openToArrival = new Map();  // openEventId -> arrival event
+    for (const e of sorted) {
+        const ent = e.entity_id;
+        if (!ent) continue;
+        if (e.event_type === 'late' || e.event_type === 'absence') {
+            (openQueues[ent] = openQueues[ent] || []).push(e);
+        } else if (e.event_type === 'arrival') {
+            const q = openQueues[ent];
+            if (q && q.length) { const opened = q.shift(); arrivalToOpen.set(e.id, opened); openToArrival.set(opened.id, e); }
+        }
+    }
+    return { arrivalToOpen, openToArrival };
+}
+const VOID_OPEN_TYPE = { late_void: 'late', absence_void: 'absence' };
+// حلّ هدف التصحيح على الأحداث المتبقية: هدف صريح مطابق للنوع والكيان (غير
+// المطابق ⇒ لا شيء إطلاقًا — بلا استنتاج بديل)، وإلا أحدث حدث من النوع
+// المطلوب لنفس الكيان سابقًا لحدث التصحيح (نفس قاعدة «أحدث زوج» القائمة).
+function resolveVoidEffect(sorted, removed, maps, corrects, ent, explicitId, beforeIso) {
+    if (!ent) return null;
+    const pickType = corrects === 'arrival_void' ? 'arrival' : VOID_OPEN_TYPE[corrects];
+    if (!pickType) return null;
+    let target = null;
+    if (explicitId != null) {
+        const cand = sorted.find(x => x.id === explicitId && x.entity_id === ent && x.event_type === pickType);
+        if (!cand || removed.has(cand.id)) return null;
+        target = cand;
+    } else {
+        for (const x of sorted) {
+            if (x.entity_id !== ent || x.event_type !== pickType || removed.has(x.id)) continue;
+            if (beforeIso && String(x.created_at) >= String(beforeIso)) continue;
+            target = x; // الترتيب صاعد — آخر مطابق هو الأحدث
+        }
+    }
+    if (!target) return null;
+    const alsoRemove = [];
+    let reopenEvent = null;
+    if (corrects === 'arrival_void') {
+        const opened = maps.arrivalToOpen.get(target.id);
+        if (opened && !removed.has(opened.id)) reopenEvent = opened;
+    } else {
+        // إلغاء الفتح يشمل الوصول المقترن به (إن وُجد) — الموظف حاضر طبيعي بلا سجل
+        const arr = maps.openToArrival.get(target.id);
+        if (arr && !removed.has(arr.id)) alsoRemove.push(arr.id);
+    }
+    return { target, alsoRemove, reopenEvent };
+}
+// مجرى الاشتقاق الفعلي: الأحداث الخام مطروحًا منها المصحَّح (القاعدة لا تُمس)
+function applyAttendanceCorrections(events) {
+    const sorted = sortChrono(events);
+    const maps = pairArrivalsWithOpens(sorted);
+    const removed = new Set();
+    for (const e of sorted) {
+        if (e.event_type !== 'correction') continue;
+        const p = parsePayload(e.payload);
+        const corrects = p.corrects || 'arrival_time';
+        if (corrects === 'arrival_time') continue;
+        const eff = resolveVoidEffect(sorted, removed, maps, corrects, e.entity_id, p.targetEventId, e.created_at);
+        if (!eff) continue;
+        removed.add(eff.target.id);
+        for (const id of eff.alsoRemove) removed.add(id);
+    }
+    return sorted.filter(e => !removed.has(e.id));
+}
+
 function deriveLateRecords(events, shiftType, shiftDate, startByEmployee) {
     const sorted = (events || []).slice().sort((a, b) =>
         String(a.created_at).localeCompare(String(b.created_at)) || ((a.id || 0) - (b.id || 0)));
@@ -170,14 +254,21 @@ function deriveLateRecords(events, shiftType, shiftDate, startByEmployee) {
                     startedAt: (startByEmployee && startByEmployee[ent]) || shiftStartAt || opened.created_at,
                     arrivedAt: e.created_at,
                     arrivalEventId: e.id || null,
+                    openEventId: opened.id || null, // بند «تصحيح الحالة»: استهداف دقيق من الواجهة
                     sourceEventType
                 });
             }
         } else if (e.event_type === 'correction') {
             const p = parsePayload(e.payload);
+            // بند «تصحيح الحالة»: الإلغاء/الإرجاع عولج استبعادًا قبل الاشتقاق —
+            // هنا يُقرأ تصحيح وقت الحضور فقط (arrival_time)
+            if ((p.corrects || 'arrival_time') !== 'arrival_time') continue;
             const correctedAt = p.arrivalAt || null;
             if (correctedAt && !isNaN(new Date(correctedAt).getTime())) {
-                (corrections[ent] = corrections[ent] || []).push({ at: correctedAt, createdAt: e.created_at });
+                (corrections[ent] = corrections[ent] || []).push({
+                    at: correctedAt, createdAt: e.created_at,
+                    targetEventId: (p.targetEventId != null) ? p.targetEventId : null
+                });
             }
         }
     }
@@ -185,11 +276,17 @@ function deriveLateRecords(events, shiftType, shiftDate, startByEmployee) {
         console.warn('[StaffingEventsService] تعذّر حلّ نوع/تاريخ المناوبة — التأخير يُحسب من طابع حدث الفتح (سلوك احتياطي فقط)');
     }
     // التصحيح يطبَّق على أحدث زوج وصول لنفس الموظف (الأحداث append-only — التصحيح حدث تدقيق)
+    // بند «تصحيح الحالة»: targetEventId صريح يستهدف زوجه بالضبط بدل «الأحدث»
     for (const ent of Object.keys(corrections)) {
         const entPairs = pairs.filter(p => p.employee === ent);
         if (!entPairs.length) continue;
         const latestCorrection = corrections[ent][corrections[ent].length - 1];
-        entPairs[entPairs.length - 1].arrivedAt = latestCorrection.at;
+        let pair = entPairs[entPairs.length - 1];
+        if (latestCorrection.targetEventId != null) {
+            const exact = entPairs.find(p => p.arrivalEventId === latestCorrection.targetEventId);
+            if (exact) pair = exact;
+        }
+        pair.arrivedAt = latestCorrection.at;
     }
     const records = pairs.map(p => {
         const mins = Math.max(0, Math.round((new Date(p.arrivedAt) - new Date(p.startedAt)) / 60000));
@@ -197,6 +294,7 @@ function deriveLateRecords(events, shiftType, shiftDate, startByEmployee) {
             employee: p.employee, teamId: p.teamId,
             startedAt: p.startedAt, arrivedAt: p.arrivedAt,
             durationMinutes: mins, status: 'arrived',
+            arrivalEventId: p.arrivalEventId, openEventId: p.openEventId, // بند «تصحيح الحالة»
             sourceEventType: p.sourceEventType
         };
         // مرحلة الأوفرلاب 3: البداية التشغيلية تُوسَم فقط لمن له كود تشغيلي
@@ -213,6 +311,7 @@ function deriveLateRecords(events, shiftType, shiftDate, startByEmployee) {
                     employee: ent, teamId: ev.team_id || null,
                     startedAt: (startByEmployee && startByEmployee[ent]) || shiftStartAt || ev.created_at, arrivedAt: null,
                     durationMinutes: null, status: 'not_arrived',
+                    openEventId: ev.id || null, // بند «تصحيح الحالة»: استهداف دقيق من الواجهة
                     sourceEventType
                 };
                 const opStart = startByEmployee && startByEmployee[ent];
@@ -421,9 +520,20 @@ class StaffingEventsService {
         return { success: true, eventId: id, shiftId: activeShift.id };
     }
 
+    /**
+     * بند «تصحيح الحالة»: أحداث المناوبة في مجراها الفعلي — الخام مطروحًا منه
+     * المصحَّح (late_void/absence_void/arrival_void). كل اشتقاق لحالة الحضور
+     * يقرأ من هنا؛ السجل الخام الكامل (مع الأحداث المصحَّحة والتصحيحات) يبقى
+     * متاحًا عبر getOperationalEventsByShift مباشرة لأسطح التدقيق (getTimeline).
+     */
+    async _attendanceEvents(shiftId) {
+        const raw = await this.storage.getOperationalEventsByShift(shiftId, DOMAIN);
+        return applyAttendanceCorrections(raw);
+    }
+
     /** الحالة الحالية المشتقة لكل كيان في المناوبة (طيّ الأحداث). */
     async getState(shiftId) {
-        const events = await this.storage.getOperationalEventsByShift(shiftId, DOMAIN);
+        const events = await this._attendanceEvents(shiftId);
         const base = { shiftId, domain: DOMAIN, entities: foldEvents(events, DOMAIN) };
         // VA: إثراء إضافي — جاهزية الفرق المشتقة + مجاميع القوى (نفس الاشتقاق الوحيد)
         try {
@@ -656,7 +766,7 @@ class StaffingEventsService {
             const currentShiftStartIso = shiftStartIso(shiftType, shiftDate);
             const prev = currentShiftStartIso ? await this._findPreviousShift(shiftType, shiftDate) : null;
             if (prev) {
-                const prevEvents = await this.storage.getOperationalEventsByShift(prev.id, DOMAIN);
+                const prevEvents = await this._attendanceEvents(prev.id); // بند «تصحيح الحالة»: المصحَّح لا يُرحَّل
                 const rosterCodes = await this._rosterShiftCodeByName(prev.shift_date);
                 const seeds = this._computeCarrySeeds(prev, prevEvents, rosterCodes, currentShiftStartIso);
                 for (const s of seeds) {
@@ -677,7 +787,9 @@ class StaffingEventsService {
         } catch (e) {
             console.warn('[StaffingEventsService] تعذّر ترحيل الأحداث المفتوحة من المناوبة السابقة:', e.message);
         }
-        const lateRecords = deriveLateRecords(events.concat(seedEvents), shiftType, shiftDate, startByEmployee);
+        // بند «تصحيح الحالة»: سجلات التأخير من المجرى الفعلي (المصحَّح مستبعد)،
+        // بينما events المُعادة تبقى خامًا كاملة — سجل التدقيق يعرض كل شيء.
+        const lateRecords = deriveLateRecords(applyAttendanceCorrections(events).concat(seedEvents), shiftType, shiftDate, startByEmployee);
         // مرحلة الأوفرلاب 3: توثيق السجلات المرحّلة بالطوابع الثلاثة —
         // operationalStart (بدايته التشغيلية في مناوبة المنشأ) + responsibilityStart
         // (بداية هذه المناوبة = لحظة انتقال المسؤولية، تُعرض أيضًا carryForwardAt)
@@ -733,7 +845,7 @@ class StaffingEventsService {
 
     /** مؤشرات القوى البشرية — تُشتق هنا فقط ولا تُحسب في مكان آخر. */
     async getIndicators(shiftId) {
-        const events = await this.storage.getOperationalEventsByShift(shiftId, DOMAIN);
+        const events = await this._attendanceEvents(shiftId);
         const base = { shiftId, ...deriveIndicators(events, DOMAIN) };
         // VA: نفس اشتقاق جاهزية الفرق (مصدر واحد للوحة الرئيسية والمؤشرات)
         try {
@@ -849,7 +961,7 @@ class StaffingEventsService {
             out[k] = { status: d.status, reason: d.reason || '', missingPerson: '' };
         }
         // الشخص المفتوح غيابه/تأخيره لفريق ناقص (arrival يغلقه دلاليًا) — من سجل الأشخاص
-        const events = await this.storage.getOperationalEventsByShift(shiftId, DOMAIN);
+        const events = await this._attendanceEvents(shiftId);
         const folded = foldEvents(events, DOMAIN);
         for (const f of folded) {
             if (!f.entityId || !f.teamId) continue;
@@ -901,12 +1013,21 @@ class StaffingEventsService {
                 err.statusCode = 400;
                 throw err;
             }
-            // بند 15: تصحيح وقت الحضور — وقت صالح إلزامي (صلاحية المشرف على المسار)
-            // (تفويض 2026-08: naive يُقبل ثم يُطبَّع كتوقيت الرياض عند الختم أدناه)
-            if (type === 'correction' && (!ev.arrivalAt || !normalizeRiyadhWallIso(ev.arrivalAt))) {
-                const err = new Error('وقت الحضور المصحَّح غير صالح');
-                err.statusCode = 400;
-                throw err;
+            // بند 15 + «تصحيح الحالة» (2026-09-08): correction بنوع فرعي صريح —
+            // arrival_time يتطلب وقتًا صالحًا (السلوك القائم)، وأنواع الإلغاء/الإرجاع
+            // (late_void/absence_void/arrival_void) تستهدف حدثًا قائمًا ولا تحمل وقتًا.
+            if (type === 'correction') {
+                const corrects = ev.corrects || 'arrival_time';
+                if (!['arrival_time', 'late_void', 'absence_void', 'arrival_void'].includes(corrects)) {
+                    const err = new Error('نوع التصحيح غير صالح: ' + corrects);
+                    err.statusCode = 400;
+                    throw err;
+                }
+                if (corrects === 'arrival_time' && (!ev.arrivalAt || !normalizeRiyadhWallIso(ev.arrivalAt))) {
+                    const err = new Error('وقت الحضور المصحَّح غير صالح');
+                    err.statusCode = 400;
+                    throw err;
+                }
             }
             // كل الأنواع مرتبطة بفريق إلا دعم الاحتياط (external_support بلا فريق هدف)
             // المرحلة ب: وsupport_end — إنهاء متطوع الحوض (volunteer_support بلا
@@ -920,8 +1041,14 @@ class StaffingEventsService {
         }
 
         // الحالة المطوية الحالية — لمنع التكرار ولتحقق الإغلاق
+        // بند «تصحيح الحالة»: الطيّ على المجرى الفعلي (المصحَّح مستبعد) حتى لا
+        // يمنع حدثٌ ملغىً إلحاقَ الحالة الصحيحة، وremovedIds يتتبع الاستبعاد
+        // داخل الدفعة فتتسلسل التصحيحات والحالات الجديدة على واقع محدّث.
         const existing = await this.storage.getOperationalEventsByShift(shiftId, DOMAIN);
-        const folded = foldEvents(existing, DOMAIN);
+        const effective = applyAttendanceCorrections(existing);
+        const effectiveIds = new Set(effective.map(e => e.id));
+        const removedIds = new Set(existing.filter(e => !effectiveIds.has(e.id)).map(e => e.id));
+        const folded = foldEvents(effective, DOMAIN);
         const openOf = (entityId) => {
             const f = folded.find(x => x.entityId === entityId);
             return f ? f.open : [];
@@ -955,10 +1082,26 @@ class StaffingEventsService {
                 // وإنهاء بلا تفعيل مفتوح يُتخطى — نفس قاعدة الدعم/التكليف حرفيًا
                 if (type === 'activation' && open.some(o => o.event_type === 'activation' && canonicalTeamId(o.team_id) === teamId)) continue;
                 if (type === 'activation_end' && !open.some(o => o.event_type === 'activation')) continue;
+                // بند «تصحيح الحالة»: تصحيح إلغاء/إرجاع بلا هدف قائم في المجرى
+                // الفعلي يُتخطى (idempotent — لا تكرار تدقيقي بلا أثر)؛ وإلا يُحلّ
+                // هدفه الآن ويُختم targetEventId في الـ payload أدناه.
+                if (type === 'correction' && (ev.corrects || 'arrival_time') !== 'arrival_time') {
+                    const sortedExisting = sortChrono(existing);
+                    const eff = resolveVoidEffect(sortedExisting, removedIds, pairArrivalsWithOpens(sortedExisting), ev.corrects, employee, ev.targetEventId, null);
+                    if (!eff) continue;
+                    ev._voidEffect = eff;
+                }
             }
 
             const payload = { source: 'completion-person-events' };
-            if (type === 'correction') { payload.corrects = 'arrival_time'; payload.arrivalAt = normalizeRiyadhWallIso(ev.arrivalAt); }
+            // بند «تصحيح الحالة»: النوع الفرعي صريح، والهدف المحلول سيرفريًا يُختم
+            // (هدف العميل الصريح يُمرَّر لتصحيح الوقت — الاشتقاق يستهدفه بدقة)
+            if (type === 'correction') {
+                payload.corrects = ev.corrects || 'arrival_time';
+                if (payload.corrects === 'arrival_time') payload.arrivalAt = normalizeRiyadhWallIso(ev.arrivalAt);
+                const tgt = (ev._voidEffect && ev._voidEffect.target) ? ev._voidEffect.target.id : ev.targetEventId;
+                if (tgt != null) payload.targetEventId = tgt;
+            }
             if (ev.coverageType) payload.coverageType = ev.coverageType;
             if (ev.jobTitle) payload.jobTitle = ev.jobTitle;
             if (ev.employeeNumber) payload.employeeNumber = ev.employeeNumber;
@@ -989,6 +1132,17 @@ class StaffingEventsService {
                 if (idx >= 0) f.open.splice(idx, 1);
             } else if (type !== 'correction') { // التصحيح حدث تدقيق — ليس حالة مفتوحة
                 f.open.push(synth);
+            }
+            // بند «تصحيح الحالة»: الإلغاء يُخرج هدفه من الطيّ المحلي للدفعة،
+            // و«لم يحضر حتى الآن» يُعيد الفتح المقترن — فيُقبل حضور لاحق ضمن
+            // نفس الدفعة على نفس السجل، ولا يتكرر الاسم ولا تتضاعف الساعات.
+            if (type === 'correction' && ev._voidEffect) {
+                const effv = ev._voidEffect;
+                removedIds.add(effv.target.id);
+                for (const rid of effv.alsoRemove) removedIds.add(rid);
+                const oidx = f.open.findIndex(o => o.id === effv.target.id);
+                if (oidx >= 0) f.open.splice(oidx, 1);
+                if (effv.reopenEvent) f.open.push(effv.reopenEvent);
             }
             f.lastEvent = synth;
         }
@@ -1073,7 +1227,7 @@ class StaffingEventsService {
         // roster فارغ ⇒ كادر فارغ (صادق) حتى تتم مزامنة الجدولة عبر RosterSyncService.
 
         // طيّ أحداث staffing
-        const events = await this.storage.getOperationalEventsByShift(shiftId, DOMAIN);
+        const events = await this._attendanceEvents(shiftId);
         const folded = foldEvents(events, DOMAIN);
         const openByEntity = {};
         const teamOpen = {};
@@ -1403,7 +1557,7 @@ class StaffingEventsService {
             return clsNight === isNight;
         });
 
-        const events = await this.storage.getOperationalEventsByShift(shiftId, DOMAIN);
+        const events = await this._attendanceEvents(shiftId);
         const folded = foldEvents(events, DOMAIN);
         const openByEntity = {};
         for (const f of folded) { if (f.entityId) openByEntity[f.entityId] = f.open; }
@@ -1510,7 +1664,7 @@ class StaffingEventsService {
 
     /** التفعيل المفتوح حاليًا لموظف في مناوبة (طيّ دلالي) أو null. */
     async _openActivation(shiftId, employeeName) {
-        const events = await this.storage.getOperationalEventsByShift(shiftId, DOMAIN);
+        const events = await this._attendanceEvents(shiftId);
         const folded = foldEvents(events, DOMAIN);
         const f = folded.find(x => x.entityId === employeeName);
         if (!f) return null;
@@ -1691,7 +1845,7 @@ class StaffingEventsService {
         const codeByName = {};
         for (const r of rosterRows) if (!(r.name in codeByName)) codeByName[r.name] = r.shift_code || null;
         // مشغّلات مفتوحة (تطوع/دعم/تفعيل/تكليف) تُخرج صاحبها من المرشحين
-        const events = await this.storage.getOperationalEventsByShift(shiftId, DOMAIN);
+        const events = await this._attendanceEvents(shiftId);
         const folded = foldEvents(events, DOMAIN);
         const OPEN_TRIGGERS = ['volunteer_support', 'external_support', 'activation', 'assignment'];
         const busy = new Set();
@@ -1717,7 +1871,7 @@ class StaffingEventsService {
 
     /** التطوع المفتوح بلا فريق («في الحوض») لموظف في مناوبة (طيّ دلالي) أو null. */
     async _openTeamlessVolunteer(shiftId, employeeName) {
-        const events = await this.storage.getOperationalEventsByShift(shiftId, DOMAIN);
+        const events = await this._attendanceEvents(shiftId);
         const folded = foldEvents(events, DOMAIN);
         const f = folded.find(x => x.entityId === employeeName);
         if (!f) return null;
@@ -1781,7 +1935,7 @@ class StaffingEventsService {
             throw err;
         }
         // المشغّلات المفتوحة باسمه في هذه المناوبة (طيّ دلالي واحد)
-        const events = await this.storage.getOperationalEventsByShift(shift.id, DOMAIN);
+        const events = await this._attendanceEvents(shift.id);
         const folded = foldEvents(events, DOMAIN);
         const f = folded.find(x => x.entityId === name);
         const open = f ? (f.open || []) : [];
