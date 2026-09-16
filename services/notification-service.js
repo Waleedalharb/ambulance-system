@@ -89,7 +89,9 @@ function resolveDeps() {
         return {
             usersPath: _deps.usersPath,
             db: typeof _deps.getDb === 'function' ? _deps.getDb() : _deps.db,
-            broadcastToUsers: _deps.broadcastToUsers
+            broadcastToUsers: _deps.broadcastToUsers,
+            // v6: بوابة APNs الاختيارية — غيابها = بلا Push وبلا أي تغيير سلوك
+            pushGateway: _deps.pushGateway || null
         };
     }
     const storage = process.env.RENDER_DISK_PATH || process.env.DATA_DIR || path.join(__dirname, '..', 'data');
@@ -134,7 +136,16 @@ async function notifyPersonal(userId, { eventKey, title, message, type }) {
             notification: { id, user_id: targetUserId, title, message: message || '', type: finalType }
         });
     }
-    return { id, type: finalType };
+    // v6: نسخة Push لأجهزة المستهدف — فوق القناة القائمة لا بدلًا عنها.
+    // البوابة لا ترمي أبدًا؛ فشلها لا يمس الإشعار المنشأ ولا البث.
+    let push = null;
+    if (d.pushGateway && typeof d.pushGateway.sendToUsers === 'function') {
+        push = await d.pushGateway.sendToUsers([targetUserId], {
+            title, body: message || '', badge: 'auto',
+            data: { kind: 'notification', notification_id: id }
+        });
+    }
+    return { id, type: finalType, push };
 }
 
 module.exports = {

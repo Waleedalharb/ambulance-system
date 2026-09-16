@@ -908,6 +908,22 @@ const TABLE_SCHEMAS = [
     error_message TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );`,
+  // v6 (طبقة APNs): أجهزة الإشعارات الفورية — جدول إضافي صرف، لا تعديل
+  // على أي جدول قائم. التوكن يُربط بالحساب بعد المصادقة فقط، ويُفصل عند
+  // تسجيل الخروج أو إبلاغ APNs بأنه غير صالح (410/Unregistered).
+  `CREATE TABLE IF NOT EXISTS push_devices (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT NOT NULL,
+    device_token TEXT NOT NULL UNIQUE,
+    platform TEXT DEFAULT 'ios',
+    environment TEXT DEFAULT 'development' CHECK(environment IN ('development', 'production')),
+    app_version TEXT,
+    is_active INTEGER DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    last_seen_at DATETIME,
+    deactivated_at DATETIME
+  );`,
+  `CREATE INDEX IF NOT EXISTS idx_push_devices_user ON push_devices(user_id, is_active);`,
   `CREATE TABLE IF NOT EXISTS shift_change_requests (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     roster_id INTEGER,
@@ -4153,6 +4169,46 @@ const NotificationLog = {
   }
 };
 
+// v6 (طبقة APNs): أجهزة الإشعارات الفورية — التوكن فريد عالميًا؛ إعادة
+// التسجيل تُفعل الجهاز وتحدّث مالكه (انتقال الجهاز لحساب آخر = تسجيل جديد
+// يعيد الربط، وتسجيل الخروج يفصل أجهزة الحساب كلها من مسار /api/auth/logout).
+const PushDevices = {
+  async upsert(data) {
+    if (!data.user_id) throw new Error('PushDevices.upsert: user_id مطلوب');
+    if (!data.device_token) throw new Error('PushDevices.upsert: device_token مطلوب');
+    const env = data.environment === 'production' ? 'production' : 'development';
+    await run(
+      `INSERT INTO push_devices (user_id, device_token, platform, environment, app_version, is_active, last_seen_at)
+       VALUES (?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP)
+       ON CONFLICT(device_token) DO UPDATE SET
+         user_id = excluded.user_id,
+         platform = excluded.platform,
+         environment = excluded.environment,
+         app_version = excluded.app_version,
+         is_active = 1,
+         last_seen_at = CURRENT_TIMESTAMP,
+         deactivated_at = NULL;`,
+      [String(data.user_id), String(data.device_token), data.platform || 'ios', env, data.app_version || null]
+    );
+    return get('SELECT * FROM push_devices WHERE device_token = ?', [String(data.device_token)]);
+  },
+  async activeForUsers(userIds) {
+    const ids = (userIds || []).map(String).filter(Boolean);
+    if (!ids.length) return [];
+    const marks = ids.map(() => '?').join(',');
+    return all(`SELECT * FROM push_devices WHERE is_active = 1 AND user_id IN (${marks})`, ids);
+  },
+  async getByUser(userId) {
+    return all('SELECT * FROM push_devices WHERE user_id = ? ORDER BY last_seen_at DESC', [String(userId)]);
+  },
+  async deactivateByUser(userId) {
+    return run('UPDATE push_devices SET is_active = 0, deactivated_at = CURRENT_TIMESTAMP WHERE user_id = ? AND is_active = 1', [String(userId)]);
+  },
+  async deactivateToken(deviceToken) {
+    return run('UPDATE push_devices SET is_active = 0, deactivated_at = CURRENT_TIMESTAMP WHERE device_token = ? AND is_active = 1', [String(deviceToken)]);
+  }
+};
+
 // v5: مراجعات الجدولة — العملية الواحدة (استيراد/تعديل/مسح) التي تربط
 // صفوف التدقيق والإشعارات وحالات القراءة والتأكيد ببعضها.
 const ScheduleRevisions = {
@@ -4819,6 +4875,7 @@ module.exports = {
   ShiftReportsGenerated,
   ShiftRosterDrafts,
   NotificationLog,
+  PushDevices,
   ShiftChangeRequests,
 
   // نظام العهد والأصول (المرحلة 2 — 2026-08-23)

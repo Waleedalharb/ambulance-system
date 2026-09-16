@@ -31,11 +31,13 @@ class ScheduleChangeNotifier {
      *   usersPath: مسار users.json (SSOT الدخول) — يُتحمل غيابه.
      *   broadcastToUsers: دالة البث الموجَّه (WS+SSE) — اختيارية في الاختبارات.
      */
-    constructor({ db, usersPath, broadcastToUsers }) {
+    constructor({ db, usersPath, broadcastToUsers, pushGateway }) {
         if (!db || !usersPath) throw new Error('ScheduleChangeNotifier: db و usersPath مطلوبان');
         this.db = db;
         this.usersPath = usersPath;
         this.broadcastToUsers = typeof broadcastToUsers === 'function' ? broadcastToUsers : null;
+        // v6: بوابة APNs اختيارية — غيابها = بلا Push وبلا أي تغيير سلوك
+        this.pushGateway = pushGateway && typeof pushGateway.sendToUsers === 'function' ? pushGateway : null;
     }
 
     /** حساب الدخول للموظف: users.json أولًا ثم جدول users (username = employee_code). */
@@ -114,7 +116,7 @@ class ScheduleChangeNotifier {
      *   لا يرمي أبدًا — الفشل الكلي يُسجَّل ويُعاد failed=total.
      */
     async notifyRevision({ revisionId, auditIds }) {
-        const stats = { notified: 0, noAccount: 0, duplicates: 0, failed: 0, total: 0 };
+        const stats = { notified: 0, noAccount: 0, duplicates: 0, failed: 0, total: 0, pushed: 0 };
         try {
             if (!revisionId || !Array.isArray(auditIds) || !auditIds.length) return stats;
             const rows = await this.db.ShiftAuditLog.getByIds(auditIds);
@@ -185,6 +187,20 @@ class ScheduleChangeNotifier {
                             });
                         } catch (bErr) {
                             console.warn('[schedule-change-notifier] broadcast failed for', emp.employee_code, bErr.message);
+                        }
+                    }
+
+                    // v6: نسخة Push لأجهزة الموظف — بعد نجاح الإشعار الداخلي فقط.
+                    // البوابة لا ترمي؛ فشلها لا يمس الإشعار ولا الإحصاء القائم.
+                    if (this.pushGateway) {
+                        try {
+                            const p = await this.pushGateway.sendToUsers([account.id], {
+                                title: SHIFT_CHANGE_TITLE, body: message, badge: 'auto',
+                                data: { kind: 'schedule_change', revision_id: revisionId, notification_id: notifId }
+                            });
+                            if (p && p.sent) stats.pushed += p.sent;
+                        } catch (pErr) {
+                            console.warn('[schedule-change-notifier] push failed for', emp.employee_code, pErr.message);
                         }
                     }
                 } catch (perErr) {
