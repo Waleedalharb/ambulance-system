@@ -24,6 +24,7 @@
     "@anthropic-ai/sdk": "^0.110.0",
     "@capacitor/core": "^8.5.2",
     "@capacitor/ios": "^8.5.2",
+    "@capacitor/push-notifications": "^8.1.2",
     "@capacitor/splash-screen": "^8.0.2",
     "@capacitor/status-bar": "^8.0.3",
     "@google/generative-ai": "^0.21.0",
