@@ -2,6 +2,10 @@
   "appId": "online.emsoperations.app",
   "appName": "EMS Operations",
   "webDir": "public",
+  "server": {
+    "url": "https://emsoperations.online/",
+    "cleartext": false
+  },
   "backgroundColor": "#070F20",
   "ios": {
     "contentInset": "never",
