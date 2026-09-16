@@ -1,0 +1,24 @@
+{
+  "appId": "online.emsoperations.app",
+  "appName": "EMS Operations",
+  "webDir": "public",
+  "backgroundColor": "#070F20",
+  "ios": {
+    "contentInset": "never",
+    "allowsLinkPreview": false,
+    "scrollEnabled": true
+  },
+  "plugins": {
+    "StatusBar": {
+      "style": "DARK",
+      "overlaysWebView": true,
+      "backgroundColor": "#070F20"
+    },
+    "SplashScreen": {
+      "launchShowDuration": 0,
+      "launchAutoHide": true,
+      "backgroundColor": "#070F20",
+      "showSpinner": false
+    }
+  }
+}
