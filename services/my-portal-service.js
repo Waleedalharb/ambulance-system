@@ -407,16 +407,25 @@ class MyPortalService {
     /**
      * «المناوبة الحالية» بوقت الرياض الفعلي — الليلية الممتدة محسوبة:
      *   < 05:00  ⇒ ليلية الأمس · [05:00,17:00) ⇒ صباحية اليوم · ≥ 17:00 ⇒ ليلية اليوم.
-     * التحديد بالتاريخ + الوقت الفعليين، لا بـ shift_date وحده (شرط المالك).
+     * احتياطي «clock» فقط: يُستخدم عندما لا يوجد للموظف تعيين نشط/قادم
+     * (السياق الأساسي يُشتق من تعيينه الفعلي — _myShiftContext).
      */
-    _currentShiftWindow() {
-        const p = TimeRiyadh.riyadhParts(new Date());
+    _currentShiftWindow(now) {
+        const p = TimeRiyadh.riyadhParts(now || new Date());
         if (!p) return null;
         const today = `${p.year}-${pad2(p.month)}-${pad2(p.day)}`;
         const minutes = (Number(p.hour) % 24) * 60 + Number(p.minute || 0);
         if (minutes < 5 * 60) return { date: addDays(today, -1), side: 'night', label: 'ليلية' };
         if (minutes < 17 * 60) return { date: today, side: 'day', label: 'صباحية' };
         return { date: today, side: 'night', label: 'ليلية' };
+    }
+
+    /** جهة رمز العمل: 'day' | 'night' · null لغير العمل (راحة/إجازة) · undefined إن تعذّر القاموس */
+    _sideOf(shiftCode) {
+        if (!STD || typeof STD.classifyDayCode !== 'function') return undefined;
+        const g = STD.classifyDayCode(shiftCode || '').group;
+        if (['rest', 'vacation', 'off'].indexOf(g) !== -1) return null;
+        return ['night', 'night8', 'overlap'].indexOf(g) !== -1 ? 'night' : 'day';
     }
 
     /** هل رمز المناوبة يطابق جهة النافذة؟ (الأوفرلاب جزء من الليلية — القاموس الرسمي) */
@@ -443,51 +452,87 @@ class MyPortalService {
     }
 
     /**
-     * من معي في المناوبة الآن: أعضاء فرقتي + القيادة الميدانية + العمليات
-     * المناوبون في النافذة الحالية، مع إظهار الدور. الربط بـ employee_id،
-     * والتصنيف بمطابقة job_title التامة (شرط المالك).
+     * سياق «مناوبتي» — المصدر: تعييني الفعلي في shift_roster (أمس/اليوم/غد)،
+     * لا الساعة وحدها (تصحيح ملاحظة المالك 2026-09-16: تغيير التعيين Day←Night
+     * كان يعرض طاقم النافذة الساعية بدل طاقم مناوبتي الفعلية). النوافذ هي
+     * نوافذ النظام الرسمية: صباحية 05:00→17:00 · ليلية 17:00→05:00⁺¹ — نفس
+     * shiftStartIso في staffing-events-service حرفيًا (12 ساعة). الأولوية
+     * للمناوبة النشطة الآن، ثم أقرب قادمة، وإلا سقوط لنافذة الساعة (clock).
+     * now قابلة للحقن (اختبارات). المفتاح: employee_id + shift_date +
+     * shift_code + team_id + نافذة الرياض — كما اشترط المالك.
      */
-    async getShiftMates(user, { canPhone } = {}) {
+    async _myShiftContext(empId, now) {
+        const p = TimeRiyadh.riyadhParts(now || new Date());
+        if (!p) return null;
+        const today = `${p.year}-${pad2(p.month)}-${pad2(p.day)}`;
+        const minutes = (Number(p.hour) % 24) * 60 + Number(p.minute || 0);
+        const rows = await this.db.all(
+            'SELECT shift_date, shift_code, team_id FROM shift_roster WHERE employee_id = ? AND shift_date IN (?, ?, ?)',
+            [empId, addDays(today, -1), today, addDays(today, 1)]);
+        const candidates = [];
+        for (const r of rows) {
+            const side = this._sideOf(r.shift_code);
+            if (side === undefined) break;   // القاموس غير متاح ← سقوط لنافذة الساعة
+            if (side === null) continue;      // راحة/إجازة/خارج — ليست مناوبة عمل
+            const start = daysBetween(today, r.shift_date) * 1440 + (side === 'night' ? 17 * 60 : 5 * 60);
+            candidates.push({
+                date: r.shift_date, side, shiftCode: r.shift_code, teamId: r.team_id,
+                start,
+                active: minutes >= start && minutes < start + 720,
+                upcoming: minutes < start
+            });
+        }
+        const chosen = candidates.find(c => c.active)
+            || candidates.filter(c => c.upcoming).sort((a, b) => a.start - b.start)[0]
+            || null;
+        if (chosen) return Object.assign(chosen, { source: 'assignment' });
+        const w = this._currentShiftWindow(now);
+        return w ? { date: w.date, side: w.side, shiftCode: null, teamId: null, active: false, upcoming: false, source: 'clock' } : null;
+    }
+
+    /**
+     * من معي في المناوبة: طاقم سياق مناوبتي (فرقتي + القيادة الميدانية +
+     * العمليات) — السياق يُشتق من تعييني الفعلي (_myShiftContext)، بما فيه
+     * الليلية الممتدة لليوم التالي وتغيير التعيين Day↔Night (شرط المالك
+     * 2026-09-16). الربط بـ employee_id، والتصنيف بمطابقة job_title التامة.
+     */
+    async getShiftMates(user, { canPhone, now } = {}) {
         const emp = await this.resolveEmployee(user);
         if (!emp) return { notFound: true };
-        const window = this._currentShiftWindow();
-        if (!window) return { available: false, reason: 'time_unavailable' };
+        const ctx = await this._myShiftContext(emp.id, now);
+        if (!ctx) return { available: false, reason: 'time_unavailable' };
         const { teamById } = await this._refs();
+        const label = ctx.side === 'night' ? 'ليلية' : 'صباحية';
+        const myTeam = ctx.teamId != null ? teamById.get(ctx.teamId) : null;
 
-        const myRow = await this.db.get(
-            'SELECT shift_code, team_id FROM shift_roster WHERE employee_id = ? AND shift_date = ?',
-            [emp.id, window.date]);
-        const myMatch = myRow ? this._sideMatches(myRow.shift_code, window.side) : { match: false, work: false };
-        const myTeam = myRow && myRow.team_id != null ? teamById.get(myRow.team_id) : null;
-
-        // طاقم فرقتي في النافذة (بما فيهم أنا — موسوم isMe)
+        // طاقم فرقتي في سياق مناوبتي (بما فيهم أنا — موسوم isMe)
         let team = [];
-        if (myRow && myRow.team_id != null) {
+        if (ctx.teamId != null) {
             const rows = await this.db.all(
                 `SELECT e.id, e.employee_code, e.name, e.job_title, e.phone, r.shift_code
                  FROM shift_roster r JOIN employees e ON e.id = r.employee_id
                  WHERE r.team_id = ? AND r.shift_date = ? AND e.is_active = 1
-                 ORDER BY e.name`, [myRow.team_id, window.date]);
-            team = rows.filter(r => this._sideMatches(r.shift_code, window.side).match)
+                 ORDER BY e.name`, [ctx.teamId, ctx.date]);
+            team = rows.filter(r => this._sideMatches(r.shift_code, ctx.side).match)
                 .map(r => this._personView(r, canPhone, {
-                    shiftCode: r.shift_code, teamId: myRow.team_id,
+                    shiftCode: r.shift_code, teamId: ctx.teamId,
                     teamName: myTeam ? myTeam.name : null, isMe: r.id === emp.id
                 }));
         }
 
-        // القيادة الميدانية والعمليات المناوبون في النافذة (مطابقة تامة — بلا جزئية)
+        // القيادة الميدانية والعمليات في السياق نفسه (مطابقة تامة — بلا جزئية)
         const titles = [...MyPortalService.LEADERSHIP_TITLES, ...MyPortalService.OPS_TITLES];
         const ph = titles.map(() => '?').join(',');
         const dutyRows = await this.db.all(
             `SELECT e.id, e.employee_code, e.name, e.job_title, e.phone, r.shift_code, r.team_id
              FROM shift_roster r JOIN employees e ON e.id = r.employee_id
              WHERE r.shift_date = ? AND e.is_active = 1 AND e.job_title IN (${ph})
-             ORDER BY e.name`, [window.date, ...titles]);
+             ORDER BY e.name`, [ctx.date, ...titles]);
         const leadership = [];
         const ops = [];
         for (const r of dutyRows) {
-            if (!this._sideMatches(r.shift_code, window.side).match) continue;
-            if (myRow && r.team_id != null && r.team_id === myRow.team_id) continue; // ظاهر ضمن فرقتي
+            if (!this._sideMatches(r.shift_code, ctx.side).match) continue;
+            if (ctx.teamId != null && r.team_id != null && r.team_id === ctx.teamId) continue; // ظاهر ضمن فرقتي
             const t = r.team_id != null ? teamById.get(r.team_id) : null;
             const view = this._personView(r, canPhone, { shiftCode: r.shift_code, teamId: r.team_id, teamName: t ? t.name : null });
             if (MyPortalService.LEADERSHIP_TITLES.indexOf(r.job_title) !== -1) leadership.push(view);
@@ -497,10 +542,13 @@ class MyPortalService {
         return {
             available: true,
             classification: STD ? 'dictionary' : 'unavailable',
-            window,
+            window: { date: ctx.date, side: ctx.side, label, source: ctx.source, active: !!ctx.active },
             me: {
-                onShift: !!(myRow && myMatch.match), shiftCode: myRow ? myRow.shift_code : null,
-                teamId: myRow ? myRow.team_id : null, teamName: myTeam ? myTeam.name : null
+                onShift: !!ctx.active,
+                state: ctx.active ? 'active' : (ctx.source === 'assignment' ? 'upcoming' : 'off'),
+                shiftCode: ctx.shiftCode || null,
+                teamId: ctx.teamId != null ? ctx.teamId : null,
+                teamName: myTeam ? myTeam.name : null
             },
             team, leadership, ops
         };

@@ -40,6 +40,27 @@
         return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     }
 
+    // توست عام خفيف بنطاق الصفحة (إصلاح v5: bindNotifEvents كان ينادي toast
+    // غير معرّفة خارج bindCheckEvents — ReferenceError في مسار الخطأ)
+    function toast(m) {
+        const t = document.createElement('div');
+        t.className = 'my-toast';
+        t.textContent = m;
+        document.body.appendChild(t);
+        setTimeout(() => { try { t.remove(); } catch (_) { } }, 3500);
+    }
+
+    // تطبيع سعودي لـ WhatsApp: 05xxxxxxxx / 5xxxxxxxx / 9665xxxxxxxx ⇒ wa.me/9665…
+    // غير ذلك ⇒ null (لا يُعرض زر واتساب) — الرقم نفسه يصل من الخادم فقط لحامل staff.phone_view
+    function waHref(phone) {
+        const d = String(phone || '').replace(/\D/g, '');
+        let n = null;
+        if (/^05\d{8}$/.test(d)) n = '966' + d.slice(1);
+        else if (/^5\d{8}$/.test(d)) n = '966' + d;
+        else if (/^9665\d{8}$/.test(d)) n = d;
+        return n ? 'https://wa.me/' + n : null;
+    }
+
     async function api(path) {
         const r = await fetch(path, { headers: { Authorization: 'Bearer ' + token } });
         if (r.status === 401) throw { state: 401 };
@@ -595,7 +616,7 @@
         </div>`;
     }
 
-    // ── v5: معي في المناوبة الآن — النافذة تحسب خادميًا بالتوقيت الفعلي ──
+    // ── v5: معي في المناوبة — السياق يُشتق خادميًا من تعييني الفعلي (تصحيح 2026-09-16) ──
     function renderMates(d) {
         if (!d || !d.available) return '';
         const w = d.window || {};
@@ -604,21 +625,23 @@
                 <div class="m-name">${esc(p.name)}${p.isMe ? ' <span class="me-tag">(أنا)</span>' : ''}</div>
                 <div class="m-role">${esc(p.jobTitle || '—')}${p.shiftCode ? ' · ' + esc(p.shiftCode) : ''}${showTeam && p.teamName ? ' · ' + esc(p.teamName) : ''}</div>
             </div>
-            ${p.phone ? `<div class="m-phone" dir="ltr">📞 ${esc(p.phone)}</div>` : ''}
+            ${p.phone ? `<div class="m-phone"><a class="ph-btn" href="tel:${esc(p.phone)}">📞 اتصال</a>${waHref(p.phone) ? ` <a class="ph-btn wa" href="${waHref(p.phone)}" target="_blank" rel="noopener">واتساب</a>` : ''}</div>` : ''}
         </div>`;
         const teamRows = (d.team || []).map(p => row(p, false)).join('');
         const leadRows = (d.leadership || []).map(p => row(p, true)).join('');
         const opsRows = (d.ops || []).map(p => row(p, true)).join('');
-        const offNote = d.me && !d.me.onShift
-            ? '<div class="chk-hint" style="margin:0 0 8px">أنت خارج المناوبة الحالية — المعروضون هم المناوبون الآن.</div>' : '';
-        return `<div class="card"><div class="card-head mates">👥 معي في المناوبة الآن</div>
+        const stateNote = d.me && d.me.state === 'upcoming'
+            ? `<div class="chk-hint" style="margin:0 0 8px">مناوبتك ${esc(w.label || '')} لم تبدأ بعد — المعروض طاقمها مسبقًا.</div>`
+            : d.me && !d.me.onShift
+                ? '<div class="chk-hint" style="margin:0 0 8px">أنت خارج المناوبة الحالية — المعروضون هم المناوبون الآن.</div>' : '';
+        return `<div class="card"><div class="card-head mates">👥 معي في المناوبة</div>
             <div class="card-body">
-                <div class="chk-hint" style="margin:0 0 8px">المناوبة ${esc(w.label || '')} · ${fmtDateShort(w.date)} ${arDay(w.date)} — تُحدَّد بالتوقيت الفعلي (الليلية الممتدة محسوبة)</div>
-                ${offNote}
+                <div class="chk-hint" style="margin:0 0 8px">السياق: ${esc(w.label || '')} · ${fmtDateShort(w.date)} ${arDay(w.date)}${w.source === 'clock' ? ' · نافذة الساعة (لا تعيين لك)' : ' · من تعيينك الفعلي'}${w.active ? ' · جارية الآن' : ''}</div>
+                ${stateNote}
                 ${teamRows ? `<div class="mates-sub">فرقتي${d.me && d.me.teamName ? ' — ' + esc(d.me.teamName) : ''}</div>` + teamRows : ''}
                 ${leadRows ? '<div class="mates-sub">القيادة الميدانية</div>' + leadRows : ''}
                 ${opsRows ? '<div class="mates-sub">العمليات</div>' + opsRows : ''}
-                ${!teamRows && !leadRows && !opsRows ? '<div class="empty">لا يوجد مناوبون مسجلون في هذه النافذة.</div>' : ''}
+                ${!teamRows && !leadRows && !opsRows ? '<div class="empty">لا يوجد مناوبون مسجلون في هذا السياق.</div>' : ''}
             </div>
         </div>`;
     }
@@ -668,6 +691,40 @@
         } catch (_) { /* تبقى البطاقة القديمة — لا انهيار */ }
     }
 
+    async function refreshChanges() {
+        try {
+            const changes = await api('/api/my/schedule-changes');
+            const tmp = document.createElement('div');
+            tmp.innerHTML = renderChanges(changes);
+            const old = document.getElementById('changesCard');
+            if (old) old.replaceWith(tmp.firstElementChild);
+        } catch (_) { /* تبقى البطاقة القديمة — لا انهيار */ }
+    }
+
+    // ── v5.1: التحديث اللحظي — SSE الموجَّه القائم (OV-S6: لا قناة جديدة تُنشأ). ──
+    // Initial Load يبقى REST دائمًا؛ هذه طبقة تسريع فقط: عند بث notification_created
+    // يظهر 🔔 فورًا ثم يُعاد جلب القسمين من REST (مصدر الحقيقة). انقطاعها لا يُسقط
+    // شيئًا — عند فتح الصفحة يجلب REST كل الإشعارات الفائتة (شرط المالك 2026-09-16).
+    function connectLive() {
+        if (!token || typeof EventSource === 'undefined') return;
+        let es = null;
+        try { es = new EventSource('/api/sse?token=' + encodeURIComponent(token)); }
+        catch (_) { return; }
+        es.onmessage = (event) => {
+            let data = null;
+            try { data = JSON.parse(event.data); } catch (_) { return; }
+            if (!data || data.type !== 'notification_created') return;
+            toast('🔔 ' + (data.message || 'وصلك إشعار جديد'));
+            refreshNotifs();
+            refreshChanges();
+        };
+        // رفض خادمي (401/403 ⇒ CLOSED): إيقاف نهائي بلا عاصفة إعادة اتصال — نفس
+        // سياسة websocket-sync. الأخطاء العابرة يعيد المتصفح الاتصال بها تلقائيًا.
+        es.onerror = () => {
+            if (es.readyState === EventSource.CLOSED) { try { es.close(); } catch (_) { } es = null; }
+        };
+    }
+
     // ── v5: سجل تغييرات جدولي — كل رقم قابل للتتبع (العملية/الفاعل/المراجعة) ──
     function renderChanges(d) {
         const rows = (d.changes || []).map(c => {
@@ -678,7 +735,7 @@
             const src = [c.revisionSource, c.revisionActor].filter(Boolean).map(esc).join(' · ') || '—';
             return `<tr><td>${fmtDateShort(c.date)}<br><small>${arDay(c.date)}</small></td><td>${c.changeLabel}: ${what}${team}</td><td><small>${src}</small></td></tr>`;
         }).join('');
-        return `<div class="card"><div class="card-head changes">📅 سجل تغييرات جدولي</div>
+        return `<div class="card" id="changesCard"><div class="card-head changes">📅 سجل تغييرات جدولي</div>
             <div class="card-body">
                 ${rows ? `<table><thead><tr><th>اليوم</th><th>التغيير</th><th>العملية</th></tr></thead><tbody>${rows}</tbody></table>`
                     : '<div class="empty">لا توجد تغييرات مسجلة على جدولك.</div>'}
@@ -731,6 +788,7 @@
                 + renderAssignments(assignments);
             if (checkData) bindCheckEvents();
             if (notifs) bindNotifEvents();
+            connectLive(); // v5.1: القناة اللحظية بعد نجاح التحميل الأول — REST يبقى المصدر
             if (logoutBtn) logoutBtn.style.display = ''; // نجاح التحميل ← الزر يظهر في الشريط العلوي الثابت
 
             const bdToggle = document.getElementById('bdToggle');

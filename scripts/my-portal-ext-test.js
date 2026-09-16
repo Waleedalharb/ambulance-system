@@ -12,6 +12,11 @@
  *  13) ختم القراءة   14) ختم التأكيد (فتح ≠ تأكيد، بلا تكرار)
  *  15) إعادة نفس الحدث = بلا إشعار مكرر   16) فشل الإشعار لا يرجع الجدول
  *  + حراسة المسارات: 401 بلا توكن · 403 بلا الصلاحية · 404 بلا ملف موظف
+ * تصحيحات المالك 2026-09-16 (بعد التجربة الواقعية):
+ *  17) Day نشطة من التعيين   18) Night نشطة   19) الليلية الممتدة (02:00 ← أمس)
+ *  20) تغيير Day←Night: السياق ليلي upcoming لا صباحي   21) تغيير الفرقة
+ *  22) أكثر من مجموعة بنفس اليوم   23) بلا تعيين = سقوط لنافذة الساعة
+ *  24) سلامة حقول المصدر (shift_code/team_id)   25) التوصيل اللحظي SSE الموجَّه
  *
  * العزل: VACUUM INTO + DATA_DIR مؤقت + بورت معزول — لا تمس بيانات الإنتاج.
  * التشغيل: node scripts/my-portal-ext-test.js
@@ -353,6 +358,114 @@ function addDaysRef(s, n) { const d = new Date(s + 'T00:00:00Z'); d.setUTCDate(d
         const rosterCountAfter = (await db2.get('SELECT COUNT(*) c FROM shift_roster')).c;
         check('س16: فشل الإشعار لا يرمي ويُحصى failed', !threw && re2 && re2.failed > 0, JSON.stringify(re2));
         check('س16: الجدول سليم بعد فشل الإشعار (بلا Rollback)', rosterCountAfter === rosterCountBefore && rosterCountAfter > 0, `${rosterCountBefore}→${rosterCountAfter}`);
+
+        // ═══ س25: التوصيل اللحظي عبر SSE الموجَّه (تصحيح المالك 2026-09-16) ═══
+        console.log('\n— س25: التوصيل اللحظي SSE —');
+        function sseListen(tok, store) {
+            const state = { reader: null, stopped: false };
+            (async () => {
+                try {
+                    const r = await fetch(BASE + '/api/sse?token=' + encodeURIComponent(tok));
+                    const reader = r.body.getReader();
+                    state.reader = reader;
+                    const dec = new TextDecoder();
+                    let buf = '';
+                    while (!state.stopped) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+                        buf += dec.decode(value, { stream: true });
+                        let i;
+                        while ((i = buf.indexOf('\n\n')) !== -1) {
+                            const frame = buf.slice(0, i); buf = buf.slice(i + 2);
+                            const line = frame.split('\n').find(l => l.indexOf('data:') === 0);
+                            if (line) { try { store.push(JSON.parse(line.slice(5).trim())); } catch (_) { } }
+                        }
+                    }
+                } catch (_) { }
+            })();
+            return { stop: () => { state.stopped = true; try { state.reader && state.reader.cancel(); } catch (_) { } } };
+        }
+        const evA = [], evB = [];
+        const sA = sseListen(tokA, evA), sB = sseListen(tokB, evB);
+        await sleep(800);
+        const notifCountBefore = (await notifsOf(tokA)).length;
+        await doImport([
+            ['TA01', winDate, winCode, 'جنوب 1'], ['TC01', winDate, winCode, 'جنوب 1'],
+            ['TB01', winDate, oppCode, 'جنوب 1'],
+            ['TD01', winDate, winCode, 'جنوب 1'], ['TD02', winDate, winCode, 'جنوب 1'],
+            ['TE01', winDate, winCode, 'القيادة الميدانية'], ['TE02', winDate, winCode, 'القيادة الميدانية'],
+            ['TO01', winDate, winCode, 'التحكم العملياتي'],
+            ['TA01', D(3), 'D12', 'جنوب 1']
+        ], 'س25 لحظي');
+        let liveEv = null;
+        for (let i = 0; i < 12 && !liveEv; i++) { await sleep(500); liveEv = evA.find(e => e.type === 'notification_created'); }
+        sA.stop(); sB.stop();
+        check('س25: الإشعار يصل لحظيًا عبر SSE للمستهدف (بلا Refresh)', !!liveEv && liveEv.notification && liveEv.notification.kind === 'schedule_change', JSON.stringify(liveEv || evA.slice(0, 2)));
+        check('س25: غير المستهدف لا يستلم الحدث', !evB.some(e => e.type === 'notification_created'));
+        let countAfter = notifCountBefore;
+        for (let i = 0; i < 10 && countAfter !== notifCountBefore + 1; i++) { await sleep(400); countAfter = (await notifsOf(tokA)).length; }
+        check('س25: إشعار واحد فقط للحدث (البث لا يكرر الإنشاء)', countAfter === notifCountBefore + 1, `${notifCountBefore}→${countAfter}`);
+
+        // ═══ س17-س24: سياق «من معي» من التعيين الفعلي (تصحيح المالك 2026-09-16) ═══
+        console.log('\n— س17-س24: سياق من معي من التعيين الفعلي —');
+        const MPS = require('../services/my-portal-service.js');
+        const mps = new MPS({ db: db2 });
+        const B = '2026-10-15', Bm1 = '2026-10-14', Bp1 = '2026-10-16';
+        const empId = async c => { const r = await db2.get('SELECT id FROM employees WHERE employee_code = ?', [c]); return r && r.id; };
+        async function ensureTeam(name, type) {
+            let t = await db2.get('SELECT id FROM teams WHERE name = ?', [name]);
+            if (!t) {
+                await db2.run('INSERT INTO teams (name, center, team_type) VALUES (?, ?, ?)', [name, 'اختبار', type || '']);
+                t = await db2.get('SELECT id FROM teams WHERE name = ?', [name]);
+            }
+            return t.id;
+        }
+        const tmS1 = await ensureTeam('جنوب 1', 'جنوب');
+        const tmS2 = await ensureTeam('جنوب 2', 'جنوب');
+        const tmLd = await ensureTeam('القيادة الميدانية', 'قيادة');
+        const tmOps = await ensureTeam('التحكم العملياتي', 'عمليات');
+        async function insRos(code, date, sc, tid) {
+            await db2.run('INSERT INTO shift_roster (employee_id, team_id, shift_date, shift_code, month, year) VALUES (?,?,?,?,?,?)',
+                [await empId(code), tid, date, sc, +date.slice(5, 7), +date.slice(0, 4)]);
+        }
+        await insRos('TA01', Bm1, 'N12', tmS1);
+        await insRos('TA01', B, 'N12', tmS1);
+        await insRos('TC01', B, 'N12', tmS1);
+        await insRos('TB01', B, 'D12', tmS2);
+        await insRos('TE01', B, 'N12', tmLd);
+        await insRos('TO01', B, 'N12', tmOps);
+        const riyadhAt = (ds, hh, mm) => new Date(Date.UTC(+ds.slice(0, 4), +ds.slice(5, 7) - 1, +ds.slice(8, 10), hh - 3, mm));
+        const matesAt = (code, ds, hh, mm) => mps.getShiftMates({ username: code }, { canPhone: false, now: riyadhAt(ds, hh, mm) });
+        const namesOf = list => (list || []).map(p => p.name);
+
+        const m17 = await matesAt('TB01', B, 10, 0);
+        check('س17: Day نشطة — سياق صباحي من التعيين', m17.window && m17.window.side === 'day' && m17.window.date === B && m17.window.source === 'assignment' && m17.me.state === 'active' && m17.me.onShift === true, JSON.stringify(m17.window));
+        check('س17: طاقم Day يستبعد رموز الليل وقيادتها', namesOf(m17.team).join('،') === 'موظف ثانٍ' && (m17.leadership || []).length === 0 && (m17.ops || []).length === 0, namesOf(m17.team).join('،'));
+
+        const m18 = await matesAt('TA01', B, 20, 0);
+        check('س18: Night نشطة — سياق ليلي من التعيين', m18.window.side === 'night' && m18.window.date === B && m18.me.onShift === true && m18.me.state === 'active', JSON.stringify(m18.window));
+        check('س24: سلامة حقول المصدر (shift_code/team_id)', m18.me.shiftCode === 'N12' && m18.me.teamId === tmS1 && m18.window.source === 'assignment', JSON.stringify(m18.me));
+        check('س18: الطاقم الليلي كاملًا (فرقة+قيادة+عمليات)', namesOf(m18.team).includes('موظف أول') && namesOf(m18.team).includes('موظف ثالث') && namesOf(m18.leadership).includes('قائد ميداني') && namesOf(m18.ops).includes('متحكم عملياتي'), [...namesOf(m18.team), ...namesOf(m18.leadership), ...namesOf(m18.ops)].join('،'));
+
+        const m19 = await matesAt('TA01', Bp1, 2, 0);
+        check('س19: الليلية الممتدة — 02:00 تتبع ليلية الأمس', m19.window.side === 'night' && m19.window.date === B && m19.me.onShift === true && namesOf(m19.team).includes('موظف ثالث'), JSON.stringify(m19.window));
+
+        const m20 = await matesAt('TA01', B, 10, 0);
+        check('س20: تغيير Day←Night — السياق ليلي لا صباحي', m20.window.side === 'night' && m20.window.date === B && m20.window.source === 'assignment', JSON.stringify(m20.window));
+        check('س20: الحالة upcoming (مناوبتي لم تبدأ)', m20.me.state === 'upcoming' && m20.me.onShift === false, JSON.stringify(m20.me));
+        check('س20: يعرض طاقم الليل لا طاقم الصباح', namesOf(m20.team).includes('موظف ثالث') && namesOf(m20.leadership).includes('قائد ميداني') && !namesOf(m20.team).includes('موظف ثانٍ'), namesOf(m20.team).join('،'));
+
+        await db2.run('UPDATE shift_roster SET team_id = ? WHERE employee_id = ? AND shift_date = ?', [tmS2, await empId('TA01'), B]);
+        const m21 = await matesAt('TA01', B, 20, 0);
+        check('س21: تغيير الفرقة — الطاقم من الفرقة الجديدة', m21.me.teamName === 'جنوب 2' && (m21.team || []).length === 1 && m21.team[0].isMe === true, JSON.stringify(m21.me));
+
+        const m22a = await matesAt('TB01', B, 10, 0);
+        const m22b = await matesAt('TC01', B, 20, 0);
+        check('س22: أكثر من مجموعة بنفس اليوم — كلٌّ في سياقه', !namesOf(m22a.team).includes('موظف أول') && namesOf(m22b.team).includes('موظف ثالث') && !namesOf(m22b.team).includes('موظف ثانٍ'), namesOf(m22a.team).join('،') + ' | ' + namesOf(m22b.team).join('،'));
+
+        const m23 = await matesAt('TD01', B, 10, 0);
+        check('س23: بلا تعيين — سقوط لنافذة الساعة', m23.available === true && m23.window.source === 'clock' && m23.me.state === 'off' && (m23.team || []).length === 0, JSON.stringify(m23.window));
+
         await db2.closeDb();
     } catch (e) {
         check('إقلاع الاختبار', false, e.message);
