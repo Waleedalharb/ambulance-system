@@ -37,6 +37,8 @@ html.is-capacitor body {
     body {
         overscroll-behavior-y: none;
         -webkit-tap-highlight-color: transparent;
+        /* منع أي تمرير أفقي عرضي */
+        overflow-x: hidden;
     }
     /* الحقول: حجم خط آمن يمنع الزوم التلقائي في iOS */
     input, select, textarea {
@@ -46,4 +48,22 @@ html.is-capacitor body {
     button, .btn, [role="button"] {
         min-height: 44px;
     }
+}
+
+/* ===== داخل تطبيق iOS (Capacitor): احترام كامل للـ Safe Area ===== */
+html.is-capacitor body {
+    overflow-x: hidden;
+}
+
+/* العناصر الحساسة للوحة المفاتيح: JS يصغرها فوق الكيبورد */
+.kb-aware {
+    transition: height 0.18s ease, top 0.18s ease;
+}
+html.kb-open .kb-hides {
+    display: none !important;
+}
+
+/* الشاشات القصيرة (عرضي/انقسام): تقليل الهوامش الرأسية */
+@media (max-height: 500px) {
+    body { overflow-y: auto; }
 }
