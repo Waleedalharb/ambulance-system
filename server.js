@@ -1279,6 +1279,28 @@ function getMyPortalService() {
     }
     return myPortalService;
 }
+// ═══ v5: موحِّد إشعارات تغيير الجدول — يُستدعى بعد COMMIT فقط ═══
+// فشل الإشعار لا يمس الجدول إطلاقًا (شرط المالك) — الاستدعاء عبر
+// fireScheduleChangeNotify يبتلع أي خطأ بعد تسجيله.
+let scheduleChangeNotifier = null;
+function getScheduleChangeNotifier() {
+    if (!scheduleChangeNotifier && db) {
+        const ScheduleChangeNotifier = require('./services/schedule-change-notifier');
+        scheduleChangeNotifier = new ScheduleChangeNotifier({ db, usersPath: USERS_PATH, broadcastToUsers });
+    }
+    return scheduleChangeNotifier;
+}
+async function fireScheduleChangeNotify(revisionId, auditIds) {
+    if (!revisionId || !auditIds || !auditIds.length) return;
+    try {
+        const stats = await getScheduleChangeNotifier().notifyRevision({ revisionId, auditIds });
+        if (stats && (stats.notified || stats.failed || stats.noAccount)) {
+            console.log('[v5] schedule-change notify:', JSON.stringify(stats));
+        }
+    } catch (e) {
+        console.error('[v5] schedule-change notify failed (الجدول سليم):', e.message);
+    }
+}
 const MY_PORTAL_NO_EMPLOYEE = { error: 'لا يوجد ملف موظف مرتبط بهذا الحساب', code: 'NO_EMPLOYEE' };
 
 app.get('/api/my/profile', authenticate, authorizePerm('ops.my_portal'), async (req, res) => {
@@ -1445,6 +1467,69 @@ app.post('/api/my/check-session/confirm', authenticate, authorizePerm('ops.my_po
         const out = await getShiftCheckService().confirm(req.user, { kind: req.body && req.body.kind });
         res.json(out);
     } catch (error) { myCheckError(res, error, 'فشل في تسجيل التأكيد'); }
+});
+
+// ── v5: من معي في المناوبة + إشعارات تغيير جدولي + سجل التغييرات ──
+// قراءة فقط + إجراءا ختم (read/ack) على إشعارات صاحب الحساب حصرًا.
+// فتح الإشعار ≠ تأكيده: مساران مستقلان بختمين مستقلين (شرط المالك).
+app.get('/api/my/shift-mates', authenticate, authorizePerm('ops.my_portal'), async (req, res) => {
+    try {
+        // الجوال طبقة مشروطة بعضوية صريحة بمفتاح staff.phone_view (نمط employeeColumnsFor)
+        const eff = await getPermissionService().getEffective(req.user.id, req.user.role);
+        const canPhone = holdsExplicitPerm(eff, 'admin.users_manage') || holdsExplicitPerm(eff, 'staff.phone_view');
+        const out = await getMyPortalService().getShiftMates(req.user, { canPhone });
+        if (out.notFound) return res.status(404).json(MY_PORTAL_NO_EMPLOYEE);
+        res.json({ success: true, ...out });
+    } catch (error) {
+        console.error('[my-portal] shift-mates error:', error);
+        res.status(500).json({ error: 'فشل في جلب طاقم المناوبة' });
+    }
+});
+
+app.get('/api/my/notifications', authenticate, authorizePerm('ops.my_portal'), async (req, res) => {
+    try {
+        const out = await getMyPortalService().getMyNotifications(req.user);
+        if (out.notFound) return res.status(404).json(MY_PORTAL_NO_EMPLOYEE);
+        res.json({ success: true, ...out });
+    } catch (error) {
+        console.error('[my-portal] notifications error:', error);
+        res.status(500).json({ error: 'فشل في جلب الإشعارات' });
+    }
+});
+
+app.post('/api/my/notifications/:id/read', authenticate, authorizePerm('ops.my_portal'), async (req, res) => {
+    try {
+        const out = await getMyPortalService().markMyNotificationRead(req.user, req.params.id);
+        if (out.notFound) return res.status(404).json(MY_PORTAL_NO_EMPLOYEE);
+        if (out.notOwned) return res.status(404).json({ error: 'الإشعار غير موجود' });
+        res.json({ success: true, status: out.status });
+    } catch (error) {
+        console.error('[my-portal] notification read error:', error);
+        res.status(500).json({ error: 'فشل في ختم القراءة' });
+    }
+});
+
+app.post('/api/my/notifications/:id/ack', authenticate, authorizePerm('ops.my_portal'), async (req, res) => {
+    try {
+        const out = await getMyPortalService().ackMyNotification(req.user, req.params.id);
+        if (out.notFound) return res.status(404).json(MY_PORTAL_NO_EMPLOYEE);
+        if (out.notOwned) return res.status(404).json({ error: 'الإشعار غير موجود' });
+        res.json({ success: true, status: out.status });
+    } catch (error) {
+        console.error('[my-portal] notification ack error:', error);
+        res.status(500).json({ error: 'فشل في ختم التأكيد' });
+    }
+});
+
+app.get('/api/my/schedule-changes', authenticate, authorizePerm('ops.my_portal'), async (req, res) => {
+    try {
+        const out = await getMyPortalService().getMyScheduleChanges(req.user);
+        if (out.notFound) return res.status(404).json(MY_PORTAL_NO_EMPLOYEE);
+        res.json({ success: true, ...out });
+    } catch (error) {
+        console.error('[my-portal] schedule-changes error:', error);
+        res.status(500).json({ error: 'فشل في جلب سجل التغييرات' });
+    }
 });
 
 app.get('/api/permissions/catalog', authenticate, authorizePerm('admin.users_manage'), async (req, res) => {
@@ -9939,7 +10024,12 @@ async function handleScheduleEmployeesSave(req, res) {
         // حارس المسح الصامت (422) يُعاد قبل أن تُكتب أي بيانات إطلاقًا.
         let syncStats = null;
         try {
-            syncStats = await rosterSyncService.syncFromSchedule(employees, { overwriteManual: confirmOverwriteManual });
+            // v5: الفاعل والمصدر يُمرَّران لربط التدقيق/الإشعارات بالعملية
+            syncStats = await rosterSyncService.syncFromSchedule(employees, {
+                overwriteManual: confirmOverwriteManual,
+                source: req.path.indexOf('official-import') !== -1 ? 'official-import' : 'schedule-save',
+                actor: { id: req.user.id, username: req.user.username, name: req.user.name }
+            });
         } catch (syncErr) {
             if (syncErr && syncErr.code === 'EMPTY_PERIODS_GUARD') {
                 return res.status(422).json({ error: syncErr.message, skippedEntries: syncErr.skippedEntries || 0 });
@@ -9949,6 +10039,8 @@ async function handleScheduleEmployeesSave(req, res) {
         }
         // JSON ملف استيراد فقط — يُكتب بعد نجاح المزامنة (كاش سقوط مُنحط، ليس SSOT)
         await writeScheduleEmployees(employees);
+        // v5: الإشعارات بعد COMMIT فقط — فشلها لا يمس الجدول
+        await fireScheduleChangeNotify(syncStats.revisionId, syncStats.auditIds);
         if (confirmOverwriteManual && syncStats.manualOverwritten > 0) {
             await addAuditLogEntry('import_overwrite_manual',
                 `استيراد الجدولة مع تأكيد صريح: استُبدل ${syncStats.manualOverwritten} تعيينًا يدويًا (source='manual')`,
@@ -10150,12 +10242,18 @@ app.delete('/api/schedule/employees', authenticate, authorizePerm('schedule.empl
         // SR-2: مسح الجدولة = مسح roster بالكامل + تعطيل جميع الموظفين (لا حذف)
         // G2: المسار الوحيد المصرَّح له بالمسح الشامل — explicitClear صريح.
         if (rosterSyncService) {
+            let clearStats = null;
             try {
-                await rosterSyncService.syncFromSchedule([], { explicitClear: true });
+                clearStats = await rosterSyncService.syncFromSchedule([], {
+                    explicitClear: true,
+                    actor: { id: req.user.id, username: req.user.username, name: req.user.name }
+                });
             } catch (syncErr) {
                 console.error('[RosterSync] فشل مزامنة المسح:', syncErr);
                 return res.status(500).json({ error: 'فشل في مزامنة مسح الكادر مع قاعدة البيانات' });
             }
+            // v5: إشعار حذف المناوبات بعد COMMIT — فشله لا يمس نتيجة المسح
+            await fireScheduleChangeNotify(clearStats && clearStats.revisionId, clearStats && clearStats.auditIds);
         } else {
             return res.status(503).json({ error: 'خدمة مزامنة الكادر غير متاحة' });
         }
@@ -11541,16 +11639,23 @@ app.put('/api/shift-roster/cell', authenticate, authorizePerm('schedule.edit_cel
             changeType = 'add';
         }
 
-        await addShiftAuditLog({
+        // v5: مراجعة العملية + ربط صف التدقيق بها + إشعار الموظف بعد الكتابة
+        const cellRevisionId = await db.ScheduleRevisions.create({
+            source: 'manual-cell', actor_id: req.user.id, actor_name: req.user.name,
+            stats_json: { employee_code: employeeCode, date, change_type: changeType,
+                old_shift_code: existing ? existing.shift_code : null, new_shift_code: codeRow.code }
+        });
+        const cellAuditId = await addShiftAuditLog({
             roster_id: row.id, employee_id: employee.id, team_id: row.team_id,
             shift_date: date, old_shift_code: existing ? existing.shift_code : null, new_shift_code: codeRow.code,
             old_team_id: existing ? existing.team_id : null, new_team_id: row.team_id,
             changed_by: req.user.username || req.user.name, changed_by_name: req.user.name,
-            change_type: changeType, reason: 'تعديل خلية مناوبة ليوم واحد'
+            change_type: changeType, reason: 'تعديل خلية مناوبة ليوم واحد', revision_id: cellRevisionId
         });
         await addAuditLogEntry('shift_cell_update',
             `تعديل مناوبة ${employee.name} (${employeeCode}) يوم ${date}: ${existing ? existing.shift_code : '—'} ← ${codeRow.code}`,
             'schedule', req.user.name, req.user.role, req.user.id);
+        await fireScheduleChangeNotify(cellRevisionId, cellAuditId ? [cellAuditId] : []);
         broadcast({ type: 'shift_roster_updated', payload: { type: 'single', changes: [{ roster_id: row.id, change_type: changeType }], by_user: req.user.name || req.user.username } });
         res.json({ success: true, entry: row });
     } catch (error) {
@@ -11569,13 +11674,18 @@ app.post('/api/shift-roster', authenticate, authorizePerm('schedule.employees'),
     try {
         if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
         const id = await db.ShiftRoster.create(req.body);
-        await addShiftAuditLog({
+        const addRevisionId = await db.ScheduleRevisions.create({
+            source: 'manual-add', actor_id: req.user.id, actor_name: req.user.name,
+            stats_json: { employee_id: req.body.employee_id, date: req.body.shift_date, new_shift_code: req.body.shift_code }
+        });
+        const addAuditId = await addShiftAuditLog({
             roster_id: id, employee_id: req.body.employee_id, team_id: req.body.team_id || null,
             shift_date: req.body.shift_date, old_shift_code: null, new_shift_code: req.body.shift_code,
             old_team_id: null, new_team_id: req.body.team_id || null,
             changed_by: req.user.username || req.user.name, changed_by_name: req.user.name,
-            change_type: 'add', reason: 'إضافة سجل مناوبة جديد'
+            change_type: 'add', reason: 'إضافة سجل مناوبة جديد', revision_id: addRevisionId
         });
+        await fireScheduleChangeNotify(addRevisionId, addAuditId ? [addAuditId] : []);
         broadcast({ type: 'shift_roster_updated', payload: { type: 'single', changes: [{ roster_id: id, change_type: 'add' }], by_user: req.user.name || req.user.username } });
         res.json({ success: true, id });
     } catch (error) {
@@ -11590,13 +11700,18 @@ app.put('/api/shift-roster/:id', authenticate, authorizePerm('schedule.employees
         const existing = await db.ShiftRoster.getById(req.params.id);
         if (!existing) return res.status(404).json({ error: 'السجل غير موجود' });
         const result = await db.ShiftRoster.update(req.params.id, req.body);
-        await addShiftAuditLog({
+        const updRevisionId = await db.ScheduleRevisions.create({
+            source: 'manual-edit', actor_id: req.user.id, actor_name: req.user.name,
+            stats_json: { roster_id: Number(req.params.id), employee_id: existing.employee_id, date: existing.shift_date }
+        });
+        const updAuditId = await addShiftAuditLog({
             roster_id: req.params.id, employee_id: existing.employee_id, team_id: existing.team_id,
             shift_date: existing.shift_date, old_shift_code: existing.shift_code, new_shift_code: req.body.shift_code || existing.shift_code,
             old_team_id: existing.team_id, new_team_id: req.body.team_id || existing.team_id,
             changed_by: req.user.username || req.user.name, changed_by_name: req.user.name,
-            change_type: 'edit', reason: 'تحديث سجل المناوبة'
+            change_type: 'edit', reason: 'تحديث سجل المناوبة', revision_id: updRevisionId
         });
+        await fireScheduleChangeNotify(updRevisionId, updAuditId ? [updAuditId] : []);
         broadcast({ type: 'shift_roster_updated', payload: { type: 'single', changes: [{ roster_id: req.params.id, change_type: 'edit' }], by_user: req.user.name || req.user.username } });
         res.json({ success: true });
     } catch (error) {
@@ -11611,13 +11726,18 @@ app.delete('/api/shift-roster/:id', authenticate, authorizePerm('schedule.employ
         const existing = await db.ShiftRoster.getById(req.params.id);
         if (!existing) return res.status(404).json({ error: 'السجل غير موجود' });
         await db.ShiftRoster.delete(req.params.id);
-        await addShiftAuditLog({
+        const delRevisionId = await db.ScheduleRevisions.create({
+            source: 'manual-delete', actor_id: req.user.id, actor_name: req.user.name,
+            stats_json: { roster_id: Number(req.params.id), employee_id: existing.employee_id, date: existing.shift_date }
+        });
+        const delAuditId = await addShiftAuditLog({
             roster_id: req.params.id, employee_id: existing.employee_id, team_id: existing.team_id,
             shift_date: existing.shift_date, old_shift_code: existing.shift_code, new_shift_code: null,
             old_team_id: existing.team_id, new_team_id: null,
             changed_by: req.user.username || req.user.name, changed_by_name: req.user.name,
-            change_type: 'delete', reason: 'حذف سجل المناوبة'
+            change_type: 'delete', reason: 'حذف سجل المناوبة', revision_id: delRevisionId
         });
+        await fireScheduleChangeNotify(delRevisionId, delAuditId ? [delAuditId] : []);
         broadcast({ type: 'shift_roster_updated', payload: { type: 'single', changes: [{ roster_id: req.params.id, change_type: 'delete' }], by_user: req.user.name || req.user.username } });
         res.json({ success: true });
     } catch (error) {
@@ -11699,13 +11819,19 @@ app.post('/api/shift-roster/import', authenticate, authorizePerm('schedule.impor
         // الاستيراد العادي بلا فترات صالحة ليس «نجاحًا» ولا يمسح شيئًا.
         let syncStats;
         try {
-            syncStats = await rosterSyncService.syncFromSchedule(scheduleModel, { overwriteManual: confirmOverwriteManual });
+            syncStats = await rosterSyncService.syncFromSchedule(scheduleModel, {
+                overwriteManual: confirmOverwriteManual,
+                source: 'roster-import',
+                actor: { id: req.user.id, username: req.user.username, name: req.user.name }
+            });
         } catch (syncErr) {
             if (syncErr && syncErr.code === 'EMPTY_PERIODS_GUARD') {
                 return res.status(422).json({ error: syncErr.message, skippedEntries: syncErr.skippedEntries || 0 });
             }
             throw syncErr;
         }
+        // v5: إشعارات تغيير الجدول بعد COMMIT — فشلها لا يمس نتيجة الاستيراد
+        await fireScheduleChangeNotify(syncStats.revisionId, syncStats.auditIds);
         if (confirmOverwriteManual && syncStats.manualOverwritten > 0) {
             await addAuditLogEntry('import_overwrite_manual',
                 `استيراد roster مع تأكيد صريح: استُبدل ${syncStats.manualOverwritten} تعيينًا يدويًا (source='manual')`,
@@ -11772,10 +11898,40 @@ app.post('/api/shift-roster/clear', authenticate, authorizePerm('schedule.clear'
         if (!startDate || !endDate) {
             return res.status(400).json({ error: 'تاريخ البداية والنهاية مطلوب' });
         }
-        const result = await db.run(
-            'DELETE FROM shift_roster WHERE shift_date >= ? AND shift_date <= ?',
-            [startDate, endDate]
-        );
+        // v5: المسح بالمدى تعديل جدولة — يُوثَّق بمراجعة + صفوف تدقيق (delete)
+        // ويُشعر المتأثرون بعد COMMIT، مثله مثل أي كاتب آخر للجدول.
+        const doomed = await db.all(
+            'SELECT id, employee_id, team_id, shift_date, shift_code FROM shift_roster WHERE shift_date >= ? AND shift_date <= ?',
+            [startDate, endDate]);
+        let result; let clearRevId = null; const clearAuditIds = [];
+        await db.beginTransaction();
+        try {
+            result = await db.run(
+                'DELETE FROM shift_roster WHERE shift_date >= ? AND shift_date <= ?',
+                [startDate, endDate]
+            );
+            if (doomed.length) {
+                clearRevId = await db.ScheduleRevisions.create({
+                    source: 'manual-clear-range', actor_id: req.user.id, actor_name: req.user.name,
+                    stats_json: { startDate, endDate, deleted: doomed.length }
+                });
+                for (const d of doomed) {
+                    const aid = await addShiftAuditLog({
+                        roster_id: d.id, employee_id: d.employee_id, team_id: null,
+                        shift_date: d.shift_date, old_shift_code: d.shift_code, new_shift_code: null,
+                        old_team_id: d.team_id, new_team_id: null,
+                        changed_by: req.user.username || req.user.name, changed_by_name: req.user.name,
+                        change_type: 'delete', reason: `مسح الجدول بالمدى ${startDate} ← ${endDate}`, revision_id: clearRevId
+                    });
+                    if (aid) clearAuditIds.push(aid);
+                }
+            }
+            await db.commitTransaction();
+        } catch (txErr) {
+            await db.rollbackTransaction();
+            throw txErr;
+        }
+        await fireScheduleChangeNotify(clearRevId, clearAuditIds);
         res.json({ success: true, deleted: result.changes, message: `تم حذف ${result.changes} سجل من الجدول` });
     } catch (error) {
         console.error('ShiftRoster clear error:', error);
@@ -11838,7 +11994,13 @@ app.post('/api/shift-roster/bulk-update', authenticate, authorizePerm('schedule.
         const conflicts = [];
         const auditRecords = [];
         await db.beginTransaction();
+        let bulkRevisionId = null;
         try {
+            // v5: مراجعة واحدة للدفعة كلها داخل المعاملة — الإشعار بعد COMMIT
+            bulkRevisionId = await db.ScheduleRevisions.create({
+                source: 'manual-bulk', actor_id: req.user.id, actor_name: req.user.name,
+                stats_json: { requested: changes.length }
+            });
             for (const change of changes) {
                 const { roster_id, employee_id, team_id, shift_date, shift_code, old_shift_code } = change;
                 if (!roster_id) {
@@ -11866,7 +12028,7 @@ app.post('/api/shift-roster/bulk-update', authenticate, authorizePerm('schedule.
                     old_team_id: existing.team_id, new_team_id: team_id || existing.team_id,
                     changed_by: req.user.username || req.user.name,
                     changed_by_name: req.user.name,
-                    change_type: 'bulk', reason: 'تحديث جماعي'
+                    change_type: 'bulk', reason: 'تحديث جماعي', revision_id: bulkRevisionId
                 });
                 updated.push({ roster_id, auditId });
                 auditRecords.push({ roster_id, auditId });
@@ -11876,6 +12038,7 @@ app.post('/api/shift-roster/bulk-update', authenticate, authorizePerm('schedule.
             await db.rollbackTransaction();
             throw err;
         }
+        await fireScheduleChangeNotify(bulkRevisionId, auditRecords.map(r => r.auditId).filter(Boolean));
         broadcast({
             type: 'shift_roster_updated',
             payload: { type: 'bulk', changes: updated, by_user: req.user.name || req.user.username }
@@ -11903,6 +12066,7 @@ app.post('/api/shift-roster/swap', authenticate, authorizePerm('schedule.swap'),
             return res.status(404).json({ error: 'أحد السجلات غير موجود' });
         }
         await db.beginTransaction();
+        let swapRevisionId = null; let swapAuditIds = [];
         try {
             await db.ShiftRoster.update(roster_id_1, {
                 employee_id: employee_id_2 || entry2.employee_id,
@@ -11920,25 +12084,32 @@ app.post('/api/shift-roster/swap', authenticate, authorizePerm('schedule.swap'),
                 month: entry2.month,
                 year: entry2.year
             });
-            await addShiftAuditLog({
+            // v5: مراجعة واحدة للتبديل داخل المعاملة — الإشعار بعد COMMIT فقط
+            swapRevisionId = await db.ScheduleRevisions.create({
+                source: 'manual-swap', actor_id: req.user.id, actor_name: req.user.name,
+                stats_json: { roster_id_1, roster_id_2, employee_id_1: entry1.employee_id, employee_id_2: entry2.employee_id }
+            });
+            const sa1 = await addShiftAuditLog({
                 roster_id: roster_id_1, employee_id: entry1.employee_id, team_id: entry1.team_id,
                 shift_date: entry1.shift_date, old_shift_code: entry1.shift_code, new_shift_code: entry2.shift_code,
                 old_team_id: entry1.team_id, new_team_id: entry2.team_id,
                 changed_by: req.user.username || req.user.name, changed_by_name: req.user.name,
-                change_type: 'swap', reason: 'تبديل مع سجل ' + roster_id_2
+                change_type: 'swap', reason: 'تبديل مع سجل ' + roster_id_2, revision_id: swapRevisionId
             });
-            await addShiftAuditLog({
+            const sa2 = await addShiftAuditLog({
                 roster_id: roster_id_2, employee_id: entry2.employee_id, team_id: entry2.team_id,
                 shift_date: entry2.shift_date, old_shift_code: entry2.shift_code, new_shift_code: entry1.shift_code,
                 old_team_id: entry2.team_id, new_team_id: entry1.team_id,
                 changed_by: req.user.username || req.user.name, changed_by_name: req.user.name,
-                change_type: 'swap', reason: 'تبديل مع سجل ' + roster_id_1
+                change_type: 'swap', reason: 'تبديل مع سجل ' + roster_id_1, revision_id: swapRevisionId
             });
+            swapAuditIds = [sa1, sa2].filter(Boolean);
             await db.commitTransaction();
         } catch (err) {
             await db.rollbackTransaction();
             throw err;
         }
+        await fireScheduleChangeNotify(swapRevisionId, swapAuditIds);
         broadcast({
             type: 'shift_roster_swapped',
             payload: { roster_id_1, roster_id_2, by_user: req.user.name || req.user.username }
@@ -12764,13 +12935,18 @@ app.post('/api/employees/:employeeCode/transfer', authenticate, authorize(['admi
             }
             await db.run('UPDATE shift_roster SET team_id = ? WHERE id = ?', [team.id, row.id]);
             const updated = await db.ShiftRoster.getById(row.id);
-            await addShiftAuditLog({
+            const trRevisionId = await db.ScheduleRevisions.create({
+                source: 'manual-transfer', actor_id: req.user.id, actor_name: req.user.name,
+                stats_json: { employee_code: employee.employee_code, date, from_team_id: row.team_id, to_team_id: team.id, scope: 'day' }
+            });
+            const trAuditId = await addShiftAuditLog({
                 roster_id: row.id, employee_id: employee.id, team_id: team.id,
                 shift_date: date, old_shift_code: row.shift_code, new_shift_code: row.shift_code,
                 old_team_id: row.team_id, new_team_id: team.id,
                 changed_by: req.user.username || req.user.name, changed_by_name: req.user.name,
-                change_type: 'edit', reason: `نقل يومي إلى ${team.name}`
+                change_type: 'edit', reason: `نقل يومي إلى ${team.name}`, revision_id: trRevisionId
             });
+            await fireScheduleChangeNotify(trRevisionId, trAuditId ? [trAuditId] : []);
             await addAuditLogEntry('employee_transfer_day',
                 `نقل ${employee.name} (${employee.employee_code}) إلى ${team.name} ليوم ${date} فقط`,
                 'schedule', req.user.name, req.user.role, req.user.id);

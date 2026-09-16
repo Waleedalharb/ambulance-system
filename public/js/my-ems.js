@@ -595,6 +595,97 @@
         </div>`;
     }
 
+    // ── v5: معي في المناوبة الآن — النافذة تحسب خادميًا بالتوقيت الفعلي ──
+    function renderMates(d) {
+        if (!d || !d.available) return '';
+        const w = d.window || {};
+        const row = (p, showTeam) => `<div class="mate-row">
+            <div>
+                <div class="m-name">${esc(p.name)}${p.isMe ? ' <span class="me-tag">(أنا)</span>' : ''}</div>
+                <div class="m-role">${esc(p.jobTitle || '—')}${p.shiftCode ? ' · ' + esc(p.shiftCode) : ''}${showTeam && p.teamName ? ' · ' + esc(p.teamName) : ''}</div>
+            </div>
+            ${p.phone ? `<div class="m-phone" dir="ltr">📞 ${esc(p.phone)}</div>` : ''}
+        </div>`;
+        const teamRows = (d.team || []).map(p => row(p, false)).join('');
+        const leadRows = (d.leadership || []).map(p => row(p, true)).join('');
+        const opsRows = (d.ops || []).map(p => row(p, true)).join('');
+        const offNote = d.me && !d.me.onShift
+            ? '<div class="chk-hint" style="margin:0 0 8px">أنت خارج المناوبة الحالية — المعروضون هم المناوبون الآن.</div>' : '';
+        return `<div class="card"><div class="card-head mates">👥 معي في المناوبة الآن</div>
+            <div class="card-body">
+                <div class="chk-hint" style="margin:0 0 8px">المناوبة ${esc(w.label || '')} · ${fmtDateShort(w.date)} ${arDay(w.date)} — تُحدَّد بالتوقيت الفعلي (الليلية الممتدة محسوبة)</div>
+                ${offNote}
+                ${teamRows ? `<div class="mates-sub">فرقتي${d.me && d.me.teamName ? ' — ' + esc(d.me.teamName) : ''}</div>` + teamRows : ''}
+                ${leadRows ? '<div class="mates-sub">القيادة الميدانية</div>' + leadRows : ''}
+                ${opsRows ? '<div class="mates-sub">العمليات</div>' + opsRows : ''}
+                ${!teamRows && !leadRows && !opsRows ? '<div class="empty">لا يوجد مناوبون مسجلون في هذه النافذة.</div>' : ''}
+            </div>
+        </div>`;
+    }
+
+    // ── v5: إشعاراتي — فتح الإشعار ≠ تأكيده (زرّان مستقلان بختمين مستقلين) ──
+    function renderNotifs(d) {
+        const rows = (d.notifications || []).map(n => {
+            const st = n.status === 'acknowledged' ? '<span class="notif-state st-ack">✓ تم التأكيد</span>'
+                : n.status === 'read' ? '<span class="notif-state st-read">مقروء — بانتظار التأكيد</span>'
+                : '<span class="notif-state st-new">جديد</span>';
+            const actions = n.status === 'acknowledged' ? '' : `<div class="n-actions">
+                ${n.status !== 'read' ? `<button class="notif-btn" data-nread="${n.id}">تحديد كمقروء</button>` : ''}
+                <button class="notif-btn ack" data-nack="${n.id}">✓ تأكيد الاطلاع</button>
+            </div>`;
+            return `<div class="notif-row${['read', 'acknowledged'].indexOf(n.status) === -1 ? ' unread' : ''}">
+                <div class="n-msg">${esc(n.message)}</div>
+                <div class="n-meta">${st} · ${esc((n.createdAt || '').slice(0, 16))}</div>
+                ${actions}
+            </div>`;
+        }).join('');
+        return `<div class="card" id="notifCard"><div class="card-head notifs">🔔 إشعاراتي${d.unackedCount ? ` <span class="notif-count">${d.unackedCount} بلا تأكيد</span>` : ''}</div>
+            <div class="card-body">${rows || '<div class="empty">لا توجد إشعارات بعد — تصلك هنا أي تغييرات على جدولك فور اعتمادها.</div>'}</div>
+        </div>`;
+    }
+
+    function bindNotifEvents() {
+        document.querySelectorAll('[data-nread]').forEach(b => b.addEventListener('click', async () => {
+            b.disabled = true;
+            try { await apiPost('/api/my/notifications/' + b.dataset.nread + '/read'); await refreshNotifs(); }
+            catch (e) { b.disabled = false; toast(e.message || 'تعذر الختم'); }
+        }));
+        document.querySelectorAll('[data-nack]').forEach(b => b.addEventListener('click', async () => {
+            b.disabled = true;
+            try { await apiPost('/api/my/notifications/' + b.dataset.nack + '/ack'); await refreshNotifs(); }
+            catch (e) { b.disabled = false; toast(e.message || 'تعذر التأكيد'); }
+        }));
+    }
+
+    async function refreshNotifs() {
+        try {
+            const notifs = await api('/api/my/notifications');
+            const tmp = document.createElement('div');
+            tmp.innerHTML = renderNotifs(notifs);
+            const old = document.getElementById('notifCard');
+            if (old) old.replaceWith(tmp.firstElementChild);
+            bindNotifEvents();
+        } catch (_) { /* تبقى البطاقة القديمة — لا انهيار */ }
+    }
+
+    // ── v5: سجل تغييرات جدولي — كل رقم قابل للتتبع (العملية/الفاعل/المراجعة) ──
+    function renderChanges(d) {
+        const rows = (d.changes || []).map(c => {
+            const what = c.changeType === 'add' ? `أُضيفت مناوبة «${esc(c.newShiftCode || '')}»`
+                : c.changeType === 'delete' ? `أُلغيت مناوبة «${esc(c.oldShiftCode || '')}»`
+                : `«${esc(c.oldShiftCode || '—')}» ← «${esc(c.newShiftCode || '—')}»`;
+            const team = c.oldTeam !== c.newTeam ? `<br><small>${esc(c.oldTeam || 'بدون فرقة')} ← ${esc(c.newTeam || 'بدون فرقة')}</small>` : '';
+            const src = [c.revisionSource, c.revisionActor].filter(Boolean).map(esc).join(' · ') || '—';
+            return `<tr><td>${fmtDateShort(c.date)}<br><small>${arDay(c.date)}</small></td><td>${c.changeLabel}: ${what}${team}</td><td><small>${src}</small></td></tr>`;
+        }).join('');
+        return `<div class="card"><div class="card-head changes">📅 سجل تغييرات جدولي</div>
+            <div class="card-body">
+                ${rows ? `<table><thead><tr><th>اليوم</th><th>التغيير</th><th>العملية</th></tr></thead><tbody>${rows}</tbody></table>`
+                    : '<div class="empty">لا توجد تغييرات مسجلة على جدولك.</div>'}
+            </div>
+        </div>`;
+    }
+
     // ── التحميل ──
     let curMonth = null, curYear = null;
     async function load() {
@@ -618,20 +709,28 @@
                 curYear = t ? +t.slice(0, 4) : new Date().getFullYear();
                 curMonth = t ? +t.slice(5, 7) : new Date().getMonth() + 1;
             }
-            const [schedule, incidents, vehicle, inventory, checkData] = await Promise.all([
+            const [schedule, incidents, vehicle, inventory, checkData, mates, notifs, changes] = await Promise.all([
                 api(`/api/my/schedule?month=${curMonth}&year=${curYear}`),
                 sec.incidents ? api('/api/my/team-incidents') : Promise.resolve(null),
                 sec.vehicle ? api('/api/my/vehicle') : Promise.resolve(null),
                 sec.inventory ? api('/api/my/inventory') : Promise.resolve(null),
-                sec.check ? api('/api/my/check-session') : Promise.resolve(null)]);
+                sec.check ? api('/api/my/check-session') : Promise.resolve(null),
+                // v5: الأقسام الثلاثة الجديدة — فشل أيٍّ منها لا يُسقط بقية الصفحة
+                api('/api/my/shift-mates').catch(() => null),
+                api('/api/my/notifications').catch(() => null),
+                api('/api/my/schedule-changes').catch(() => null)]);
             app.innerHTML = renderProfile(profile)
+                + (notifs ? renderNotifs(notifs) : '')
+                + (mates ? renderMates(mates) : '')
                 + (checkData ? renderCheck(checkData) : '')
                 + (incidents ? renderIncidents(incidents) : '')
                 + (vehicle ? renderVehicle(vehicle) : '')
                 + (inventory ? renderInventory(inventory, !!sec.inventoryCanOpen) : '')
                 + renderSchedule(schedule)
+                + (changes ? renderChanges(changes) : '')
                 + renderAssignments(assignments);
             if (checkData) bindCheckEvents();
+            if (notifs) bindNotifEvents();
             if (logoutBtn) logoutBtn.style.display = ''; // نجاح التحميل ← الزر يظهر في الشريط العلوي الثابت
 
             const bdToggle = document.getElementById('bdToggle');

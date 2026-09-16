@@ -95,6 +95,46 @@ class RosterSyncService {
     }
 
     /**
+     * v5: diff حقيقي قيمة-بقيمة بين لقطة roster القديمة والصفوف المدرجة حديثًا.
+     * المفتاح (employee_id|shift_date)؛ المقارنة على (team_id, shift_code) فقط
+     * مع توحيد حالة الرمز. إعادة نفس الملف ⇒ صفر تغيير (لا audit ولا إشعار).
+     * @returns {Array} [{change_type: add|edit|delete, employee_id, shift_date,
+     *   old_shift_code, new_shift_code, old_team_id, new_team_id, roster_id, team_id}]
+     */
+    _diffRoster(oldRows, newEntries) {
+        const key = (empId, date) => empId + '|' + date;
+        const normTeam = v => (v === null || v === undefined ? null : Number(v));
+        const normCode = v => String(v == null ? '' : v).toUpperCase();
+        const oldBy = new Map(oldRows.map(r => [key(r.employee_id, r.shift_date), r]));
+        const newBy = new Map(); // الأخير يغلب عند تكرار (موظف، تاريخ) في المدخل
+        for (const e of newEntries) newBy.set(key(e.employee_id, e.shift_date), e);
+        const changes = [];
+        for (const [k, n] of newBy) {
+            const o = oldBy.get(k);
+            if (!o) {
+                changes.push({ change_type: 'add', employee_id: n.employee_id, shift_date: n.shift_date,
+                    old_shift_code: null, new_shift_code: n.shift_code,
+                    old_team_id: null, new_team_id: normTeam(n.team_id),
+                    roster_id: n.roster_id || null, team_id: normTeam(n.team_id) });
+            } else if (normTeam(o.team_id) !== normTeam(n.team_id) || normCode(o.shift_code) !== normCode(n.shift_code)) {
+                changes.push({ change_type: 'edit', employee_id: n.employee_id, shift_date: n.shift_date,
+                    old_shift_code: o.shift_code, new_shift_code: n.shift_code,
+                    old_team_id: normTeam(o.team_id), new_team_id: normTeam(n.team_id),
+                    roster_id: n.roster_id || o.id, team_id: normTeam(n.team_id) });
+            }
+        }
+        for (const [k, o] of oldBy) {
+            if (!newBy.has(k)) {
+                changes.push({ change_type: 'delete', employee_id: o.employee_id, shift_date: o.shift_date,
+                    old_shift_code: o.shift_code, new_shift_code: null,
+                    old_team_id: normTeam(o.team_id), new_team_id: null,
+                    roster_id: o.id, team_id: null });
+            }
+        }
+        return changes;
+    }
+
+    /**
      * كشف تعارض الاستيراد مع التعيينات اليدوية (source='manual') قبل أي كتابة.
      * التعارض = موظف له تعيين يدوي نشط لفرقة، والاستيراد يضعه في فرقة مختلفة.
      * لا يكتب شيئًا — قراءة فقط. الموظف غير الموجود في القاعدة لا تعارض له.
@@ -163,6 +203,10 @@ class RosterSyncService {
         // أي فترة صالحة يُرفض قبل أي كتابة — ممنوع أن يعود «نجاحًا» وقد
         // مُسحت كل الشهور (حوادث «الحفظ لا ينعكس» التاريخية).
         const explicitClear = options && options.explicitClear === true;
+        // v5: الفاعل ومصدر المراجعة — يُمرَّران من المسار (req.user) لربط
+        // التدقيق والإشعارات بالعملية. الافتراضي system (سكربتات/اختبارات).
+        const actor = options && options.actor ? options.actor : null;
+        const syncSource = explicitClear ? 'clear' : (options && options.source ? String(options.source) : 'import');
         if (!Array.isArray(scheduleEmployees)) {
             throw new Error('RosterSyncService: مصفوفة الجدولة مطلوبة');
         }
@@ -172,7 +216,12 @@ class RosterSyncService {
             skippedEmployees: 0, skippedEntries: 0,
             assignmentsCreated: 0, assignmentsEnded: 0,
             manualConflictsProtected: [], manualOverwritten: 0,
-            unmatchedTeams: []
+            unmatchedTeams: [],
+            // v5: ناتج الـ diff الحقيقي + مراجعة العملية + معرّفات صفوف التدقيق
+            // (مدخل موحِّد الإشعارات بعد COMMIT — لا فروق ⇒ كلها صفر/null)
+            scheduleChanges: { added: 0, edited: 0, deleted: 0, total: 0 },
+            revisionId: null,
+            auditIds: []
         };
 
         // ── 1) تطبيع المدخل وإزالة التكرار بالرمز (الأخير يغلب) ──
@@ -344,7 +393,22 @@ class RosterSyncService {
                 }
             }
 
-            // ── 5) إعادة بناء roster للفترات المشمولة (حذف + إدراج) ──
+            // ── 5) إعادة بناء roster للفترات المشمولة (حذف + إدراج ذري) ──
+            // 5أ) لقطة ما قبل التغيير — أساس الـ diff الحقيقي (v5): إعادة نفس
+            // الملف = صفر تغيير = صفر audit = صفر إشعار (شرط المالك).
+            let oldRows = [];
+            if (periods.size === 0) {
+                oldRows = await this.db.all('SELECT id, employee_id, team_id, shift_date, shift_code FROM shift_roster');
+            } else {
+                for (const key of periods) {
+                    const [y, m] = key.split('-').map(Number);
+                    const part = await this.db.all(
+                        'SELECT id, employee_id, team_id, shift_date, shift_code FROM shift_roster WHERE year = ? AND month = ?', [y, m]);
+                    oldRows = oldRows.concat(part);
+                }
+            }
+
+            const newEntries = []; // {employee_id, team_id, shift_date, shift_code, roster_id}
             if (periods.size === 0) {
                 // مسح الجدولة ⇒ مسح roster بالكامل (بيانات جدولة، لا بيانات موظفين)
                 await this.db.run('DELETE FROM shift_roster');
@@ -354,13 +418,48 @@ class RosterSyncService {
                     await this.db.run('DELETE FROM shift_roster WHERE year = ? AND month = ?', [y, m]);
                 }
                 for (const r of rows) {
-                    await this.db.run(
+                    const ins = await this.db.run(
                         'INSERT INTO shift_roster (employee_id, team_id, shift_date, shift_code, month, year) VALUES (?, ?, ?, ?, ?, ?)',
                         r);
+                    newEntries.push({ employee_id: r[0], team_id: r[1], shift_date: r[2], shift_code: r[3], roster_id: ins.id });
                 }
             }
             stats.rosterRows = rows.length;
             stats.rosterPeriods = [...periods].sort();
+
+            // ── 5ب) Diff حقيقي قيمة-بقيمة + مراجعة + تدقيق داخل المعاملة (v5) ──
+            // صفوف shift_audit_log هي المُشغِّل الموحّد لإشعارات تغيير الجدول —
+            // تُقرأ بعد COMMIT بواسطة schedule-change-notifier. قواعد مصغّرة
+            // بلا مجالي ScheduleRevisions/ShiftAuditLog تُتخطى الكتابة بأمان.
+            const changes = this._diffRoster(oldRows, newEntries);
+            stats.scheduleChanges = {
+                added: changes.filter(c => c.change_type === 'add').length,
+                edited: changes.filter(c => c.change_type === 'edit').length,
+                deleted: changes.filter(c => c.change_type === 'delete').length,
+                total: changes.length
+            };
+            if (changes.length && this.db.ScheduleRevisions && this.db.ShiftAuditLog) {
+                const revisionId = await this.db.ScheduleRevisions.create({
+                    source: syncSource,
+                    actor_id: actor ? (actor.id != null ? actor.id : actor.username) : null,
+                    actor_name: actor ? (actor.name || actor.username || null) : null,
+                    stats_json: { periods: stats.rosterPeriods, rosterRows: stats.rosterRows, changes: stats.scheduleChanges }
+                });
+                const changedBy = actor ? String(actor.username || actor.name || actor.id || 'system') : 'system';
+                const changedByName = actor ? (actor.name || null) : null;
+                const reason = syncSource === 'clear' ? 'مسح الجدولة (مسح صريح)' : 'مزامنة الجدولة من الاستيراد';
+                for (const c of changes) {
+                    const auditId = await this.db.ShiftAuditLog.create({
+                        roster_id: c.roster_id, employee_id: c.employee_id, team_id: c.team_id,
+                        shift_date: c.shift_date, old_shift_code: c.old_shift_code, new_shift_code: c.new_shift_code,
+                        old_team_id: c.old_team_id, new_team_id: c.new_team_id,
+                        changed_by: changedBy, changed_by_name: changedByName,
+                        change_type: c.change_type, reason, revision_id: revisionId
+                    });
+                    stats.auditIds.push(auditId);
+                }
+                stats.revisionId = revisionId;
+            }
 
             await this.db.commitTransaction();
             return stats;

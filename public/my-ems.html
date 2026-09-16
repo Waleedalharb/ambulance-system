@@ -159,6 +159,30 @@
     .day-row.off .d-code { color: var(--coral); }
     .day-row.off .d-name { color: var(--muted); }
 
+    /* ═══ v5: معي في المناوبة + الإشعارات + سجل التغييرات ═══ */
+    .card-head.mates::before { background: var(--lead-hi); }
+    .card-head.notifs::before { background: var(--gold-id); }
+    .card-head.changes::before { background: var(--ops); }
+    .mate-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; background: var(--surface-2); border: 1px solid var(--border-soft); border-radius: var(--radius-md); padding: 8px 11px; margin-bottom: 6px; }
+    .mate-row .m-name { font-size: 0.84rem; font-weight: 600; }
+    .mate-row .m-name .me-tag { color: var(--gold-id); font-size: 0.7rem; }
+    .mate-row .m-role { font-size: 0.7rem; color: var(--muted); margin-top: 2px; }
+    .mate-row .m-phone { font-size: 0.78rem; color: var(--ops); white-space: nowrap; }
+    .mates-sub { font-size: 0.76rem; font-weight: 700; color: var(--lead-hi); margin: 10px 0 6px; }
+    .notif-count { font-size: 0.7rem; color: var(--gold-id); border: 1px solid rgba(232,200,74,0.4); background: rgba(232,200,74,0.08); border-radius: 8px; padding: 2px 9px; }
+    .notif-row { background: var(--surface-2); border: 1px solid var(--border-soft); border-radius: var(--radius-md); padding: 9px 12px; margin-bottom: 7px; }
+    .notif-row.unread { border-color: rgba(232,200,74,0.45); background: rgba(232,200,74,0.06); }
+    .notif-row .n-msg { font-size: 0.82rem; line-height: 1.8; }
+    .notif-row .n-meta { font-size: 0.68rem; color: var(--muted); margin-top: 4px; }
+    .notif-row .n-actions { display: flex; gap: 7px; margin-top: 8px; }
+    .notif-btn { background: var(--surface); color: var(--text-2); border: 1px solid var(--border); border-radius: 8px; padding: 5px 12px; font-family: inherit; font-size: 0.72rem; font-weight: 600; cursor: pointer; }
+    .notif-btn.ack { color: #7EE2B8; border-color: rgba(14,164,122,0.4); background: rgba(14,164,122,0.10); }
+    .notif-btn:disabled { opacity: 0.5; cursor: default; }
+    .notif-state { font-size: 0.68rem; border-radius: 7px; padding: 1px 8px; }
+    .notif-state.st-ack { color: #7EE2B8; }
+    .notif-state.st-read { color: var(--ops); }
+    .notif-state.st-new { color: var(--gold-id); }
+
     .empty { text-align: center; color: var(--muted); font-size: 0.85rem; padding: 22px 12px; }
     .state-card { text-align: center; padding: 44px 20px; }
     .state-card .t { font-size: 1.05rem; font-weight: 700; margin-bottom: 8px; }
@@ -185,6 +209,6 @@
     </div>
     <div id="app"><div class="loading">جارٍ تحميل بياناتك…</div></div>
 </div>
-<script src="js/my-ems.js?v=4"></script>
+<script src="js/my-ems.js?v=5"></script>
 </body>
 </html>

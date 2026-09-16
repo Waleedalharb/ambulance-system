@@ -28,6 +28,12 @@
 
 const TimeRiyadh = require('../public/js/time-riyadh.js'); // الطبقة المركزية للوقت (TIME-POLICY)
 
+// v5: قاموس الرموز المركزي — تصنيف صباحي/ليلي لنافذة «من معي في المناوبة».
+// فشل التحميل ⇒ window.sideMatch يطابق كل رموز العمل (عرض أمين بلا إخفاء) مع
+// وسم classification:'unavailable' بدل اختراع قوائم موازية.
+let STD = null;
+try { STD = require('../public/js/core/shift-type-dictionary.js'); } catch (_) { STD = null; }
+
 function pad2(v) { return String(Number(v)).padStart(2, '0'); }
 
 // تاريخ الرياض اليوم بصيغة YYYY-MM-DD (من الطبقة المركزية — لا اختراع منطق وقت)
@@ -387,6 +393,192 @@ class MyPortalService {
             hasData: total > 0 || !!lastSession,
             assets: { total, byStatus },
             lastSession: lastSession || null
+        };
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // v5: من معي في المناوبة + إشعارات تغيير جدولي + سجل التغييرات
+    // ════════════════════════════════════════════════════════════════════
+
+    /** التصنيف التشغيلي بمطابقة تامة فقط (قرار المالك — لا مطابقة جزئية). */
+    static LEADERSHIP_TITLES = ['كبير مسعفين', 'مساعد كبير المسعفين'];
+    static OPS_TITLES = ['تحكم عملياتي', 'تنسيق الاستجابة'];
+
+    /**
+     * «المناوبة الحالية» بوقت الرياض الفعلي — الليلية الممتدة محسوبة:
+     *   < 05:00  ⇒ ليلية الأمس · [05:00,17:00) ⇒ صباحية اليوم · ≥ 17:00 ⇒ ليلية اليوم.
+     * التحديد بالتاريخ + الوقت الفعليين، لا بـ shift_date وحده (شرط المالك).
+     */
+    _currentShiftWindow() {
+        const p = TimeRiyadh.riyadhParts(new Date());
+        if (!p) return null;
+        const today = `${p.year}-${pad2(p.month)}-${pad2(p.day)}`;
+        const minutes = (Number(p.hour) % 24) * 60 + Number(p.minute || 0);
+        if (minutes < 5 * 60) return { date: addDays(today, -1), side: 'night', label: 'ليلية' };
+        if (minutes < 17 * 60) return { date: today, side: 'day', label: 'صباحية' };
+        return { date: today, side: 'night', label: 'ليلية' };
+    }
+
+    /** هل رمز المناوبة يطابق جهة النافذة؟ (الأوفرلاب جزء من الليلية — القاموس الرسمي) */
+    _sideMatches(shiftCode, side) {
+        if (!STD || typeof STD.classifyDayCode !== 'function') return { match: true, work: true, unavailable: true };
+        const g = STD.classifyDayCode(shiftCode || '').group;
+        const work = ['rest', 'vacation', 'off'].indexOf(g) === -1;
+        if (!work) return { match: false, work: false };
+        const nightSide = ['night', 'night8', 'overlap'].indexOf(g) !== -1;
+        return { match: side === 'night' ? nightSide : !nightSide, work: true };
+    }
+
+    _personView(e, canPhone, extra) {
+        const out = {
+            employeeId: e.id, code: e.employee_code, name: e.name,
+            jobTitle: e.job_title || null, shiftCode: extra && extra.shiftCode || null,
+            teamId: extra && extra.teamId !== undefined ? extra.teamId : null,
+            teamName: extra && extra.teamName || null
+        };
+        if (extra && extra.isMe) out.isMe = true;
+        // الجوال: طبقة staff.phone_view فقط — وإلا يُحذف من الرد بنيويًا
+        if (canPhone) out.phone = e.phone || null;
+        return out;
+    }
+
+    /**
+     * من معي في المناوبة الآن: أعضاء فرقتي + القيادة الميدانية + العمليات
+     * المناوبون في النافذة الحالية، مع إظهار الدور. الربط بـ employee_id،
+     * والتصنيف بمطابقة job_title التامة (شرط المالك).
+     */
+    async getShiftMates(user, { canPhone } = {}) {
+        const emp = await this.resolveEmployee(user);
+        if (!emp) return { notFound: true };
+        const window = this._currentShiftWindow();
+        if (!window) return { available: false, reason: 'time_unavailable' };
+        const { teamById } = await this._refs();
+
+        const myRow = await this.db.get(
+            'SELECT shift_code, team_id FROM shift_roster WHERE employee_id = ? AND shift_date = ?',
+            [emp.id, window.date]);
+        const myMatch = myRow ? this._sideMatches(myRow.shift_code, window.side) : { match: false, work: false };
+        const myTeam = myRow && myRow.team_id != null ? teamById.get(myRow.team_id) : null;
+
+        // طاقم فرقتي في النافذة (بما فيهم أنا — موسوم isMe)
+        let team = [];
+        if (myRow && myRow.team_id != null) {
+            const rows = await this.db.all(
+                `SELECT e.id, e.employee_code, e.name, e.job_title, e.phone, r.shift_code
+                 FROM shift_roster r JOIN employees e ON e.id = r.employee_id
+                 WHERE r.team_id = ? AND r.shift_date = ? AND e.is_active = 1
+                 ORDER BY e.name`, [myRow.team_id, window.date]);
+            team = rows.filter(r => this._sideMatches(r.shift_code, window.side).match)
+                .map(r => this._personView(r, canPhone, {
+                    shiftCode: r.shift_code, teamId: myRow.team_id,
+                    teamName: myTeam ? myTeam.name : null, isMe: r.id === emp.id
+                }));
+        }
+
+        // القيادة الميدانية والعمليات المناوبون في النافذة (مطابقة تامة — بلا جزئية)
+        const titles = [...MyPortalService.LEADERSHIP_TITLES, ...MyPortalService.OPS_TITLES];
+        const ph = titles.map(() => '?').join(',');
+        const dutyRows = await this.db.all(
+            `SELECT e.id, e.employee_code, e.name, e.job_title, e.phone, r.shift_code, r.team_id
+             FROM shift_roster r JOIN employees e ON e.id = r.employee_id
+             WHERE r.shift_date = ? AND e.is_active = 1 AND e.job_title IN (${ph})
+             ORDER BY e.name`, [window.date, ...titles]);
+        const leadership = [];
+        const ops = [];
+        for (const r of dutyRows) {
+            if (!this._sideMatches(r.shift_code, window.side).match) continue;
+            if (myRow && r.team_id != null && r.team_id === myRow.team_id) continue; // ظاهر ضمن فرقتي
+            const t = r.team_id != null ? teamById.get(r.team_id) : null;
+            const view = this._personView(r, canPhone, { shiftCode: r.shift_code, teamId: r.team_id, teamName: t ? t.name : null });
+            if (MyPortalService.LEADERSHIP_TITLES.indexOf(r.job_title) !== -1) leadership.push(view);
+            else ops.push(view);
+        }
+
+        return {
+            available: true,
+            classification: STD ? 'dictionary' : 'unavailable',
+            window,
+            me: {
+                onShift: !!(myRow && myMatch.match), shiftCode: myRow ? myRow.shift_code : null,
+                teamId: myRow ? myRow.team_id : null, teamName: myTeam ? myTeam.name : null
+            },
+            team, leadership, ops
+        };
+    }
+
+    /** إشعاراتي (تغييرات الجدول) — الأحدث أولًا + عداد غير المقروء. */
+    async getMyNotifications(user) {
+        const emp = await this.resolveEmployee(user);
+        if (!emp) return { notFound: true };
+        const rows = await this.db.NotificationLog.getByRecipient(emp.id, 50);
+        const notifications = rows.map(r => ({
+            id: r.id, message: r.message, status: r.status,
+            shiftDate: r.shift_date, revisionId: r.revision_id,
+            createdAt: r.created_at, openedAt: r.opened_at, acknowledgedAt: r.acknowledged_at
+        }));
+        const unreadCount = notifications.filter(n => ['read', 'acknowledged'].indexOf(n.status) === -1).length;
+        const unackedCount = notifications.filter(n => n.status !== 'acknowledged').length;
+        return { notifications, unreadCount, unackedCount };
+    }
+
+    /** ختم القراءة — على إشعارات صاحب الحساب حصرًا، انتقال أحادي بلا تكرار. */
+    async markMyNotificationRead(user, id) {
+        const emp = await this.resolveEmployee(user);
+        if (!emp) return { notFound: true };
+        const row = await this.db.NotificationLog.getById(id);
+        if (!row || row.recipient_id !== emp.id) return { notOwned: true };
+        if (['read', 'acknowledged'].indexOf(row.status) === -1) {
+            await this.db.NotificationLog.markAsRead(row.id);
+            return { status: 'read' };
+        }
+        return { status: row.status };
+    }
+
+    /** ختم التأكيد — إجراء مستقل عن الفتح (فتح الإشعار ≠ تأكيده)، بلا تكرار. */
+    async ackMyNotification(user, id) {
+        const emp = await this.resolveEmployee(user);
+        if (!emp) return { notFound: true };
+        const row = await this.db.NotificationLog.getById(id);
+        if (!row || row.recipient_id !== emp.id) return { notOwned: true };
+        if (row.status !== 'acknowledged') {
+            await this.db.NotificationLog.markAsAcknowledged(row.id);
+            return { status: 'acknowledged' };
+        }
+        return { status: 'acknowledged' };
+    }
+
+    /** سجل تغييرات جدولي — صفوف التدقيق المرتبطة بي + سياق المراجعة (العملية/الفاعل). */
+    async getMyScheduleChanges(user) {
+        const emp = await this.resolveEmployee(user);
+        if (!emp) return { notFound: true };
+        const { teamById } = await this._refs();
+        const rows = await this.db.all(
+            `SELECT a.id, a.shift_date, a.old_shift_code, a.new_shift_code,
+                    a.old_team_id, a.new_team_id, a.change_type, a.reason,
+                    a.changed_by_name, a.created_at, a.revision_id,
+                    r.source AS revision_source, r.actor_name AS revision_actor
+             FROM shift_audit_log a
+             LEFT JOIN schedule_revisions r ON r.id = a.revision_id
+             WHERE a.employee_id = ? ORDER BY a.id DESC LIMIT 50`, [emp.id]);
+        const teamName = id => (id == null ? null : ((teamById.get(id) || {}).name || null));
+        const TYPE_LABELS = { edit: 'تعديل', add: 'إضافة', delete: 'حذف', swap: 'تبديل', bulk: 'تحديث جماعي' };
+        const SOURCE_LABELS = {
+            import: 'استيراد الجدولة', 'official-import': 'الاستيراد الرسمي', 'roster-import': 'استيراد الإكسل',
+            'schedule-save': 'حفظ الجدولة', clear: 'مسح الجدولة', 'manual-clear-range': 'مسح بمدى',
+            'manual-cell': 'تعديل خلية', 'manual-add': 'إضافة يدوية', 'manual-edit': 'تعديل يدوي',
+            'manual-delete': 'حذف يدوي', 'manual-swap': 'تبديل', 'manual-bulk': 'تحديث جماعي', 'manual-transfer': 'نقل بين الفرق'
+        };
+        return {
+            changes: rows.map(r => ({
+                id: r.id, date: r.shift_date,
+                oldShiftCode: r.old_shift_code, newShiftCode: r.new_shift_code,
+                oldTeam: teamName(r.old_team_id), newTeam: teamName(r.new_team_id),
+                changeType: r.change_type, changeLabel: TYPE_LABELS[r.change_type] || r.change_type,
+                reason: r.reason, changedByName: r.changed_by_name, createdAt: r.created_at,
+                revisionId: r.revision_id,
+                revisionSource: r.revision_source ? (SOURCE_LABELS[r.revision_source] || r.revision_source) : null,
+                revisionActor: r.revision_actor || null
+            }))
         };
     }
 }

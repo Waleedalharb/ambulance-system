@@ -882,22 +882,29 @@ const TABLE_SCHEMAS = [
     applied_at DATETIME,
     reverted_at DATETIME
   );`,
+  // v5 (توسعة بوابة الموظف — تغييرات الجدول): acknowledged ضمن دورة الحالة
+  // Created→Sent→Delivered→Read→Acknowledged + ربط الحساب/المراجعة/التدقيق.
+  // القواعد القائمة بالمخطط القديم تُعاد بناؤها في runMigrations (أسفل).
   `CREATE TABLE IF NOT EXISTS notification_log (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     notification_type TEXT DEFAULT 'shift_change' CHECK(notification_type IN ('shift_change', 'system', 'alert')),
     recipient_id INTEGER NOT NULL,
+    recipient_user_id TEXT,
     recipient_name TEXT,
     recipient_phone TEXT,
     message TEXT NOT NULL,
     channel TEXT DEFAULT 'in-app' CHECK(channel IN ('in-app', 'whatsapp', 'sms', 'email')),
-    status TEXT DEFAULT 'pending' CHECK(status IN ('pending', 'sent', 'delivered', 'failed', 'read')),
+    status TEXT DEFAULT 'pending' CHECK(status IN ('pending', 'sent', 'delivered', 'failed', 'read', 'acknowledged')),
     roster_id INTEGER,
     shift_date TEXT,
     old_value TEXT,
     new_value TEXT,
+    revision_id INTEGER,
+    audit_id INTEGER,
     sent_at DATETIME,
     delivered_at DATETIME,
     opened_at DATETIME,
+    acknowledged_at DATETIME,
     error_message TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );`,
@@ -936,6 +943,18 @@ const TABLE_SCHEMAS = [
     changed_by_name TEXT,
     change_type TEXT DEFAULT 'edit' CHECK(change_type IN ('edit', 'swap', 'bulk', 'delete', 'add')),
     reason TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );`,
+
+  // v5 (توسعة بوابة الموظف): مراجعة جدولة واحدة = عملية واحدة (استيراد/تعديل
+  // يدوي/مسح) تربط المتأثرين والتغييرات (shift_audit_log.revision_id)
+  // والإشعارات (notification_log.revision_id) وحالات القراءة والتأكيد.
+  `CREATE TABLE IF NOT EXISTS schedule_revisions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    source TEXT NOT NULL,
+    actor_id TEXT,
+    actor_name TEXT,
+    stats_json TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );`
 ];
@@ -1256,6 +1275,66 @@ async function runMigrations() {
     }
   } catch (err) {
     logger.warn('operational_events nullable-stamp rebuild: ' + err.message);
+  }
+
+  // v5 (توسعة بوابة الموظف — تغييرات الجدول): ربط التدقيق بالمراجعة + دورة
+  // حالة الإشعار المكتملة (…→Read→Acknowledged). إضافي بالكامل: لا صف يُحذف.
+  await ensureColumn('shift_audit_log', 'revision_id', 'INTEGER');
+
+  // notification_log: SQLite لا يعدّل CHECK — إعادة بناء عند المخطط القديم
+  // (بلا acknowledged_at) مع نسخ الصفوف حرفيًا. نمط shifts/operational_events
+  // نفسه أعلاه: foreign_keys OFF + معاملة واحدة. القواعد الجديدة تأخذ المخطط
+  // من TABLE_SCHEMAS مباشرة ولا تدخل هنا (PRAGMA يجد العمود).
+  try {
+    const nlCols = await all(`PRAGMA table_info(notification_log)`);
+    if (nlCols.length && !nlCols.some(c => c.name === 'acknowledged_at')) {
+      logger.info('Rebuilding notification_log: v5 status lifecycle + link columns');
+      db.pragma('foreign_keys = OFF');
+      beginTransaction();
+      try {
+        await exec(`CREATE TABLE notification_log_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          notification_type TEXT DEFAULT 'shift_change' CHECK(notification_type IN ('shift_change', 'system', 'alert')),
+          recipient_id INTEGER NOT NULL,
+          recipient_user_id TEXT,
+          recipient_name TEXT,
+          recipient_phone TEXT,
+          message TEXT NOT NULL,
+          channel TEXT DEFAULT 'in-app' CHECK(channel IN ('in-app', 'whatsapp', 'sms', 'email')),
+          status TEXT DEFAULT 'pending' CHECK(status IN ('pending', 'sent', 'delivered', 'failed', 'read', 'acknowledged')),
+          roster_id INTEGER,
+          shift_date TEXT,
+          old_value TEXT,
+          new_value TEXT,
+          revision_id INTEGER,
+          audit_id INTEGER,
+          sent_at DATETIME,
+          delivered_at DATETIME,
+          opened_at DATETIME,
+          acknowledged_at DATETIME,
+          error_message TEXT,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )`);
+        await exec(`INSERT INTO notification_log_new
+          (id, notification_type, recipient_id, recipient_name, recipient_phone, message,
+           channel, status, roster_id, shift_date, old_value, new_value,
+           sent_at, delivered_at, opened_at, error_message, created_at)
+          SELECT id, notification_type, recipient_id, recipient_name, recipient_phone, message,
+           channel, status, roster_id, shift_date, old_value, new_value,
+           sent_at, delivered_at, opened_at, error_message, created_at FROM notification_log`);
+        await exec(`DROP TABLE notification_log`);
+        await exec(`ALTER TABLE notification_log_new RENAME TO notification_log`);
+        commitTransaction();
+        db.pragma('foreign_keys = ON');
+        logger.info('notification_log rebuilt (v5)');
+      } catch (nlErr) {
+        rollbackTransaction();
+        db.pragma('foreign_keys = ON');
+        throw nlErr;
+      }
+    }
+  } catch (err) {
+    logger.warn('notification_log v5 rebuild migration: ' + err.message);
   }
 
   // Reconcile legacy JSON shifts into SQLite (X2 single-source adoption):
@@ -3670,7 +3749,7 @@ const SHIFT_TIMELINE_EVENT_TYPES = ['start', 'team_checkin', 'report_received', 
 const SHIFT_AUDIT_LOG_CHANGE_TYPES = ['edit', 'swap', 'bulk', 'delete', 'add'];
 const NOTIFICATION_LOG_TYPES = ['shift_change', 'system', 'alert'];
 const NOTIFICATION_LOG_CHANNELS = ['in-app', 'whatsapp', 'sms', 'email'];
-const NOTIFICATION_LOG_STATUSES = ['pending', 'sent', 'delivered', 'failed', 'read'];
+const NOTIFICATION_LOG_STATUSES = ['pending', 'sent', 'delivered', 'failed', 'read', 'acknowledged'];
 const SHIFT_CHANGE_REQUEST_STATUSES = ['pending', 'approved', 'denied', 'cancelled'];
 const ROSTER_DRAFT_OPERATION_TYPES = ['edit', 'swap', 'bulk', 'delete', 'add'];
 const SHIFT_REPORT_TYPES = ['daily', 'weekly', 'monthly', 'shift_detail'];
@@ -3925,16 +4004,22 @@ const ShiftAuditLog = {
   async create(data) {
     if (!data.shift_date) throw new Error('ShiftAuditLog.create: shift_date مطلوب');
     const result = await run(
-      `INSERT INTO shift_audit_log (roster_id, employee_id, team_id, shift_date, old_shift_code, new_shift_code, old_team_id, new_team_id, changed_by, changed_by_name, change_type, reason)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+      `INSERT INTO shift_audit_log (roster_id, employee_id, team_id, shift_date, old_shift_code, new_shift_code, old_team_id, new_team_id, changed_by, changed_by_name, change_type, reason, revision_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
       [data.roster_id || null, data.employee_id || null, data.team_id || null, data.shift_date,
        data.old_shift_code || null, data.new_shift_code || null,
        data.old_team_id || null, data.new_team_id || null,
        String(data.changed_by || 'system'), data.changed_by_name || null,
        SHIFT_AUDIT_LOG_CHANGE_TYPES.includes(data.change_type) ? data.change_type : 'edit',
-       data.reason || null]
+       data.reason || null, data.revision_id || null]
     );
     return result.id;
+  },
+  // v5: قراءة صفوف محددة بالمعرّفات — مدخل موحِّد الإشعارات بعد COMMIT
+  async getByIds(ids) {
+    if (!Array.isArray(ids) || !ids.length) return [];
+    const ph = ids.map(() => '?').join(',');
+    return all(`SELECT * FROM shift_audit_log WHERE id IN (${ph}) ORDER BY id`, ids);
   }
 };
 
@@ -4023,23 +4108,32 @@ const NotificationLog = {
   async getAll(limit = 50) {
     return all('SELECT * FROM notification_log ORDER BY created_at DESC, id DESC LIMIT ?', [limit]);
   },
+  async getById(id) {
+    return get('SELECT * FROM notification_log WHERE id = ?', [id]);
+  },
   async getByRecipient(recipientId, limit = 50) {
     return all('SELECT * FROM notification_log WHERE recipient_id = ? ORDER BY created_at DESC, id DESC LIMIT ?', [recipientId, limit]);
   },
   async getByStatus(status, limit = 50) {
     return all('SELECT * FROM notification_log WHERE status = ? ORDER BY created_at DESC, id DESC LIMIT ?', [status, limit]);
   },
+  // v5: منع تكرار الإشعار لنفس المراجعة/الموظف (Refresh/Retry/إعادة الاستيراد)
+  async getByRevisionAndRecipient(revisionId, recipientId) {
+    return all('SELECT * FROM notification_log WHERE revision_id = ? AND recipient_id = ?', [revisionId, recipientId]);
+  },
   async create(data) {
     if (!data.recipient_id && data.recipient_id !== 0) throw new Error('NotificationLog.create: recipient_id مطلوب');
     if (!data.message) throw new Error('NotificationLog.create: message مطلوب');
     const result = await run(
-      `INSERT INTO notification_log (notification_type, recipient_id, recipient_name, recipient_phone, message, channel, status, roster_id, shift_date, old_value, new_value)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+      `INSERT INTO notification_log (notification_type, recipient_id, recipient_user_id, recipient_name, recipient_phone, message, channel, status, roster_id, shift_date, old_value, new_value, revision_id, audit_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
       [NOTIFICATION_LOG_TYPES.includes(data.notification_type) ? data.notification_type : 'shift_change',
-       data.recipient_id, data.recipient_name || null, data.recipient_phone || null, data.message,
+       data.recipient_id, data.recipient_user_id != null ? String(data.recipient_user_id) : null,
+       data.recipient_name || null, data.recipient_phone || null, data.message,
        NOTIFICATION_LOG_CHANNELS.includes(data.channel) ? data.channel : 'in-app',
        NOTIFICATION_LOG_STATUSES.includes(data.status) ? data.status : 'pending',
-       data.roster_id || null, data.shift_date || null, data.old_value || null, data.new_value || null]
+       data.roster_id || null, data.shift_date || null, data.old_value || null, data.new_value || null,
+       data.revision_id || null, data.audit_id || null]
     );
     return result.id;
   },
@@ -4048,6 +4142,31 @@ const NotificationLog = {
   },
   async markAsDelivered(id) {
     return run("UPDATE notification_log SET status = 'delivered', delivered_at = CURRENT_TIMESTAMP WHERE id = ?", [id]);
+  },
+  // v5: فتح الإشعار ≠ تأكيده — حالتان مستقلتان بختمين مستقلين، وكلتاهما
+  // لا رجعة فيها ولا تتكرر (انتقال أحادي الاتجاه في دورة الحالة).
+  async markAsRead(id) {
+    return run("UPDATE notification_log SET status = 'read', opened_at = CURRENT_TIMESTAMP WHERE id = ? AND status IN ('pending', 'sent', 'delivered')", [id]);
+  },
+  async markAsAcknowledged(id) {
+    return run("UPDATE notification_log SET status = 'acknowledged', acknowledged_at = CURRENT_TIMESTAMP WHERE id = ? AND status != 'acknowledged'", [id]);
+  }
+};
+
+// v5: مراجعات الجدولة — العملية الواحدة (استيراد/تعديل/مسح) التي تربط
+// صفوف التدقيق والإشعارات وحالات القراءة والتأكيد ببعضها.
+const ScheduleRevisions = {
+  async getById(id) {
+    return get('SELECT * FROM schedule_revisions WHERE id = ?', [id]);
+  },
+  async create(data) {
+    if (!data.source) throw new Error('ScheduleRevisions.create: source مطلوب');
+    const result = await run(
+      'INSERT INTO schedule_revisions (source, actor_id, actor_name, stats_json) VALUES (?, ?, ?, ?);',
+      [String(data.source), data.actor_id != null ? String(data.actor_id) : null,
+       data.actor_name || null, _jsonOrRaw(data.stats_json)]
+    );
+    return result.id;
   }
 };
 
@@ -4662,6 +4781,7 @@ module.exports = {
   StaffingAlerts,
   Notifications,
   ShiftCompletions,
+  ScheduleRevisions,
   AuditLog,
   TokenBlacklist,
   AuthSessions,
