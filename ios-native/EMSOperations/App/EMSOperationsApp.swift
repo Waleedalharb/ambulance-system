@@ -14,14 +14,23 @@ struct EMSOperationsApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var session = SessionStore()
     @StateObject private var deepLinks = DeepLinkRouter()
+    @StateObject private var network = NetworkMonitor()
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some Scene {
         WindowGroup {
             RootView()
                 .environmentObject(session)
                 .environmentObject(deepLinks)
+                .environmentObject(network)
                 .task { await session.restore() }
                 .onAppear { PushService.shared.attach(deepLinks: deepLinks, session: session) }
+                // تحديث ذكي عند العودة للمقدمة (قسم 37): صلاحيات فقط —
+                // الشاشات تحدّث بياناتها عند الظهور/السحب، لا إعادة تحميل شاملة.
+                .onChange(of: scenePhase) { _, phase in
+                    guard phase == .active, session.isAuthenticated else { return }
+                    Task { await session.permissions.load() }
+                }
         }
     }
 }

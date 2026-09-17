@@ -22,6 +22,9 @@ final class SessionStore: ObservableObject {
     /// عند وجود جلسة مخزنة وFace ID مفعّل — نطلب البوابة قبل الدخول.
     @Published var needsBiometricUnlock = false
 
+    /// صلاحيات المستخدم الفعلية — تُبنى عليها الواجهة (v2 قسم 6).
+    let permissions = PermissionStore()
+
     private let auth = AuthService.shared
 
     init() {
@@ -47,6 +50,8 @@ final class SessionStore: ObservableObject {
                 }
             }
             state = .authenticated(user)
+            // الصلاحيات أولًا — الواجهة تُبنى عليها (فشلها لا يكسر الدخول)
+            await permissions.load()
             // أول فرصة آمنة لتسجيل جهاز Push (بعد المصادقة — شرط المالك)
             await PushService.shared.requestPermissionAndRegister()
         } else {
@@ -57,11 +62,14 @@ final class SessionStore: ObservableObject {
 
     func loginSucceeded(user: AuthUser) async {
         state = .authenticated(user)
+        await permissions.load()
         await PushService.shared.requestPermissionAndRegister()
     }
 
     func logout() async {
         await auth.logout()
+        permissions.reset()
+        SafeCache.clear()
         unreadNotifications = 0
         state = .unauthenticated
     }

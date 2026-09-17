@@ -51,6 +51,24 @@ struct SimpleSuccess: Decodable {
     let success: Bool?
 }
 
+// MARK: - /api/auth/me/permissions (permission-service.mePayload — v2 قسم 6)
+struct MePermissionsDTO: Decodable {
+    let role: String?
+    let roleLabel: String?
+    let permissions: [String]?
+    let permissionsStar: Bool?
+    let permissionsGranted: [String]?
+    let permissionsRevoked: [String]?
+
+    enum CodingKeys: String, CodingKey {
+        case role, permissions
+        case roleLabel = "role_label"
+        case permissionsStar = "permissions_star"
+        case permissionsGranted = "permissions_granted"
+        case permissionsRevoked = "permissions_revoked"
+    }
+}
+
 struct PushRegisterRequest: Encodable {
     let token: String
     let platform: String
