@@ -129,4 +129,63 @@ final class EMSOperationsTests: XCTestCase {
         XCTAssertEqual(APIError.badRequest("سبب").userMessage, "سبب")
         XCTAssertEqual(APIError.badRequest("").userMessage, "بيانات غير مكتملة.")
     }
+
+    // MARK: - MePermissionsDTO: مفاتيح snake_case (mePayload)
+
+    func testMePermissionsDTODecodes() throws {
+        let json = #"{"role": "user", "role_label": "مستخدم", "permissions": ["ops.my_portal", "ops.completion"], "permissions_star": false, "permissions_granted": ["ops.my_portal"], "permissions_revoked": []}"#.data(using: .utf8)!
+        let dto = try JSONDecoder().decode(MePermissionsDTO.self, from: json)
+        XCTAssertEqual(dto.roleLabel, "مستخدم")
+        XCTAssertEqual(dto.permissions?.count, 2)
+        XCTAssertEqual(dto.permissionsStar, false)
+    }
+
+    // MARK: - PermissionMapper (v2 قسم 6 — خرائط القدرات)
+
+    func testPermissionMapperStarGrantsEverything() {
+        XCTAssertTrue(PermissionMapper.canAccessEmployeePortal([], star: true))
+        XCTAssertTrue(PermissionMapper.canAccessOperations([], star: true))
+        XCTAssertTrue(PermissionMapper.canViewIndicators([], star: true))
+        XCTAssertTrue(PermissionMapper.canViewPhones([], star: true))
+    }
+
+    func testPermissionMapperEmployeePortalKey() {
+        XCTAssertTrue(PermissionMapper.canAccessEmployeePortal(["ops.my_portal"], star: false))
+        XCTAssertFalse(PermissionMapper.canAccessEmployeePortal(["ops.reports"], star: false))
+        XCTAssertFalse(PermissionMapper.canAccessEmployeePortal([], star: false))
+    }
+
+    func testPermissionMapperOperationsKeys() {
+        XCTAssertTrue(PermissionMapper.canAccessOperations(["ops.dispatch"], star: false))
+        XCTAssertTrue(PermissionMapper.canAccessOperations(["ops.execute"], star: false))
+        XCTAssertFalse(PermissionMapper.canAccessOperations(["ops.my_portal"], star: false))
+        XCTAssertFalse(PermissionMapper.canAccessOperations(["schedule.view"], star: false))
+    }
+
+    func testPermissionMapperIndicatorsAndPhones() {
+        XCTAssertTrue(PermissionMapper.canViewIndicators(["indicators.contribution"], star: false))
+        XCTAssertFalse(PermissionMapper.canViewIndicators(["ops.reports"], star: false))
+        XCTAssertTrue(PermissionMapper.canViewPhones(["staff.phone_view"], star: false))
+        XCTAssertFalse(PermissionMapper.canViewPhones([], star: false))
+    }
+
+    // MARK: - ScheduleChangesDTO: فك Before/After (v2 قسم 13)
+
+    func testScheduleChangesDTODecodes() throws {
+        let json = #"{"changes": [{"id": 5, "date": "2026-09-20", "oldShiftCode": "D", "newShiftCode": "N", "oldTeam": "جنوب 4", "newTeam": "جنوب 7", "changeLabel": "تعديل", "reason": "تغطية", "revisionId": 12}]}"#.data(using: .utf8)!
+        let dto = try JSONDecoder().decode(ScheduleChangesDTO.self, from: json)
+        let change = try XCTUnwrap(dto.changes.first)
+        XCTAssertEqual(change.oldTeam, "جنوب 4")
+        XCTAssertEqual(change.newTeam, "جنوب 7")
+        XCTAssertEqual(change.revisionId, 12)
+    }
+
+    // MARK: - AssignmentsDTO: فك مرن
+
+    func testAssignmentsDTOToleratesMissingFields() throws {
+        let json = #"{"periods": [{"date": "2026-09-21"}], "available": true}"#.data(using: .utf8)!
+        let dto = try JSONDecoder().decode(AssignmentsDTO.self, from: json)
+        XCTAssertEqual(dto.periods?.count, 1)
+        XCTAssertNil(dto.periods?.first?.teamName)
+    }
 }
