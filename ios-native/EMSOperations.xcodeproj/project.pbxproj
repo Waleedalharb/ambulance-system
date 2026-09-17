@@ -39,6 +39,10 @@
 		5E400000000000000000001E /* VehicleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000001E /* VehicleView.swift */; };
 		5E400000000000000000001F /* InventoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000001F /* InventoryView.swift */; };
 		5E4000000000000000000020 /* ReportsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000020 /* ReportsView.swift */; };
+		5E4000000000000000000021 /* PermissionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000021 /* PermissionStore.swift */; };
+		5E4000000000000000000022 /* SafeCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000022 /* SafeCache.swift */; };
+		5E4000000000000000000023 /* NetworkMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000023 /* NetworkMonitor.swift */; };
+		5E4000000000000000000024 /* OperationsHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000024 /* OperationsHomeView.swift */; };
 		5E40000000000000000000E1 /* EMSOperationsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000E1 /* EMSOperationsTests.swift */; };
 		5E40000000000000000000F0 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000F0 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
@@ -86,6 +90,10 @@
 		5E300000000000000000001E /* VehicleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VehicleView.swift; sourceTree = "<group>"; };
 		5E300000000000000000001F /* InventoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InventoryView.swift; sourceTree = "<group>"; };
 		5E3000000000000000000020 /* ReportsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportsView.swift; sourceTree = "<group>"; };
+		5E3000000000000000000021 /* PermissionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionStore.swift; sourceTree = "<group>"; };
+		5E3000000000000000000022 /* SafeCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SafeCache.swift; sourceTree = "<group>"; };
+		5E3000000000000000000023 /* NetworkMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkMonitor.swift; sourceTree = "<group>"; };
+		5E3000000000000000000024 /* OperationsHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OperationsHomeView.swift; sourceTree = "<group>"; };
 		5E30000000000000000000D0 /* EMSOperations.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = EMSOperations.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		5E30000000000000000000D1 /* EMSOperationsTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = EMSOperationsTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		5E30000000000000000000E1 /* EMSOperationsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EMSOperationsTests.swift; sourceTree = "<group>"; };
@@ -135,11 +143,7 @@
 			children = (
 				5E2000000000000000000011 /* App */,
 				5E2000000000000000000012 /* Core */,
-				5E2000000000000000000013 /* Networking */,
 				5E2000000000000000000014 /* Models */,
-				5E2000000000000000000015 /* Security */,
-				5E2000000000000000000016 /* Authentication */,
-				5E2000000000000000000017 /* Notifications */,
 				5E2000000000000000000018 /* DesignSystem */,
 				5E2000000000000000000019 /* Features */,
 				5E2000000000000000000032 /* Resources */,
@@ -160,9 +164,66 @@
 			isa = PBXGroup;
 			children = (
 				5E3000000000000000000003 /* AppEnvironment.swift */,
-				5E3000000000000000000004 /* AppLogger.swift */,
+				5E2000000000000000000051 /* Logging */,
+				5E2000000000000000000013 /* Networking */,
+				5E2000000000000000000016 /* Authentication */,
+				5E2000000000000000000052 /* Session */,
+				5E2000000000000000000015 /* Security */,
+				5E2000000000000000000053 /* Permissions */,
+				5E2000000000000000000017 /* Notifications */,
+				5E2000000000000000000054 /* DeepLinks */,
+				5E2000000000000000000055 /* Storage */,
+				5E2000000000000000000056 /* Network */,
 			);
 			path = Core;
+			sourceTree = "<group>";
+		};
+		5E2000000000000000000051 /* Logging */ = {
+			isa = PBXGroup;
+			children = (
+				5E3000000000000000000004 /* AppLogger.swift */,
+			);
+			path = Logging;
+			sourceTree = "<group>";
+		};
+		5E2000000000000000000052 /* Session */ = {
+			isa = PBXGroup;
+			children = (
+				5E300000000000000000000C /* SessionStore.swift */,
+			);
+			path = Session;
+			sourceTree = "<group>";
+		};
+		5E2000000000000000000053 /* Permissions */ = {
+			isa = PBXGroup;
+			children = (
+				5E3000000000000000000021 /* PermissionStore.swift */,
+			);
+			path = Permissions;
+			sourceTree = "<group>";
+		};
+		5E2000000000000000000054 /* DeepLinks */ = {
+			isa = PBXGroup;
+			children = (
+				5E300000000000000000000E /* DeepLinkRouter.swift */,
+			);
+			path = DeepLinks;
+			sourceTree = "<group>";
+		};
+		5E2000000000000000000055 /* Storage */ = {
+			isa = PBXGroup;
+			children = (
+				5E3000000000000000000022 /* SafeCache.swift */,
+			);
+			path = Storage;
+			sourceTree = "<group>";
+		};
+		5E2000000000000000000056 /* Network */ = {
+			isa = PBXGroup;
+			children = (
+				5E3000000000000000000023 /* NetworkMonitor.swift */,
+			);
+			path = Network;
 			sourceTree = "<group>";
 		};
 		5E2000000000000000000013 /* Networking */ = {
@@ -196,7 +257,6 @@
 			isa = PBXGroup;
 			children = (
 				5E300000000000000000000B /* AuthService.swift */,
-				5E300000000000000000000C /* SessionStore.swift */,
 			);
 			path = Authentication;
 			sourceTree = "<group>";
@@ -205,7 +265,6 @@
 			isa = PBXGroup;
 			children = (
 				5E300000000000000000000D /* PushService.swift */,
-				5E300000000000000000000E /* DeepLinkRouter.swift */,
 			);
 			path = Notifications;
 			sourceTree = "<group>";
@@ -234,8 +293,17 @@
 				5E2000000000000000000029 /* Vehicle */,
 				5E2000000000000000000030 /* Inventory */,
 				5E2000000000000000000031 /* Reports */,
+				5E2000000000000000000057 /* Operations */,
 			);
 			path = Features;
+			sourceTree = "<group>";
+		};
+		5E2000000000000000000057 /* Operations */ = {
+			isa = PBXGroup;
+			children = (
+				5E3000000000000000000024 /* OperationsHomeView.swift */,
+			);
+			path = Operations;
 			sourceTree = "<group>";
 		};
 		5E2000000000000000000020 /* Login */ = {
@@ -488,6 +556,10 @@
 				5E400000000000000000001E /* VehicleView.swift in Sources */,
 				5E400000000000000000001F /* InventoryView.swift in Sources */,
 				5E4000000000000000000020 /* ReportsView.swift in Sources */,
+				5E4000000000000000000021 /* PermissionStore.swift in Sources */,
+				5E4000000000000000000022 /* SafeCache.swift in Sources */,
+				5E4000000000000000000023 /* NetworkMonitor.swift in Sources */,
+				5E4000000000000000000024 /* OperationsHomeView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
