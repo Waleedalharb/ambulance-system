@@ -43,6 +43,13 @@
 		5E4000000000000000000022 /* SafeCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000022 /* SafeCache.swift */; };
 		5E4000000000000000000023 /* NetworkMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000023 /* NetworkMonitor.swift */; };
 		5E4000000000000000000024 /* OperationsHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000024 /* OperationsHomeView.swift */; };
+		5E4000000000000000000025 /* OpsDTO.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000025 /* OpsDTO.swift */; };
+		5E4000000000000000000026 /* OpsTeamsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000026 /* OpsTeamsView.swift */; };
+		5E4000000000000000000027 /* OpsReadinessView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000027 /* OpsReadinessView.swift */; };
+		5E4000000000000000000028 /* OpsVehiclesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000028 /* OpsVehiclesView.swift */; };
+		5E4000000000000000000029 /* OpsEventsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000029 /* OpsEventsView.swift */; };
+		5E400000000000000000002A /* OpsMapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000002A /* OpsMapView.swift */; };
+		5E400000000000000000002B /* DecisionCenterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000002B /* DecisionCenterView.swift */; };
 		5E40000000000000000000E1 /* EMSOperationsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000E1 /* EMSOperationsTests.swift */; };
 		5E40000000000000000000F0 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000F0 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
@@ -94,6 +101,13 @@
 		5E3000000000000000000022 /* SafeCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SafeCache.swift; sourceTree = "<group>"; };
 		5E3000000000000000000023 /* NetworkMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkMonitor.swift; sourceTree = "<group>"; };
 		5E3000000000000000000024 /* OperationsHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OperationsHomeView.swift; sourceTree = "<group>"; };
+		5E3000000000000000000025 /* OpsDTO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpsDTO.swift; sourceTree = "<group>"; };
+		5E3000000000000000000026 /* OpsTeamsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpsTeamsView.swift; sourceTree = "<group>"; };
+		5E3000000000000000000027 /* OpsReadinessView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpsReadinessView.swift; sourceTree = "<group>"; };
+		5E3000000000000000000028 /* OpsVehiclesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpsVehiclesView.swift; sourceTree = "<group>"; };
+		5E3000000000000000000029 /* OpsEventsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpsEventsView.swift; sourceTree = "<group>"; };
+		5E300000000000000000002A /* OpsMapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpsMapView.swift; sourceTree = "<group>"; };
+		5E300000000000000000002B /* DecisionCenterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionCenterView.swift; sourceTree = "<group>"; };
 		5E30000000000000000000D0 /* EMSOperations.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = EMSOperations.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		5E30000000000000000000D1 /* EMSOperationsTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = EMSOperationsTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		5E30000000000000000000E1 /* EMSOperationsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EMSOperationsTests.swift; sourceTree = "<group>"; };
@@ -240,6 +254,7 @@
 			children = (
 				5E3000000000000000000007 /* AuthDTO.swift */,
 				5E3000000000000000000008 /* PortalDTO.swift */,
+				5E3000000000000000000025 /* OpsDTO.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -302,6 +317,12 @@
 			isa = PBXGroup;
 			children = (
 				5E3000000000000000000024 /* OperationsHomeView.swift */,
+				5E3000000000000000000026 /* OpsTeamsView.swift */,
+				5E3000000000000000000027 /* OpsReadinessView.swift */,
+				5E3000000000000000000028 /* OpsVehiclesView.swift */,
+				5E3000000000000000000029 /* OpsEventsView.swift */,
+				5E300000000000000000002A /* OpsMapView.swift */,
+				5E300000000000000000002B /* DecisionCenterView.swift */,
 			);
 			path = Operations;
 			sourceTree = "<group>";
@@ -560,6 +581,13 @@
 				5E4000000000000000000022 /* SafeCache.swift in Sources */,
 				5E4000000000000000000023 /* NetworkMonitor.swift in Sources */,
 				5E4000000000000000000024 /* OperationsHomeView.swift in Sources */,
+				5E4000000000000000000025 /* OpsDTO.swift in Sources */,
+				5E4000000000000000000026 /* OpsTeamsView.swift in Sources */,
+				5E4000000000000000000027 /* OpsReadinessView.swift in Sources */,
+				5E4000000000000000000028 /* OpsVehiclesView.swift in Sources */,
+				5E4000000000000000000029 /* OpsEventsView.swift in Sources */,
+				5E400000000000000000002A /* OpsMapView.swift in Sources */,
+				5E400000000000000000002B /* DecisionCenterView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

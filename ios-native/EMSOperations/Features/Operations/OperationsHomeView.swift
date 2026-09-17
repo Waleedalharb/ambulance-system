@@ -2,10 +2,9 @@
 //  OperationsHomeView.swift
 //  EMSOperations
 //
-//  وحدة العمليات — الأساس المعماري (v2 قسم 20/21/22/23).
-//  Navigation جاهز لـ: الفرق، الجاهزية، المركبات، الأحداث، مركز القرار، الخريطة.
-//  لا بيانات مخترعة: كل شاشة تعرض حالة «قيد التفعيل» حتى يوفر الـBackend
-//  مسار القراءة المعتمد، وتُربط حينها دون تغيير الـNavigation.
+//  وحدة العمليات (تفعيل المنصة الأصلية — docs/native-platform-activation.md):
+//  الفرق، الجاهزية، المركبات، الأحداث، مركز القرار، الخريطة — كلها شاشات
+//  بيانات حقيقية مربوطة بمسارات قراءة قائمة في الـBackend (عرض فقط).
 //
 
 import SwiftUI
@@ -61,7 +60,7 @@ struct OperationsHomeView: View {
                             Text("غرفة العمليات")
                                 .font(.headline.weight(.semibold))
                                 .foregroundStyle(.white)
-                            Text("البنية جاهزة — تُفعَّل الشاشات تباعًا مع مسارات الـBackend المعتمدة")
+                            Text("بيانات حية من المنظومة — عرض فقط حسب صلاحياتك")
                                 .font(.caption)
                                 .foregroundStyle(EMSTheme.Colors.textMuted)
                         }
@@ -100,27 +99,14 @@ struct OperationsHomeView: View {
         }
         .emsPage("العمليات")
         .navigationDestination(for: OpsModule.self) { module in
-            OperationsModulePlaceholder(title: module.title, icon: module.icon, detail: module.detail)
-        }
-    }
-}
-
-/// شاشة أساس موحدة لوحدات العمليات — تُستبدل بشاشة البيانات عند توفر مسار الـBackend.
-private struct OperationsModulePlaceholder: View {
-    let title: String
-    let icon: String
-    let detail: String
-
-    var body: some View {
-        ScrollView {
-            VStack(spacing: EMSTheme.spacing) {
-                EMSEmptyView(
-                    icon: icon,
-                    title: "\(title) — قيد التفعيل",
-                    detail: "\(detail). ستُربط هذه الشاشة بمسار الـBackend المعتمد دون أي تغيير في التنقل.")
+            switch module {
+            case .teams: OpsTeamsView()
+            case .readiness: OpsReadinessView()
+            case .vehicles: OpsVehiclesView()
+            case .events: OpsEventsView()
+            case .decisionCenter: DecisionCenterView()
+            case .map: OpsMapView()
             }
-            .padding(EMSTheme.pagePadding)
         }
-        .emsPage(title)
     }
 }
