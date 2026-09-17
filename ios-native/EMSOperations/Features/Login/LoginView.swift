@@ -45,7 +45,7 @@ struct LoginView: View {
                 .font(.title3.weight(.bold))
                 .foregroundStyle(.white)
             Text("EMS OPERATIONS")
-                .font(.caption.monospaced())
+                .font(.system(.caption, design: .monospaced))
                 .tracking(3)
                 .foregroundStyle(EMSTheme.Colors.teal)
         }

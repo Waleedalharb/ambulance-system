@@ -40,6 +40,11 @@ actor APIClient {
         try await send(.post, path, query: [:], body: body, authorized: true, retried: false)
     }
 
+    /// POST بلا جسم — النوع المعتم في البديل الآخر لا يُستنتج من `= nil`.
+    func post<T: Decodable>(_ path: String) async throws -> T {
+        try await send(.post, path, query: [:], body: nil as String?, authorized: true, retried: false)
+    }
+
     /// طلب بلا مصادقة (login/refresh فقط).
     func postPublic<T: Decodable>(_ path: String, body: some Encodable) async throws -> T {
         try await send(.post, path, query: [:], body: body, authorized: false, retried: false)
