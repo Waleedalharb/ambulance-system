@@ -82,7 +82,6 @@ struct LoginView: View {
                     .font(.caption)
                     .foregroundStyle(EMSTheme.Colors.danger)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .accessibilityLiveRegion(.polite)
             }
 
             EMSPrimaryButton(
