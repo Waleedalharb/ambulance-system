@@ -562,7 +562,11 @@ const PEAK_DATA_PATH = path.join(STORAGE_PATH, 'peak-data.json');
 const THEME_SETTINGS_PATH = path.join(STORAGE_PATH, 'theme-settings.json');
 const USERS_PATH = path.join(STORAGE_PATH, 'users.json');
 // جولة ربط الإشعارات: حقن الاعتماديات في الخدمة المركزية (مسار المستخدمين + db + البث الموجَّه)
-notificationService.init({ usersPath: USERS_PATH, getDb: () => db, broadcastToUsers });
+// v6: بوابة APNs — getDb كسول لأن db تُفتح لاحقًا. بلا مفاتيح بيئة تبقى
+// البوابة معطّلة بأمان ({disabled:true}) ولا يتغيّر أي سلوك قائم.
+const PushGateway = require('./services/push-gateway');
+const pushGateway = new PushGateway({ getDb: () => db });
+notificationService.init({ usersPath: USERS_PATH, getDb: () => db, broadcastToUsers, pushGateway });
 const SHIFT_EVENTS_PATH = path.join(STORAGE_PATH, 'shift-events.json');
 const SHIFT_ABSENCES_PATH = path.join(STORAGE_PATH, 'shift-absences.json');
 const SHIFT_NOTES_PATH = path.join(STORAGE_PATH, 'shift-notes.json');
@@ -1286,7 +1290,7 @@ let scheduleChangeNotifier = null;
 function getScheduleChangeNotifier() {
     if (!scheduleChangeNotifier && db) {
         const ScheduleChangeNotifier = require('./services/schedule-change-notifier');
-        scheduleChangeNotifier = new ScheduleChangeNotifier({ db, usersPath: USERS_PATH, broadcastToUsers });
+        scheduleChangeNotifier = new ScheduleChangeNotifier({ db, usersPath: USERS_PATH, broadcastToUsers, pushGateway });
     }
     return scheduleChangeNotifier;
 }
@@ -1502,6 +1506,8 @@ app.post('/api/my/notifications/:id/read', authenticate, authorizePerm('ops.my_p
         const out = await getMyPortalService().markMyNotificationRead(req.user, req.params.id);
         if (out.notFound) return res.status(404).json(MY_PORTAL_NO_EMPLOYEE);
         if (out.notOwned) return res.status(404).json({ error: 'الإشعار غير موجود' });
+        // v6: تحديث صامت للشارة — بذل قصوى، لا يمس نتيجة الختم
+        pushGateway.sendBadgeRefresh(req.user.id).catch(() => { });
         res.json({ success: true, status: out.status });
     } catch (error) {
         console.error('[my-portal] notification read error:', error);
@@ -1514,10 +1520,55 @@ app.post('/api/my/notifications/:id/ack', authenticate, authorizePerm('ops.my_po
         const out = await getMyPortalService().ackMyNotification(req.user, req.params.id);
         if (out.notFound) return res.status(404).json(MY_PORTAL_NO_EMPLOYEE);
         if (out.notOwned) return res.status(404).json({ error: 'الإشعار غير موجود' });
+        // v6: تحديث صامت للشارة — بذل قصوى، لا يمس نتيجة الختم
+        pushGateway.sendBadgeRefresh(req.user.id).catch(() => { });
         res.json({ success: true, status: out.status });
     } catch (error) {
         console.error('[my-portal] notification ack error:', error);
         res.status(500).json({ error: 'فشل في ختم التأكيد' });
+    }
+});
+
+// ═══ v6: أجهزة Push (APNs) — التسجيل بعد المصادقة فقط، والفصل عند الطلب ═══
+// التوكن ملك الجهاز؛ لا يُقبل إلا من جلسة موثقة ويُربط بحسابها حصرًا (الهوية
+// من التوكن — لا يُقبل user_id من العميل). بلا قاعدة جاهزة 503 كسائر مسارات البوابة.
+app.post('/api/my/push/register', authenticate, authorizePerm('ops.my_portal'), async (req, res) => {
+    try {
+        if (!dbAvailable() || !db.PushDevices) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const { token, platform, environment, appVersion } = req.body || {};
+        // توكن APNs الحقيقي hex (64 محرفًا عادة) — نسمح بمدى أوسع تحسبًا لتغيّر الصيغة
+        if (!token || !/^[A-Fa-f0-9]{32,256}$/.test(String(token))) {
+            return res.status(400).json({ error: 'توكن الجهاز غير صالح' });
+        }
+        const row = await db.PushDevices.upsert({
+            user_id: req.user.id,
+            device_token: String(token),
+            platform: platform === 'ios' ? 'ios' : String(platform || 'ios'),
+            environment: environment === 'production' ? 'production' : 'development',
+            app_version: appVersion ? String(appVersion).slice(0, 40) : null
+        });
+        res.json({ success: true, registered: true, environment: row ? row.environment : undefined });
+    } catch (error) {
+        console.error('[push] register error:', error);
+        res.status(500).json({ error: 'فشل في تسجيل الجهاز' });
+    }
+});
+
+// فصل جهاز محدد (توكن) أو كل أجهزة الحساب — تسجيل الخروج يفصل الكل خادميًا
+// (مسار /api/auth/logout) وهذا المسار للفصل الاستباقي من العميل.
+app.post('/api/my/push/unregister', authenticate, authorizePerm('ops.my_portal'), async (req, res) => {
+    try {
+        if (!dbAvailable() || !db.PushDevices) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const { token } = req.body || {};
+        if (token) {
+            await db.PushDevices.deactivateToken(String(token));
+        } else {
+            await db.PushDevices.deactivateByUser(req.user.id);
+        }
+        res.json({ success: true });
+    } catch (error) {
+        console.error('[push] unregister error:', error);
+        res.status(500).json({ error: 'فشل في فصل الجهاز' });
     }
 });
 
@@ -1907,6 +1958,17 @@ app.post('/api/auth/logout', authenticate, async (req, res) => {
             console.error('Session deactivate error:', e.message);
         }
         
+        // v6: فصل أجهزة Push عن الحساب — الخروج يقطع وصول الإشعارات للأجهزة
+        // (يشمل تبديل الحساب على نفس الجهاز: الجهاز يبقى مفصولًا حتى يُسجَّل
+        // مجددًا من الجلسة الجديدة عبر /api/my/push/register).
+        try {
+            if (db && db.PushDevices) {
+                await db.PushDevices.deactivateByUser(req.user.id);
+            }
+        } catch (e) {
+            console.error('Push devices deactivate error:', e.message);
+        }
+
         await logAuthEvent(req.user.id, req.user.username, 'logout', 'logout successful', true, null, sessionToDeactivate?.id || null, req);
         
         res.json({ success: true, message: 'تم تسجيل الخروج' });
@@ -10944,6 +11006,11 @@ app.post('/api/notifications', authenticate, async (req, res) => {
             message: 'تم إنشاء إشعار جديد',
             notification: { id: notificationId, user_id: targetUserId, title, message, type: notifType }
         });
+        // v6: نسخة Push لأجهزة المستهدف — فوق القناة القائمة، لا ترمي ولا تمس النتيجة
+        pushGateway.sendToUsers([targetUserId], {
+            title, body: message || '', badge: 'auto',
+            data: { kind: 'notification', notification_id: notificationId }
+        }).catch(() => { });
         res.json({ success: true, id: notificationId });
     } catch (error) {
         console.error('[API] Error creating notification:', error);

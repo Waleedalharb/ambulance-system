@@ -821,3 +821,16 @@
 
     load();
 })();
+
+// ── v6: طبقة APNs — تُحمَّل فقط داخل تطبيق iOS (Capacitor)؛ في المتصفح لا تفعل شيئًا ──
+// اللمسة الوحيدة على هذا الملف: تحميل مشروط لملف مستقل push-register.js —
+// لا تغيير على أي منطق أو واجهة قائمة.
+(function () {
+    try {
+        if (!(window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform())) return;
+        const s = document.createElement('script');
+        s.src = '/js/push-register.js';
+        s.defer = true;
+        document.head.appendChild(s);
+    } catch (_) { /* لا شيء — طبقة اختيارية */ }
+})();
