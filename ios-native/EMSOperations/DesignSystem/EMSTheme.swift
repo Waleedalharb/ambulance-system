@@ -43,9 +43,7 @@ enum EMSTheme {
     static let spacing: CGFloat = 12
 }
 
-/// أسماء مختصرة مستخدمة عبر الواجهات
-typealias EMSTypography = EMSTheme.Type
-
+/// خطوط الهوية — تُستدعى مباشرة: EMSTheme.titleArabic إلخ.
 extension EMSTheme {
     static let titleArabic = Font.system(.title3, design: .default, weight: .bold)
     static let headlineArabic = Font.system(.headline, weight: .semibold)

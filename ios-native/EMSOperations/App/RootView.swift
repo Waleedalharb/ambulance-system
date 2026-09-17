@@ -24,7 +24,7 @@ struct RootView: View {
         }
         .environment(\.layoutDirection, .rightToLeft)
         .onChange(of: deepLinks.pending) { link in
-            guard link != nil, session.state == .authenticated else { return }
+            guard link != nil, session.isAuthenticated else { return }
             // يُستهلك في MainTabView عبر deepLinks.consume()
         }
     }
@@ -42,10 +42,10 @@ struct LaunchView: View {
                     .frame(width: 96, height: 96)
                     .accessibilityHidden(true)
                 Text("منظومة العمليات الإسعافية")
-                    .font(EMSTypography.titleArabic)
+                    .font(EMSTheme.titleArabic)
                     .foregroundStyle(.white)
                 Text("EMS OPERATIONS")
-                    .font(EMSTypography.captionLatin)
+                    .font(EMSTheme.captionLatin)
                     .tracking(3)
                     .foregroundStyle(EMSTeal)
                 ProgressView()
@@ -95,7 +95,7 @@ struct MainTabView: View {
         }
         .tint(EMSTeal)
         .onChange(of: deepLinks.pending) { link in
-            guard let link, session.state == .authenticated else { return }
+            guard let link, session.isAuthenticated else { return }
             switch link.destination {
             case .scheduleChanges:
                 if showPortalTabs {
