@@ -104,10 +104,13 @@ struct ScheduleView: View {
     // MARK: - الشبكة
 
     private func calendarGrid(_ s: ScheduleDTO) -> some View {
-        let daysByDate = Dictionary(uniqueKeysWithValues: s.days.compactMap { d -> (String, ScheduleDTO.Day)? in
-            guard let date = d.date else { return nil }
-            return (date, d)
-        })
+        // تسامحًا مع أي تكرار يوم من الخادم — يُحتفظ بأول إدخال بدل الانهيار
+        let daysByDate = Dictionary(
+            s.days.compactMap { d -> (String, ScheduleDTO.Day)? in
+                guard let date = d.date else { return nil }
+                return (date, d)
+            },
+            uniquingKeysWith: { first, _ in first })
         let cells = monthCells(schedule: s)
 
         return EMSCard {

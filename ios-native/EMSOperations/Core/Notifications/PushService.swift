@@ -61,7 +61,7 @@ final class PushService: NSObject, UNUserNotificationCenterDelegate {
     }
 
     private func register() async {
-        await UIApplication.shared.registerForRemoteNotifications()
+        UIApplication.shared.registerForRemoteNotifications()
     }
 
     // MARK: - AppDelegate hooks

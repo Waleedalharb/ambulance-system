@@ -51,7 +51,9 @@ actor AuthService {
             let res: RefreshResponse = try await api.postPublic(
                 "/api/auth/refresh", body: RefreshRequest(refreshToken: refresh))
             _ = KeychainService.save(res.accessToken, for: .accessToken)
-            _ = try? KeychainService.save(String(data: JSONEncoder().encode(res.user), encoding: .utf8) ?? "", for: .userJSON)
+            if let data = try? JSONEncoder().encode(res.user), let json = String(data: data, encoding: .utf8) {
+                _ = KeychainService.save(json, for: .userJSON)
+            }
             return res.accessToken
         } catch {
             AppLogger.auth.warning("refresh failed — session dead")
@@ -64,21 +66,21 @@ actor AuthService {
     /// فصل الجهاز (بذل قصوى) ← إبطال خادمي ← مسح محلي. لا يرمي أبدًا.
     func logout() async {
         struct Empty: Encodable {}
-        try? await { let _: SimpleSuccess = try await api.post("/api/my/push/unregister", body: Optional<Empty>.none) }()
-        try? await { let _: SimpleSuccess = try await api.post("/api/auth/logout", body: Optional<Empty>.none) }()
+        let _: SimpleSuccess? = try? await api.post("/api/my/push/unregister", body: Empty())
+        let _: SimpleSuccess? = try? await api.post("/api/auth/logout", body: Empty())
         KeychainService.clearSession()
         AppLogger.auth.info("logout complete")
     }
 
-    // MARK: - Stored
+    // MARK: - Stored (nonisolated: Keychain خيط-آمن — يُستدعى من مزوّد توكن APIClient المتزامن)
 
-    func storedUser() -> AuthUser? {
+    nonisolated func storedUser() -> AuthUser? {
         guard let json = KeychainService.read(.userJSON),
               let data = json.data(using: .utf8) else { return nil }
         return try? JSONDecoder().decode(AuthUser.self, from: data)
     }
 
-    func storedAccessToken() -> String? { KeychainService.read(.accessToken) }
+    nonisolated func storedAccessToken() -> String? { KeychainService.read(.accessToken) }
 
     private func persist(access: String, refresh: String, user: AuthUser) {
         _ = KeychainService.save(access, for: .accessToken)

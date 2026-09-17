@@ -23,7 +23,7 @@ struct RootView: View {
             }
         }
         .environment(\.layoutDirection, .rightToLeft)
-        .onChange(of: deepLinks.pending) { _, link in
+        .onChange(of: deepLinks.pending) { link in
             guard link != nil, session.state == .authenticated else { return }
             // يُستهلك في MainTabView عبر deepLinks.consume()
         }
@@ -94,7 +94,7 @@ struct MainTabView: View {
                 .tag(AppTab.account)
         }
         .tint(EMSTeal)
-        .onChange(of: deepLinks.pending) { _, link in
+        .onChange(of: deepLinks.pending) { link in
             guard let link, session.state == .authenticated else { return }
             switch link.destination {
             case .scheduleChanges:

@@ -27,7 +27,7 @@ struct EMSOperationsApp: App {
                 .onAppear { PushService.shared.attach(deepLinks: deepLinks, session: session) }
                 // تحديث ذكي عند العودة للمقدمة (قسم 37): صلاحيات فقط —
                 // الشاشات تحدّث بياناتها عند الظهور/السحب، لا إعادة تحميل شاملة.
-                .onChange(of: scenePhase) { _, phase in
+                .onChange(of: scenePhase) { phase in
                     guard phase == .active, session.isAuthenticated else { return }
                     Task { await session.permissions.load() }
                 }

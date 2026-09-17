@@ -19,15 +19,15 @@ enum AppLogger {
     static func redact(_ text: String) -> String {
         var out = text
         let patterns = [
-            #"eyJ[A-Za-z0-9_\-\.]{10,}"#,          // JWT
-            #"[A-Fa-f0-9]{64,}"#,                   // device tokens / hashes
-            #"(?i)(password[\"'\s:=]+)[^\"'\s,}]+"# // password=…
+            #"(eyJ[A-Za-z0-9_\-\.]{10,})"#,         // JWT
+            #"([A-Fa-f0-9]{64,})"#,                  // device tokens / hashes
+            #"(?i)(password[\"'\s:=]+)[^\"'\s,}]+"#  // password=… (يبقي المفتاح، يطمس القيمة)
         ]
         for p in patterns {
             if let rx = try? NSRegularExpression(pattern: p) {
                 out = rx.stringByReplacingMatches(
                     in: out, range: NSRange(out.startIndex..., in: out),
-                    withTemplate: "$1•••")
+                    withTemplate: "•••")
             }
         }
         return out
