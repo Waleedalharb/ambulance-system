@@ -188,4 +188,78 @@ final class EMSOperationsTests: XCTestCase {
         XCTAssertEqual(dto.periods?.count, 1)
         XCTAssertNil(dto.periods?.first?.teamName)
     }
+
+    // MARK: - OpsDTO: نماذج وحدة العمليات (تفعيل المنصة الأصلية)
+
+    func testOpsTeamsDTODecodesSnakeCase() throws {
+        let json = #"{"success": true, "teams": [{"id": 3, "name": "جنوب 2", "center": "مركز النرجس", "team_type": "ميداني", "sort_order": 2, "is_active": 1, "requiredPersonnel": 2}]}"#.data(using: .utf8)!
+        let dto = try JSONDecoder().decode(OpsTeamsDTO.self, from: json)
+        let team = try XCTUnwrap(dto.teams?.first)
+        XCTAssertEqual(team.teamId, 3)
+        XCTAssertEqual(team.name, "جنوب 2")
+        XCTAssertEqual(team.teamType, "ميداني")
+        XCTAssertEqual(team.isActive, 1)
+        XCTAssertEqual(team.requiredPersonnel, 2)
+    }
+
+    func testStaffingStateDTODecodesTeamsDictionary() throws {
+        let json = #"{"success": true, "shiftId": 41, "teams": {"جنوب 10": {"status": "missing", "activeCount": 1, "requiredPersonnel": 2, "vacant": 1, "absentees": [{"name": "م", "type": "late"}]}, "جنوب 2": {"status": "ready", "activeCount": 2, "requiredPersonnel": 2, "vehicleOk": true}}, "workforce": {"totalStaff": 3, "totalRequired": 4, "readyTeams": 1, "missingTeams": 1, "operationalReadinessRate": 50}}"#.data(using: .utf8)!
+        let dto = try JSONDecoder().decode(StaffingStateDTO.self, from: json)
+        XCTAssertEqual(dto.shiftId, 41)
+        XCTAssertEqual(dto.teams?["جنوب 2"]?.status, "ready")
+        XCTAssertEqual(dto.teams?["جنوب 10"]?.absentees?.first?.type, "late")
+        XCTAssertEqual(dto.workforce?.operationalReadinessRate, 50)
+        // الفرز الطبيعي: جنوب 2 قبل جنوب 10
+        XCTAssertEqual(dto.sortedTeamNames, ["جنوب 2", "جنوب 10"])
+    }
+
+    func testVehiclesBoardDTODecodesCountersAndSupport() throws {
+        let json = #"{"success": true, "shiftId": 41, "counters": {"active": 8, "reserve": 2, "breakdown": 1, "out_of_service": 1, "unset": 0}, "vehicles": [{"id": "veh_000001", "name": "911", "status": "active", "inWorkshop": false, "teamId": 5}], "unassigned": [{"id": "veh_000009", "name": "احتياط 1", "status": null, "inWorkshop": true}], "support": [{"vehicleId": "veh_000003", "name": "912", "homeTeamId": 3, "targetTeamId": 7, "since": "2026-09-18T08:00:00Z"}]}"#.data(using: .utf8)!
+        let dto = try JSONDecoder().decode(VehiclesBoardDTO.self, from: json)
+        XCTAssertEqual(dto.counters?.outOfService, 1)
+        let v = try XCTUnwrap(dto.vehicles?.first)
+        XCTAssertEqual(v.vehicleId, "veh_000001")
+        XCTAssertEqual(v.teamId, 5)
+        XCTAssertEqual(v.displayName, "911")
+        let s = try XCTUnwrap(dto.support?.first)
+        XCTAssertEqual(s.homeTeamId, 3)
+        XCTAssertEqual(s.targetTeamId, 7)
+        XCTAssertEqual(dto.unassigned?.first?.inWorkshop, true)
+    }
+
+    func testTimelineDTODecodesItems() throws {
+        let json = #"{"success": true, "data": [{"title": "استلام المناوبة", "desc": "تم", "type": "event", "date": "2026-09-18", "time": "07:00"}]}"#.data(using: .utf8)!
+        let dto = try JSONDecoder().decode(TimelineDTO.self, from: json)
+        let item = try XCTUnwrap(dto.data?.first)
+        XCTAssertEqual(item.title, "استلام المناوبة")
+        XCTAssertEqual(item.type, "event")
+    }
+
+    func testCenterGeoDTODecodesCoordinates() throws {
+        let json = #"{"success": true, "data": {"مركز النرجس": {"center": [24.8132, 46.6931], "radius": 3000}}}"#.data(using: .utf8)!
+        let dto = try JSONDecoder().decode(CenterGeoDTO.self, from: json)
+        let center = try XCTUnwrap(dto.data?["مركز النرجس"])
+        XCTAssertEqual(center.center?.count, 2)
+        XCTAssertEqual(center.center?.first, 24.8132)
+        XCTAssertEqual(center.radius, 3000)
+    }
+
+    func testSmartAssessmentDTODecodesEngineOutput() throws {
+        let json = #"{"success": true, "data": {"generatedAt": "2026-09-18T09:00:00Z", "shift": {"id": 41, "type": "صباحية", "date": "2026-09-18", "status": "active"}, "shiftPhase": "early", "readiness": {"percent": 85, "status": "attention"}, "risks": [{"code": "TEAM_MISSING", "severity": "critical", "team": "جنوب 4", "title": "جنوب 4 ينقصها فرد", "detail": "الغياب المفتوح: م"}], "recommendations": [{"code": "ASSIGN_SUPPORT", "priority": 2, "title": "إسناد دعم", "action": "إسناد داعم لفريق جنوب 4"}], "proactive": [{"code": "LATE_GRACE", "text": "جنوب 2 بانتظار متأخر"}], "summary": "جاهزية 85٪", "supportCount": 3}}"#.data(using: .utf8)!
+        let dto = try JSONDecoder().decode(SmartAssessmentDTO.self, from: json)
+        let a = try XCTUnwrap(dto.data)
+        XCTAssertEqual(a.readiness?.percent, 85)
+        XCTAssertEqual(a.readiness?.status, "attention")
+        XCTAssertEqual(a.risks?.first?.severity, "critical")
+        XCTAssertEqual(a.recommendations?.first?.priority, 2)
+        XCTAssertEqual(a.supportCount, 3)
+    }
+
+    func testCurrentShiftDTODecodesNoneState() throws {
+        let json = #"{"success": true, "shift": {"id": null, "status": "none"}, "serverNow": "2026-09-18T06:00:00Z", "prepShift": {"type": "صباحية", "date": "2026-09-18"}}"#.data(using: .utf8)!
+        let dto = try JSONDecoder().decode(CurrentShiftDTO.self, from: json)
+        XCTAssertEqual(dto.shift?.status, "none")
+        XCTAssertNil(dto.shift?.id)
+        XCTAssertEqual(dto.prepShift?.type, "صباحية")
+    }
 }
