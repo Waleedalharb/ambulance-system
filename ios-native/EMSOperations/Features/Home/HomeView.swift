@@ -153,31 +153,58 @@ struct HomeView: View {
         }
     }
 
-    // MARK: - نبض العمليات (صلاحيات ops.*)
+    // MARK: - نبض العمليات (صلاحيات ops.*) — عدّادات حية من الخادم
 
     private var operationsPulseCard: some View {
         NavigationLink(value: Destination.operations) {
             EMSCard {
-                HStack(spacing: 12) {
-                    Image(systemName: "point.3.connected.trianglepath.dotted")
-                        .font(.title3)
-                        .foregroundStyle(EMSTheme.Colors.teal)
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("نبض العمليات")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(.white)
-                        Text("الفرق · الجاهزية · المركبات · الأحداث")
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 12) {
+                        Image(systemName: "point.3.connected.trianglepath.dotted")
+                            .font(.title3)
+                            .foregroundStyle(EMSTheme.Colors.teal)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("نبض العمليات")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(.white)
+                            Text("الفرق · الجاهزية · المركبات · الأحداث")
+                                .font(.caption)
+                                .foregroundStyle(EMSTheme.Colors.textMuted)
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.left")
                             .font(.caption)
                             .foregroundStyle(EMSTheme.Colors.textMuted)
                     }
-                    Spacer()
-                    Image(systemName: "chevron.left")
-                        .font(.caption)
-                        .foregroundStyle(EMSTheme.Colors.textMuted)
+                    if let pulse = vm.pulse {
+                        Divider().overlay(EMSTheme.Colors.divider)
+                        HStack(spacing: 16) {
+                            pulseCounter(pulse.activeVehicles, "مركبة عاملة", EMSTheme.Colors.emerald)
+                            pulseCounter(pulse.breakdownVehicles, "متعطلة", EMSTheme.Colors.warning)
+                            pulseCounter(pulse.outOfServiceVehicles, "خارج الخدمة", EMSTheme.Colors.danger)
+                            if let rate = pulse.readinessRate {
+                                pulseCounter(rate, "الجاهزية ٪", EMSTheme.Colors.teal)
+                            } else if let ready = pulse.readyTeams, let required = pulse.requiredTeams {
+                                pulseCounter(ready, "فرق جاهزة من \(required)", EMSTheme.Colors.teal)
+                            }
+                            Spacer()
+                        }
+                    }
                 }
             }
         }
         .buttonStyle(.plain)
+    }
+
+    private func pulseCounter(_ value: Int?, _ label: String, _ color: Color) -> some View {
+        VStack(spacing: 2) {
+            Text(value.map(String.init) ?? "—")
+                .font(.title3.weight(.bold))
+                .foregroundStyle(color)
+            Text(label)
+                .font(.caption2)
+                .foregroundStyle(EMSTheme.Colors.textMuted)
+        }
     }
 
     // MARK: - المؤشرات (indicators.contribution)

@@ -25,6 +25,18 @@ final class HomeViewModel: ObservableObject {
     @Published var unreadCount = 0
     /// الحساب غير مرتبط ببوابة الموظف (403/NO_EMPLOYEE) — مستخدم عمليات/إدارة بلا بوابة.
     @Published var portalUnavailable = false
+    /// نبض العمليات الحي (صلاحيات ops.*) — عدّادات من vehicles/board + staffing/state كما يشتقها الخادم.
+    @Published var pulse: OpsPulse?
+
+    /// لقطة عدّادات النبض — قيم سيرفرية خام، بلا أي حساب في العميل.
+    struct OpsPulse: Equatable {
+        let activeVehicles: Int?
+        let breakdownVehicles: Int?
+        let outOfServiceVehicles: Int?
+        let readyTeams: Int?
+        let requiredTeams: Int?
+        let readinessRate: Int?
+    }
 
     private let api = APIClient.shared
 
@@ -61,6 +73,28 @@ final class HomeViewModel: ObservableObject {
             }
         } catch {
             if !hadContent { state = .failed(APIError.unknown.userMessage) }
+        }
+        // نبض العمليات مستقل — فشله لا يكسر الرئيسية إطلاقًا.
+        if session.permissions.canAccessOperations {
+            await loadPulse()
+        }
+    }
+
+    /// عدّادات حية لبطاقة «نبض العمليات» — قراءة فقط من مسارين قائمين.
+    private func loadPulse() async {
+        do {
+            async let boardReq: VehiclesBoardDTO = api.get("/api/vehicles/board")
+            async let staffReq: StaffingStateDTO = api.get("/api/staffing/state")
+            let (b, s) = try await (boardReq, staffReq)
+            pulse = OpsPulse(
+                activeVehicles: b.counters?.active,
+                breakdownVehicles: b.counters?.breakdown,
+                outOfServiceVehicles: b.counters?.outOfService,
+                readyTeams: s.workforce?.readyTeams,
+                requiredTeams: s.workforce?.requiredTeams,
+                readinessRate: s.workforce?.operationalReadinessRate ?? s.workforce?.readinessRate)
+        } catch {
+            pulse = nil // تبقى البطاقة بلا عدّادات — لا حالة فشل في الرئيسية بسبب النبض
         }
     }
 
