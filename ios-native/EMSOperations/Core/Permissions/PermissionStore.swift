@@ -69,6 +69,11 @@ final class PermissionStore: ObservableObject {
         loadFailed = false
         do {
             payload = try await api.get("/api/auth/me/permissions")
+            #if DEBUG
+            AppLogger.auth.info("permissions loaded — role: \(payload?.roleLabel ?? "—", privacy: .public) · star: \(payload?.permissionsStar ?? false) · count: \(payload?.permissions?.count ?? 0)")
+            AppLogger.auth.info("permissions list: \((payload?.permissions ?? []).joined(separator: ", "), privacy: .public)")
+            AppLogger.auth.info("derived — operations: \(canAccessOperations) · portal: \(canAccessEmployeePortal) · indicators: \(canViewIndicators)")
+            #endif
         } catch {
             loadFailed = true
             AppLogger.auth.error("permissions load failed")

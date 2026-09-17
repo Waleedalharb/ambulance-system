@@ -87,11 +87,24 @@ actor APIClient {
         }
         guard let http = response as? HTTPURLResponse else { throw APIError.unknown }
 
+        #if DEBUG
+        AppLogger.network.info("\(method.rawValue, privacy: .public) \(path, privacy: .public) → HTTP \(http.statusCode)")
+        #endif
+
         switch http.statusCode {
         case 200...299:
-            do { return try JSONDecoder().decode(T.self, from: data) }
+            do {
+                let decoded = try JSONDecoder().decode(T.self, from: data)
+                #if DEBUG
+                AppLogger.network.info("decode OK \(path, privacy: .public) — \(data.count) bytes")
+                #endif
+                return decoded
+            }
             catch {
                 AppLogger.network.error("decoding failed for \(path, privacy: .public)")
+                #if DEBUG
+                AppLogger.network.error("decode detail \(path, privacy: .public): \(AppLogger.redact(String(describing: error)), privacy: .public)")
+                #endif
                 throw APIError.decoding
             }
         case 401:

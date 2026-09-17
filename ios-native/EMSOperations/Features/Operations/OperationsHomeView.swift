@@ -98,6 +98,13 @@ struct OperationsHomeView: View {
             .padding(EMSTheme.pagePadding)
         }
         .emsPage("العمليات")
+        .onAppear {
+            #if DEBUG
+            // علامة النسخة الحية: وجود هذا السطر في السجل يثبت أن البناء يحتوي
+            // شاشات البيانات الحقيقية (ee41e8c+) — نسخة «قيد التفعيل» لا تملكه.
+            AppLogger.ui.info("OperationsHomeView LIVE-DATA build appeared — 6 modules wired to Backend APIs")
+            #endif
+        }
         .navigationDestination(for: OpsModule.self) { module in
             switch module {
             case .teams: OpsTeamsView()

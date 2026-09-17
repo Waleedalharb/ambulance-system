@@ -94,6 +94,16 @@ struct MainTabView: View {
                 .tag(AppTab.account)
         }
         .tint(EMSTeal)
+        .onAppear {
+            #if DEBUG
+            AppLogger.ui.info("MainTabView appeared — operations tab: \(showOperations) · portal tabs: \(showPortalTabs)")
+            #endif
+        }
+        .onChange(of: session.permissions.canAccessOperations) { newValue in
+            #if DEBUG
+            AppLogger.ui.info("operations tab visibility changed → \(newValue)")
+            #endif
+        }
         .onChange(of: deepLinks.pending) { link in
             guard let link, session.isAuthenticated else { return }
             switch link.destination {
