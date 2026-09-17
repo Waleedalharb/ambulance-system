@@ -8,15 +8,15 @@
 
 import Foundation
 
-// MARK: - /api/my/profile
-struct ProfileDTO: Decodable {
-    struct Employee: Decodable {
+// MARK: - /api/my/profile (Codable: تُخزَّن مؤقتًا للعرض دون اتصال — SafeCache)
+struct ProfileDTO: Codable {
+    struct Employee: Codable {
         let id: Int?
         let code: String?
         let name: String
         let jobTitle: String?
     }
-    struct Today: Decodable {
+    struct Today: Codable {
         let date: String?
         let shiftCode: String?
         let shiftName: String?
