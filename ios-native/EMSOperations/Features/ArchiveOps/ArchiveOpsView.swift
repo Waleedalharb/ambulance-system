@@ -93,7 +93,7 @@ struct ArchiveOpsView: View {
     private var filtersCard: some View {
         EMSCard {
             VStack(alignment: .leading, spacing: 10) {
-                EMSSectionHeader(title: "تصفية الأرشيف", systemImage: "line.3.horizontal.decrease.circle")
+                EMSectionHeader(title: "تصفية الأرشيف", systemImage: "line.3.horizontal.decrease.circle")
                 HStack(spacing: 8) {
                     TextField("من تاريخ (YYYY-MM-DD)", text: $vm.dateFrom)
                         .textFieldStyle(.roundedBorder)

@@ -81,3 +81,38 @@ struct PushRegisterResponse: Decodable {
     let registered: Bool?
     let environment: String?
 }
+
+// MARK: - استعادة كلمة المرور (§1) — auth-reset-service.js (مسارات عامة بلا جلسة)
+// الرد الموحّد لا يكشف وجود الحساب؛ الرمز يصل للجوال الموثّق سيرفريًا فقط.
+
+struct ForgotPasswordBody: Encodable {
+    let identifier: String
+}
+
+struct ForgotPasswordResponseDTO: Decodable {
+    let success: Bool?
+    let message: String?
+}
+
+struct VerifyResetCodeBody: Encodable {
+    let identifier: String
+    let code: String
+}
+
+struct VerifyResetCodeResponseDTO: Decodable {
+    let success: Bool?
+    let resetToken: String?
+    let expiresInMinutes: Int?
+}
+
+struct ResetPasswordBody: Encodable {
+    let token: String
+    let newPassword: String
+}
+
+// MARK: - تغيير كلمة المرور (§1) — POST /api/auth/change-password (جلسة قائمة)
+
+struct ChangePasswordBody: Encodable {
+    let currentPassword: String
+    let newPassword: String
+}

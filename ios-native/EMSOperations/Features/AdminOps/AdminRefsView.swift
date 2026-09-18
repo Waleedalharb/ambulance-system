@@ -135,7 +135,7 @@ struct AdminRefsView: View {
                 VStack(spacing: EMSTheme.spacing) {
                     EMSCard {
                         VStack(alignment: .leading, spacing: 10) {
-                            EMSSectionHeader(title: editingTeam == nil ? "إضافة فريق" : "تعديل فريق",
+                            EMSectionHeader(title: editingTeam == nil ? "إضافة فريق" : "تعديل فريق",
                                              systemImage: "person.3.fill")
                             TextField("اسم الفريق", text: $tName).textFieldStyle(.roundedBorder)
                             TextField("المركز", text: $tCenter).textFieldStyle(.roundedBorder)
@@ -238,7 +238,7 @@ struct AdminRefsView: View {
                 VStack(spacing: EMSTheme.spacing) {
                     EMSCard {
                         VStack(alignment: .leading, spacing: 10) {
-                            EMSSectionHeader(title: editingCode == nil ? "إضافة رمز" : "تعديل رمز",
+                            EMSectionHeader(title: editingCode == nil ? "إضافة رمز" : "تعديل رمز",
                                              systemImage: "tag.fill")
                             TextField("الرمز (مثل: M1)", text: $cCode).textFieldStyle(.roundedBorder)
                             TextField("الاسم", text: $cName).textFieldStyle(.roundedBorder)

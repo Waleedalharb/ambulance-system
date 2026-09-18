@@ -97,7 +97,7 @@ struct HospitalMonitorSegment: View {
 
             // التنبيهات
             let alerts = d.alerts ?? []
-            EMSSectionHeader(title: "تنبيهات المراقبة (\(d.activeAlerts ?? 0) نشطة)", systemImage: "bell.badge")
+            EMSectionHeader(title: "تنبيهات المراقبة (\(d.activeAlerts ?? 0) نشطة)", systemImage: "bell.badge")
             if alerts.isEmpty {
                 EMSEmptyView(icon: "bell.slash", title: "لا تنبيهات", detail: "لا تنبيهات في هذه النافذة")
             } else {
@@ -141,7 +141,7 @@ struct HospitalMonitorSegment: View {
             // المنشآت
             let facilities = d.facilities ?? []
             if !facilities.isEmpty {
-                EMSSectionHeader(title: "المنشآت", systemImage: "building.2")
+                EMSectionHeader(title: "المنشآت", systemImage: "building.2")
                 ForEach(facilities) { fac in
                     EMSCard {
                         VStack(alignment: .leading, spacing: 8) {

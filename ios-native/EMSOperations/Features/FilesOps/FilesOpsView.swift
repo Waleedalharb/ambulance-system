@@ -46,7 +46,7 @@ struct FilesOpsView: View {
     // MARK: - الملفات التشغيلية
     private var opsFilesSection: some View {
         VStack(spacing: EMSTheme.spacing) {
-            EMSSectionHeader(title: "الملفات التشغيلية", systemImage: "folder.fill")
+            EMSectionHeader(title: "الملفات التشغيلية", systemImage: "folder.fill")
             Text("الرفع من الويب حاليًا — التنزيل والحذف متاحان هنا حسب الصلاحية.")
                 .font(.caption2)
                 .foregroundStyle(EMSTheme.Colors.textMuted)
@@ -101,7 +101,7 @@ struct FilesOpsView: View {
     // MARK: - المستندات العامة
     private var docsSection: some View {
         VStack(spacing: EMSTheme.spacing) {
-            EMSSectionHeader(title: "المستندات العامة", systemImage: "doc.on.doc.fill")
+            EMSectionHeader(title: "المستندات العامة", systemImage: "doc.on.doc.fill")
             if vm.docs.isEmpty {
                 EMSEmptyView(icon: "doc.on.doc", title: "لا توجد مستندات")
             } else {

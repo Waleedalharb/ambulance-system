@@ -167,7 +167,7 @@ struct AssetsDashboardSegment: View {
             }
 
             if let byStatus = d.byStatus, !byStatus.isEmpty {
-                EMSSectionHeader(title: "حسب الحالة", systemImage: "chart.bar.fill")
+                EMSectionHeader(title: "حسب الحالة", systemImage: "chart.bar.fill")
                 EMSCard {
                     VStack(alignment: .leading, spacing: 8) {
                         ForEach(byStatus, id: \.status) { row in
@@ -180,7 +180,7 @@ struct AssetsDashboardSegment: View {
             }
 
             if let events = d.recentEvents, !events.isEmpty {
-                EMSSectionHeader(title: "أحدث الأحداث", systemImage: "clock.arrow.circlepath")
+                EMSectionHeader(title: "أحدث الأحداث", systemImage: "clock.arrow.circlepath")
                 ForEach(events.prefix(10)) { ev in
                     EMSCard {
                         VStack(alignment: .leading, spacing: 6) {

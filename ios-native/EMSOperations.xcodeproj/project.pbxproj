@@ -110,6 +110,9 @@
 		5E4000000000000000000067 /* SignoutsOpsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000067 /* SignoutsOpsView.swift */; };
 		5E4000000000000000000068 /* FilesOpsDTO.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000068 /* FilesOpsDTO.swift */; };
 		5E4000000000000000000069 /* FilesOpsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000069 /* FilesOpsView.swift */; };
+		5E400000000000000000006A /* PermissionsAdminDTO.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000006A /* PermissionsAdminDTO.swift */; };
+		5E400000000000000000006B /* ForgotPasswordView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000006B /* ForgotPasswordView.swift */; };
+		5E400000000000000000006C /* AdminPermissionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000006C /* AdminPermissionsView.swift */; };
 		5E400000000000000000004C /* ArchiveOpsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000004C /* ArchiveOpsViewModel.swift */; };
 		5E400000000000000000004D /* ArchiveOpsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000004D /* ArchiveOpsView.swift */; };
 		5E40000000000000000000E1 /* EMSOperationsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000E1 /* EMSOperationsTests.swift */; };
@@ -230,6 +233,9 @@
 		5E3000000000000000000067 /* SignoutsOpsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignoutsOpsView.swift; sourceTree = "<group>"; };
 		5E3000000000000000000068 /* FilesOpsDTO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilesOpsDTO.swift; sourceTree = "<group>"; };
 		5E3000000000000000000069 /* FilesOpsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilesOpsView.swift; sourceTree = "<group>"; };
+		5E300000000000000000006A /* PermissionsAdminDTO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionsAdminDTO.swift; sourceTree = "<group>"; };
+		5E300000000000000000006B /* ForgotPasswordView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ForgotPasswordView.swift; sourceTree = "<group>"; };
+		5E300000000000000000006C /* AdminPermissionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminPermissionsView.swift; sourceTree = "<group>"; };
 		5E300000000000000000004C /* ArchiveOpsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveOpsViewModel.swift; sourceTree = "<group>"; };
 		5E300000000000000000004D /* ArchiveOpsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveOpsView.swift; sourceTree = "<group>"; };
 		5E30000000000000000000D0 /* EMSOperations.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = EMSOperations.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -397,6 +403,7 @@
 				5E3000000000000000000062 /* IndicatorsDTO.swift */,
 				5E3000000000000000000064 /* RequestsDTO.swift */,
 				5E3000000000000000000068 /* FilesOpsDTO.swift */,
+				5E300000000000000000006A /* PermissionsAdminDTO.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -594,6 +601,7 @@
 				5E3000000000000000000054 /* AdminSymbolsView.swift */,
 				5E3000000000000000000055 /* AdminSystemView.swift */,
 				5E3000000000000000000056 /* AdminNotificationsView.swift */,
+				5E300000000000000000006C /* AdminPermissionsView.swift */,
 			);
 			path = AdminOps;
 			sourceTree = "<group>";
@@ -638,6 +646,7 @@
 			children = (
 				5E3000000000000000000011 /* LoginView.swift */,
 				5E3000000000000000000012 /* LoginViewModel.swift */,
+				5E300000000000000000006B /* ForgotPasswordView.swift */,
 			);
 			path = Login;
 			sourceTree = "<group>";
@@ -954,6 +963,9 @@
 				5E4000000000000000000067 /* SignoutsOpsView.swift in Sources */,
 				5E4000000000000000000068 /* FilesOpsDTO.swift in Sources */,
 				5E4000000000000000000069 /* FilesOpsView.swift in Sources */,
+				5E400000000000000000006A /* PermissionsAdminDTO.swift in Sources */,
+				5E400000000000000000006B /* ForgotPasswordView.swift in Sources */,
+				5E400000000000000000006C /* AdminPermissionsView.swift in Sources */,
 				5E400000000000000000004C /* ArchiveOpsViewModel.swift in Sources */,
 				5E400000000000000000004D /* ArchiveOpsView.swift in Sources */,
 			);

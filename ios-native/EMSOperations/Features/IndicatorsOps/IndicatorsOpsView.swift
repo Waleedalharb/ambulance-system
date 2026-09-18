@@ -96,7 +96,7 @@ struct IndicatorsDashboardSegment: View {
             }
 
             if let weekly = d.weekly, !weekly.isEmpty {
-                EMSSectionHeader(title: "الأسابيع الأخيرة", systemImage: "calendar")
+                EMSectionHeader(title: "الأسابيع الأخيرة", systemImage: "calendar")
                 ForEach(weekly.prefix(6)) { w in
                     EMSCard {
                         HStack {
@@ -113,7 +113,7 @@ struct IndicatorsDashboardSegment: View {
             }
 
             if let centers = d.centerDistribution, !centers.isEmpty {
-                EMSSectionHeader(title: "توزيع المراكز", systemImage: "mappin.and.ellipse")
+                EMSectionHeader(title: "توزيع المراكز", systemImage: "mappin.and.ellipse")
                 EMSCard {
                     VStack(alignment: .leading, spacing: 8) {
                         ForEach(centers.prefix(8)) { c in
@@ -124,7 +124,7 @@ struct IndicatorsDashboardSegment: View {
             }
 
             if let recent = d.recentShifts, !recent.isEmpty {
-                EMSSectionHeader(title: "أحدث المناوبات", systemImage: "clock")
+                EMSectionHeader(title: "أحدث المناوبات", systemImage: "clock")
                 ForEach(recent.prefix(10)) { s in
                     EMSCard {
                         HStack {
@@ -245,7 +245,7 @@ struct ContributionSegment: View {
             }
 
             if let ops = d.groups?.operations {
-                EMSSectionHeader(title: "العمليات (تحكم عملياتي/تنسيق استجابة)", systemImage: "headphones")
+                EMSectionHeader(title: "العمليات (تحكم عملياتي/تنسيق استجابة)", systemImage: "headphones")
                 if ops.isEmpty {
                     EMSEmptyView(icon: "person", title: "لا موظفين", detail: "لا موظفون مصنفون في العمليات")
                 } else {
@@ -254,7 +254,7 @@ struct ContributionSegment: View {
             }
 
             if let field = d.groups?.fieldLeadership {
-                EMSSectionHeader(title: "القيادة الميدانية (كبير/مساعد كبير مسعفين)", systemImage: "star.leadinghalf.filled")
+                EMSectionHeader(title: "القيادة الميدانية (كبير/مساعد كبير مسعفين)", systemImage: "star.leadinghalf.filled")
                 if field.isEmpty {
                     EMSEmptyView(icon: "person", title: "لا موظفين", detail: "لا موظفون مصنفون في القيادة الميدانية")
                 } else {

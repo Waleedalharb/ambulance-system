@@ -47,7 +47,7 @@ struct MyRequestsView: View {
     // MARK: - الإعلانات (قراءة)
     private var announcementsSection: some View {
         VStack(spacing: EMSTheme.spacing) {
-            EMSSectionHeader(title: "الإعلانات", systemImage: "megaphone.fill")
+            EMSectionHeader(title: "الإعلانات", systemImage: "megaphone.fill")
             if vm.announcements.isEmpty {
                 EMSEmptyView(icon: "megaphone", title: "لا توجد إعلانات حاليًا")
             } else {
@@ -90,7 +90,7 @@ struct MyRequestsView: View {
     // MARK: - طلبات الإجازة
     private var leaveSection: some View {
         VStack(spacing: EMSTheme.spacing) {
-            EMSSectionHeader(title: "طلبات إجازتي", systemImage: "calendar.badge.clock")
+            EMSectionHeader(title: "طلبات إجازتي", systemImage: "calendar.badge.clock")
 
             EMSCard {
                 VStack(alignment: .leading, spacing: 10) {
@@ -155,7 +155,7 @@ struct MyRequestsView: View {
     // MARK: - طلب تغيير المناوبة (تقديم فقط للموظف)
     private var shiftChangeSection: some View {
         VStack(spacing: EMSTheme.spacing) {
-            EMSSectionHeader(title: "طلب تغيير مناوبة", systemImage: "arrow.triangle.2.circlepath")
+            EMSectionHeader(title: "طلب تغيير مناوبة", systemImage: "arrow.triangle.2.circlepath")
             EMSCard {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("يُرسل الطلب للإدارة للمراجعة — نتيجته تظهر في «تغييرات جدولي» بعد الاعتماد.")
@@ -184,7 +184,7 @@ struct MyRequestsView: View {
     // MARK: - الإجازات المجدولة (قراءة)
     private var vacationsSection: some View {
         VStack(spacing: EMSTheme.spacing) {
-            EMSSectionHeader(title: "إجازات التحكم والتنسيق المجدولة", systemImage: "calendar.badge.checkmark")
+            EMSectionHeader(title: "إجازات التحكم والتنسيق المجدولة", systemImage: "calendar.badge.checkmark")
             if vm.vacations.isEmpty {
                 EMSEmptyView(icon: "calendar", title: "لا توجد إجازات مجدولة")
             } else {

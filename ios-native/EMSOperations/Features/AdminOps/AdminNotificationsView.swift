@@ -117,7 +117,7 @@ struct AdminNotificationsView: View {
     private var filtersCard: some View {
         EMSCard {
             VStack(alignment: .leading, spacing: 10) {
-                EMSSectionHeader(title: "سجل الإرسال", systemImage: "list.bullet.rectangle")
+                EMSectionHeader(title: "سجل الإرسال", systemImage: "list.bullet.rectangle")
                 HStack(spacing: 8) {
                     Picker("الحالة", selection: $vm.statusFilter) {
                         Text("كل الحالات").tag("")

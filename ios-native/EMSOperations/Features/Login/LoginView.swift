@@ -11,6 +11,7 @@ struct LoginView: View {
     @EnvironmentObject private var session: SessionStore
     @StateObject private var vm = LoginViewModel()
     @FocusState private var focus: Field?
+    @State private var showForgot = false
 
     enum Field { case username, password }
 
@@ -32,6 +33,9 @@ struct LoginView: View {
             Button("لاحقًا", role: .cancel) { Task { await vm.skipBiometricAndContinue(session: session) } }
         } message: {
             Text("استخدم \(BiometricGate.biometryName) لفتح جلستك بسرعة وأمان في المرات القادمة.")
+        }
+        .sheet(isPresented: $showForgot) {
+            NavigationStack { ForgotPasswordView() }
         }
     }
 
@@ -92,6 +96,10 @@ struct LoginView: View {
                 focus = nil
                 Task { await vm.login(session: session) }
             }
+
+            Button("نسيت كلمة المرور؟") { showForgot = true }
+                .font(.caption)
+                .foregroundStyle(EMSTheme.Colors.teal)
 
             Text("نسعى لنحييها")
                 .font(.caption)

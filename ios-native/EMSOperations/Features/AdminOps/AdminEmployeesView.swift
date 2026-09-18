@@ -176,7 +176,7 @@ struct AdminEmployeesView: View {
                 VStack(spacing: EMSTheme.spacing) {
                     EMSCard {
                         VStack(alignment: .leading, spacing: 10) {
-                            EMSSectionHeader(title: isNew ? "إضافة موظف" : "تعديل موظف",
+                            EMSectionHeader(title: isNew ? "إضافة موظف" : "تعديل موظف",
                                              systemImage: "person.fill.badge.plus")
                             if isNew {
                                 TextField("الكود الوظيفي", text: $fCode)
@@ -227,7 +227,7 @@ struct AdminEmployeesView: View {
                     if isAdmin {
                         EMSCard {
                             VStack(alignment: .leading, spacing: 8) {
-                                EMSSectionHeader(title: "توثيق الجوال", systemImage: "checkmark.shield")
+                                EMSectionHeader(title: "توثيق الجوال", systemImage: "checkmark.shield")
                                 if emp.verified {
                                     Text("الجوال موثق\(emp.phoneVerifiedBy.map { " بواسطة \($0)" } ?? "")")
                                         .font(.caption).foregroundStyle(EMSTheme.Colors.emerald)
@@ -262,7 +262,7 @@ struct AdminEmployeesView: View {
                     // تحديث الجوال — admin/director
                     EMSCard {
                         VStack(alignment: .leading, spacing: 8) {
-                            EMSSectionHeader(title: "تحديث الجوال", systemImage: "phone")
+                            EMSectionHeader(title: "تحديث الجوال", systemImage: "phone")
                             TextField("رقم الجوال (أرقام فقط 9-15)", text: $fPhone)
                                 .textFieldStyle(.roundedBorder)
                                 .keyboardType(.phonePad)
@@ -279,7 +279,7 @@ struct AdminEmployeesView: View {
                     // تعيين النمط — admin/director
                     EMSCard {
                         VStack(alignment: .leading, spacing: 8) {
-                            EMSSectionHeader(title: "نمط المناوبة", systemImage: "repeat")
+                            EMSectionHeader(title: "نمط المناوبة", systemImage: "repeat")
                             TextField("كود النمط (فارغ = فك الربط)", text: $fPattern)
                                 .textFieldStyle(.roundedBorder)
                             EMSPrimaryButton(title: "حفظ النمط", isLoading: working) {
@@ -296,7 +296,7 @@ struct AdminEmployeesView: View {
                     // النقل — admin/director
                     EMSCard {
                         VStack(alignment: .leading, spacing: 8) {
-                            EMSSectionHeader(title: "نقل الموظف", systemImage: "arrow.left.arrow.right")
+                            EMSectionHeader(title: "نقل الموظف", systemImage: "arrow.left.arrow.right")
                             TextField("معرّف الفرقة المستهدفة (رقم)", text: $fTransferTeamId)
                                 .textFieldStyle(.roundedBorder)
                                 .keyboardType(.numberPad)

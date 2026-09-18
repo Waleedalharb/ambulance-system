@@ -133,7 +133,7 @@ struct AdminSymbolsView: View {
             VStack(spacing: EMSTheme.spacing) {
                 EMSCard {
                     VStack(alignment: .leading, spacing: 10) {
-                        EMSSectionHeader(title: "فتح قفل الإدارة", systemImage: "lock.open")
+                        EMSectionHeader(title: "فتح قفل الإدارة", systemImage: "lock.open")
                         Text("الرمز السري المستقل — الجلسة المفتوحة تدوم 15 دقيقة وتُبطل عند تغيير الرمز.")
                             .font(.caption).foregroundStyle(EMSTheme.Colors.textMuted)
                         SecureField("الرمز السري", text: $secretInput)
@@ -168,7 +168,7 @@ struct AdminSymbolsView: View {
                 VStack(spacing: EMSTheme.spacing) {
                     EMSCard {
                         VStack(alignment: .leading, spacing: 10) {
-                            EMSSectionHeader(title: "الرمز السري لإدارة الأكواد", systemImage: "key.fill")
+                            EMSectionHeader(title: "الرمز السري لإدارة الأكواد", systemImage: "key.fill")
                             Text("6 أحرف على الأقل. تغييره يُبطل كل الجلسات المفتوحة.")
                                 .font(.caption).foregroundStyle(EMSTheme.Colors.textMuted)
                             if vm.secretConfigured == true {
@@ -309,7 +309,7 @@ struct AdminSymbolsView: View {
                 VStack(spacing: EMSTheme.spacing) {
                     EMSCard {
                         VStack(alignment: .leading, spacing: 10) {
-                            EMSSectionHeader(title: "إضافة رمز", systemImage: "plus.square")
+                            EMSectionHeader(title: "إضافة رمز", systemImage: "plus.square")
                             TextField("الكود", text: $sCode).textFieldStyle(.roundedBorder)
                             TextField("النوع (مثل: day_code / employee_symbol)", text: $sType)
                                 .textFieldStyle(.roundedBorder)

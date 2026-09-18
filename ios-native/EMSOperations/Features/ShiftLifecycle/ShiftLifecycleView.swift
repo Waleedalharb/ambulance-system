@@ -160,7 +160,7 @@ struct ShiftLifecycleView: View {
             VStack(spacing: EMSTheme.spacing) {
                 EMSCard {
                     VStack(alignment: .leading, spacing: 10) {
-                        EMSSectionHeader(title: "إنهاء المناوبة", systemImage: "flag.checkered")
+                        EMSectionHeader(title: "إنهاء المناوبة", systemImage: "flag.checkered")
                         Text("الإنهاء ينقل المناوبة إلى «بانتظار التسليم» — الاعتماد يتم بصلاحية shift.approve.")
                             .font(.caption).foregroundStyle(EMSTheme.Colors.textMuted)
                         TextField("ملاحظات التسليم (اختياري)", text: $handoverNotes, axis: .vertical)
@@ -255,7 +255,7 @@ struct ShiftLifecycleView: View {
                 VStack(spacing: EMSTheme.spacing) {
                     EMSCard {
                         VStack(alignment: .leading, spacing: 10) {
-                            EMSSectionHeader(title: "تعديل قسري — \(shift.displayName)",
+                            EMSectionHeader(title: "تعديل قسري — \(shift.displayName)",
                                              systemImage: "pencil.circle")
                             TextField("نوع المناوبة", text: $eType).textFieldStyle(.roundedBorder)
                             TextField("التاريخ (YYYY-MM-DD)", text: $eDate).textFieldStyle(.roundedBorder)

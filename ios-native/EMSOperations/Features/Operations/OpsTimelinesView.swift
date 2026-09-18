@@ -72,7 +72,7 @@ struct StaffingTimelineView: View {
                 detail: "لم تُسجّل أحداث قوى بشرية في هذه المناوبة")
         } else {
             if !late.isEmpty {
-                EMSSectionHeader(title: "سجلات التأخير", systemImage: "clock.badge.exclamationmark")
+                EMSectionHeader(title: "سجلات التأخير", systemImage: "clock.badge.exclamationmark")
                 ForEach(late) { rec in
                     EMSCard {
                         VStack(alignment: .leading, spacing: 8) {
@@ -106,7 +106,7 @@ struct StaffingTimelineView: View {
             }
 
             if !coverage.isEmpty {
-                EMSSectionHeader(title: "سجلات التغطية", systemImage: "person.2.badge.plus")
+                EMSectionHeader(title: "سجلات التغطية", systemImage: "person.2.badge.plus")
                 ForEach(coverage) { rec in
                     EMSCard {
                         VStack(alignment: .leading, spacing: 8) {
@@ -140,7 +140,7 @@ struct StaffingTimelineView: View {
             }
 
             if !events.isEmpty {
-                EMSSectionHeader(title: "السجل الخام", systemImage: "list.bullet.rectangle")
+                EMSectionHeader(title: "السجل الخام", systemImage: "list.bullet.rectangle")
                 ForEach(events) { ev in
                     OpEventCard(event: ev)
                 }
@@ -327,7 +327,7 @@ struct ShiftTimelineView: View {
                     .foregroundStyle(EMSTheme.Colors.emerald)
             }
 
-            EMSSectionHeader(title: "الخط الزمني للمناوبة", systemImage: "clock.arrow.circlepath")
+            EMSectionHeader(title: "الخط الزمني للمناوبة", systemImage: "clock.arrow.circlepath")
             if vm.timeline.isEmpty {
                 EMSEmptyView(
                     icon: "clock",
@@ -370,7 +370,7 @@ struct ShiftTimelineView: View {
             }
 
             HStack {
-                EMSSectionHeader(title: "الأحداث اليدوية", systemImage: "square.and.pencil")
+                EMSectionHeader(title: "الأحداث اليدوية", systemImage: "square.and.pencil")
                 Spacer()
                 if canWrite {
                     Button {

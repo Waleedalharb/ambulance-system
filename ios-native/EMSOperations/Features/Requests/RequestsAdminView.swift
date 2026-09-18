@@ -43,7 +43,7 @@ struct RequestsAdminView: View {
     // MARK: - طلبات الإجازة
     private var leaveSection: some View {
         VStack(spacing: EMSTheme.spacing) {
-            EMSSectionHeader(title: "طلبات الإجازة", systemImage: "calendar.badge.clock")
+            EMSectionHeader(title: "طلبات الإجازة", systemImage: "calendar.badge.clock")
             if vm.leaveRequests.isEmpty {
                 EMSEmptyView(icon: "calendar", title: "لا توجد طلبات إجازة")
             } else {
@@ -93,7 +93,7 @@ struct RequestsAdminView: View {
     // MARK: - طلبات تغيير المناوبة
     private var shiftChangeSection: some View {
         VStack(spacing: EMSTheme.spacing) {
-            EMSSectionHeader(title: "طلبات تغيير المناوبة", systemImage: "arrow.triangle.2.circlepath")
+            EMSectionHeader(title: "طلبات تغيير المناوبة", systemImage: "arrow.triangle.2.circlepath")
             if vm.shiftChangeRequests.isEmpty {
                 EMSEmptyView(icon: "arrow.triangle.2.circlepath", title: "لا توجد طلبات تغيير")
             } else {
@@ -143,7 +143,7 @@ struct RequestsAdminView: View {
     // MARK: - الإعلانات (إضافة/حذف — admin فقط)
     private var announcementsSection: some View {
         VStack(spacing: EMSTheme.spacing) {
-            EMSSectionHeader(title: "الإعلانات", systemImage: "megaphone.fill")
+            EMSectionHeader(title: "الإعلانات", systemImage: "megaphone.fill")
             if session.permissions.isAdmin {
                 EMSPrimaryButton(title: "إضافة إعلان جديد") { showAddAnnouncement = true }
             }

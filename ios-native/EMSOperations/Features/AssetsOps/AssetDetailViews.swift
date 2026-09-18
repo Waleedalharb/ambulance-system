@@ -125,7 +125,7 @@ struct AssetCardView: View {
             }
 
             if let replacements = vm.data?.replacements, !replacements.isEmpty {
-                EMSSectionHeader(title: "الاستبدالات", systemImage: "arrow.triangle.2.circlepath")
+                EMSectionHeader(title: "الاستبدالات", systemImage: "arrow.triangle.2.circlepath")
                 ForEach(replacements) { r in
                     EMSCard {
                         VStack(alignment: .leading, spacing: 6) {
@@ -144,7 +144,7 @@ struct AssetCardView: View {
 
             let events = vm.data?.events ?? []
             if !events.isEmpty {
-                EMSSectionHeader(title: "سجل الأحداث", systemImage: "clock.arrow.circlepath")
+                EMSectionHeader(title: "سجل الأحداث", systemImage: "clock.arrow.circlepath")
                 ForEach(events) { ev in
                     EMSCard {
                         VStack(alignment: .leading, spacing: 6) {
@@ -401,7 +401,7 @@ struct InventorySessionView: View {
             // النتائج المسجلة
             let items = vm.data?.items ?? []
             if !items.isEmpty {
-                EMSSectionHeader(title: "النتائج المسجلة", systemImage: "checklist")
+                EMSectionHeader(title: "النتائج المسجلة", systemImage: "checklist")
                 ForEach(items) { item in
                     EMSCard {
                         VStack(alignment: .leading, spacing: 6) {
@@ -431,7 +431,7 @@ struct InventorySessionView: View {
             // الأجهزة المتوقعة — النقر يسجل النتيجة (INV_EXEC وجلسة مفتوحة)
             let expected = vm.data?.expected ?? []
             if !expected.isEmpty {
-                EMSSectionHeader(title: "الأجهزة المتوقعة", systemImage: "cube")
+                EMSectionHeader(title: "الأجهزة المتوقعة", systemImage: "cube")
                 ForEach(expected) { asset in
                     EMSCard {
                         HStack {

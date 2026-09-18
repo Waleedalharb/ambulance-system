@@ -127,7 +127,7 @@ struct AdminUsersView: View {
                 VStack(spacing: EMSTheme.spacing) {
                     EMSCard {
                         VStack(alignment: .leading, spacing: 10) {
-                            EMSSectionHeader(title: "حساب موظف جديد", systemImage: "person.badge.plus")
+                            EMSectionHeader(title: "حساب موظف جديد", systemImage: "person.badge.plus")
                             Text("عقد الهوية: اسم المستخدم يساوي الكود الوظيفي، ويجب أن يكون ملف الموظف موجودًا ونشطًا. كلمة المرور تُولَّد خادميًا.")
                                 .font(.caption)
                                 .foregroundStyle(EMSTheme.Colors.textMuted)

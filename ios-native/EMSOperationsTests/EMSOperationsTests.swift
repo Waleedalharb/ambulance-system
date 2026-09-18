@@ -1283,4 +1283,71 @@ final class EMSOperationsTests: XCTestCase {
         XCTAssertFalse(PermissionMapper.canOpsFiles(["ops.dispatch"], star: false))
         XCTAssertTrue(PermissionMapper.canOpsFiles([], star: true))
     }
+
+    // MARK: - مجال الصلاحيات الفردية واستعادة كلمة المرور (§1/§2)
+
+    func testPermCatalogDecodesMap() throws {
+        // GET /api/permissions/catalog — server.js:1535 (خريطة مفاتيح ← {label, domain})
+        let json = #"{"success": true, "permissions": {"ops.files": {"label": "رفع الملفات", "domain": "ops"}, "admin.users_manage": {"label": "إدارة المستخدمين", "domain": "admin"}}, "roles": {"admin": "مدير النظام"}}"#.data(using: .utf8)!
+        let dto = try JSONDecoder().decode(PermissionsCatalogDTO.self, from: json)
+        XCTAssertEqual(dto.permissions?["ops.files"]?.label, "رفع الملفات")
+        XCTAssertEqual(dto.permissions?["admin.users_manage"]?.domain, "admin")
+        XCTAssertEqual(dto.roles?["admin"], "مدير النظام")
+    }
+
+    func testPermUsersDecodeFlexibleIdsAndCounters() throws {
+        // GET /api/permissions/users — server.js:1619 (عدّادات الاستثناءات)
+        let json = #"{"success": true, "users": [{"id": 3, "username": "waleed", "name": "وليد", "role": "admin", "role_label": "مدير النظام", "isActive": true, "overrides": {"grants": 2, "revokes": 1}}, {"id": "u9", "username": "sara", "role": "user", "isActive": false}]}"#.data(using: .utf8)!
+        let dto = try JSONDecoder().decode(PermUsersResponseDTO.self, from: json)
+        XCTAssertEqual(dto.users?.count, 2)
+        XCTAssertEqual(dto.users?.first?.id, "3")
+        XCTAssertEqual(dto.users?.first?.overrides?.grants, 2)
+        XCTAssertEqual(dto.users?.last?.id, "u9")
+        XCTAssertNil(dto.users?.last?.overrides)
+    }
+
+    func testPermUserDetailDecodesPayloadAndOverrides() throws {
+        // GET /api/permissions/user/:id — permission-service.js mePayload + UserPermissions.getByUser
+        let json = #"{"success": true, "user": {"id": 3, "name": "وليد", "role": "user"}, "role": "user", "role_label": "مستخدم", "permissions": ["ops.my_portal", "ops.files"], "permissions_star": false, "permissions_granted": ["ops.files"], "permissions_revoked": [], "overrides": [{"id": 1, "user_id": 3, "permission": "ops.files", "granted": 1}]}"#.data(using: .utf8)!
+        let dto = try JSONDecoder().decode(PermUserDetailDTO.self, from: json)
+        XCTAssertEqual(dto.user?.id, "3")
+        XCTAssertEqual(dto.permissions?.count, 2)
+        XCTAssertEqual(dto.permissionsStar, false)
+        XCTAssertEqual(dto.overrides?.first?.userId, "3")
+        XCTAssertTrue(dto.overriddenKeys.contains("ops.files"))
+        XCTAssertFalse(dto.overriddenKeys.contains("ops.alerts"))
+    }
+
+    func testPermActionBodyEncodesSnakeCase() throws {
+        let body = PermActionBody(user_id: "3", permission: "ops.files")
+        let data = try JSONEncoder().encode(body)
+        let obj = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        XCTAssertEqual(obj?["user_id"] as? String, "3")
+        XCTAssertEqual(obj?["permission"] as? String, "ops.files")
+        XCTAssertNil(obj?["userId"])
+    }
+
+    func testVerifyResetCodeDecodesToken() throws {
+        // auth-reset-service.js verifyCode — يرجع resetToken مرة واحدة/10 دقائق
+        let json = #"{"success": true, "resetToken": "abc123", "expiresInMinutes": 10}"#.data(using: .utf8)!
+        let dto = try JSONDecoder().decode(VerifyResetCodeResponseDTO.self, from: json)
+        XCTAssertEqual(dto.resetToken, "abc123")
+        XCTAssertEqual(dto.expiresInMinutes, 10)
+    }
+
+    func testForgotPasswordUniformResponse() throws {
+        // requestReset — رد موحّد لا يكشف وجود الحساب (auth-reset-service.js:104)
+        let json = #"{"success": true, "message": "إن كان الحساب مسجلًا فسيصله رمز"}"#.data(using: .utf8)!
+        let dto = try JSONDecoder().decode(ForgotPasswordResponseDTO.self, from: json)
+        XCTAssertEqual(dto.success, true)
+        XCTAssertNotNil(dto.message)
+    }
+
+    func testChangePasswordBodyEncodes() throws {
+        let body = ChangePasswordBody(currentPassword: "old", newPassword: "new")
+        let data = try JSONEncoder().encode(body)
+        let obj = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        XCTAssertEqual(obj?["currentPassword"] as? String, "old")
+        XCTAssertEqual(obj?["newPassword"] as? String, "new")
+    }
 }

@@ -44,7 +44,7 @@ struct SignoutsOpsView: View {
     // MARK: - تسجيل الخروج (ops.team_exit)
     private var recordSection: some View {
         VStack(spacing: EMSTheme.spacing) {
-            EMSSectionHeader(title: "تسجيل خروج فرقة", systemImage: "rectangle.portrait.and.arrow.right")
+            EMSectionHeader(title: "تسجيل خروج فرقة", systemImage: "rectangle.portrait.and.arrow.right")
 
             EMSCard {
                 VStack(alignment: .leading, spacing: 10) {
@@ -120,7 +120,7 @@ struct SignoutsOpsView: View {
     // MARK: - سجل تسجيلات المناوبة النشطة
     private var logSection: some View {
         VStack(spacing: EMSTheme.spacing) {
-            EMSSectionHeader(title: "تسجيلات المناوبة النشطة", systemImage: "list.clipboard.fill")
+            EMSectionHeader(title: "تسجيلات المناوبة النشطة", systemImage: "list.clipboard.fill")
             if vm.signouts.isEmpty {
                 EMSEmptyView(icon: "rectangle.portrait.and.arrow.right",
                              title: "لا توجد تسجيلات خروج في المناوبة النشطة")

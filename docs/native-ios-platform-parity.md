@@ -33,7 +33,7 @@
 | **Operational Actions** | استعادة كلمة المرور عبر الرمز، إبطال الجلسة عند الخروج |
 | **Permissions** | عامة (بلا حارس) ما عدا `sessions` → `authorize(['admin'])` |
 | **Native Screen** | `LoginView` + `SessionStore` + `AuthService` + `Keychain` + `BiometricGate` |
-| **Native Status** | ✅ مبني (دخول/خروج/تحديث/Face ID) — ⛔ نسيت كلمة المرور وتغييرها من التطبيق |
+| **Native Status** | ✅ مبني بالكامل — دخول/خروج/تحديث/Face ID + استعادة كلمة المرور (٣ خطوات عبر الرمز — `ForgotPasswordView`) + تغييرها من «ملفي» (`ChangePasswordSheet`) · جلسات المستخدم sessions (admin) لم تُبنَ — إدارة ويب |
 
 ## 2. الصلاحيات والأدوار
 
@@ -49,7 +49,7 @@
 | **Operational Actions** | منح فردي فوق الدور، سحب فردي، مسح كامل المنح |
 | **Permissions** | كلها `admin.users_manage` |
 | **Native Screen** | `PermissionStore` + `PermissionMapper` (استهلاك داخلي للصلاحيات) — لا شاشة إدارة |
-| **Native Status** | ◐ استهلاك ✅ / إدارة ⛔ |
+| **Native Status** | ✅ مبني — استهلاك + إدارة (`AdminPermissionsView`: كتالوج/مستخدمون/تفاصيل/منح/سحب/إعادة — موديول في مركز الإدارة بـadmin.users_manage) |
 
 ## 3. بوابة الموظف التشغيلية (my-ems)
 

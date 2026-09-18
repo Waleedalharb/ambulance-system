@@ -13,6 +13,7 @@ struct ProfileView: View {
     @StateObject private var vm = ProfileViewModel()
     @State private var showLogoutConfirm = false
     @State private var faceIDOn = BiometricGate.isEnabled
+    @State private var showChangePassword = false
 
     var body: some View {
         ScrollView {
@@ -47,6 +48,9 @@ struct ProfileView: View {
             Button("إلغاء", role: .cancel) {}
         } message: {
             Text("سيُفصل هذا الجهاز من الإشعارات وتحتاج اسم المستخدم وكلمة المرور للدخول مجددًا.")
+        }
+        .sheet(isPresented: $showChangePassword) {
+            NavigationStack { ChangePasswordSheet() }
         }
     }
 
@@ -171,6 +175,21 @@ struct ProfileView: View {
                         .font(.caption)
                         .foregroundStyle(EMSTheme.Colors.textMuted)
                 }
+                Divider().overlay(EMSTheme.Colors.divider)
+                Button { showChangePassword = true } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "key.fill")
+                            .foregroundStyle(EMSTheme.Colors.teal)
+                        Text("تغيير كلمة المرور")
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(.white)
+                        Spacer()
+                        Image(systemName: "chevron.left")
+                            .font(.caption)
+                            .foregroundStyle(EMSTheme.Colors.textMuted)
+                    }
+                }
+                .buttonStyle(.plain)
             }
         }
     }
@@ -229,6 +248,104 @@ final class ProfileViewModel: ObservableObject {
             state = .failed(e.userMessage)
         } catch {
             state = .failed(APIError.unknown.userMessage)
+        }
+    }
+}
+
+
+// MARK: - ورقة تغيير كلمة المرور (§1 — POST /api/auth/change-password، جلسة قائمة)
+
+private struct ChangePasswordSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @State private var current = ""
+    @State private var new_ = ""
+    @State private var confirm = ""
+    @State private var working = false
+    @State private var errorMessage: String? = nil
+    @State private var done = false
+
+    private var canSubmit: Bool {
+        !current.isEmpty && !new_.isEmpty && new_ == confirm
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: EMSTheme.spacing) {
+                if done {
+                    EMSCard {
+                        VStack(spacing: 12) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.largeTitle)
+                                .foregroundStyle(EMSTheme.Colors.emerald)
+                            Text("تم تغيير كلمة المرور بنجاح")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(.white)
+                            EMSPrimaryButton(title: "إغلاق") { dismiss() }
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                } else {
+                    EMSCard {
+                        VStack(spacing: 12) {
+                            HStack {
+                                Image(systemName: "lock.fill")
+                                    .foregroundStyle(EMSTheme.Colors.textMuted)
+                                SecureField("كلمة المرور الحالية", text: $current)
+                                    .textContentType(.password)
+                                    .foregroundStyle(.white)
+                            }
+                            Divider().overlay(EMSTheme.Colors.divider)
+                            HStack {
+                                Image(systemName: "key.fill")
+                                    .foregroundStyle(EMSTheme.Colors.textMuted)
+                                SecureField("كلمة المرور الجديدة", text: $new_)
+                                    .textContentType(.newPassword)
+                                    .foregroundStyle(.white)
+                            }
+                            Divider().overlay(EMSTheme.Colors.divider)
+                            HStack {
+                                Image(systemName: "key.fill")
+                                    .foregroundStyle(EMSTheme.Colors.textMuted)
+                                SecureField("تأكيد كلمة المرور الجديدة", text: $confirm)
+                                    .textContentType(.newPassword)
+                                    .foregroundStyle(.white)
+                            }
+                        }
+                    }
+                    if let error = errorMessage {
+                        Text(error)
+                            .font(.caption)
+                            .foregroundStyle(EMSTheme.Colors.danger)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    EMSPrimaryButton(title: "حفظ", isLoading: working, isDisabled: !canSubmit) {
+                        Task { await submit() }
+                    }
+                }
+            }
+            .padding(EMSTheme.pagePadding)
+        }
+        .emsPage("تغيير كلمة المرور")
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("إلغاء") { dismiss() }
+            }
+        }
+    }
+
+    private func submit() async {
+        working = true
+        errorMessage = nil
+        defer { working = false }
+        do {
+            let _: BasicSuccessDTO = try await APIClient.shared.post(
+                "/api/auth/change-password",
+                body: ChangePasswordBody(currentPassword: current, newPassword: new_))
+            done = true
+        } catch let e as APIError {
+            errorMessage = e.userMessage
+        } catch {
+            errorMessage = APIError.unknown.userMessage
         }
     }
 }
