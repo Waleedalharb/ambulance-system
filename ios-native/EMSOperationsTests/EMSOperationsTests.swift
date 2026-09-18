@@ -554,4 +554,80 @@ final class EMSOperationsTests: XCTestCase {
         XCTAssertFalse(PermissionMapper.canVehicleOps(["ops.dispatch"], false))
         XCTAssertTrue(PermissionMapper.canVehicleOps([], true))
     }
+
+    // MARK: - مجال النماذج التشغيلية (FormsOps)
+
+    func testIncidentLookupDTODecodes() throws {
+        let json = #"{"success": true, "found": true, "number": "10234", "shiftId": 41, "incident": {"number": "10234", "type": "medical", "address": "طريق الملك فهد", "district": "النرجس", "status": "active", "cadCreatedAtRaw": "18/09/2026 14:05"}, "units": [{"unit": "جنوب 2", "respArrivalMin": 7.5, "counted": true}], "bestArrivalMin": 7.5, "timeCompleteness": {"state": "complete", "missing": []}}"#.data(using: .utf8)!
+        let dto = try JSONDecoder().decode(IncidentLookupDTO.self, from: json)
+        XCTAssertEqual(dto.found, true)
+        XCTAssertEqual(dto.incident?.district, "النرجس")
+        XCTAssertEqual(dto.units?.first?.counted, true)
+        XCTAssertEqual(dto.bestArrivalMin, 7.5)
+        XCTAssertEqual(dto.timeCompleteness?.state, "complete")
+    }
+
+    func testFormRecordItemProjectionKeepsKnownFieldsInOrder() {
+        let item = FormRecordItem.from([
+            "id": "123", "reportNumber": "5521", "type": "تصادم مروري",
+            "location": "طريق الملك فهد", "injuries": 2, "agencies": ["المرور", "الدفاع المدني"],
+            "unknownFutureField": "x" // حقل مستقبلي — لا يكسر الإسقاط
+        ], formType: "escalation")
+        XCTAssertEqual(item.id, "123")
+        XCTAssertEqual(item.title, "بلاغ 5521")
+        XCTAssertEqual(item.rows.first?.label, "رقم البلاغ")
+        XCTAssertTrue(item.rows.contains { $0.label == "الإصابات" && $0.value == "2" })
+        XCTAssertTrue(item.rows.contains { $0.label == "الجهات" && $0.value == "المرور، الدفاع المدني" })
+        // ترتيب الحقول يتبع تعريف النوع لا الأبجدية
+        let labels = item.rows.map(\.label)
+        XCTAssertLessThan(labels.firstIndex(of: "رقم البلاغ")!, labels.firstIndex(of: "الجهات")!)
+    }
+
+    func testOpsFormTypePaths() {
+        XCTAssertEqual(OpsFormType.incident.path, "/api/incidents")
+        XCTAssertEqual(OpsFormType.eCase.path, "/api/e-cases")
+        XCTAssertEqual(OpsFormType.dailyReport.path, "/api/daily-reports")
+        XCTAssertTrue(OpsFormType.escalation.requiresLookup)
+        XCTAssertFalse(OpsFormType.seniorShift.requiresLookup)
+    }
+
+    func testFormsPermissionKey() {
+        XCTAssertTrue(PermissionMapper.canForms(["ops.forms"], false))
+        XCTAssertFalse(PermissionMapper.canForms(["ops.dispatch"], false))
+        XCTAssertTrue(PermissionMapper.canForms([], true))
+    }
+
+    // MARK: - مجال سير العمل (WorkflowOps)
+
+    func testWorkflowVersionDTODecodesSnakeCaseAndFields() throws {
+        let json = #"{"id": 7, "shift_id": 41, "version_no": 2, "status": "approved", "ref_no": "WF-41-2", "created_by_name": "مشرف", "approved_by_name": "كبير المسعفين", "fields_json": "{\"summary\":\"مناوبة هادئة\",\"reviewedBy\":[\"مدير القطاع\"]}"}"#.data(using: .utf8)!
+        let dto = try JSONDecoder().decode(WorkflowVersionDTO.self, from: json)
+        XCTAssertEqual(dto.shiftId, 41)
+        XCTAssertEqual(dto.versionNo, 2)
+        XCTAssertEqual(dto.status, "approved")
+        XCTAssertEqual(dto.statusTitle, "معتمدة")
+        XCTAssertEqual(dto.refNo, "WF-41-2")
+        XCTAssertEqual(dto.fields["summary"], "مناوبة هادئة")
+        XCTAssertEqual(dto.fields["reviewedBy"], "مدير القطاع")
+    }
+
+    func testWorkflowFieldsRequestEncodesWhitelistOnly() throws {
+        let req = WorkflowFieldsRequest(summary: "ملخص", reviewedBy: ["مدير القطاع"])
+        let data = try JSONEncoder().encode(req)
+        let obj = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        XCTAssertEqual(obj["summary"] as? String, "ملخص")
+        XCTAssertEqual(obj["reviewedBy"] as? [String], ["مدير القطاع"])
+        XCTAssertNil(obj["operationalNotes"])
+        XCTAssertNil(obj["issues"])
+    }
+
+    func testWorkflowPermissionKeys() {
+        XCTAssertTrue(PermissionMapper.canViewWorkflow(["workflow.view"], false))
+        XCTAssertFalse(PermissionMapper.canViewWorkflow(["workflow.manage"], false))
+        XCTAssertTrue(PermissionMapper.canManageWorkflow(["workflow.manage"], false))
+        XCTAssertTrue(PermissionMapper.canApproveWorkflow(["workflow.approve"], false))
+        XCTAssertFalse(PermissionMapper.canApproveWorkflow(["workflow.manage"], false))
+        // workflow.view يفتح وحدة العمليات (سير العمل داخل غرفة العمليات)
+        XCTAssertTrue(PermissionMapper.canAccessOperations(["workflow.view"], false))
+    }
 }

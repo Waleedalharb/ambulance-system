@@ -11,11 +11,12 @@ import Foundation
 
 /// قدرات التطبيق المشتقة من الصلاحيات — دوال نقية لسهولة الاختبار.
 enum PermissionMapper {
-    /// مفاتيح ops.* التي تفتح وحدة العمليات (حسب config/permissions.js).
+    /// مفاتيح ops.* التي تفتح وحدة العمليات (حسب config/permissions.js) +
+    /// workflow.view لأن سير العمل وحدة داخل غرفة العمليات.
     static let operationsKeys: [String] = [
         "ops.execute", "ops.completion", "ops.dispatch", "ops.reports",
         "ops.report_detail", "ops.report_revert", "ops.deployments", "ops.forms",
-        "ops.team_exit", "ops.vehicles", "ops.alerts"
+        "ops.team_exit", "ops.vehicles", "ops.alerts", "workflow.view"
     ]
 
     static func has(_ permissions: [String], star: Bool, _ key: String) -> Bool {
@@ -80,6 +81,28 @@ enum PermissionMapper {
     /// أحداث المركبات: إسناد/تبديل/دعم/حالة ميكانيكية.
     static func canVehicleOps(_ permissions: [String], star: Bool) -> Bool {
         has(permissions, star: star, "ops.vehicles")
+    }
+
+    /// النماذج التشغيلية (حوادث/تصعيدات/حالات إلكترونية/تقارير يومية/مناوبات كبار).
+    static func canForms(_ permissions: [String], star: Bool) -> Bool {
+        has(permissions, star: star, "ops.forms")
+    }
+
+    // ── سير العمل الرسمي (§13) — مفاتيح مستقلة عن ops.* ──
+
+    /// مشاهدة نسخ سير العمل.
+    static func canViewWorkflow(_ permissions: [String], star: Bool) -> Bool {
+        has(permissions, star: star, "workflow.view")
+    }
+
+    /// إعداد/تحرير/إعادة إصدار سير العمل.
+    static func canManageWorkflow(_ permissions: [String], star: Bool) -> Bool {
+        has(permissions, star: star, "workflow.manage")
+    }
+
+    /// الاعتماد الرسمي (قفل + مرجع + PDF).
+    static func canApproveWorkflow(_ permissions: [String], star: Bool) -> Bool {
+        has(permissions, star: star, "workflow.approve")
     }
 
     // ── مفاتيح الجداول التفصيلية (config/permissions.js — كلها منح فردية حصرًا) ──
@@ -159,6 +182,10 @@ final class PermissionStore: ObservableObject {
     var canRevertReports: Bool { PermissionMapper.canRevertReports(permissions, star: isStar) }
     var canReportDetail: Bool { PermissionMapper.canReportDetail(permissions, star: isStar) }
     var canVehicleOps: Bool { PermissionMapper.canVehicleOps(permissions, star: isStar) }
+    var canForms: Bool { PermissionMapper.canForms(permissions, star: isStar) }
+    var canViewWorkflow: Bool { PermissionMapper.canViewWorkflow(permissions, star: isStar) }
+    var canManageWorkflow: Bool { PermissionMapper.canManageWorkflow(permissions, star: isStar) }
+    var canApproveWorkflow: Bool { PermissionMapper.canApproveWorkflow(permissions, star: isStar) }
     var canEditScheduleCell: Bool { PermissionMapper.canEditScheduleCell(permissions, star: isStar) }
     var canManageScheduleEmployees: Bool { PermissionMapper.canManageScheduleEmployees(permissions, star: isStar) }
     var canImportSchedule: Bool { PermissionMapper.canImportSchedule(permissions, star: isStar) }

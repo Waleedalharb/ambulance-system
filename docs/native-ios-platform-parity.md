@@ -205,8 +205,8 @@
 | **Delete** | :id لكل نموذج + clear-air-ambulance |
 | **Operational Actions** | تسجيل نموذج تشغيلي بأنواعه، متابعة، حذف |
 | **Permissions** | `ops.forms` (كل الإنشاء/الحذف) · القراءة `authenticate` · بعض الحذف `admin` |
-| **Native Screen** | — |
-| **Native Status** | ⛔ غير موجود (قراءة النماذج وتقديمها) |
+| **Native Screen** | `FormsOpsView` (خمسة أنواع: حوادث/تصعيدات/حالات إلكترونية/تقارير يومية/مناوبات كبار — بحث CAD إلزامي للأنواع المرتبطة ببلاغ) |
+| **Native Status** | ✅ مكتمل للأنواع الخمسة (`ops.forms`): قراءة + إنشاء + حذف؛ الحوادث/التصعيدات/الحالات الإلكترونية عبر بوابة `incidents/lookup` نفسها (لا حفظ بلا بلاغ متحقق). ⛔ متبقٍ: الإسعاف الجوي (`air-ambulance`)، ملاحظات التحكم (`control-notes` — حذف admin)، الإجازات المجدولة (`vacations` — ضمن مجال الإجازات §24)، مرفقات النماذج، إرسال WhatsApp |
 
 ## 13. سير العمل (workflow)
 
@@ -221,8 +221,8 @@
 | **Delete** | — |
 | **Operational Actions** | اعتماد سير العمل (القيادة الميدانية)، إعادة إصدار بعد التعديل |
 | **Permissions** | `workflow.view` · `workflow.manage` · `workflow.approve` · audit `admin` |
-| **Native Screen** | — |
-| **Native Status** | ⛔ غير موجود |
+| **Native Screen** | `WorkflowOpsView` (نسخ المناوبة + إعداد/تحرير/اعتماد/إعادة إصدار + PDF) |
+| **Native Status** | ✅ مكتمل عمليًا — إعداد مسودة (`workflow.manage`)، تحرير القائمة البيضاء الخمس + راجعها، اعتماد (`workflow.approve`)، إعادة إصدار بسبب اختياري، تنزيل PDF للمعتمدة. ⛔ متبقٍ: سجل التدقيق `version/:id/audit` (admin)، عرض اللقطة الكاملة (snapshot) داخل النسخة، الإرسال/الاستلام (sent/acknowledged — لا مسارات كتابة لها في الخادم) |
 
 ## 14. الأحداث والخط الزمني (events / timeline)
 

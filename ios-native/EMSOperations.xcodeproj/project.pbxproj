@@ -75,6 +75,12 @@
 		5E4000000000000000000042 /* VehiclesOpsDTO.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000042 /* VehiclesOpsDTO.swift */; };
 		5E4000000000000000000043 /* VehicleHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000043 /* VehicleHistoryView.swift */; };
 		5E4000000000000000000044 /* VehicleRegistryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000044 /* VehicleRegistryView.swift */; };
+		5E4000000000000000000045 /* FormsOpsDTO.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000045 /* FormsOpsDTO.swift */; };
+		5E4000000000000000000046 /* FormsOpsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000046 /* FormsOpsViewModel.swift */; };
+		5E4000000000000000000047 /* FormsOpsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000047 /* FormsOpsView.swift */; };
+		5E4000000000000000000048 /* WorkflowOpsDTO.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000048 /* WorkflowOpsDTO.swift */; };
+		5E4000000000000000000049 /* WorkflowOpsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000049 /* WorkflowOpsViewModel.swift */; };
+		5E400000000000000000004A /* WorkflowOpsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000004A /* WorkflowOpsView.swift */; };
 		5E40000000000000000000E1 /* EMSOperationsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000E1 /* EMSOperationsTests.swift */; };
 		5E40000000000000000000F0 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000F0 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
@@ -158,6 +164,12 @@
 		5E3000000000000000000042 /* VehiclesOpsDTO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VehiclesOpsDTO.swift; sourceTree = "<group>"; };
 		5E3000000000000000000043 /* VehicleHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VehicleHistoryView.swift; sourceTree = "<group>"; };
 		5E3000000000000000000044 /* VehicleRegistryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VehicleRegistryView.swift; sourceTree = "<group>"; };
+		5E3000000000000000000045 /* FormsOpsDTO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FormsOpsDTO.swift; sourceTree = "<group>"; };
+		5E3000000000000000000046 /* FormsOpsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FormsOpsViewModel.swift; sourceTree = "<group>"; };
+		5E3000000000000000000047 /* FormsOpsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FormsOpsView.swift; sourceTree = "<group>"; };
+		5E3000000000000000000048 /* WorkflowOpsDTO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkflowOpsDTO.swift; sourceTree = "<group>"; };
+		5E3000000000000000000049 /* WorkflowOpsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkflowOpsViewModel.swift; sourceTree = "<group>"; };
+		5E300000000000000000004A /* WorkflowOpsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkflowOpsView.swift; sourceTree = "<group>"; };
 		5E30000000000000000000D0 /* EMSOperations.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = EMSOperations.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		5E30000000000000000000D1 /* EMSOperationsTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = EMSOperationsTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		5E30000000000000000000E1 /* EMSOperationsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EMSOperationsTests.swift; sourceTree = "<group>"; };
@@ -310,6 +322,8 @@
 				5E300000000000000000003C /* PositioningOpsDTO.swift */,
 				5E300000000000000000003F /* DispatchOpsDTO.swift */,
 				5E3000000000000000000042 /* VehiclesOpsDTO.swift */,
+				5E3000000000000000000045 /* FormsOpsDTO.swift */,
+				5E3000000000000000000048 /* WorkflowOpsDTO.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -368,6 +382,8 @@
 				5E2000000000000000000059 /* CompletionOps */,
 				5E200000000000000000005A /* PositioningOps */,
 				5E200000000000000000005B /* DispatchOps */,
+				5E200000000000000000005C /* FormsOps */,
+				5E200000000000000000005D /* WorkflowOps */,
 			);
 			path = Features;
 			sourceTree = "<group>";
@@ -399,6 +415,24 @@
 				5E3000000000000000000041 /* DispatchOpsView.swift */,
 			);
 			path = DispatchOps;
+			sourceTree = "<group>";
+		};
+		5E200000000000000000005C /* FormsOps */ = {
+			isa = PBXGroup;
+			children = (
+				5E3000000000000000000046 /* FormsOpsViewModel.swift */,
+				5E3000000000000000000047 /* FormsOpsView.swift */,
+			);
+			path = FormsOps;
+			sourceTree = "<group>";
+		};
+		5E200000000000000000005D /* WorkflowOps */ = {
+			isa = PBXGroup;
+			children = (
+				5E3000000000000000000049 /* WorkflowOpsViewModel.swift */,
+				5E300000000000000000004A /* WorkflowOpsView.swift */,
+			);
+			path = WorkflowOps;
 			sourceTree = "<group>";
 		};
 		5E2000000000000000000058 /* ScheduleOps */ = {
@@ -720,6 +754,12 @@
 				5E4000000000000000000042 /* VehiclesOpsDTO.swift in Sources */,
 				5E4000000000000000000043 /* VehicleHistoryView.swift in Sources */,
 				5E4000000000000000000044 /* VehicleRegistryView.swift in Sources */,
+				5E4000000000000000000045 /* FormsOpsDTO.swift in Sources */,
+				5E4000000000000000000046 /* FormsOpsViewModel.swift in Sources */,
+				5E4000000000000000000047 /* FormsOpsView.swift in Sources */,
+				5E4000000000000000000048 /* WorkflowOpsDTO.swift in Sources */,
+				5E4000000000000000000049 /* WorkflowOpsViewModel.swift in Sources */,
+				5E400000000000000000004A /* WorkflowOpsView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

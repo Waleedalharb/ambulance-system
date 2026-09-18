@@ -11,7 +11,7 @@ import SwiftUI
 
 struct OperationsHomeView: View {
     private enum OpsModule: Hashable, Identifiable {
-        case teams, readiness, completion, vehicles, events, decisionCenter, map, positioning, dispatch
+        case teams, readiness, completion, vehicles, events, decisionCenter, map, positioning, dispatch, forms, workflow
         var id: Self { self }
 
         var title: String {
@@ -25,6 +25,8 @@ struct OperationsHomeView: View {
             case .map: return "الخريطة"
             case .positioning: return "التمركز والذروة"
             case .dispatch: return "البلاغات والتوزيع"
+            case .forms: return "النماذج التشغيلية"
+            case .workflow: return "سير العمل"
             }
         }
         var icon: String {
@@ -38,6 +40,8 @@ struct OperationsHomeView: View {
             case .map: return "map.fill"
             case .positioning: return "mappin.and.ellipse"
             case .dispatch: return "megaphone.fill"
+            case .forms: return "doc.text.fill"
+            case .workflow: return "checkmark.doc.fill"
             }
         }
         var detail: String {
@@ -51,11 +55,13 @@ struct OperationsHomeView: View {
             case .map: return "المراكز والفرق والمركبات على الخريطة"
             case .positioning: return "مواقع الوحدات · خطط الذروة · المهام والتنبيهات"
             case .dispatch: return "توزيع وتراجع · طواقم CAD · بلاغات تفصيلية"
+            case .forms: return "حوادث · تصعيدات · حالات إلكترونية · تقارير يومية · مناوبات كبار"
+            case .workflow: return "إعداد · تحرير · اعتماد · إعادة إصدار · PDF"
             }
         }
     }
 
-    private let modules: [OpsModule] = [.dispatch, .teams, .readiness, .completion, .vehicles, .events, .decisionCenter, .map, .positioning]
+    private let modules: [OpsModule] = [.dispatch, .teams, .readiness, .completion, .vehicles, .events, .decisionCenter, .map, .positioning, .forms, .workflow]
 
     var body: some View {
         ScrollView {
@@ -111,7 +117,7 @@ struct OperationsHomeView: View {
             #if DEBUG
             // علامة النسخة الحية: وجود هذا السطر في السجل يثبت أن البناء يحتوي
             // شاشات البيانات الحقيقية (ee41e8c+) — نسخة «قيد التفعيل» لا تملكه.
-            AppLogger.ui.info("OperationsHomeView LIVE-DATA build appeared — 9 modules wired to Backend APIs")
+            AppLogger.ui.info("OperationsHomeView LIVE-DATA build appeared — 11 modules wired to Backend APIs")
             #endif
         }
         .navigationDestination(for: OpsModule.self) { module in
@@ -125,6 +131,8 @@ struct OperationsHomeView: View {
             case .map: OpsMapView()
             case .positioning: PositioningOpsView()
             case .dispatch: DispatchOpsView()
+            case .forms: FormsOpsView()
+            case .workflow: WorkflowOpsView()
             }
         }
     }
