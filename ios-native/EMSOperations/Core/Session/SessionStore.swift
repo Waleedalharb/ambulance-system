@@ -69,11 +69,14 @@ final class SessionStore: ObservableObject {
     func loginSucceeded(user: AuthUser) async {
         state = .authenticated(user)
         await permissions.load()
+        // تبديل حساب على نفس الجهاز: إبطال ذاكرة التوكن حتى يُعاد الربط خادميًا
+        PushService.shared.invalidateRegistrationCache()
         await PushService.shared.requestPermissionAndRegister()
     }
 
     func logout() async {
         await auth.logout()
+        PushService.shared.invalidateRegistrationCache()
         permissions.reset()
         SafeCache.clear()
         unreadNotifications = 0
