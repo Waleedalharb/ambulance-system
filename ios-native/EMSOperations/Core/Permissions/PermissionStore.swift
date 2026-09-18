@@ -46,6 +46,49 @@ enum PermissionMapper {
     static func canViewSchedules(_ permissions: [String], star: Bool) -> Bool {
         has(permissions, star: star, "schedule.view")
     }
+
+    // ── مفاتيح الجداول التفصيلية (config/permissions.js — كلها منح فردية حصرًا) ──
+    // من لا يملك المفتاح لا يرى الإجراء إطلاقًا؛ الحسم النهائي على الخادم (403).
+
+    /// تعديل خلية مناوبة ليوم واحد.
+    static func canEditScheduleCell(_ permissions: [String], star: Bool) -> Bool {
+        has(permissions, star: star, "schedule.edit_cell")
+    }
+
+    /// إدارة سجلات الجدول (إضافة/تحديث/حذف سجل).
+    static func canManageScheduleEmployees(_ permissions: [String], star: Bool) -> Bool {
+        has(permissions, star: star, "schedule.employees")
+    }
+
+    /// استيراد الجداول (الرسمي وroster).
+    static func canImportSchedule(_ permissions: [String], star: Bool) -> Bool {
+        has(permissions, star: star, "schedule.import")
+    }
+
+    /// التحديث الجماعي والمسودات والتراجع/الإعادة.
+    static func canBulkUpdateSchedule(_ permissions: [String], star: Bool) -> Bool {
+        has(permissions, star: star, "schedule.bulk_update")
+    }
+
+    /// تبديل مناوبتين.
+    static func canSwapSchedule(_ permissions: [String], star: Bool) -> Bool {
+        has(permissions, star: star, "schedule.swap")
+    }
+
+    /// مزامنة ملفات الجدولة.
+    static func canSyncSchedule(_ permissions: [String], star: Bool) -> Bool {
+        has(permissions, star: star, "schedule.sync")
+    }
+
+    /// تصدير الجداول (JSON/PDF).
+    static func canExportSchedule(_ permissions: [String], star: Bool) -> Bool {
+        has(permissions, star: star, "schedule.export")
+    }
+
+    /// مسح بيانات الجداول — شديدة الحساسية (يدوية حصرًا).
+    static func canClearSchedule(_ permissions: [String], star: Bool) -> Bool {
+        has(permissions, star: star, "schedule.clear")
+    }
 }
 
 @MainActor
@@ -57,12 +100,25 @@ final class PermissionStore: ObservableObject {
 
     var permissions: [String] { payload?.permissions ?? [] }
     var isStar: Bool { payload?.permissionsStar ?? false }
+    var role: String? { payload?.role }
     var roleLabel: String? { payload?.roleLabel }
+
+    /// التوليد الذكي للجداول مقيد سيرفريًا بدور admin/director (لا مفتاح منح).
+    var canGenerateSchedule: Bool { role == "admin" || role == "director" }
 
     var canAccessEmployeePortal: Bool { PermissionMapper.canAccessEmployeePortal(permissions, star: isStar) }
     var canAccessOperations: Bool { PermissionMapper.canAccessOperations(permissions, star: isStar) }
     var canViewIndicators: Bool { PermissionMapper.canViewIndicators(permissions, star: isStar) }
     var canViewPhones: Bool { PermissionMapper.canViewPhones(permissions, star: isStar) }
+    var canViewSchedules: Bool { PermissionMapper.canViewSchedules(permissions, star: isStar) }
+    var canEditScheduleCell: Bool { PermissionMapper.canEditScheduleCell(permissions, star: isStar) }
+    var canManageScheduleEmployees: Bool { PermissionMapper.canManageScheduleEmployees(permissions, star: isStar) }
+    var canImportSchedule: Bool { PermissionMapper.canImportSchedule(permissions, star: isStar) }
+    var canBulkUpdateSchedule: Bool { PermissionMapper.canBulkUpdateSchedule(permissions, star: isStar) }
+    var canSwapSchedule: Bool { PermissionMapper.canSwapSchedule(permissions, star: isStar) }
+    var canSyncSchedule: Bool { PermissionMapper.canSyncSchedule(permissions, star: isStar) }
+    var canExportSchedule: Bool { PermissionMapper.canExportSchedule(permissions, star: isStar) }
+    var canClearSchedule: Bool { PermissionMapper.canClearSchedule(permissions, star: isStar) }
 
     /// يُستدعى بعد المصادقة مباشرة. الفشل لا يكسر الدخول — يُسجَّل وتُخفى الوحدات المشروطة.
     func load() async {

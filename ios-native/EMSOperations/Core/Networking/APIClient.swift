@@ -28,7 +28,7 @@ actor APIClient {
         session = URLSession(configuration: cfg)
     }
 
-    enum Method: String { case get = "GET", post = "POST" }
+    enum Method: String { case get = "GET", post = "POST", put = "PUT", delete = "DELETE" }
 
     // MARK: - Public
 
@@ -48,6 +48,94 @@ actor APIClient {
     /// طلب بلا مصادقة (login/refresh فقط).
     func postPublic<T: Decodable>(_ path: String, body: some Encodable) async throws -> T {
         try await send(.post, path, query: [:], body: body, authorized: false, retried: false)
+    }
+
+    /// PUT بنفس قواعد post (تعديل خلية الجدول ونحوها).
+    func put<T: Decodable>(_ path: String, body: (some Encodable)? = nil) async throws -> T {
+        try await send(.put, path, query: [:], body: body, authorized: true, retried: false)
+    }
+
+    /// DELETE بلا جسم (حذف سجل جدول ونحوه).
+    func delete<T: Decodable>(_ path: String) async throws -> T {
+        try await send(.delete, path, query: [:], body: nil as String?, authorized: true, retried: false)
+    }
+
+    // MARK: - تنزيل ثنائي (PDF/Excel) — قراءة فقط
+
+    /// ملف منزَّل من الخادم مع بيانات وصفية من الترويسات.
+    struct DownloadedFile {
+        let data: Data
+        let filename: String?
+        let mimeType: String?
+    }
+
+    /// تنزيل ثنائي بنفس قواعد send (مصادقة، مهلة، تحديث واحد عند 401).
+    /// يُستخدم لتصدير PDF الجداول — لا يُفك كـJSON إطلاقًا.
+    func download(_ path: String, query: [String: String] = [:]) async throws -> DownloadedFile {
+        try await sendDownload(path, query: query, retried: false)
+    }
+
+    private func sendDownload(_ path: String, query: [String: String], retried: Bool) async throws -> DownloadedFile {
+        var comps = URLComponents(url: AppEnvironment.current.baseURL.appending(path: path), resolvingAgainstBaseURL: false)
+        if !query.isEmpty { comps?.queryItems = query.map { URLQueryItem(name: $0.key, value: $0.value) } }
+        guard let url = comps?.url else { throw APIError.unknown }
+
+        var req = URLRequest(url: url)
+        req.httpMethod = "GET"
+        if let token = tokenProvider?() {
+            req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+
+        let (data, response): (Data, URLResponse)
+        do {
+            (data, response) = try await session.data(for: req)
+        } catch let e as URLError {
+            switch e.code {
+            case .notConnectedToInternet, .networkConnectionLost, .dataNotAllowed:
+                throw APIError.offline
+            case .timedOut:
+                throw APIError.timeout
+            default:
+                throw APIError.offline
+            }
+        }
+        guard let http = response as? HTTPURLResponse else { throw APIError.unknown }
+
+        #if DEBUG
+        AppLogger.network.info("GET \(path, privacy: .public) → HTTP \(http.statusCode) (download \(data.count) bytes)")
+        #endif
+
+        switch http.statusCode {
+        case 200...299:
+            let filename = Self.contentDispositionFilename(http.value(forHTTPHeaderField: "Content-Disposition"))
+            return DownloadedFile(data: data, filename: filename, mimeType: http.value(forHTTPHeaderField: "Content-Type"))
+        case 401:
+            if !retried, let refresh = refreshHandler, let newToken = await refresh() {
+                _ = newToken
+                return try await sendDownload(path, query: query, retried: true)
+            }
+            throw APIError.unauthenticated
+        case 403:
+            throw APIError.forbidden
+        case 404:
+            throw APIError.notFound
+        default:
+            let msg = (try? JSONDecoder().decode([String: String].self, from: data))?["error"] ?? "HTTP \(http.statusCode)"
+            throw APIError.server(msg)
+        }
+    }
+
+    /// اسم الملف من Content-Disposition (filename*=UTF-8''… أو filename="…").
+    private static func contentDispositionFilename(_ header: String?) -> String? {
+        guard let header else { return nil }
+        if let range = header.range(of: "filename\\*=UTF-8''", options: .regularExpression) {
+            let raw = String(header[range.upperBound...])
+            return raw.removingPercentEncoding
+        }
+        if let range = header.range(of: "filename=\"([^\"]+)\"", options: .regularExpression) {
+            return String(header[range.upperBound...]).replacingOccurrences(of: "\"", with: "")
+        }
+        return nil
     }
 
     // MARK: - Core
