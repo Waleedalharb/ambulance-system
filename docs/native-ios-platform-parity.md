@@ -251,8 +251,8 @@
 | **Update / Delete** | — |
 | **Operational Actions** | أرشفة رسمية، استعادة من الأرشيف، تحقق سلامة |
 | **Permissions** | أرشيف حساس `archive.sensitive` · أرشفة/استعادة `admin`/`director` · audit-log `authenticate` |
-| **Native Screen** | — |
-| **Native Status** | ⛔ غير موجود |
+| **Native Screen** | `ArchiveOpsView` (قائمة + فلاتر سيرفرية + تحقق سلامة بخمسة فحوصات + سجل الأرشفة + أرشفة/استعادة/إعادة أرشفة مقيدة بالدور) — موديول «الأرشيف» في `OperationsHomeView` |
+| **Native Status** | ✅ مكتمل (قائمة/تحقق/سجل/أرشفة/استعادة/إعادة أرشفة) — مؤجل: عرض `shift-snapshot`/`shift-integrity` (حمولة كبيرة) و`POST /api/shift-archive` وaudit-log العام |
 
 ## 16. العهد والأصول (assets)
 

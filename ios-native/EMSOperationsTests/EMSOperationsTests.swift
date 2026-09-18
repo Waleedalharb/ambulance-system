@@ -630,4 +630,66 @@ final class EMSOperationsTests: XCTestCase {
         // workflow.view يفتح وحدة العمليات (سير العمل داخل غرفة العمليات)
         XCTAssertTrue(PermissionMapper.canAccessOperations(["workflow.view"], false))
     }
+
+    // MARK: - مجال الأرشيف (ArchiveOps)
+
+    func testArchiveListResponseDecodesSnakeCase() throws {
+        let json = #"{"success": true, "total": 3, "page": 1, "total_pages": 2, "shifts": [{"id": 41, "shiftName": "مناوبة مسائية", "shiftDate": "2026-09-10", "shiftType": "مسائية", "shiftDay": "الخميس", "startTime": "20:00", "totalReports": 12, "generalNotes": "", "lastUpdate": "2026-09-11T08:00:00Z", "status": "archived", "archivedAt": "2026-09-11T08:00:00Z", "createdAt": "2026-09-10T20:00:00Z"}]}"#.data(using: .utf8)!
+        let dto = try JSONDecoder().decode(ArchiveListResponseDTO.self, from: json)
+        XCTAssertEqual(dto.total, 3)
+        XCTAssertEqual(dto.totalPages, 2)
+        let shift = try XCTUnwrap(dto.shifts?.first)
+        XCTAssertEqual(shift.id, 41)
+        XCTAssertEqual(shift.shiftName, "مناوبة مسائية")
+        XCTAssertTrue(shift.isArchived)
+        XCTAssertEqual(shift.statusTitle, "مؤرشفة")
+        XCTAssertEqual(shift.totalReports, 12)
+    }
+
+    func testArchiveShiftDefaultsActiveStatus() throws {
+        // normalizeShiftRow يعطي status='active' افتراضيًا — لكن الصف القديم قد يفتقده
+        let json = #"{"id": 7, "shiftDate": "2026-09-01", "totalReports": 0}"#.data(using: .utf8)!
+        let shift = try JSONDecoder().decode(ArchiveShiftDTO.self, from: json)
+        XCTAssertFalse(shift.isArchived)
+        XCTAssertEqual(shift.statusTitle, "نشطة")
+        XCTAssertEqual(shift.displayName, "مناوبة #7")
+    }
+
+    func testVerifyArchiveResponseDecodesChecks() throws {
+        let json = #"{"success": true, "shiftId": 41, "passed": false, "timestamp": "2026-09-18T00:00:00Z", "checks": {"hashMatch": {"passed": true}, "dataLinkage": {"passed": false, "issues": ["2 سجل تكميل غير مرتبط"]}, "fileIntegrity": {"passed": true, "checked": 5}, "dataCompleteness": {"passed": true}, "noDuplicates": {"passed": true, "duplicateCount": 0}}}"#.data(using: .utf8)!
+        let dto = try JSONDecoder().decode(VerifyArchiveResponseDTO.self, from: json)
+        XCTAssertEqual(dto.passed, false)
+        XCTAssertEqual(dto.checks?.count, 5)
+        XCTAssertEqual(dto.checks?["dataLinkage"]??.issues?.first, "2 سجل تكميل غير مرتبط")
+        XCTAssertEqual(dto.checks?["fileIntegrity"]??.checked, 5)
+        XCTAssertEqual(dto.checks?["hashMatch"]??.passed, true)
+    }
+
+    func testArchiveLogEntryToleratesMissingDetails() throws {
+        // details حرة الشكل — سطر بلا details أو بحقول ناقصة لا يسقط الفكّ
+        let json = #"{"success": true, "shiftId": 41, "logs": [{"id": "1700000000000-ab12cd", "timestamp": "2026-09-11T08:00:00Z", "operation": "archive", "shiftId": 41, "user": {"id": 3, "name": "مشرف", "role": "admin"}}, {"timestamp": "2026-09-11T08:01:00Z", "operation": "verify", "shiftId": 41, "details": {"status": "passed"}}]}"#.data(using: .utf8)!
+        let dto = try JSONDecoder().decode(ArchiveLogResponseDTO.self, from: json)
+        let logs = try XCTUnwrap(dto.logs)
+        XCTAssertEqual(logs.count, 2)
+        XCTAssertEqual(logs[0].operationTitle, "أرشفة")
+        XCTAssertEqual(logs[0].user?.name, "مشرف")
+        XCTAssertNil(logs[0].details)
+        XCTAssertEqual(logs[1].operationTitle, "التحقق من السلامة")
+        XCTAssertEqual(logs[1].details?.summary, "passed")
+        XCTAssertFalse(logs[1].stableId.isEmpty)
+    }
+
+    func testArchiveActionResponseDecodesEngineResult() throws {
+        let json = #"{"success": true, "shiftId": 41, "message": "تمت إعادة الأرشفة بنجاح", "snapshotHash": "abc123", "duration": 1540}"#.data(using: .utf8)!
+        let dto = try JSONDecoder().decode(ArchiveActionResponseDTO.self, from: json)
+        XCTAssertEqual(dto.success, true)
+        XCTAssertEqual(dto.snapshotHash, "abc123")
+        XCTAssertEqual(dto.duration, 1540)
+    }
+
+    func testArchiveRequestEncodesReason() throws {
+        let data = try JSONEncoder().encode(ArchiveRequestDTO(reason: "أرشفة مباشرة"))
+        let obj = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        XCTAssertEqual(obj["reason"] as? String, "أرشفة مباشرة")
+    }
 }
