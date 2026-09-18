@@ -692,4 +692,48 @@ final class EMSOperationsTests: XCTestCase {
         let obj = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
         XCTAssertEqual(obj["reason"] as? String, "أرشفة مباشرة")
     }
+
+    // MARK: - مجال الذكاء: اسأل والذاكرة (SmartOps)
+
+    func testSmartAskResponseDecodesAnswer() throws {
+        let json = #"{"success": true, "data": {"family": "current-risk", "text": "الخطر الأبرز الآن: نقص فرقة — …"}}"#.data(using: .utf8)!
+        let dto = try JSONDecoder().decode(SmartAskResponseDTO.self, from: json)
+        XCTAssertEqual(dto.data?.family, "current-risk")
+        XCTAssertEqual(dto.data?.text, "الخطر الأبرز الآن: نقص فرقة — …")
+    }
+
+    func testSmartAskOutOfScopeFamilyIsNil() throws {
+        // سؤال خارج النطاق ⇒ family=null مع نص اعتذار (smart-ask-service.js:121)
+        let json = #"{"success": true, "data": {"family": null, "text": "سؤال خارج نطاق البيانات التشغيلية الحالية."}}"#.data(using: .utf8)!
+        let dto = try JSONDecoder().decode(SmartAskResponseDTO.self, from: json)
+        XCTAssertNil(dto.data?.family)
+        XCTAssertNotNil(dto.data?.text)
+    }
+
+    func testSmartAskRequestEncodesQuestion() throws {
+        let data = try JSONEncoder().encode(SmartAskRequestDTO(question: "ما الخطر الحالي؟"))
+        let obj = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        XCTAssertEqual(obj["question"] as? String, "ما الخطر الحالي؟")
+    }
+
+    func testDecisionMemoryRecordDecodes() throws {
+        let json = #"{"success": true, "shiftId": 41, "records": [{"id": "dm-1-abc", "recordedAt": "2026-09-18T00:00:00Z", "recordedAtRiyadh": "2026-09-18 03:00:00", "shiftId": 41, "shiftType": "مسائية", "shiftPhase": "active", "fingerprint": "fp1", "readiness": {"percent": 82, "status": "stable"}, "summary": "الوضع مستقر", "counts": {"critical": 0, "warning": 1, "info": 2}, "riskCodes": ["TEAM_UNDERSTAFFED"], "shortageTeams": ["فرقة 3"], "vehicleIssues": [], "completionDelay": false, "risks": [{"code": "X"}], "recommendations": [], "proactive": []}]}"#.data(using: .utf8)!
+        let dto = try JSONDecoder().decode(SmartMemoryResponseDTO.self, from: json)
+        let record = try XCTUnwrap(dto.records?.first)
+        XCTAssertEqual(record.id, "dm-1-abc")
+        XCTAssertEqual(record.readiness?.percent, 82)
+        XCTAssertEqual(record.counts?.warning, 1)
+        XCTAssertEqual(record.shortageTeams, ["فرقة 3"])
+        XCTAssertEqual(record.completionDelay, false)
+    }
+
+    func testSmartPatternsResponseDecodes() throws {
+        let json = #"{"success": true, "scope": {"shiftId": 41, "from": null, "to": null}, "records": 12, "riskCodes": {"TEAM_MISSING": 3}, "shortageTeams": {"فرقة 3": 2}, "vehicleIssues": {"إسعاف 12": 1}, "completionDelays": 1, "readiness": {"min": 64, "avg": 78, "samples": 12}}"#.data(using: .utf8)!
+        let dto = try JSONDecoder().decode(SmartPatternsResponseDTO.self, from: json)
+        XCTAssertEqual(dto.records, 12)
+        XCTAssertEqual(dto.riskCodes?["TEAM_MISSING"], 3)
+        XCTAssertEqual(dto.shortageTeams?["فرقة 3"], 2)
+        XCTAssertEqual(dto.readiness?.min, 64)
+        XCTAssertEqual(dto.readiness?.avg, 78)
+    }
 }

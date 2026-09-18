@@ -37,6 +37,8 @@ struct DecisionCenterView: View {
     private var content: some View {
         if let assessment = vm.assessment {
             summaryCard(assessment)
+            askSection
+            memorySection
             risksSection(assessment)
             recommendationsSection(assessment)
             proactiveSection(assessment)
@@ -82,6 +84,119 @@ struct DecisionCenterView: View {
                     Text("وُلِّد: \(at)")
                         .font(.caption2)
                         .foregroundStyle(EMSTheme.Colors.textMuted)
+                }
+            }
+        }
+    }
+
+    // MARK: - اسأل المشغل الذكي (§18 — إجابة حتمية سيرفرية، لا LLM في العميل)
+
+    private var askSection: some View {
+        EMSCard {
+            VStack(alignment: .leading, spacing: 10) {
+                EMSectionHeader(title: "اسأل المشغل الذكي", systemImage: "bubble.left.and.bubble.right.fill")
+                // اقتراحات = عائلات الأسئلة المدعومة سيرفريًا (smart-ask-service FAMILIES)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(vm.suggestedQuestions, id: \.self) { q in
+                            Button(q) { vm.question = q }
+                                .font(.caption2)
+                                .padding(.horizontal, 10).padding(.vertical, 6)
+                                .background(EMSTheme.Colors.navySoft)
+                                .foregroundStyle(EMSTheme.Colors.textSecondary)
+                                .clipShape(Capsule())
+                        }
+                    }
+                }
+                HStack(spacing: 8) {
+                    TextField("اكتب سؤالًا تشغيليًا…", text: $vm.question)
+                        .textFieldStyle(.roundedBorder)
+                        .font(.subheadline)
+                    Button {
+                        Task { await vm.ask() }
+                    } label: {
+                        if vm.asking { ProgressView().tint(.white) }
+                        else { Image(systemName: "paperplane.fill") }
+                    }
+                    .frame(width: 44, height: 36)
+                    .background(EMSTheme.Colors.teal)
+                    .foregroundStyle(.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .disabled(vm.asking || vm.question.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+                if let answer = vm.askAnswer {
+                    Divider().overlay(EMSTheme.Colors.divider)
+                    Text(answer)
+                        .font(.subheadline)
+                        .foregroundStyle(.white)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                if let askError = vm.askError {
+                    Text(askError)
+                        .font(.caption)
+                        .foregroundStyle(EMSTheme.Colors.danger)
+                }
+            }
+        }
+    }
+
+    // MARK: - ذاكرة القرار وأنماطها (قراءة — authenticate)
+
+    @ViewBuilder
+    private var memorySection: some View {
+        if let patterns = vm.patterns {
+            EMSCard {
+                VStack(alignment: .leading, spacing: 8) {
+                    EMSectionHeader(title: "أنماط القرار", systemImage: "chart.bar.fill")
+                    EMSInfoRow(label: "سجلّات المناوبة", value: "\(patterns.records ?? 0)")
+                    if let r = patterns.readiness {
+                        if let min = r.min { EMSInfoRow(label: "أدنى جاهزية", value: "\(min)٪") }
+                        if let avg = r.avg { EMSInfoRow(label: "متوسط الجاهزية", value: "\(avg)٪") }
+                    }
+                    if (patterns.completionDelays ?? 0) > 0 {
+                        EMSInfoRow(label: "تأخر تكميل", value: "×\(patterns.completionDelays ?? 0)")
+                    }
+                    if let teams = patterns.shortageTeams, !teams.isEmpty {
+                        EMSInfoRow(label: "نقص متكرر",
+                                   value: teams.sorted { $0.value > $1.value }.map { "\($0.key) (×\($0.value))" }.joined(separator: "، "))
+                    }
+                    if let vehicles = patterns.vehicleIssues, !vehicles.isEmpty {
+                        EMSInfoRow(label: "أعطال مركبات",
+                                   value: vehicles.sorted { $0.value > $1.value }.map { "\($0.key) (×\($0.value))" }.joined(separator: "، "))
+                    }
+                }
+            }
+        }
+        if !vm.memory.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                EMSectionHeader(title: "ذاكرة القرار")
+                ForEach(vm.memory, id: \.id) { record in
+                    EMSCard {
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack {
+                                if let status = record.readiness?.status {
+                                    EMSStatusPill(text: vm.readinessLabel(status), tone: vm.readinessTone(status))
+                                }
+                                Spacer()
+                                if let at = record.recordedAtRiyadh ?? record.recordedAt {
+                                    Text(at)
+                                        .font(.caption2)
+                                        .foregroundStyle(EMSTheme.Colors.textMuted)
+                                }
+                            }
+                            if let summary = record.summary, !summary.isEmpty {
+                                Text(summary)
+                                    .font(.caption)
+                                    .foregroundStyle(EMSTheme.Colors.textSecondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            if let counts = record.counts {
+                                Text("مخاطر: حرج \(counts.critical ?? 0) · تحذير \(counts.warning ?? 0) · معلومة \(counts.info ?? 0)")
+                                    .font(.caption2)
+                                    .foregroundStyle(EMSTheme.Colors.textMuted)
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -196,7 +311,29 @@ final class DecisionCenterViewModel: ObservableObject {
     @Published var assessment: SmartAssessmentDTO.Assessment?
     @Published var currentShift: CurrentShiftDTO?
 
+    // «اسأل» + الذاكرة (§18)
+    @Published var question = ""
+    @Published var asking = false
+    @Published var askAnswer: String?
+    @Published var askError: String?
+    @Published private(set) var memory: [DecisionMemoryRecordDTO] = []
+    @Published private(set) var patterns: SmartPatternsResponseDTO?
+
+    /// عائلات الأسئلة المدعومة سيرفريًا (smart-ask-service.js FAMILIES) —
+    /// اقتراحات نصية فقط؛ الكشف والإجابة سيرفيان بالكامل.
+    let suggestedQuestions = [
+        "ماذا أفعل الآن؟", "ما الخطر الحالي؟", "من يحتاج دعمًا؟",
+        "هل الجاهزية مقبولة؟", "أي مركز به نقص؟",
+        "ما الذي يمنع الجاهزية الكاملة؟", "أي طلب تكميل يحتاج انتباهًا؟",
+        "ماذا حدث في هذه المناوبة؟"
+    ]
+
     private let api = APIClient.shared
+
+    /// المناوبة المرجعية للذاكرة: النشطة من التقييم ثم من current-shift.
+    private var memoryShiftId: Int? {
+        assessment?.shift?.id ?? currentShift?.shift?.id
+    }
 
     func load() async {
         state = .loading
@@ -207,10 +344,46 @@ final class DecisionCenterViewModel: ObservableObject {
             assessment = a.data
             currentShift = s
             state = .loaded
+            // الذاكرة إثراء اختياري — فشلها لا يسقط التقييم (نفس روح الخادم)
+            await loadMemory()
         } catch let e as APIError {
             state = .failed(e.userMessage)
         } catch {
             state = .failed(APIError.unknown.userMessage)
+        }
+    }
+
+    private func loadMemory() async {
+        guard let shiftId = memoryShiftId else {
+            memory = []
+            patterns = nil
+            return
+        }
+        let q = ["shiftId": "\(shiftId)"]
+        if let res: SmartMemoryResponseDTO = try? await api.get("/api/smart-operator/memory", query: q) {
+            // الأحدث أولًا — listByShift يعيد ترتيب الملف (الأقدم أولًا)
+            memory = (res.records ?? []).reversed()
+        }
+        if let res: SmartPatternsResponseDTO = try? await api.get("/api/smart-operator/memory/patterns", query: q) {
+            patterns = res
+        }
+    }
+
+    /// سؤال المشغل الذكي — إجابة الخادم تُعرض حرفيًا (قانون الصدق).
+    func ask() async {
+        let q = question.trimmingCharacters(in: .whitespaces)
+        guard !q.isEmpty else { return }
+        asking = true
+        askError = nil
+        defer { asking = false }
+        do {
+            let res: SmartAskResponseDTO = try await api.post("/api/smart-operator/ask",
+                                                              body: SmartAskRequestDTO(question: q))
+            askAnswer = res.data?.text ?? "لا إجابة من الخادم."
+        } catch let e as APIError {
+            askError = e.userMessage
+        } catch {
+            askError = APIError.unknown.userMessage
         }
     }
 

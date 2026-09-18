@@ -299,8 +299,8 @@
 | **Delete** | knowledge/:id / kb/:id |
 | **Operational Actions** | سؤال المشغل الذكي، معالجة أسئلة بلا إجابة |
 | **Permissions** | AI/kb إدارة `admin`/`director` · smart-operator `authenticate` |
-| **Native Screen** | `DecisionCenterView` (تقييم + ملخص + مخاطر + توصيات — قراءة) |
-| **Native Status** | ◐ التقييم ✅ / الذاكرة و«اسأل» وAI ⛔ |
+| **Native Screen** | `DecisionCenterView` (تقييم + «اسأل المشغل الذكي» + ذاكرة القرار + أنماطها — قراءة/سؤال) |
+| **Native Status** | ✅ التقييم و«اسأل» والذاكرة والأنماط — مؤجل: محادثة AI (v1/v2/agent) وقاعدة المعرفة وأسئلة بلا إجابة (إدارة admin/director — واجهة محادثة وإدارة معرفة ثقيلة، تحتاج قرار تصميم مستقل) |
 
 ## 19. الدردشة (chat)
 
