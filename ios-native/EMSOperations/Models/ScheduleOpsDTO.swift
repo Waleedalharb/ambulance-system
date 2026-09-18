@@ -374,7 +374,7 @@ struct RosterValidateRequest: Encodable {
     let changes: [Change]
 }
 
-struct RosterBulkUpdateRequest: Encodable {
+struct RosterBulkUpdateRequest: Codable {
     /// Codable: فكّ draft_data_json عند إعادة تطبيق المسودة (undo/redo).
     struct Change: Codable {
         let roster_id: Int
