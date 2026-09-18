@@ -249,7 +249,7 @@ struct ScheduleHistoryView: View {
                         .font(.caption)
                         .foregroundStyle(EMSTheme.Colors.textMuted)
                     Text("\(e.oldShiftCode ?? "—") ← \(e.newShiftCode ?? "—")")
-                        .font(.system(.caption.weight(.semibold), design: .monospaced))
+                        .font(.system(.caption, design: .monospaced).weight(.semibold))
                         .foregroundStyle(EMSTheme.Colors.textPrimary)
                 }
                 if e.oldTeamId != e.newTeamId {

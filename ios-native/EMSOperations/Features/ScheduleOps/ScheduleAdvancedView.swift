@@ -368,7 +368,7 @@ struct ScheduleAdvancedView: View {
                     .font(.caption2)
                     .foregroundStyle(EMSTheme.Colors.textMuted)
                 if let genResult {
-                    EMSInfoRow(label: "سجلات مولّدة", value: genResult.schedule?.count.map(String.init) ?? "—")
+                    EMSInfoRow(label: "سجلات مولّدة", value: genResult.schedule.map { String($0.count) } ?? "—")
                     if let alerts = genResult.alerts, !alerts.isEmpty {
                         Text("تنبيهات التوليد:")
                             .font(.caption.weight(.semibold))
