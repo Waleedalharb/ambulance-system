@@ -1166,4 +1166,91 @@ final class EMSOperationsTests: XCTestCase {
         XCTAssertEqual(dto.periodRange?.shiftsCount, 8)
         XCTAssertEqual(dto.meta?.note, "الترتيب نشاط فقط (عدد البلاغات المباشرة) — ليس تقييم أداء")
     }
+
+    // MARK: - مجالات الطلبات والإعلانات وخروج الفرق (§23-§26)
+
+    func testAnnouncementDecodesFlexibleId() throws {
+        // readAnnouncements — server.js:9025 (id نص من Date.now() — فك مرن)
+        let json = #"{"success": true, "data": [{"id": "1758123456789", "title": "تنبيه", "body": "نص الإعلان", "date": "2026-09-18", "pinned": true, "urgent": false}, {"id": 42, "title": "قديم"}]}"#.data(using: .utf8)!
+        let dto = try JSONDecoder().decode(AnnouncementsResponseDTO.self, from: json)
+        XCTAssertEqual(dto.data?.count, 2)
+        XCTAssertEqual(dto.data?.first?.id, "1758123456789")
+        XCTAssertEqual(dto.data?.first?.pinned, true)
+        XCTAssertEqual(dto.data?.last?.id, "42")
+    }
+
+    func testVacationEntryDecodesRawArray() throws {
+        // GET /api/vacations — مصفوفة خام (server.js:8528) بلا غلاف success
+        let json = #"[{"code": "4252", "name": "سلطان اليوسف", "role": "تنسيق استجابة", "vacationStart": "2026-10-01", "vacationEnd": "2026-10-10"}, {"code": "11120", "name": "عوض الاسمري", "role": "تنسيق استجابة", "vacationStart": "", "vacationEnd": ""}]"#.data(using: .utf8)!
+        let list = try JSONDecoder().decode([VacationEntryDTO].self, from: json)
+        XCTAssertEqual(list.count, 2)
+        XCTAssertTrue(list[0].hasVacation)
+        XCTAssertFalse(list[1].hasVacation)
+    }
+
+    func testLeaveRequestDecodesSnakeCase() throws {
+        // db.LeaveRequests.getAll — JOIN employees (db.js:2834)
+        let json = #"{"success": true, "requests": [{"id": 7, "employee_id": 12, "start_date": "2026-10-01", "end_date": "2026-10-05", "type": "سنوية", "status": "pending", "reason": "ظرف عائلي", "approved_by": null, "approved_at": null, "created_at": "2026-09-18 10:00:00", "employee_name": "أحمد", "employee_code": "101"}]}"#.data(using: .utf8)!
+        let dto = try JSONDecoder().decode(LeaveRequestsResponseDTO.self, from: json)
+        let req = try XCTUnwrap(dto.requests?.first)
+        XCTAssertEqual(req.employeeId, 12)
+        XCTAssertEqual(req.employeeName, "أحمد")
+        XCTAssertTrue(req.isPending)
+        XCTAssertEqual(req.statusLabel, "قيد المراجعة")
+    }
+
+    func testLeaveRequestBodyEncodesSnakeCase() throws {
+        let body = LeaveRequestBody(employee_id: 12, start_date: "2026-10-01", end_date: "2026-10-05", type: "سنوية", reason: nil)
+        let data = try JSONEncoder().encode(body)
+        let obj = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        XCTAssertEqual(obj?["employee_id"] as? Int, 12)
+        XCTAssertEqual(obj?["start_date"] as? String, "2026-10-01")
+        XCTAssertNil(obj?["employeeId"])
+    }
+
+    func testShiftChangeRequestDecodes() throws {
+        // db.ShiftChangeRequests.getAll — server.js:12520
+        let json = #"{"success": true, "requests": [{"id": 3, "roster_id": null, "employee_id": 9, "team_id": 2, "shift_date": "2026-09-20", "proposed_shift_code": "N1", "old_shift_code": "M1", "requested_by": "waleed", "requested_by_name": "وليد الحربي", "status": "approved", "reason": "موعد", "reviewed_by": "admin", "reviewed_at": "2026-09-18 11:00:00", "created_at": "2026-09-18 09:00:00"}]}"#.data(using: .utf8)!
+        let dto = try JSONDecoder().decode(ShiftChangeListResponseDTO.self, from: json)
+        let req = try XCTUnwrap(dto.requests?.first)
+        XCTAssertEqual(req.proposedShiftCode, "N1")
+        XCTAssertEqual(req.oldShiftCode, "M1")
+        XCTAssertFalse(req.isPending)
+        XCTAssertEqual(req.statusLabel, "مقبول")
+    }
+
+    func testSignoutDecodesCamelCase() throws {
+        // SignoutService._rowToJson — services/signout-service.js:65
+        let json = #"{"success": true, "signouts": [{"id": 5, "shiftId": 12, "shiftDate": "2026-09-18", "shiftType": "night", "eventType": "TEAM_CHECKOUT", "team": "جنوب 1", "members": ["أحمد", "محمد"], "notes": "", "recordedByName": "وليد", "createdAt": "2026-09-18T06:00:00.000Z"}]}"#.data(using: .utf8)!
+        let dto = try JSONDecoder().decode(SignoutListResponseDTO.self, from: json)
+        let s = try XCTUnwrap(dto.signouts?.first)
+        XCTAssertEqual(s.recordId, 5)
+        XCTAssertEqual(s.team, "جنوب 1")
+        XCTAssertEqual(s.members?.count, 2)
+        XCTAssertFalse(s.id.isEmpty)
+    }
+
+    func testSignoutSuggestDecodes() throws {
+        // SignoutService.suggest — server.js:10741 (حقول الاقتراح في الجذر)
+        let json = #"{"success": true, "members": ["أحمد", "محمد"], "source": "signout", "sourceShiftId": 11, "sourceLabel": "تسليم مناوبة 11"}"#.data(using: .utf8)!
+        let dto = try JSONDecoder().decode(SignoutSuggestDTO.self, from: json)
+        XCTAssertEqual(dto.members?.count, 2)
+        XCTAssertEqual(dto.source, "signout")
+        XCTAssertEqual(dto.sourceText, "من آخر تسليم معتمد")
+    }
+
+    func testSignoutRecordBodyEncodes() throws {
+        let body = SignoutRecordBody(team: "جنوب 1", members: ["أحمد"], notes: nil, createdAt: nil)
+        let data = try JSONEncoder().encode(body)
+        let obj = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        XCTAssertEqual(obj?["team"] as? String, "جنوب 1")
+        XCTAssertEqual((obj?["members"] as? [String])?.count, 1)
+    }
+
+    func testTeamExitPermissionMapping() {
+        // ops.team_exit — server.js:10758 (authorizePerm)
+        XCTAssertTrue(PermissionMapper.canTeamExit(["ops.team_exit"], star: false))
+        XCTAssertFalse(PermissionMapper.canTeamExit(["ops.completion"], star: false))
+        XCTAssertTrue(PermissionMapper.canTeamExit([], star: true))
+    }
 }

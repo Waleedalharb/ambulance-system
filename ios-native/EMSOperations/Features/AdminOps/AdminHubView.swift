@@ -14,7 +14,7 @@ struct AdminHubView: View {
     @EnvironmentObject private var session: SessionStore
 
     private enum AdminModule: Hashable, Identifiable {
-        case users, employees, refs, symbols, notifications, system
+        case users, employees, refs, symbols, notifications, system, requests
         var id: Self { self }
 
         var title: String {
@@ -25,6 +25,7 @@ struct AdminHubView: View {
             case .symbols: return "رموز الجداول"
             case .notifications: return "إشعارات النظام"
             case .system: return "الإعدادات والمراقبة"
+            case .requests: return "مراجعة الطلبات والإعلانات"
             }
         }
         var icon: String {
@@ -35,6 +36,7 @@ struct AdminHubView: View {
             case .symbols: return "lock.square.stack"
             case .notifications: return "bell.badge.fill"
             case .system: return "gearshape.2.fill"
+            case .requests: return "checkmark.bubble.fill"
             }
         }
         var detail: String {
@@ -45,6 +47,7 @@ struct AdminHubView: View {
             case .symbols: return "السجل المركزي · القفل السري · سجل التعديلات"
             case .notifications: return "إرسال موجه · سجل الإرسال وتعقّب التسليم"
             case .system: return "الساعات الشهرية · استخدام القرص · سجل التدقيق"
+            case .requests: return "اعتماد الإجازات · مراجعة تغيير المناوبة · الإعلانات"
             }
         }
     }
@@ -60,7 +63,7 @@ struct AdminHubView: View {
         if p.isAdminOrDirector { list.append(.employees) }
         if p.isAdmin { list.append(.refs) }
         if p.canManageSymbols { list.append(.symbols) }
-        if p.isAdminOrDirector { list.append(.notifications); list.append(.system) }
+        if p.isAdminOrDirector { list.append(.notifications); list.append(.system); list.append(.requests) }
         return list
     }
 
@@ -122,6 +125,7 @@ struct AdminHubView: View {
             case .symbols: AdminSymbolsView()
             case .notifications: AdminNotificationsView()
             case .system: AdminSystemView()
+            case .requests: RequestsAdminView()
             }
         }
     }

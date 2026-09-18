@@ -24,6 +24,7 @@ struct ProfileView: View {
                     EMSErrorView(message: message) { Task { await vm.load() } }
                 case .loaded:
                     if let p = vm.profile { employeeCard(p) }
+                    requestsCard
                     if session.permissions.canAccessAdmin { adminCard }
                     securityCard
                     logoutCard
@@ -82,6 +83,36 @@ struct ProfileView: View {
                 }
             }
         }
+    }
+
+    // MARK: - طلباتي والإعلانات (§23-§25 — لكل مستخدم موثّق)
+
+    private var requestsCard: some View {
+        NavigationLink {
+            MyRequestsView()
+        } label: {
+            EMSCard {
+                HStack(spacing: 12) {
+                    Image(systemName: "calendar.badge.clock")
+                        .font(.title3)
+                        .foregroundStyle(EMSTheme.Colors.teal)
+                        .frame(width: 28)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("طلباتي والإعلانات")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.white)
+                        Text("طلب إجازة · تغيير مناوبة · الإعلانات والإجازات المجدولة")
+                            .font(.caption)
+                            .foregroundStyle(EMSTheme.Colors.textMuted)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.left")
+                        .font(.caption)
+                        .foregroundStyle(EMSTheme.Colors.textMuted)
+                }
+            }
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - الإدارة (§20 — تظهر فقط لحاملي صلاحياتها)

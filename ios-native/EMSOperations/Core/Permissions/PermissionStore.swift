@@ -195,6 +195,11 @@ enum PermissionMapper {
     static func canOpsAlerts(_ permissions: [String], star: Bool) -> Bool {
         has(permissions, star: star, "ops.alerts")
     }
+
+    /// تسجيل خروج الفرق (ops.team_exit — POST /api/signouts).
+    static func canTeamExit(_ permissions: [String], star: Bool) -> Bool {
+        has(permissions, star: star, "ops.team_exit")
+    }
 }
 
 @MainActor
@@ -250,6 +255,7 @@ final class PermissionStore: ObservableObject {
     var canAssetsManage: Bool { PermissionMapper.canAssetsManage(permissions, star: isStar) }
     var canAssetsInventory: Bool { PermissionMapper.canAssetsInventory(permissions, star: isStar) }
     var canOpsAlerts: Bool { PermissionMapper.canOpsAlerts(permissions, star: isStar) }
+    var canTeamExit: Bool { PermissionMapper.canTeamExit(permissions, star: isStar) }
 
     /// بوابة مركز الإدارة (§20): دور admin/director أو أي مفتاح إداري —
     /// كل شاشة داخل المركز تُقيَّد بصلاحيتها الخاصة، والحسم النهائي سيرفري.

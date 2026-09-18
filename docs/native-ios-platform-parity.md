@@ -375,8 +375,8 @@
 | **Update / Delete** | :id (admin) |
 | **Operational Actions** | نشر إعلان |
 | **Permissions** | القراءة `authenticate` · الكتابة `admin` |
-| **Native Screen** | — (تظهر ضمن سياق التنبيهات على الويب) |
-| **Native Status** | ⛔ غير موجود |
+| **Native Screen** | `MyRequestsView` (قراءة للجميع) · `RequestsAdminView` (إضافة/حذف admin عبر `/add` و`DELETE :id`) |
+| **Native Status** | ✅ مبني — الكتابة الجماعية `POST /api/announcements` (JSON كامل قديم) مؤجلة موثقة |
 
 ## 24. الإجازات وطلبات الإجازة (leave)
 
@@ -391,8 +391,8 @@
 | **Delete** | leave-requests/:id / vacations |
 | **Operational Actions** | اعتماد طلب إجازة |
 | **Permissions** | الاعتماد `admin`/`director` · الطلب `authenticate` |
-| **Native Screen** | — |
-| **Native Status** | ⛔ غير موجود |
+| **Native Screen** | `MyRequestsView` (تقديم/قائمة/إلغاء المعلَّق + إجازات مجدولة قراءة) · `RequestsAdminView` (اعتماد/رفض) |
+| **Native Status** | ✅ مبني — `POST /api/save-vacations` كتابة JSON كاملة قديمة مؤجلة موثقة · `DELETE /api/vacations` (مسح الكل) مؤجل |
 
 ## 25. طلبات تغيير المناوبة (shift change requests)
 
@@ -407,8 +407,8 @@
 | **Delete** | — |
 | **Operational Actions** | مراجعة طلب تغيير |
 | **Permissions** | المراجعة `admin`/`director` |
-| **Native Screen** | — (الموظف يرى «تغييرات جدولي» — نتائج لا طلبات) |
-| **Native Status** | ⛔ غير موجود |
+| **Native Screen** | `MyRequestsView` (تقديم — قائمة الموظف غير متاحة سيرفريًا) · `RequestsAdminView` (مراجعة admin/director) |
+| **Native Status** | ✅ مبني |
 
 ## 26. البنية التحتية والمتفرقات
 
@@ -418,8 +418,8 @@
 | **Existing API** | `GET /api/sse` · `GET /health` · `GET /api/disk-usage` · `GET /api/last-update` · `POST /api/frontend-errors` · `GET /api/export` · `GET /api/cad-overlay/package` · `GET/POST /api/signouts` · `GET /api/signouts/suggest` · `GET/POST /api/references` · `GET /api/get-password` · `POST /api/change-password` · `GET /api/data` · `GET /api/settings/monthly-required-hours` |
 | **Operational Actions** | تسجيل خروج فريق (`signouts` ← `ops.team_exit`) |
 | **Permissions** | `ops.team_exit` · `admin`/`director` للحساس |
-| **Native Screen** | — |
-| **Native Status** | ⛔ غير موجود (تسجيل خروج الفرق تحديدًا مطلوب ضمن التكميل) |
+| **Native Screen** | `SignoutsOpsView` (اقتراح التشكيلة · تسجيل بـops.team_exit · سجل المناوبة النشطة) — موديول «خروج الفرق» في العمليات |
+| **Native Status** | ◐ جزئي — تسجيل خروج الفرق ✅ مبني · SSE/الصحة/القرص/النسخ الاحتياطي/سجلات الواجهة/CAD overlay بنية تحتية لا يلزم للعميل (موثق) |
 
 ---
 

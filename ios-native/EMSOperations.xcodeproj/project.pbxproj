@@ -104,6 +104,10 @@
 		5E4000000000000000000061 /* ChatViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000061 /* ChatViews.swift */; };
 		5E4000000000000000000062 /* IndicatorsDTO.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000062 /* IndicatorsDTO.swift */; };
 		5E4000000000000000000063 /* IndicatorsOpsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000063 /* IndicatorsOpsView.swift */; };
+		5E4000000000000000000064 /* RequestsDTO.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000064 /* RequestsDTO.swift */; };
+		5E4000000000000000000065 /* MyRequestsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000065 /* MyRequestsView.swift */; };
+		5E4000000000000000000066 /* RequestsAdminView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000066 /* RequestsAdminView.swift */; };
+		5E4000000000000000000067 /* SignoutsOpsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000067 /* SignoutsOpsView.swift */; };
 		5E400000000000000000004C /* ArchiveOpsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000004C /* ArchiveOpsViewModel.swift */; };
 		5E400000000000000000004D /* ArchiveOpsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000004D /* ArchiveOpsView.swift */; };
 		5E40000000000000000000E1 /* EMSOperationsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000E1 /* EMSOperationsTests.swift */; };
@@ -218,6 +222,10 @@
 		5E3000000000000000000061 /* ChatViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatViews.swift; sourceTree = "<group>"; };
 		5E3000000000000000000062 /* IndicatorsDTO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IndicatorsDTO.swift; sourceTree = "<group>"; };
 		5E3000000000000000000063 /* IndicatorsOpsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IndicatorsOpsView.swift; sourceTree = "<group>"; };
+		5E3000000000000000000064 /* RequestsDTO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RequestsDTO.swift; sourceTree = "<group>"; };
+		5E3000000000000000000065 /* MyRequestsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MyRequestsView.swift; sourceTree = "<group>"; };
+		5E3000000000000000000066 /* RequestsAdminView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RequestsAdminView.swift; sourceTree = "<group>"; };
+		5E3000000000000000000067 /* SignoutsOpsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignoutsOpsView.swift; sourceTree = "<group>"; };
 		5E300000000000000000004C /* ArchiveOpsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveOpsViewModel.swift; sourceTree = "<group>"; };
 		5E300000000000000000004D /* ArchiveOpsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveOpsView.swift; sourceTree = "<group>"; };
 		5E30000000000000000000D0 /* EMSOperations.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = EMSOperations.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -383,6 +391,7 @@
 				5E300000000000000000005E /* HospitalsDTO.swift */,
 				5E3000000000000000000060 /* ChatDTO.swift */,
 				5E3000000000000000000062 /* IndicatorsDTO.swift */,
+				5E3000000000000000000064 /* RequestsDTO.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -450,6 +459,7 @@
 				5E2000000000000000000062 /* HospitalsOps */,
 				5E2000000000000000000063 /* Chat */,
 				5E2000000000000000000064 /* IndicatorsOps */,
+				5E2000000000000000000065 /* Requests */,
 			);
 			path = Features;
 			sourceTree = "<group>";
@@ -551,6 +561,15 @@
 			path = IndicatorsOps;
 			sourceTree = "<group>";
 		};
+		5E2000000000000000000065 /* Requests */ = {
+			isa = PBXGroup;
+			children = (
+				5E3000000000000000000065 /* MyRequestsView.swift */,
+				5E3000000000000000000066 /* RequestsAdminView.swift */,
+			);
+			path = Requests;
+			sourceTree = "<group>";
+		};
 		5E200000000000000000005F /* AdminOps */ = {
 			isa = PBXGroup;
 			children = (
@@ -595,6 +614,7 @@
 				5E3000000000000000000043 /* VehicleHistoryView.swift */,
 				5E3000000000000000000044 /* VehicleRegistryView.swift */,
 				5E300000000000000000005A /* OpsTimelinesView.swift */,
+				5E3000000000000000000067 /* SignoutsOpsView.swift */,
 			);
 			path = Operations;
 			sourceTree = "<group>";
@@ -914,6 +934,10 @@
 				5E4000000000000000000061 /* ChatViews.swift in Sources */,
 				5E4000000000000000000062 /* IndicatorsDTO.swift in Sources */,
 				5E4000000000000000000063 /* IndicatorsOpsView.swift in Sources */,
+				5E4000000000000000000064 /* RequestsDTO.swift in Sources */,
+				5E4000000000000000000065 /* MyRequestsView.swift in Sources */,
+				5E4000000000000000000066 /* RequestsAdminView.swift in Sources */,
+				5E4000000000000000000067 /* SignoutsOpsView.swift in Sources */,
 				5E400000000000000000004C /* ArchiveOpsViewModel.swift in Sources */,
 				5E400000000000000000004D /* ArchiveOpsView.swift in Sources */,
 			);
