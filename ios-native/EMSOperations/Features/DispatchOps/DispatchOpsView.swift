@@ -293,7 +293,7 @@ struct DispatchOpsView: View {
                         .foregroundStyle(EMSTheme.Colors.textPrimary)
                     Spacer()
                     if let priority = entry.priority, !priority.isEmpty {
-                        EMSStatusPill(text: priority, tone: priority == "عاجل" ? .danger : (priority == "مهم" ? .warning : .neutral))
+                        EMSStatusPill(text: priority, tone: priority == "عاجل" ? .danger : (priority == "مهم" ? .monitor : .neutral))
                     }
                 }
                 if let n = entry.reportNumber, !n.isEmpty { EMSInfoRow(label: "رقم البلاغ", value: n) }
@@ -535,7 +535,7 @@ struct DispatchOpsView: View {
         switch severity {
         case "green": return .normal
         case "red": return .danger
-        default: return .warning
+        default: return .monitor
         }
     }
 
@@ -551,7 +551,7 @@ struct DispatchOpsView: View {
         switch status {
         case "green": return .normal
         case "red": return .danger
-        default: return .warning
+        default: return .monitor
         }
     }
 

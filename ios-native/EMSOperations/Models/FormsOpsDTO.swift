@@ -58,38 +58,47 @@ struct FormRecordItem: Identifiable {
     /// الحقول المعروفة بترتيب عرض نموذج الويب لكل نوع — مطابقة لكائنات
     /// الحفظ في public/js/app.js (saveIncident/saveEscalation/saveECase/
     /// saveDailyReport/saveSenior). مصفوفة مرتبة لا قاموس (ترتيب العرض مهم).
-    static let fieldLabels: [String: [(key: String, label: String)]] = [
-        "incident": [
+    /// مبنية بمتغيرات وسيطة لكل نوع؛ حرفية قاموس واحدة بهذا الحجم
+    /// تتجاوز حدّ type-check في مترجم Swift.
+    static let fieldLabels: [String: [(key: String, label: String)]] = {
+        let incident: [(key: String, label: String)] = [
             ("reportNumber", "رقم البلاغ"), ("type", "النوع"), ("dateTime", "التاريخ والوقت"),
             ("location", "الموقع"), ("center", "المركز"), ("unit", "الفرقة"),
             ("patientName", "اسم المريض"), ("age", "العمر"), ("gender", "الجنس"),
             ("description", "الوصف"), ("actions", "الإجراءات")
-        ],
-        "escalation": [
+        ]
+        let escalation: [(key: String, label: String)] = [
             ("reportNumber", "رقم البلاغ"), ("eventType", "نوع الحدث"), ("dateTime", "التاريخ والوقت"),
             ("location", "الموقع"), ("injuries", "الإصابات"), ("deaths", "الوفيات"),
             ("agencies", "الجهات"), ("details", "التفاصيل")
-        ],
-        "e_case": [
+        ]
+        let eCase: [(key: String, label: String)] = [
             ("reportNumber", "رقم البلاغ"), ("dateTime", "التاريخ والوقت"), ("location", "الموقع"),
             ("unit", "الفرقة"), ("age", "العمر"), ("gender", "الجنس"),
             ("responseTime", "الاستجابة (د)"), ("hospital", "المستشفى"),
             ("outcome", "النتيجة"), ("notes", "ملاحظات")
-        ],
-        "daily_report": [
+        ]
+        let dailyReport: [(key: String, label: String)] = [
             ("reportNumber", "رقم التقرير"), ("date", "التاريخ"),
             ("responseTeams", "فرق الاستجابة"), ("air", "الإسعاف الجوي"),
             ("borderReports", "بلاغات الحدود"), ("paths", "المسارات"),
             ("formFill", "تعبئة النماذج"), ("summary", "الملخص")
-        ],
-        "senior_shift": [
+        ]
+        let seniorShift: [(key: String, label: String)] = [
             ("workingCars", "سيارات عاملة"), ("brokenCars", "متعطلة"), ("reserveCars", "احتياط"),
             ("overlapTeams", "فرق الأوفرلاب"), ("overlapAreas", "النطاقات"), ("notes", "ملاحظات"),
             ("asstName", "مساعد كبير المسعفين"), ("asstDate", "تاريخ المساعد"),
             ("chiefName", "كبير المسعفين"), ("chiefDate", "تاريخ الكبير"),
             ("cmdrName", "قائد القطاع"), ("cmdrDate", "تاريخ القائد")
         ]
-    ]
+        return [
+            "incident": incident,
+            "escalation": escalation,
+            "e_case": eCase,
+            "daily_report": dailyReport,
+            "senior_shift": seniorShift
+        ]
+    }()
 
     static func stringValue(_ v: Any?) -> String? {
         switch v {
