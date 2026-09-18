@@ -97,6 +97,10 @@ struct ArchiveLogEntryDTO: Decodable {
     let details: ArchiveLogDetailsDTO?
     let user: ArchiveLogUserDTO?
 
+    enum CodingKeys: String, CodingKey {
+        case id, timestamp, operation, shiftId, details, user
+    }
+
     // فكّ متسامح: details حرة الشكل وقد لا تكون كائنًا في بعض المسارات —
     // سطر معيب واحد لا يجب أن يسقط سجل الأرشفة كاملًا.
     init(from decoder: Decoder) throws {

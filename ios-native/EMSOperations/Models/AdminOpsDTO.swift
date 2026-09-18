@@ -128,8 +128,8 @@ struct AdminEmployeesResponseDTO: Decodable {
     let employees: [AdminEmployeeDTO]?
 }
 
-struct AdminEmployeeDTO: Decodable {
-    let id: Int?
+struct AdminEmployeeDTO: Decodable, Identifiable {
+    let id: Int?   // هوية الموظف الفعلية من الـAPI — تكفي لمطابقة Identifiable
     let employeeCode: String?
     let name: String?
     let jobTitle: String?
