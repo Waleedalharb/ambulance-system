@@ -736,4 +736,117 @@ final class EMSOperationsTests: XCTestCase {
         XCTAssertEqual(dto.readiness?.min, 64)
         XCTAssertEqual(dto.readiness?.avg, 78)
     }
+
+    // MARK: - مجال الإدارة (AdminOps)
+
+    func testAdminUsersDecodeFlexibleIds() throws {
+        // id نصي ('emp-<code>') أو رقمي — server.js:2000
+        let json = #"{"success": true, "users": [{"id": "emp-1042", "username": "1042", "name": "مسعف أول", "role": "operator", "isActive": true}, {"id": 3, "username": "admin", "name": "مدير", "role": "admin", "isActive": true}]}"#.data(using: .utf8)!
+        let dto = try JSONDecoder().decode(AdminUsersResponseDTO.self, from: json)
+        XCTAssertEqual(dto.users?.count, 2)
+        XCTAssertEqual(dto.users?[0].stableId, "emp-1042")
+        XCTAssertEqual(dto.users?[1].stableId, "3")
+        XCTAssertEqual(dto.users?[1].role, "admin")
+    }
+
+    func testRoleChangeResponseDecodesSnakeCase() throws {
+        let json = #"{"success": true, "changed": true, "oldRole": "viewer", "newRole": "operator", "role_label": "المشغّل", "sessionsRevoked": 2}"#.data(using: .utf8)!
+        let dto = try JSONDecoder().decode(RoleChangeResponseDTO.self, from: json)
+        XCTAssertEqual(dto.changed, true)
+        XCTAssertEqual(dto.roleLabel, "المشغّل")
+        XCTAssertEqual(dto.sessionsRevoked, 2)
+    }
+
+    func testCreateUserResponseCarriesTempPassword() throws {
+        // tempPassword تُعاد مرة واحدة — server.js:1756
+        let json = #"{"success": true, "user": {"id": "emp-1042", "username": "1042", "name": "مسعف", "role": "viewer"}, "employee": {"name": "مسعف", "jobTitle": "مسعف"}, "tempPassword": "Ab3xY9kLm2", "permissionsGranted": []}"#.data(using: .utf8)!
+        let dto = try JSONDecoder().decode(CreateUserResponseDTO.self, from: json)
+        XCTAssertEqual(dto.tempPassword, "Ab3xY9kLm2")
+        XCTAssertEqual(dto.user?.username, "1042")
+    }
+
+    func testAdminEmployeeDecodesServerColumns() throws {
+        // أعمدة employeeColumnsFor — server.js:11144-11146
+        let json = #"{"success": true, "employees": [{"id": 7, "employee_code": "1042", "name": "مسعف", "job_title": "كبير مسعفين", "symbol": "A1", "is_active": 1, "pattern_code": "P4", "created_at": "2026-01-01", "phone": "5xxxxxxxx", "phone_verified": 1, "phone_verified_by": "admin"}]}"#.data(using: .utf8)!
+        let dto = try JSONDecoder().decode(AdminEmployeesResponseDTO.self, from: json)
+        let emp = try XCTUnwrap(dto.employees?.first)
+        XCTAssertEqual(emp.employeeCode, "1042")
+        XCTAssertTrue(emp.active)
+        XCTAssertTrue(emp.verified)
+        XCTAssertEqual(emp.patternCode, "P4")
+    }
+
+    func testVerifyPhoneRequestConfirmsResponsibility() throws {
+        // confirmResponsibility: true إلزامي سيرفريًا — server.js:11223
+        let data = try JSONEncoder().encode(VerifyPhoneRequestDTO(confirmResponsibility: true))
+        let obj = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        XCTAssertEqual(obj["confirmResponsibility"] as? Bool, true)
+    }
+
+    func testTransferRequestEncodesContract() throws {
+        // teamId + scope + date كلها إلزامية — server.js:12909
+        let data = try JSONEncoder().encode(TransferEmployeeRequestDTO(teamId: 4, scope: "from-date", date: "2026-09-20"))
+        let obj = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        XCTAssertEqual(obj["teamId"] as? Int, 4)
+        XCTAssertEqual(obj["scope"] as? String, "from-date")
+        XCTAssertEqual(obj["date"] as? String, "2026-09-20")
+    }
+
+    func testTeamsAndShiftCodesDecode() throws {
+        let teamsJson = #"{"success": true, "teams": [{"id": 1, "name": "فرقة 1", "center": "مركز الشفا", "team_type": "عادية", "sort_order": 1, "is_active": 1, "requiredPersonnel": 2}]}"#.data(using: .utf8)!
+        let teams = try JSONDecoder().decode(AdminTeamsResponseDTO.self, from: teamsJson)
+        XCTAssertEqual(teams.teams?.first?.center, "مركز الشفا")
+        XCTAssertEqual(teams.teams?.first?.active, true)
+
+        let codesJson = #"{"success": true, "codes": [{"id": 2, "code": "M1", "name": "صباحية", "time_start": "07:00", "time_end": "19:00", "color": "#2563EB", "status": "دوام"}]}"#.data(using: .utf8)!
+        let codes = try JSONDecoder().decode(ShiftCodesResponseDTO.self, from: codesJson)
+        XCTAssertEqual(codes.codes?.first?.timeStart, "07:00")
+        XCTAssertEqual(codes.codes?.first?.status, "دوام")
+    }
+
+    func testSymbolsRegistryAndAuditDecode() throws {
+        let json = #"{"success": true, "secretConfigured": true, "symbols": [{"id": 5, "code": "OFF", "name": "إجازة", "symbol_type": "day_code", "source": "custom", "status": "active", "hours": 0, "usage_count": 12}]}"#.data(using: .utf8)!
+        let dto = try JSONDecoder().decode(SymbolsRegistryResponseDTO.self, from: json)
+        XCTAssertEqual(dto.secretConfigured, true)
+        XCTAssertEqual(dto.symbols?.first?.symbolType, "day_code")
+        XCTAssertEqual(dto.symbols?.first?.usageCount, 12)
+
+        let auditJson = #"{"success": true, "log": [{"id": 1, "actor_name": "مدير", "action": "secret_set", "code": null, "created_at": "2026-09-01T10:00:00Z"}]}"#.data(using: .utf8)!
+        let audit = try JSONDecoder().decode(SymbolAuditResponseDTO.self, from: auditJson)
+        XCTAssertEqual(audit.log?.first?.action, "secret_set")
+        XCTAssertEqual(audit.log?.first?.actorName, "مدير")
+    }
+
+    func testSymbolUnlockResponseDecodes() throws {
+        let json = #"{"success": true, "unlockToken": "abc123", "expiresInMinutes": 15}"#.data(using: .utf8)!
+        let dto = try JSONDecoder().decode(SymbolUnlockResponseDTO.self, from: json)
+        XCTAssertEqual(dto.unlockToken, "abc123")
+        XCTAssertEqual(dto.expiresInMinutes, 15)
+    }
+
+    func testDiskUsageAndAuditLogDecode() throws {
+        let diskJson = #"{"success": true, "disk": {"total": "10 GB", "used": "512 MB", "available": "9.5 GB", "percent": "5.0%"}, "storagePath": "/data"}"#.data(using: .utf8)!
+        let disk = try JSONDecoder().decode(DiskUsageDTO.self, from: diskJson)
+        XCTAssertEqual(disk.disk?.percent, "5.0%")
+
+        let logJson = #"{"success": true, "logs": [{"id": "1", "action": "role_change", "details": "تغيير دور", "category": "permissions", "user": "مدير", "role": "admin", "timestamp": "2026-09-18T00:00:00Z"}]}"#.data(using: .utf8)!
+        let log = try JSONDecoder().decode(AuditLogResponseDTO.self, from: logJson)
+        XCTAssertEqual(log.logs?.first?.action, "role_change")
+        XCTAssertEqual(log.logs?.first?.category, "permissions")
+    }
+
+    func testAdminPermissionKeys() {
+        XCTAssertTrue(PermissionMapper.canManageUsers(["admin.users_manage"], false))
+        XCTAssertFalse(PermissionMapper.canManageUsers(["ops.dispatch"], false))
+        XCTAssertTrue(PermissionMapper.canManageSymbols(["symbols.manage"], false))
+        XCTAssertFalse(PermissionMapper.canManageSymbols(["admin.users_manage"], false))
+        XCTAssertTrue(PermissionMapper.canManageUsers([], true))
+    }
+
+    func testAdminRolesLabels() {
+        XCTAssertEqual(AdminRoles.label("ops_supervisor"), "مشرف العمليات")
+        XCTAssertEqual(AdminRoles.label("field_leadership"), "القيادة الميدانية")
+        XCTAssertEqual(AdminRoles.label("unknown"), "unknown")
+        XCTAssertEqual(AdminRoles.all.count, 8)
+    }
 }

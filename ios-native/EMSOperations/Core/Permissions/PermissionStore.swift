@@ -147,6 +147,18 @@ enum PermissionMapper {
     static func canClearSchedule(_ permissions: [String], star: Bool) -> Bool {
         has(permissions, star: star, "schedule.clear")
     }
+
+    // ── مفاتيح الإدارة (§20) — config/permissions.js ──
+
+    /// إدارة المستخدمين (تغيير الدور/إنشاء حساب) وأعمدة الجوالات الموسعة.
+    static func canManageUsers(_ permissions: [String], star: Bool) -> Bool {
+        has(permissions, star: star, "admin.users_manage")
+    }
+
+    /// إدارة رموز الجداول (قفل سري + تدقيق).
+    static func canManageSymbols(_ permissions: [String], star: Bool) -> Bool {
+        has(permissions, star: star, "symbols.manage")
+    }
 }
 
 @MainActor
@@ -194,6 +206,12 @@ final class PermissionStore: ObservableObject {
     var canSyncSchedule: Bool { PermissionMapper.canSyncSchedule(permissions, star: isStar) }
     var canExportSchedule: Bool { PermissionMapper.canExportSchedule(permissions, star: isStar) }
     var canClearSchedule: Bool { PermissionMapper.canClearSchedule(permissions, star: isStar) }
+    var canManageUsers: Bool { PermissionMapper.canManageUsers(permissions, star: isStar) }
+    var canManageSymbols: Bool { PermissionMapper.canManageSymbols(permissions, star: isStar) }
+
+    /// بوابة مركز الإدارة (§20): دور admin/director أو أي مفتاح إداري —
+    /// كل شاشة داخل المركز تُقيَّد بصلاحيتها الخاصة، والحسم النهائي سيرفري.
+    var canAccessAdmin: Bool { isAdminOrDirector || canManageUsers || canManageSymbols }
 
     /// يُستدعى بعد المصادقة مباشرة. الفشل لا يكسر الدخول — يُسجَّل وتُخفى الوحدات المشروطة.
     func load() async {

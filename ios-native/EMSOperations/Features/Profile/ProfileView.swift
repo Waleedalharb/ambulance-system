@@ -24,6 +24,7 @@ struct ProfileView: View {
                     EMSErrorView(message: message) { Task { await vm.load() } }
                 case .loaded:
                     if let p = vm.profile { employeeCard(p) }
+                    if session.permissions.canAccessAdmin { adminCard }
                     securityCard
                     logoutCard
                     versionFooter
@@ -81,6 +82,36 @@ struct ProfileView: View {
                 }
             }
         }
+    }
+
+    // MARK: - الإدارة (§20 — تظهر فقط لحاملي صلاحياتها)
+
+    private var adminCard: some View {
+        NavigationLink {
+            AdminHubView()
+        } label: {
+            EMSCard {
+                HStack(spacing: 12) {
+                    Image(systemName: "shield.lefthalf.filled")
+                        .font(.title3)
+                        .foregroundStyle(EMSTheme.Colors.teal)
+                        .frame(width: 28)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("مركز الإدارة")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.white)
+                        Text("المستخدمون · الموظفون · الفرق والرموز · الإعدادات")
+                            .font(.caption)
+                            .foregroundStyle(EMSTheme.Colors.textMuted)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.left")
+                        .font(.caption)
+                        .foregroundStyle(EMSTheme.Colors.textMuted)
+                }
+            }
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - الأمان

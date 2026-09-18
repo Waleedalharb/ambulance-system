@@ -55,6 +55,17 @@ actor APIClient {
         try await send(.put, path, query: [:], body: body, authorized: true, retried: false)
     }
 
+    /// POST/PUT بترويسات إضافية — قفل رموز الجداول يتطلب x-symbols-unlock
+    /// (server.js requireSymbolsUnlock). الترويسة تُمرَّر كما هي؛ لا قيمة
+    /// افتراضية ولا تخزين في العميل.
+    func post<T: Decodable>(_ path: String, body: (some Encodable)? = nil, headers: [String: String]) async throws -> T {
+        try await send(.post, path, query: [:], body: body, authorized: true, retried: false, extraHeaders: headers)
+    }
+
+    func put<T: Decodable>(_ path: String, body: (some Encodable)? = nil, headers: [String: String]) async throws -> T {
+        try await send(.put, path, query: [:], body: body, authorized: true, retried: false, extraHeaders: headers)
+    }
+
     /// DELETE بلا جسم (حذف سجل جدول ونحوه).
     func delete<T: Decodable>(_ path: String) async throws -> T {
         try await send(.delete, path, query: [:], body: nil as String?, authorized: true, retried: false)
@@ -211,7 +222,7 @@ actor APIClient {
 
     private func send<T: Decodable, B: Encodable>(
         _ method: Method, _ path: String, query: [String: String],
-        body: B?, authorized: Bool, retried: Bool
+        body: B?, authorized: Bool, retried: Bool, extraHeaders: [String: String] = [:]
     ) async throws -> T {
         var comps = URLComponents(url: AppEnvironment.current.baseURL.appending(path: path), resolvingAgainstBaseURL: false)
         if !query.isEmpty { comps?.queryItems = query.map { URLQueryItem(name: $0.key, value: $0.value) } }
@@ -220,6 +231,7 @@ actor APIClient {
         var req = URLRequest(url: url)
         req.httpMethod = method.rawValue
         req.setValue("application/json", forHTTPHeaderField: "Accept")
+        for (key, value) in extraHeaders { req.setValue(value, forHTTPHeaderField: key) }
         if let body {
             req.httpBody = try JSONEncoder().encode(body)
             req.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -268,7 +280,7 @@ actor APIClient {
             // D4: تحديث واحد ثم إعادة واحدة — غير ذلك الجلسة ميتة
             if authorized, !retried, let refresh = refreshHandler, let newToken = await refresh() {
                 _ = newToken
-                return try await send(method, path, query: query, body: body, authorized: authorized, retried: true)
+                return try await send(method, path, query: query, body: body, authorized: authorized, retried: true, extraHeaders: extraHeaders)
             }
             throw APIError.unauthenticated
         case 403:

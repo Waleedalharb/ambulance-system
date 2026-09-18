@@ -83,6 +83,13 @@
 		5E400000000000000000004A /* WorkflowOpsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000004A /* WorkflowOpsView.swift */; };
 		5E400000000000000000004B /* ArchiveOpsDTO.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000004B /* ArchiveOpsDTO.swift */; };
 		5E400000000000000000004E /* SmartOpsDTO.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000004E /* SmartOpsDTO.swift */; };
+		5E400000000000000000004F /* AdminOpsDTO.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000004F /* AdminOpsDTO.swift */; };
+		5E4000000000000000000050 /* AdminHubView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000050 /* AdminHubView.swift */; };
+		5E4000000000000000000051 /* AdminUsersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000051 /* AdminUsersView.swift */; };
+		5E4000000000000000000052 /* AdminEmployeesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000052 /* AdminEmployeesView.swift */; };
+		5E4000000000000000000053 /* AdminRefsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000053 /* AdminRefsView.swift */; };
+		5E4000000000000000000054 /* AdminSymbolsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000054 /* AdminSymbolsView.swift */; };
+		5E4000000000000000000055 /* AdminSystemView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000055 /* AdminSystemView.swift */; };
 		5E400000000000000000004C /* ArchiveOpsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000004C /* ArchiveOpsViewModel.swift */; };
 		5E400000000000000000004D /* ArchiveOpsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000004D /* ArchiveOpsView.swift */; };
 		5E40000000000000000000E1 /* EMSOperationsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000E1 /* EMSOperationsTests.swift */; };
@@ -176,6 +183,13 @@
 		5E300000000000000000004A /* WorkflowOpsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkflowOpsView.swift; sourceTree = "<group>"; };
 		5E300000000000000000004B /* ArchiveOpsDTO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveOpsDTO.swift; sourceTree = "<group>"; };
 		5E300000000000000000004E /* SmartOpsDTO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartOpsDTO.swift; sourceTree = "<group>"; };
+		5E300000000000000000004F /* AdminOpsDTO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminOpsDTO.swift; sourceTree = "<group>"; };
+		5E3000000000000000000050 /* AdminHubView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminHubView.swift; sourceTree = "<group>"; };
+		5E3000000000000000000051 /* AdminUsersView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminUsersView.swift; sourceTree = "<group>"; };
+		5E3000000000000000000052 /* AdminEmployeesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminEmployeesView.swift; sourceTree = "<group>"; };
+		5E3000000000000000000053 /* AdminRefsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminRefsView.swift; sourceTree = "<group>"; };
+		5E3000000000000000000054 /* AdminSymbolsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminSymbolsView.swift; sourceTree = "<group>"; };
+		5E3000000000000000000055 /* AdminSystemView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminSystemView.swift; sourceTree = "<group>"; };
 		5E300000000000000000004C /* ArchiveOpsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveOpsViewModel.swift; sourceTree = "<group>"; };
 		5E300000000000000000004D /* ArchiveOpsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveOpsView.swift; sourceTree = "<group>"; };
 		5E30000000000000000000D0 /* EMSOperations.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = EMSOperations.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -334,6 +348,7 @@
 				5E3000000000000000000048 /* WorkflowOpsDTO.swift */,
 				5E300000000000000000004B /* ArchiveOpsDTO.swift */,
 				5E300000000000000000004E /* SmartOpsDTO.swift */,
+				5E300000000000000000004F /* AdminOpsDTO.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -395,6 +410,7 @@
 				5E200000000000000000005C /* FormsOps */,
 				5E200000000000000000005D /* WorkflowOps */,
 				5E200000000000000000005E /* ArchiveOps */,
+				5E200000000000000000005F /* AdminOps */,
 			);
 			path = Features;
 			sourceTree = "<group>";
@@ -453,6 +469,19 @@
 				5E300000000000000000004D /* ArchiveOpsView.swift */,
 			);
 			path = ArchiveOps;
+			sourceTree = "<group>";
+		};
+		5E200000000000000000005F /* AdminOps */ = {
+			isa = PBXGroup;
+			children = (
+				5E3000000000000000000050 /* AdminHubView.swift */,
+				5E3000000000000000000051 /* AdminUsersView.swift */,
+				5E3000000000000000000052 /* AdminEmployeesView.swift */,
+				5E3000000000000000000053 /* AdminRefsView.swift */,
+				5E3000000000000000000054 /* AdminSymbolsView.swift */,
+				5E3000000000000000000055 /* AdminSystemView.swift */,
+			);
+			path = AdminOps;
 			sourceTree = "<group>";
 		};
 		5E2000000000000000000058 /* ScheduleOps */ = {
@@ -782,6 +811,13 @@
 				5E400000000000000000004A /* WorkflowOpsView.swift in Sources */,
 				5E400000000000000000004B /* ArchiveOpsDTO.swift in Sources */,
 				5E400000000000000000004E /* SmartOpsDTO.swift in Sources */,
+				5E400000000000000000004F /* AdminOpsDTO.swift in Sources */,
+				5E4000000000000000000050 /* AdminHubView.swift in Sources */,
+				5E4000000000000000000051 /* AdminUsersView.swift in Sources */,
+				5E4000000000000000000052 /* AdminEmployeesView.swift in Sources */,
+				5E4000000000000000000053 /* AdminRefsView.swift in Sources */,
+				5E4000000000000000000054 /* AdminSymbolsView.swift in Sources */,
+				5E4000000000000000000055 /* AdminSystemView.swift in Sources */,
 				5E400000000000000000004C /* ArchiveOpsViewModel.swift in Sources */,
 				5E400000000000000000004D /* ArchiveOpsView.swift in Sources */,
 			);

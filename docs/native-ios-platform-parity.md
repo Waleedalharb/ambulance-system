@@ -331,8 +331,8 @@
 | **Delete** | employees / teams / codes / symbols(status) |
 | **Operational Actions** | نقل موظف، توثيق جوال، قفل رموز سري، مراقبة وإصلاح تلقائي |
 | **Permissions** | `admin.users_manage` · `employees.manage` · `symbols.manage` · `admin.settings` · `admin.tech` · `data.delete` + أدوار admin/director |
-| **Native Screen** | — |
-| **Native Status** | ⛔ غير موجود |
+| **Native Screen** | `AdminHubView` (من «ملفي» لحامل canAccessAdmin) + `AdminUsersView` + `AdminEmployeesView` + `AdminRefsView` + `AdminSymbolsView` + `AdminSystemView` |
+| **Native Status** | ✅ مكتمل (مستخدمون/أدوار/إنشاء حساب · موظفون CRUD+توثيق جوال+نقل+نمط · فرق/رموز/أنماط · رموز جداول بقفل سري · ساعات شهرية/قرص/تدقيق) — مؤجل: استيراد جوالات جماعي، theme upload، admin/monitor العميق، auto-fix/destroy-db (تخريبية لا تُدار من تطبيق) |
 
 ## 21. المؤشرات والتحليلات (indicators / analytics)
 
