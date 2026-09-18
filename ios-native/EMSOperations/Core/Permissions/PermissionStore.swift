@@ -70,9 +70,17 @@ final class PermissionStore: ObservableObject {
         do {
             payload = try await api.get("/api/auth/me/permissions")
             #if DEBUG
-            AppLogger.auth.info("permissions loaded — role: \(payload?.roleLabel ?? "—", privacy: .public) · star: \(payload?.permissionsStar ?? false) · count: \(payload?.permissions?.count ?? 0)")
-            AppLogger.auth.info("permissions list: \((payload?.permissions ?? []).joined(separator: ", "), privacy: .public)")
-            AppLogger.auth.info("derived — operations: \(canAccessOperations) · portal: \(canAccessEmployeePortal) · indicators: \(canViewIndicators)")
+            // Swift 6: ثوابت محلية — لا تُقرأ الخصائص داخل استيفاء OSLog.
+            let loadedRole = payload?.roleLabel ?? "—"
+            let loadedStar = payload?.permissionsStar ?? false
+            let loadedCount = payload?.permissions?.count ?? 0
+            let loadedPermissions = (payload?.permissions ?? []).joined(separator: ", ")
+            let derivedOperations = canAccessOperations
+            let derivedPortal = canAccessEmployeePortal
+            let derivedIndicators = canViewIndicators
+            AppLogger.auth.info("permissions loaded — role: \(loadedRole, privacy: .public) · star: \(loadedStar) · count: \(loadedCount)")
+            AppLogger.auth.info("permissions list: \(loadedPermissions, privacy: .public)")
+            AppLogger.auth.info("derived — operations: \(derivedOperations) · portal: \(derivedPortal) · indicators: \(derivedIndicators)")
             #endif
         } catch {
             loadFailed = true
