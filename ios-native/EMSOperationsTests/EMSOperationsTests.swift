@@ -849,4 +849,41 @@ final class EMSOperationsTests: XCTestCase {
         XCTAssertEqual(AdminRoles.label("unknown"), "unknown")
         XCTAssertEqual(AdminRoles.all.count, 8)
     }
+
+    // MARK: - مجال إشعارات النظام (§5)
+
+    func testNotificationLogEntryDecodesServerColumns() throws {
+        // سطر notification_log — db.js:888
+        let json = #"{"success": true, "notifications": [{"id": 9, "notification_type": "shift_change", "recipient_id": 7, "recipient_name": "مسعف", "recipient_phone": "5xxxxxxxx", "message": "تغيرت مناوبتك", "channel": "in-app", "status": "delivered", "sent_at": "2026-09-18 10:00:00", "delivered_at": "2026-09-18 10:00:05", "opened_at": null, "error_message": null, "created_at": "2026-09-18 10:00:00"}]}"#.data(using: .utf8)!
+        let dto = try JSONDecoder().decode(NotificationLogResponseDTO.self, from: json)
+        let entry = try XCTUnwrap(dto.notifications?.first)
+        XCTAssertEqual(entry.recipientId, 7)
+        XCTAssertEqual(entry.status, "delivered")
+        XCTAssertEqual(entry.statusTitle, "مسلَّم")
+        XCTAssertEqual(entry.statusTone, .normal)
+        XCTAssertEqual(entry.notificationType, "shift_change")
+        XCTAssertNotNil(entry.deliveredAt)
+    }
+
+    func testNotificationLogStatusMapping() {
+        let cases: [(String, String)] = [
+            ("pending", "معلّق"), ("sent", "مرسل"), ("delivered", "مسلَّم"),
+            ("read", "مقروء"), ("acknowledged", "مؤكَّد"), ("failed", "فشل")
+        ]
+        for (raw, title) in cases {
+            let json = #"{"id": 1, "status": "\#(raw)"}"#.data(using: .utf8)!
+            let entry = try? JSONDecoder().decode(NotificationLogEntryDTO.self, from: json)
+            XCTAssertEqual(entry?.statusTitle, title, "status \(raw)")
+        }
+    }
+
+    func testNotificationSendRequestEncodesSnakeCase() throws {
+        // recipient_id + message إلزاميان — server.js:12237
+        let data = try JSONEncoder().encode(NotificationSendRequestDTO(recipientId: 7, message: "تنبيه", type: "alert"))
+        let obj = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        XCTAssertEqual(obj["recipient_id"] as? Int, 7)
+        XCTAssertEqual(obj["message"] as? String, "تنبيه")
+        XCTAssertEqual(obj["type"] as? String, "alert")
+        XCTAssertNil(obj["recipientId"]) // لا camelCase في الجسم
+    }
 }

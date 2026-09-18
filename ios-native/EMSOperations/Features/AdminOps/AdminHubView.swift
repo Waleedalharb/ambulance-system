@@ -14,7 +14,7 @@ struct AdminHubView: View {
     @EnvironmentObject private var session: SessionStore
 
     private enum AdminModule: Hashable, Identifiable {
-        case users, employees, refs, symbols, system
+        case users, employees, refs, symbols, notifications, system
         var id: Self { self }
 
         var title: String {
@@ -23,6 +23,7 @@ struct AdminHubView: View {
             case .employees: return "الموظفون"
             case .refs: return "الفرق والرموز والأنماط"
             case .symbols: return "رموز الجداول"
+            case .notifications: return "إشعارات النظام"
             case .system: return "الإعدادات والمراقبة"
             }
         }
@@ -32,6 +33,7 @@ struct AdminHubView: View {
             case .employees: return "person.2.fill"
             case .refs: return "list.bullet.rectangle.portrait.fill"
             case .symbols: return "lock.square.stack"
+            case .notifications: return "bell.badge.fill"
             case .system: return "gearshape.2.fill"
             }
         }
@@ -41,6 +43,7 @@ struct AdminHubView: View {
             case .employees: return "إضافة وتعديل · توثيق الجوال · النقل · النمط"
             case .refs: return "الفرق · رموز المناوبات · أنماط المناوبة"
             case .symbols: return "السجل المركزي · القفل السري · سجل التعديلات"
+            case .notifications: return "إرسال موجه · سجل الإرسال وتعقّب التسليم"
             case .system: return "الساعات الشهرية · استخدام القرص · سجل التدقيق"
             }
         }
@@ -57,7 +60,7 @@ struct AdminHubView: View {
         if p.isAdminOrDirector { list.append(.employees) }
         if p.isAdmin { list.append(.refs) }
         if p.canManageSymbols { list.append(.symbols) }
-        if p.isAdminOrDirector { list.append(.system) }
+        if p.isAdminOrDirector { list.append(.notifications); list.append(.system) }
         return list
     }
 
@@ -117,6 +120,7 @@ struct AdminHubView: View {
             case .employees: AdminEmployeesView()
             case .refs: AdminRefsView()
             case .symbols: AdminSymbolsView()
+            case .notifications: AdminNotificationsView()
             case .system: AdminSystemView()
             }
         }

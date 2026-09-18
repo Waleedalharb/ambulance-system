@@ -486,3 +486,80 @@ struct AuditLogEntryDTO: Decodable {
 
     var stableId: String { id ?? "\(timestamp ?? "")-\(action ?? "")" }
 }
+
+// MARK: - إشعارات النظام (§5)
+
+/// GET /api/notifications/log (authenticate، server.js:12260) —
+/// سطر notification_log (db.js:888): الحالات pending/sent/delivered/failed/read/acknowledged.
+struct NotificationLogResponseDTO: Decodable {
+    let success: Bool?
+    let notifications: [NotificationLogEntryDTO]?
+}
+
+struct NotificationLogEntryDTO: Decodable {
+    let id: Int?
+    let notificationType: String?
+    let recipientId: Int?
+    let recipientUserId: String?
+    let recipientName: String?
+    let recipientPhone: String?
+    let message: String?
+    let channel: String?
+    let status: String?
+    let sentAt: String?
+    let deliveredAt: String?
+    let openedAt: String?
+    let errorMessage: String?
+    let createdAt: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id, message, channel, status
+        case notificationType = "notification_type"
+        case recipientId = "recipient_id"
+        case recipientUserId = "recipient_user_id"
+        case recipientName = "recipient_name"
+        case recipientPhone = "recipient_phone"
+        case sentAt = "sent_at"
+        case deliveredAt = "delivered_at"
+        case openedAt = "opened_at"
+        case errorMessage = "error_message"
+        case createdAt = "created_at"
+    }
+
+    var stableId: Int { id ?? 0 }
+
+    var statusTitle: String {
+        switch status {
+        case "pending": return "معلّق"
+        case "sent": return "مرسل"
+        case "delivered": return "مسلَّم"
+        case "read": return "مقروء"
+        case "acknowledged": return "مؤكَّد"
+        case "failed": return "فشل"
+        default: return status ?? "—"
+        }
+    }
+
+    var statusTone: EMSTheme.StatusTone {
+        switch status {
+        case "delivered", "read", "acknowledged": return .normal
+        case "sent": return .action
+        case "failed": return .danger
+        case "pending": return .monitor
+        default: return .neutral
+        }
+    }
+}
+
+/// POST /api/notifications/send (admin/director، server.js:12233) —
+/// recipient_id + message إلزاميان؛ type من CHECK الثلاثة.
+struct NotificationSendRequestDTO: Encodable {
+    let recipientId: Int
+    let message: String
+    let type: String
+
+    enum CodingKeys: String, CodingKey {
+        case message, type
+        case recipientId = "recipient_id"
+    }
+}

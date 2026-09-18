@@ -90,6 +90,7 @@
 		5E4000000000000000000053 /* AdminRefsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000053 /* AdminRefsView.swift */; };
 		5E4000000000000000000054 /* AdminSymbolsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000054 /* AdminSymbolsView.swift */; };
 		5E4000000000000000000055 /* AdminSystemView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000055 /* AdminSystemView.swift */; };
+		5E4000000000000000000056 /* AdminNotificationsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000056 /* AdminNotificationsView.swift */; };
 		5E400000000000000000004C /* ArchiveOpsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000004C /* ArchiveOpsViewModel.swift */; };
 		5E400000000000000000004D /* ArchiveOpsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000004D /* ArchiveOpsView.swift */; };
 		5E40000000000000000000E1 /* EMSOperationsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000E1 /* EMSOperationsTests.swift */; };
@@ -190,6 +191,7 @@
 		5E3000000000000000000053 /* AdminRefsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminRefsView.swift; sourceTree = "<group>"; };
 		5E3000000000000000000054 /* AdminSymbolsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminSymbolsView.swift; sourceTree = "<group>"; };
 		5E3000000000000000000055 /* AdminSystemView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminSystemView.swift; sourceTree = "<group>"; };
+		5E3000000000000000000056 /* AdminNotificationsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminNotificationsView.swift; sourceTree = "<group>"; };
 		5E300000000000000000004C /* ArchiveOpsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveOpsViewModel.swift; sourceTree = "<group>"; };
 		5E300000000000000000004D /* ArchiveOpsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveOpsView.swift; sourceTree = "<group>"; };
 		5E30000000000000000000D0 /* EMSOperations.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = EMSOperations.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -480,6 +482,7 @@
 				5E3000000000000000000053 /* AdminRefsView.swift */,
 				5E3000000000000000000054 /* AdminSymbolsView.swift */,
 				5E3000000000000000000055 /* AdminSystemView.swift */,
+				5E3000000000000000000056 /* AdminNotificationsView.swift */,
 			);
 			path = AdminOps;
 			sourceTree = "<group>";
@@ -818,6 +821,7 @@
 				5E4000000000000000000053 /* AdminRefsView.swift in Sources */,
 				5E4000000000000000000054 /* AdminSymbolsView.swift in Sources */,
 				5E4000000000000000000055 /* AdminSystemView.swift in Sources */,
+				5E4000000000000000000056 /* AdminNotificationsView.swift in Sources */,
 				5E400000000000000000004C /* ArchiveOpsViewModel.swift in Sources */,
 				5E400000000000000000004D /* ArchiveOpsView.swift in Sources */,
 			);

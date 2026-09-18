@@ -93,8 +93,8 @@
 | **Delete** | — |
 | **Operational Actions** | إرسال إشعار جماعي/فردي (admin/director)، تتبع التسليم |
 | **Permissions** | الإرسال `authorize(['admin','director'])`؛ القراءة `authenticate` |
-| **Native Screen** | `NotificationsView` (بوابة الموظف) + `PushService` + `DeepLinkRouter` |
-| **Native Status** | ◐ إشعارات الموظف ✅ / إشعارات النظام العامة والإرسال ⛔ |
+| **Native Screen** | `NotificationsView` (بوابة الموظف) + `AdminNotificationsView` (إرسال موجه admin/director + سجل الإرسال وتعقّب التسليم — في مركز الإدارة) + `PushService` + `DeepLinkRouter` |
+| **Native Status** | ✅ مكتمل (إشعارات الموظف + إرسال النظام + السجل) — Deep Links تغطي kind=schedule_change الوحيد المُرسل سيرفريًا حاليًا + السقوط الآمن لإشعاراتي |
 
 ## 6. الجداول (schedule / roster)
 
