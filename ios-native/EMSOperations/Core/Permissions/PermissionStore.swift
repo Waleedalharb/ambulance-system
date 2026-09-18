@@ -47,6 +47,16 @@ enum PermissionMapper {
         has(permissions, star: star, "schedule.view")
     }
 
+    /// تنفيذ التكميل (قرارات الفرق/أحداث الأشخاص/السجلات).
+    static func canCompleteOps(_ permissions: [String], star: Bool) -> Bool {
+        has(permissions, star: star, "ops.completion")
+    }
+
+    /// تسجيل المتطوعين (منحة مستقلة عن ops.completion).
+    static func canVolunteers(_ permissions: [String], star: Bool) -> Bool {
+        has(permissions, star: star, "ops.volunteers")
+    }
+
     // ── مفاتيح الجداول التفصيلية (config/permissions.js — كلها منح فردية حصرًا) ──
     // من لا يملك المفتاح لا يرى الإجراء إطلاقًا؛ الحسم النهائي على الخادم (403).
 
@@ -111,6 +121,8 @@ final class PermissionStore: ObservableObject {
     var canViewIndicators: Bool { PermissionMapper.canViewIndicators(permissions, star: isStar) }
     var canViewPhones: Bool { PermissionMapper.canViewPhones(permissions, star: isStar) }
     var canViewSchedules: Bool { PermissionMapper.canViewSchedules(permissions, star: isStar) }
+    var canCompleteOps: Bool { PermissionMapper.canCompleteOps(permissions, star: isStar) }
+    var canVolunteers: Bool { PermissionMapper.canVolunteers(permissions, star: isStar) }
     var canEditScheduleCell: Bool { PermissionMapper.canEditScheduleCell(permissions, star: isStar) }
     var canManageScheduleEmployees: Bool { PermissionMapper.canManageScheduleEmployees(permissions, star: isStar) }
     var canImportSchedule: Bool { PermissionMapper.canImportSchedule(permissions, star: isStar) }

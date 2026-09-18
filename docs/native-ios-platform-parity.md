@@ -125,8 +125,8 @@
 | **Delete** | event / absence / note |
 | **Operational Actions** | قرار حالة الفريق، إسناد دعم، تطوع، تفعيل أوفرلاب، تسجيل غياب/تأخر |
 | **Permissions** | التنفيذ `ops.completion` · التطوع `ops.volunteers` · القراءة `authenticate` |
-| **Native Screen** | `OpsReadinessView` (قراءة الحالة والعدّادات) · `CompletionView` (فحص الموظف — مسار مختلف) |
-| **Native Status** | ◐ قراءة ✅ / تنفيذ التكميل بكل مصادره ⛔ |
+| **Native Screen** | `OpsReadinessView` (قراءة الحالة والعدّادات) · `CompletionView` (فحص الموظف — مسار مختلف) · `Features/CompletionOps/` (`CompletionOpsView` قرارات الفرق وأحداث الأشخاص · `CompletionSupportView` حوض الدعم والتطوع · `CompletionRecordsView` أحداث/غيابات/ملاحظات المناوبة) |
+| **Native Status** | ✅ قرارات الفرق (ready/missing/offline — جدول قرار مستقل) ✅ أحداث الأشخاص (غياب/تأخر/وصول/تصحيح late_void·absence_void·arrival_void/دعم خارجي/إنهاء دعم) ✅ تفعيل/إنهاء تفعيل (activation) ✅ تطوع (مرشحون سيرفريون + ops.volunteers) ✅ حوض الدعم ✅ سجلات المناوبة (أحداث/غيابات/ملاحظات — استبدال جماعي خام يحفظ حقول الويب category/priority/resolved + حذف فردي) — الختم سيرفري (OV-S6-01) والعميل يعرض corrected عند التصحيح · ⛔ مراجعة التكميل (check-review) و`staffing/timeline` و`staffing/indicators` و`staffing-recommendations` لم تُنقل بعد |
 
 ## 8. دورة المناوبة (shifts lifecycle)
 

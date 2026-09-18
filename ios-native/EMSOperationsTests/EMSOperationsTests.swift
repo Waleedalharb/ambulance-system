@@ -366,4 +366,58 @@ final class EMSOperationsTests: XCTestCase {
         XCTAssertNil(ScheduleOpsViewModel.decodeDraftChanges(nil))
         XCTAssertNil(ScheduleOpsViewModel.decodeDraftChanges("[]"))
     }
+
+    // MARK: - مجال التكميل العملياتي (CompletionOps)
+
+    func testSupportPoolDTODecodesVolunteerFlag() throws {
+        let json = #"{"success": true, "shiftId": 41, "supporters": [{"name": "محمد", "employeeCode": "E-1", "jobTitle": "مسعف", "team": "جنوب 2", "shiftCode": "M1", "sourceUnit": "جنوب 2", "kind": "field"}, {"name": "خالد", "team": null, "shiftCode": "V", "sourceUnit": null, "kind": null, "volunteer": true}]}"#.data(using: .utf8)!
+        let dto = try JSONDecoder().decode(SupportPoolDTO.self, from: json)
+        XCTAssertEqual(dto.supporters?.count, 2)
+        XCTAssertEqual(dto.supporters?.first?.team, "جنوب 2")
+        XCTAssertEqual(dto.supporters?.last?.volunteer, true)
+        XCTAssertNil(dto.supporters?.last?.team)
+    }
+
+    func testVolunteerCandidatesDTODecodes() throws {
+        let json = #"{"success": true, "shiftId": 41, "candidates": [{"name": "سعود", "employeeCode": "E-9", "jobTitle": "مسعف", "dayCode": "V"}]}"#.data(using: .utf8)!
+        let dto = try JSONDecoder().decode(VolunteerCandidatesDTO.self, from: json)
+        let c = try XCTUnwrap(dto.candidates?.first)
+        XCTAssertEqual(c.name, "سعود")
+        XCTAssertEqual(c.dayCode, "V")
+    }
+
+    func testShiftEventsDTODecodesStringId() throws {
+        let json = #"{"success": true, "events": [{"id": "1726000000000", "type": "logistics", "description": "تجهيز", "timestamp": "2026-09-18T08:00:00Z"}]}"#.data(using: .utf8)!
+        let dto = try JSONDecoder().decode(ShiftEventsDTO.self, from: json)
+        let e = try XCTUnwrap(dto.events?.first)
+        XCTAssertEqual(e.id, "1726000000000")
+        XCTAssertEqual(e.type, "logistics")
+    }
+
+    func testCompletionSaveResponseDecodesStamp() throws {
+        let json = #"{"success": true, "message": "تم حفظ التكميل", "appended": 2, "corrected": true, "stampedShiftType": "صباحية", "stampedShiftDate": "2026-09-18"}"#.data(using: .utf8)!
+        let dto = try JSONDecoder().decode(CompletionSaveResponseDTO.self, from: json)
+        XCTAssertEqual(dto.appended, 2)
+        XCTAssertEqual(dto.corrected, true)
+        XCTAssertEqual(dto.stampedShiftType, "صباحية")
+    }
+
+    func testPersonEventRequestOmitsNilFields() throws {
+        let req = PersonEventRequest(type: "absence", employeeName: "محمد", teamId: "جنوب 2", reason: "ظرف")
+        let data = try JSONEncoder().encode(req)
+        let obj = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        XCTAssertEqual(obj["type"] as? String, "absence")
+        XCTAssertEqual(obj["employeeName"] as? String, "محمد")
+        XCTAssertNil(obj["arrivalAt"])
+        XCTAssertNil(obj["corrects"])
+    }
+
+    func testCompletionPermissionKeys() {
+        XCTAssertTrue(PermissionMapper.canCompleteOps(["ops.completion"], false))
+        XCTAssertFalse(PermissionMapper.canCompleteOps(["ops.execute"], false))
+        XCTAssertTrue(PermissionMapper.canCompleteOps([], true))
+        XCTAssertTrue(PermissionMapper.canVolunteers(["ops.volunteers"], false))
+        XCTAssertFalse(PermissionMapper.canVolunteers(["ops.completion"], false))
+        XCTAssertTrue(PermissionMapper.canVolunteers([], true))
+    }
 }

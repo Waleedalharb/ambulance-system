@@ -11,13 +11,14 @@ import SwiftUI
 
 struct OperationsHomeView: View {
     private enum OpsModule: Hashable, Identifiable {
-        case teams, readiness, vehicles, events, decisionCenter, map
+        case teams, readiness, completion, vehicles, events, decisionCenter, map
         var id: Self { self }
 
         var title: String {
             switch self {
             case .teams: return "الفرق"
             case .readiness: return "الجاهزية"
+            case .completion: return "التكميل"
             case .vehicles: return "المركبات"
             case .events: return "الأحداث التشغيلية"
             case .decisionCenter: return "مركز القرار"
@@ -28,6 +29,7 @@ struct OperationsHomeView: View {
             switch self {
             case .teams: return "person.3.fill"
             case .readiness: return "checklist.checked"
+            case .completion: return "person.crop.circle.badge.checkmark"
             case .vehicles: return "truck.box.fill"
             case .events: return "bolt.fill"
             case .decisionCenter: return "scope"
@@ -38,6 +40,7 @@ struct OperationsHomeView: View {
             switch self {
             case .teams: return "الفرقة ← المركز ← المركبة ← الجاهزية ← المناوبة"
             case .readiness: return "استعداد الفرق والتكميلات الحالية"
+            case .completion: return "قرارات الفرق · أحداث الأشخاص · الدعم والتطوع · السجلات"
             case .vehicles: return "متاحة · مُسندة · خارج الخدمة · الأحداث الميكانيكية"
             case .events: return "الأحداث التشغيلية المهمة أولًا بأول"
             case .decisionCenter: return "ما الذي يحدث؟ وما الإجراء المتاح؟ — حسب صلاحياتك"
@@ -46,7 +49,7 @@ struct OperationsHomeView: View {
         }
     }
 
-    private let modules: [OpsModule] = [.teams, .readiness, .vehicles, .events, .decisionCenter, .map]
+    private let modules: [OpsModule] = [.teams, .readiness, .completion, .vehicles, .events, .decisionCenter, .map]
 
     var body: some View {
         ScrollView {
@@ -109,6 +112,7 @@ struct OperationsHomeView: View {
             switch module {
             case .teams: OpsTeamsView()
             case .readiness: OpsReadinessView()
+            case .completion: CompletionOpsView()
             case .vehicles: OpsVehiclesView()
             case .events: OpsEventsView()
             case .decisionCenter: DecisionCenterView()

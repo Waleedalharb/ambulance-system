@@ -60,6 +60,70 @@ actor APIClient {
         try await send(.delete, path, query: [:], body: nil as String?, authorized: true, retried: false)
     }
 
+    // MARK: - JSON خام (قوائم حرة الحقول: ملاحظات/غيابات المناوبة)
+    // الاستبدال الجماعي لهذه القوائم يقتضي حفظ الحقول غير المعروفة حرفيًا —
+    // فكّ DTO انتقائي ثم إعادة ترميز كان سيُسقط حقولًا يملكها الويب.
+
+    /// GET خام — يعيد الكائن المفكوك كما هو (Dictionary/Array).
+    func getRaw(_ path: String) async throws -> Any {
+        try await sendRaw(.get, path, jsonBody: nil, retried: false)
+    }
+
+    /// POST بجسم JSON خام — يعيد الكائن المفكوك كما هو.
+    func postRaw(_ path: String, jsonObject: Any) async throws -> Any {
+        try await sendRaw(.post, path, jsonBody: jsonObject, retried: false)
+    }
+
+    private func sendRaw(_ method: Method, _ path: String, jsonBody: Any?, retried: Bool) async throws -> Any {
+        guard let url = URLComponents(url: AppEnvironment.current.baseURL.appending(path: path), resolvingAgainstBaseURL: false)?.url else {
+            throw APIError.unknown
+        }
+        var req = URLRequest(url: url)
+        req.httpMethod = method.rawValue
+        req.setValue("application/json", forHTTPHeaderField: "Accept")
+        if let jsonBody {
+            req.httpBody = try JSONSerialization.data(withJSONObject: jsonBody)
+            req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        }
+        if let token = tokenProvider?() {
+            req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        let (data, response): (Data, URLResponse)
+        do {
+            (data, response) = try await session.data(for: req)
+        } catch let e as URLError {
+            switch e.code {
+            case .notConnectedToInternet, .networkConnectionLost, .dataNotAllowed: throw APIError.offline
+            case .timedOut: throw APIError.timeout
+            default: throw APIError.offline
+            }
+        }
+        guard let http = response as? HTTPURLResponse else { throw APIError.unknown }
+        #if DEBUG
+        AppLogger.network.info("\(method.rawValue, privacy: .public) \(path, privacy: .public) → HTTP \(http.statusCode) (raw)")
+        #endif
+        switch http.statusCode {
+        case 200...299:
+            return (try? JSONSerialization.jsonObject(with: data)) ?? [:]
+        case 401:
+            if !retried, let refresh = refreshHandler, let newToken = await refresh() {
+                _ = newToken
+                return try await sendRaw(method, path, jsonBody: jsonBody, retried: true)
+            }
+            throw APIError.unauthenticated
+        case 403:
+            throw APIError.forbidden
+        case 404:
+            throw APIError.notFound
+        case 400:
+            let msg = (try? JSONDecoder().decode([String: String].self, from: data))?["error"] ?? ""
+            throw APIError.badRequest(msg)
+        default:
+            let msg = (try? JSONDecoder().decode([String: String].self, from: data))?["error"] ?? "HTTP \(http.statusCode)"
+            throw APIError.server(msg)
+        }
+    }
+
     // MARK: - تنزيل ثنائي (PDF/Excel) — قراءة فقط
 
     /// ملف منزَّل من الخادم مع بيانات وصفية من الترويسات.

@@ -61,6 +61,11 @@
 		5E4000000000000000000034 /* ScheduleCellSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000034 /* ScheduleCellSheet.swift */; };
 		5E4000000000000000000035 /* ScheduleHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000035 /* ScheduleHistoryView.swift */; };
 		5E4000000000000000000036 /* ScheduleAdvancedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000036 /* ScheduleAdvancedView.swift */; };
+		5E4000000000000000000037 /* CompletionOpsDTO.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000037 /* CompletionOpsDTO.swift */; };
+		5E4000000000000000000038 /* CompletionOpsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000038 /* CompletionOpsViewModel.swift */; };
+		5E4000000000000000000039 /* CompletionOpsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000039 /* CompletionOpsView.swift */; };
+		5E400000000000000000003A /* CompletionSupportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000003A /* CompletionSupportView.swift */; };
+		5E400000000000000000003B /* CompletionRecordsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000003B /* CompletionRecordsView.swift */; };
 		5E40000000000000000000E1 /* EMSOperationsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000E1 /* EMSOperationsTests.swift */; };
 		5E40000000000000000000F0 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000F0 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
@@ -130,6 +135,11 @@
 		5E3000000000000000000034 /* ScheduleCellSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduleCellSheet.swift; sourceTree = "<group>"; };
 		5E3000000000000000000035 /* ScheduleHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduleHistoryView.swift; sourceTree = "<group>"; };
 		5E3000000000000000000036 /* ScheduleAdvancedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduleAdvancedView.swift; sourceTree = "<group>"; };
+		5E3000000000000000000037 /* CompletionOpsDTO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompletionOpsDTO.swift; sourceTree = "<group>"; };
+		5E3000000000000000000038 /* CompletionOpsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompletionOpsViewModel.swift; sourceTree = "<group>"; };
+		5E3000000000000000000039 /* CompletionOpsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompletionOpsView.swift; sourceTree = "<group>"; };
+		5E300000000000000000003A /* CompletionSupportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompletionSupportView.swift; sourceTree = "<group>"; };
+		5E300000000000000000003B /* CompletionRecordsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompletionRecordsView.swift; sourceTree = "<group>"; };
 		5E30000000000000000000D0 /* EMSOperations.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = EMSOperations.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		5E30000000000000000000D1 /* EMSOperationsTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = EMSOperationsTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		5E30000000000000000000E1 /* EMSOperationsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EMSOperationsTests.swift; sourceTree = "<group>"; };
@@ -278,6 +288,7 @@
 				5E3000000000000000000008 /* PortalDTO.swift */,
 				5E3000000000000000000025 /* OpsDTO.swift */,
 				5E300000000000000000002C /* ScheduleOpsDTO.swift */,
+				5E3000000000000000000037 /* CompletionOpsDTO.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -333,8 +344,20 @@
 				5E2000000000000000000031 /* Reports */,
 				5E2000000000000000000057 /* Operations */,
 				5E2000000000000000000058 /* ScheduleOps */,
+				5E2000000000000000000059 /* CompletionOps */,
 			);
 			path = Features;
+			sourceTree = "<group>";
+		};
+		5E2000000000000000000059 /* CompletionOps */ = {
+			isa = PBXGroup;
+			children = (
+				5E3000000000000000000038 /* CompletionOpsViewModel.swift */,
+				5E3000000000000000000039 /* CompletionOpsView.swift */,
+				5E300000000000000000003A /* CompletionSupportView.swift */,
+				5E300000000000000000003B /* CompletionRecordsView.swift */,
+			);
+			path = CompletionOps;
 			sourceTree = "<group>";
 		};
 		5E2000000000000000000058 /* ScheduleOps */ = {
@@ -640,6 +663,11 @@
 				5E4000000000000000000034 /* ScheduleCellSheet.swift in Sources */,
 				5E4000000000000000000035 /* ScheduleHistoryView.swift in Sources */,
 				5E4000000000000000000036 /* ScheduleAdvancedView.swift in Sources */,
+				5E4000000000000000000037 /* CompletionOpsDTO.swift in Sources */,
+				5E4000000000000000000038 /* CompletionOpsViewModel.swift in Sources */,
+				5E4000000000000000000039 /* CompletionOpsView.swift in Sources */,
+				5E400000000000000000003A /* CompletionSupportView.swift in Sources */,
+				5E400000000000000000003B /* CompletionRecordsView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
