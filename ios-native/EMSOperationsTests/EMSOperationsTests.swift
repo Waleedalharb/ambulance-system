@@ -1127,4 +1127,43 @@ final class EMSOperationsTests: XCTestCase {
         let obj = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
         XCTAssertEqual(obj["user_id"] as? String, "7")
     }
+
+    // MARK: - مجال المؤشرات والتحليلات (§21)
+
+    func testIndicatorsDashboardDecodesShiftStats() throws {
+        // indicator-service.js getDashboard — server.js:5019
+        let json = #"{"success": true, "shiftStats": {"totalShifts": 120, "totalReports": 840, "avgReportsPerShift": 7, "maxReports": 20, "minReports": 0, "todayShifts": 2}, "recentShifts": [{"id": 41, "name": "مناوبة 41", "date": "2026-09-18", "type": "مسائية", "totalReports": 5}], "shiftTypes": {"صباحية": 60, "ليلية": 60}, "weekly": [{"weekStart": "2026-09-13", "shiftCount": 4, "reports": 30, "avg": 8, "max": 12, "min": 3}], "centerDistribution": [{"center": "مركز الشفا", "count": 90}]}"#.data(using: .utf8)!
+        let dto = try JSONDecoder().decode(IndicatorsDashboardDTO.self, from: json)
+        XCTAssertEqual(dto.shiftStats?.totalShifts, 120)
+        XCTAssertEqual(dto.recentShifts?.first?.totalReports, 5)
+        XCTAssertEqual(dto.shiftTypes?["صباحية"], 60)
+        XCTAssertEqual(dto.weekly?.first?.weekStart, "2026-09-13")
+    }
+
+    func testContributionDecodesGroupsAndCaveats() throws {
+        // getEmployeeContribution — indicator-service.js:450 (مجموعتان + تحفظات)
+        let json = #"{"success": true, "year": 2026, "month": 9, "monthKey": "2026-09", "range": {"from": "2026-09-01", "to": "2026-09-30"}, "generatedAt": "2026-09-18T10:00:00.000Z", "groups": {"operations": [{"employeeCode": "101", "name": "أحمد", "jobTitle": "تحكم عملياتي", "hasUserAccount": true, "hasSchedule": true, "scheduledHours": 168.5, "shifts": 14, "uncountedRosterDays": 1, "works": {"completions": 3, "dispatchActions": 10, "reports": 8, "dispatchUndo": 1, "detailedReports": 2, "positioning": {"created": 1, "updated": 0, "ended": 1, "swept": 0, "total": 2}, "signouts": 0, "forms": {"total": 4, "byType": {"حادث": 4}}, "staffingEvents": 0, "vehicleEvents": 0, "logisticsEvents": 0, "centerEvents": 0, "workflowActions": {"create": 1, "approve": 0, "pdf": 0, "reissue": 0, "edit_fields": 0, "other": 0, "total": 1}, "scheduleEdits": 0, "shiftLifecycle": 0, "docs": 0, "announcements": 0, "alertsAcked": 2}, "totalWorks": 31}], "fieldLeadership": []}, "unmatchedJobTitles": [{"jobTitle": "سائق", "count": 2}], "caveats": ["إجمالي أعمال العمليات = مجموع المؤشرات التسعة فقط."]}"#.data(using: .utf8)!
+        let dto = try JSONDecoder().decode(ContributionDTO.self, from: json)
+        XCTAssertEqual(dto.monthKey, "2026-09")
+        let emp = try XCTUnwrap(dto.groups?.operations?.first)
+        XCTAssertEqual(emp.scheduledHours, 168.5)
+        XCTAssertEqual(emp.uncountedRosterDays, 1)
+        XCTAssertEqual(emp.works?.workflowActions?.editFields, 0)
+        XCTAssertEqual(emp.works?.forms?.byType?["حادث"], 4)
+        XCTAssertEqual(emp.totalWorks, 31)
+        XCTAssertEqual(dto.unmatchedJobTitles?.first?.jobTitle, "سائق")
+        XCTAssertEqual(dto.caveats?.count, 1)
+    }
+
+    func testCrewActivityDecodesStandings() throws {
+        // crew-activity-service.js getActivity — server.js:5003
+        let json = #"{"success": true, "scope": "south", "period": "week", "period_range": {"from": "2026-09-14", "to": "2026-09-18", "shifts_count": 8}, "label": "الأكثر نشاطًا", "generated_at": "2026-09-18T10:00:00.000Z", "standings": [{"rank": 1, "team": "فريق 1", "center": "مركز الشفا", "reports_count": 12, "members": 4, "members_incomplete": 0, "shift_minutes": 2880, "active_minutes": 900}], "meta": {"teams_ranked": 10, "teams_active_without_reports": 2, "note": "الترتيب نشاط فقط (عدد البلاغات المباشرة) — ليس تقييم أداء"}}"#.data(using: .utf8)!
+        let dto = try JSONDecoder().decode(CrewActivityDTO.self, from: json)
+        let first = try XCTUnwrap(dto.standings?.first)
+        XCTAssertEqual(first.rank, 1)
+        XCTAssertEqual(first.reportsCount, 12)
+        XCTAssertEqual(first.shiftMinutes, 2880)
+        XCTAssertEqual(dto.periodRange?.shiftsCount, 8)
+        XCTAssertEqual(dto.meta?.note, "الترتيب نشاط فقط (عدد البلاغات المباشرة) — ليس تقييم أداء")
+    }
 }

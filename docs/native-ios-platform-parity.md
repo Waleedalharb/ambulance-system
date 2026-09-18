@@ -345,8 +345,8 @@
 | **Create/Update/Delete** | — |
 | **Operational Actions** | — |
 | **Permissions** | `indicators.contribution` (المساهمة) · الباقي `authenticate` |
-| **Native Screen** | بطاقة «مؤشرات المساهمة» في `HomeView` (تشير للويب) |
-| **Native Status** | ⛔ غير موجود (العرض الفعلي) |
+| **Native Screen** | `IndicatorsOpsView` (موديول «المؤشرات»: لوحة التشغيل + المساهمة الشهرية بتحفظاتها الظاهرة دائمًا + نشاط الفرق) |
+| **Native Status** | ✅ لوحة/مساهمة/نشاط فرق — مؤجل: تحليلات البلاغات المتقدمة `/api/analytics/*` (5 مسارات) والتقرير اليومي `/api/daily-report` و`workforce-stats` (شاشات تحليلية ثقيلة — قرار تصميم مستقل) |
 
 ## 22. الملفات التشغيلية (ops files)
 
