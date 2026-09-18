@@ -551,7 +551,7 @@ final class ChatConversationViewModel: ObservableObject {
         let unread = messages.filter { $0.senderId != me && !($0.readBy ?? []).contains { $0.userId == me } }
         for msg in unread {
             guard let id = msg.id else { continue }
-            let _: BasicSuccessDTO? = try? await api.put("/api/chat/messages/\(id)/read")
+            let _: BasicSuccessDTO? = try? await api.put("/api/chat/messages/\(id)/read", body: EmptyBodyDTO())
         }
     }
 
@@ -610,7 +610,7 @@ final class ChatConversationViewModel: ObservableObject {
     func leave() async -> String? {
         guard let cid = conversation.id else { return nil }
         do {
-            let _: BasicSuccessDTO = try await api.put("/api/chat/conversations/\(cid)/leave")
+            let _: BasicSuccessDTO = try await api.put("/api/chat/conversations/\(cid)/leave", body: EmptyBodyDTO())
             infoMessage = "غادرت المجموعة"
             return infoMessage
         } catch let e as APIError {

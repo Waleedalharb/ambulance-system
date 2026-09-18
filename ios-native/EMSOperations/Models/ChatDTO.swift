@@ -124,6 +124,10 @@ struct ChatUserDTO: Decodable, Identifiable {
     let name: String?
     let role: String?
 
+    enum CodingKeys: String, CodingKey {
+        case id, username, name, role
+    }
+
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         if let s = try? c.decode(String.self, forKey: .id) { id = s }
