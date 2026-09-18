@@ -1253,4 +1253,34 @@ final class EMSOperationsTests: XCTestCase {
         XCTAssertFalse(PermissionMapper.canTeamExit(["ops.completion"], star: false))
         XCTAssertTrue(PermissionMapper.canTeamExit([], star: true))
     }
+
+    // MARK: - مجال الملفات التشغيلية (§22)
+
+    func testOpsFileDecodesFlexibleId() throws {
+        // GET /api/ops-files — server.js:9788 (الخادم يسوي الحقول للعرض)
+        let json = #"{"success": true, "files": [{"id": "f1", "name": "خطة الذروة.pdf", "type": "pdf", "size": "1.2 MB", "date": "2026-09-18", "url": "/api/download-operational/f1"}, {"id": 7, "name": "صورة.png", "type": "img", "size": "340 KB", "date": "2026-09-17", "url": "/api/download-operational/7"}]}"#.data(using: .utf8)!
+        let dto = try JSONDecoder().decode(OpsFilesResponseDTO.self, from: json)
+        XCTAssertEqual(dto.files?.count, 2)
+        XCTAssertEqual(dto.files?.first?.name, "خطة الذروة.pdf")
+        XCTAssertEqual(dto.files?.last?.id, "7")
+        XCTAssertEqual(dto.files?.first?.icon, "doc.fill")
+        XCTAssertEqual(dto.files?.last?.icon, "photo.fill")
+    }
+
+    func testOpsDocDecodes() throws {
+        // GET /api/docs — readDocs (server.js:8071) · الحقول من app.js renderDocsList
+        let json = #"{"success": true, "docs": [{"id": "d1", "filename": "تعميم.docx", "category": "تعاميم", "description": "وصف", "priority": "high", "uploadDate": "2026-09-10", "uploader": "admin"}]}"#.data(using: .utf8)!
+        let dto = try JSONDecoder().decode(OpsDocsResponseDTO.self, from: json)
+        let d = try XCTUnwrap(dto.docs?.first)
+        XCTAssertEqual(d.filename, "تعميم.docx")
+        XCTAssertEqual(d.category, "تعاميم")
+        XCTAssertEqual(d.uploader, "admin")
+    }
+
+    func testOpsFilesPermissionMapping() {
+        // ops.files — server.js:9898 (حذف) و9712 (رفع)
+        XCTAssertTrue(PermissionMapper.canOpsFiles(["ops.files"], star: false))
+        XCTAssertFalse(PermissionMapper.canOpsFiles(["ops.dispatch"], star: false))
+        XCTAssertTrue(PermissionMapper.canOpsFiles([], star: true))
+    }
 }

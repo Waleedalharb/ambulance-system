@@ -360,8 +360,8 @@
 | **Update / Delete** | delete :id |
 | **Operational Actions** | رفع ملف تشغيلي لمناوبة |
 | **Permissions** | `ops.files` (رفع/حذف — منح فردي) · القراءة `authenticate` |
-| **Native Screen** | — |
-| **Native Status** | ⛔ غير موجود |
+| **Native Screen** | `FilesOpsView` (قائمة + تنزيل عبر ورقة النظام + حذف بـops.files — موديول «الملفات» في العمليات) |
+| **Native Status** | ◐ جزئي — قراءة/تنزيل/حذف ✅ · الرفع multipart مؤجل موثقًا (لا يدعمه APIClient) · ملف الهوية get/upload-identity مؤجل |
 
 ## 23. الإعلانات (announcements)
 

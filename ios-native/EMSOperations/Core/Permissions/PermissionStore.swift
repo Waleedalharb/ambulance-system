@@ -200,6 +200,11 @@ enum PermissionMapper {
     static func canTeamExit(_ permissions: [String], star: Bool) -> Bool {
         has(permissions, star: star, "ops.team_exit")
     }
+
+    /// حذف الملفات التشغيلية والمستندات (ops.files — الرفع/الحذف سيرفريًا).
+    static func canOpsFiles(_ permissions: [String], star: Bool) -> Bool {
+        has(permissions, star: star, "ops.files")
+    }
 }
 
 @MainActor
@@ -256,6 +261,7 @@ final class PermissionStore: ObservableObject {
     var canAssetsInventory: Bool { PermissionMapper.canAssetsInventory(permissions, star: isStar) }
     var canOpsAlerts: Bool { PermissionMapper.canOpsAlerts(permissions, star: isStar) }
     var canTeamExit: Bool { PermissionMapper.canTeamExit(permissions, star: isStar) }
+    var canOpsFiles: Bool { PermissionMapper.canOpsFiles(permissions, star: isStar) }
 
     /// بوابة مركز الإدارة (§20): دور admin/director أو أي مفتاح إداري —
     /// كل شاشة داخل المركز تُقيَّد بصلاحيتها الخاصة، والحسم النهائي سيرفري.

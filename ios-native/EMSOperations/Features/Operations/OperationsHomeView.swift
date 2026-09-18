@@ -11,7 +11,7 @@ import SwiftUI
 
 struct OperationsHomeView: View {
     private enum OpsModule: Hashable, Identifiable {
-        case teams, readiness, completion, vehicles, events, decisionCenter, map, positioning, dispatch, forms, workflow, archive, lifecycle, assets, hospitals, indicators, signouts
+        case teams, readiness, completion, vehicles, events, decisionCenter, map, positioning, dispatch, forms, workflow, archive, lifecycle, assets, hospitals, indicators, signouts, files
         var id: Self { self }
 
         var title: String {
@@ -33,6 +33,7 @@ struct OperationsHomeView: View {
             case .hospitals: return "المستشفيات"
             case .indicators: return "المؤشرات"
             case .signouts: return "خروج الفرق"
+            case .files: return "الملفات"
             }
         }
         var icon: String {
@@ -54,6 +55,7 @@ struct OperationsHomeView: View {
             case .hospitals: return "building.2.fill"
             case .indicators: return "chart.bar.xaxis"
             case .signouts: return "rectangle.portrait.and.arrow.right"
+            case .files: return "folder.fill"
             }
         }
         var detail: String {
@@ -75,11 +77,12 @@ struct OperationsHomeView: View {
             case .hospitals: return "مراقبة النقل والبقاء · التنبيهات · السجل"
             case .indicators: return "لوحة التشغيل · مؤشر المساهمة الشهري · نشاط الفرق"
             case .signouts: return "اقتراح التشكيلة · تسجيل الخروج · سجل المناوبة"
+            case .files: return "الملفات التشغيلية · المستندات · تنزيل وحذف"
             }
         }
     }
 
-    private let modules: [OpsModule] = [.lifecycle, .dispatch, .teams, .readiness, .completion, .vehicles, .events, .decisionCenter, .map, .positioning, .forms, .workflow, .archive, .assets, .hospitals, .indicators, .signouts]
+    private let modules: [OpsModule] = [.lifecycle, .dispatch, .teams, .readiness, .completion, .vehicles, .events, .decisionCenter, .map, .positioning, .forms, .workflow, .archive, .assets, .hospitals, .indicators, .signouts, .files]
 
     var body: some View {
         ScrollView {
@@ -135,7 +138,7 @@ struct OperationsHomeView: View {
             #if DEBUG
             // علامة النسخة الحية: وجود هذا السطر في السجل يثبت أن البناء يحتوي
             // شاشات البيانات الحقيقية (ee41e8c+) — نسخة «قيد التفعيل» لا تملكه.
-            AppLogger.ui.info("OperationsHomeView LIVE-DATA build appeared — 17 modules wired to Backend APIs")
+            AppLogger.ui.info("OperationsHomeView LIVE-DATA build appeared — 18 modules wired to Backend APIs")
             #endif
         }
         .navigationDestination(for: OpsModule.self) { module in
@@ -157,6 +160,7 @@ struct OperationsHomeView: View {
             case .hospitals: HospitalsOpsView()
             case .indicators: IndicatorsOpsView()
             case .signouts: SignoutsOpsView()
+            case .files: FilesOpsView()
             }
         }
     }
