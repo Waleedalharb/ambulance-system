@@ -50,6 +50,17 @@
 		5E4000000000000000000029 /* OpsEventsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000029 /* OpsEventsView.swift */; };
 		5E400000000000000000002A /* OpsMapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000002A /* OpsMapView.swift */; };
 		5E400000000000000000002B /* DecisionCenterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000002B /* DecisionCenterView.swift */; };
+		5E400000000000000000002C /* ScheduleOpsDTO.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000002C /* ScheduleOpsDTO.swift */; };
+		5E400000000000000000002D /* ScheduleOpsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000002D /* ScheduleOpsViewModel.swift */; };
+		5E400000000000000000002E /* ScheduleRosterGrid.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000002E /* ScheduleRosterGrid.swift */; };
+		5E400000000000000000002F /* ScheduleHubView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000002F /* ScheduleHubView.swift */; };
+		5E4000000000000000000030 /* ScheduleMonthView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000030 /* ScheduleMonthView.swift */; };
+		5E4000000000000000000031 /* ScheduleDayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000031 /* ScheduleDayView.swift */; };
+		5E4000000000000000000032 /* ScheduleTeamView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000032 /* ScheduleTeamView.swift */; };
+		5E4000000000000000000033 /* ScheduleEmployeeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000033 /* ScheduleEmployeeView.swift */; };
+		5E4000000000000000000034 /* ScheduleCellSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000034 /* ScheduleCellSheet.swift */; };
+		5E4000000000000000000035 /* ScheduleHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000035 /* ScheduleHistoryView.swift */; };
+		5E4000000000000000000036 /* ScheduleAdvancedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000036 /* ScheduleAdvancedView.swift */; };
 		5E40000000000000000000E1 /* EMSOperationsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000E1 /* EMSOperationsTests.swift */; };
 		5E40000000000000000000F0 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000F0 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
@@ -108,6 +119,17 @@
 		5E3000000000000000000029 /* OpsEventsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpsEventsView.swift; sourceTree = "<group>"; };
 		5E300000000000000000002A /* OpsMapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpsMapView.swift; sourceTree = "<group>"; };
 		5E300000000000000000002B /* DecisionCenterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionCenterView.swift; sourceTree = "<group>"; };
+		5E300000000000000000002C /* ScheduleOpsDTO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduleOpsDTO.swift; sourceTree = "<group>"; };
+		5E300000000000000000002D /* ScheduleOpsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduleOpsViewModel.swift; sourceTree = "<group>"; };
+		5E300000000000000000002E /* ScheduleRosterGrid.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduleRosterGrid.swift; sourceTree = "<group>"; };
+		5E300000000000000000002F /* ScheduleHubView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduleHubView.swift; sourceTree = "<group>"; };
+		5E3000000000000000000030 /* ScheduleMonthView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduleMonthView.swift; sourceTree = "<group>"; };
+		5E3000000000000000000031 /* ScheduleDayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduleDayView.swift; sourceTree = "<group>"; };
+		5E3000000000000000000032 /* ScheduleTeamView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduleTeamView.swift; sourceTree = "<group>"; };
+		5E3000000000000000000033 /* ScheduleEmployeeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduleEmployeeView.swift; sourceTree = "<group>"; };
+		5E3000000000000000000034 /* ScheduleCellSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduleCellSheet.swift; sourceTree = "<group>"; };
+		5E3000000000000000000035 /* ScheduleHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduleHistoryView.swift; sourceTree = "<group>"; };
+		5E3000000000000000000036 /* ScheduleAdvancedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduleAdvancedView.swift; sourceTree = "<group>"; };
 		5E30000000000000000000D0 /* EMSOperations.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = EMSOperations.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		5E30000000000000000000D1 /* EMSOperationsTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = EMSOperationsTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		5E30000000000000000000E1 /* EMSOperationsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EMSOperationsTests.swift; sourceTree = "<group>"; };
@@ -255,6 +277,7 @@
 				5E3000000000000000000007 /* AuthDTO.swift */,
 				5E3000000000000000000008 /* PortalDTO.swift */,
 				5E3000000000000000000025 /* OpsDTO.swift */,
+				5E300000000000000000002C /* ScheduleOpsDTO.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -309,8 +332,26 @@
 				5E2000000000000000000030 /* Inventory */,
 				5E2000000000000000000031 /* Reports */,
 				5E2000000000000000000057 /* Operations */,
+				5E2000000000000000000058 /* ScheduleOps */,
 			);
 			path = Features;
+			sourceTree = "<group>";
+		};
+		5E2000000000000000000058 /* ScheduleOps */ = {
+			isa = PBXGroup;
+			children = (
+				5E300000000000000000002D /* ScheduleOpsViewModel.swift */,
+				5E300000000000000000002E /* ScheduleRosterGrid.swift */,
+				5E300000000000000000002F /* ScheduleHubView.swift */,
+				5E3000000000000000000030 /* ScheduleMonthView.swift */,
+				5E3000000000000000000031 /* ScheduleDayView.swift */,
+				5E3000000000000000000032 /* ScheduleTeamView.swift */,
+				5E3000000000000000000033 /* ScheduleEmployeeView.swift */,
+				5E3000000000000000000034 /* ScheduleCellSheet.swift */,
+				5E3000000000000000000035 /* ScheduleHistoryView.swift */,
+				5E3000000000000000000036 /* ScheduleAdvancedView.swift */,
+			);
+			path = ScheduleOps;
 			sourceTree = "<group>";
 		};
 		5E2000000000000000000057 /* Operations */ = {
@@ -588,6 +629,17 @@
 				5E4000000000000000000029 /* OpsEventsView.swift in Sources */,
 				5E400000000000000000002A /* OpsMapView.swift in Sources */,
 				5E400000000000000000002B /* DecisionCenterView.swift in Sources */,
+				5E400000000000000000002C /* ScheduleOpsDTO.swift in Sources */,
+				5E400000000000000000002D /* ScheduleOpsViewModel.swift in Sources */,
+				5E400000000000000000002E /* ScheduleRosterGrid.swift in Sources */,
+				5E400000000000000000002F /* ScheduleHubView.swift in Sources */,
+				5E4000000000000000000030 /* ScheduleMonthView.swift in Sources */,
+				5E4000000000000000000031 /* ScheduleDayView.swift in Sources */,
+				5E4000000000000000000032 /* ScheduleTeamView.swift in Sources */,
+				5E4000000000000000000033 /* ScheduleEmployeeView.swift in Sources */,
+				5E4000000000000000000034 /* ScheduleCellSheet.swift in Sources */,
+				5E4000000000000000000035 /* ScheduleHistoryView.swift in Sources */,
+				5E4000000000000000000036 /* ScheduleAdvancedView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

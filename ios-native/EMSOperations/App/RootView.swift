@@ -65,9 +65,10 @@ struct MainTabView: View {
     @EnvironmentObject private var deepLinks: DeepLinkRouter
     @State private var selectedTab: AppTab = .home
 
-    enum AppTab: Hashable { case home, operations, schedule, notifications, account }
+    enum AppTab: Hashable { case home, operations, scheduleOps, schedule, notifications, account }
 
     private var showOperations: Bool { session.permissions.canAccessOperations }
+    private var showScheduleOps: Bool { session.permissions.canViewSchedules }
     private var showPortalTabs: Bool { session.permissions.canAccessEmployeePortal }
 
     var body: some View {
@@ -79,6 +80,11 @@ struct MainTabView: View {
                 NavigationStack { OperationsHomeView() }
                     .tabItem { Label("العمليات", systemImage: "point.3.connected.trianglepath.dotted") }
                     .tag(AppTab.operations)
+            }
+            if showScheduleOps {
+                NavigationStack { ScheduleHubView() }
+                    .tabItem { Label("الجداول", systemImage: "calendar.badge.clock") }
+                    .tag(AppTab.scheduleOps)
             }
             if showPortalTabs {
                 NavigationStack { ScheduleView() }
