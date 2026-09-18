@@ -116,10 +116,19 @@ struct FormRecordItem: Identifiable {
         for field in fieldLabels[formType] ?? [] {
             if let v = stringValue(dict[field.key]) { rows.append((field.label, v)) }
         }
-        let title = stringValue(dict["reportNumber"]).map { "بلاغ \($0)" }
-            ?? stringValue(dict["date"]).map { "تقرير \($0)" }
-            ?? stringValue(dict["asstName"]).map { "مناوبة كبار — \($0)" }
-            ?? "سجل \(id)"
+        let reportNumber = stringValue(dict["reportNumber"])
+        let reportDate = stringValue(dict["date"])
+        let asstName = stringValue(dict["asstName"])
+        let title: String
+        if let reportNumber {
+            title = "بلاغ \(reportNumber)"
+        } else if let reportDate {
+            title = "تقرير \(reportDate)"
+        } else if let asstName {
+            title = "مناوبة كبار — \(asstName)"
+        } else {
+            title = "سجل \(id)"
+        }
         return FormRecordItem(id: id, title: title, rows: rows)
     }
 }
