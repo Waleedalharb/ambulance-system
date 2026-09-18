@@ -420,4 +420,37 @@ final class EMSOperationsTests: XCTestCase {
         XCTAssertFalse(PermissionMapper.canVolunteers(["ops.completion"], false))
         XCTAssertTrue(PermissionMapper.canVolunteers([], true))
     }
+
+    // MARK: - مجال التمركز والذروة (PositioningOps)
+
+    func testUnitLocationsDTODecodes() throws {
+        let json = #"{"success": true, "locations": {"الرياض": {"إسعاف 12": [24.7136, 46.6753]}}, "addresses": {"إسعاف 12": "حي النرجس"}}"#.data(using: .utf8)!
+        let dto = try JSONDecoder().decode(UnitLocationsDTO.self, from: json)
+        XCTAssertEqual(dto.locations?["الرياض"]?["إسعاف 12"]?.first, 24.7136)
+        XCTAssertEqual(dto.addresses?["إسعاف 12"], "حي النرجس")
+    }
+
+    func testPeakDataDTODecodesMissionsAlertsLogs() throws {
+        let json = #"{"success": true, "data": {"missions": [{"id": "m1", "location": "طريق الملك فهد", "unit": "إسعاف 7", "startTime": "18:00", "endTime": "23:00", "priority": "عالية", "status": "active"}], "alerts": [{"id": "a1", "title": "ازدحام", "priority": "عالية", "status": "open", "missionId": "m1"}], "logs": [{"id": "l1", "icon": "📍", "action": "تمركز", "time": "18:05"}]}}"#.data(using: .utf8)!
+        let dto = try JSONDecoder().decode(PeakDataDTO.self, from: json)
+        XCTAssertEqual(dto.data?.missions?.first?.unit, "إسعاف 7")
+        XCTAssertEqual(dto.data?.alerts?.first?.missionId, "m1")
+        XCTAssertEqual(dto.data?.logs?.first?.action, "تمركز")
+    }
+
+    func testPeakMissionRequestOmitsNilFields() throws {
+        let req = PeakMissionRequest(location: "الموقع", unit: "إسعاف 3", startTime: "18:00", endTime: "22:00")
+        let data = try JSONEncoder().encode(req)
+        let obj = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        XCTAssertEqual(obj["location"] as? String, "الموقع")
+        XCTAssertNil(obj["priority"])
+        XCTAssertNil(obj["lat"])
+    }
+
+    func testDeployPermissionKey() {
+        XCTAssertTrue(PermissionMapper.canDeployOps(["ops.deployments"], false))
+        XCTAssertFalse(PermissionMapper.canDeployOps(["ops.execute"], false))
+        XCTAssertFalse(PermissionMapper.canDeployOps([], false))
+        XCTAssertTrue(PermissionMapper.canDeployOps([], true))
+    }
 }

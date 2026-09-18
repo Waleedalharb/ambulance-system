@@ -74,6 +74,11 @@ actor APIClient {
         try await sendRaw(.post, path, jsonBody: jsonObject, retried: false)
     }
 
+    /// PUT بجسم JSON خام (دمج خطط الذروة الحرة الحقول).
+    func putRaw(_ path: String, jsonObject: Any) async throws -> Any {
+        try await sendRaw(.put, path, jsonBody: jsonObject, retried: false)
+    }
+
     private func sendRaw(_ method: Method, _ path: String, jsonBody: Any?, retried: Bool) async throws -> Any {
         guard let url = URLComponents(url: AppEnvironment.current.baseURL.appending(path: path), resolvingAgainstBaseURL: false)?.url else {
             throw APIError.unknown

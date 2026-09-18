@@ -11,7 +11,7 @@ import SwiftUI
 
 struct OperationsHomeView: View {
     private enum OpsModule: Hashable, Identifiable {
-        case teams, readiness, completion, vehicles, events, decisionCenter, map
+        case teams, readiness, completion, vehicles, events, decisionCenter, map, positioning
         var id: Self { self }
 
         var title: String {
@@ -23,6 +23,7 @@ struct OperationsHomeView: View {
             case .events: return "الأحداث التشغيلية"
             case .decisionCenter: return "مركز القرار"
             case .map: return "الخريطة"
+            case .positioning: return "التمركز والذروة"
             }
         }
         var icon: String {
@@ -34,6 +35,7 @@ struct OperationsHomeView: View {
             case .events: return "bolt.fill"
             case .decisionCenter: return "scope"
             case .map: return "map.fill"
+            case .positioning: return "mappin.and.ellipse"
             }
         }
         var detail: String {
@@ -45,11 +47,12 @@ struct OperationsHomeView: View {
             case .events: return "الأحداث التشغيلية المهمة أولًا بأول"
             case .decisionCenter: return "ما الذي يحدث؟ وما الإجراء المتاح؟ — حسب صلاحياتك"
             case .map: return "المراكز والفرق والمركبات على الخريطة"
+            case .positioning: return "مواقع الوحدات · خطط الذروة · المهام والتنبيهات"
             }
         }
     }
 
-    private let modules: [OpsModule] = [.teams, .readiness, .completion, .vehicles, .events, .decisionCenter, .map]
+    private let modules: [OpsModule] = [.teams, .readiness, .completion, .vehicles, .events, .decisionCenter, .map, .positioning]
 
     var body: some View {
         ScrollView {
@@ -105,7 +108,7 @@ struct OperationsHomeView: View {
             #if DEBUG
             // علامة النسخة الحية: وجود هذا السطر في السجل يثبت أن البناء يحتوي
             // شاشات البيانات الحقيقية (ee41e8c+) — نسخة «قيد التفعيل» لا تملكه.
-            AppLogger.ui.info("OperationsHomeView LIVE-DATA build appeared — 6 modules wired to Backend APIs")
+            AppLogger.ui.info("OperationsHomeView LIVE-DATA build appeared — 8 modules wired to Backend APIs")
             #endif
         }
         .navigationDestination(for: OpsModule.self) { module in
@@ -117,6 +120,7 @@ struct OperationsHomeView: View {
             case .events: OpsEventsView()
             case .decisionCenter: DecisionCenterView()
             case .map: OpsMapView()
+            case .positioning: PositioningOpsView()
             }
         }
     }

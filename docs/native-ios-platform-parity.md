@@ -189,8 +189,8 @@
 | **Delete** | peak-plans/:id / peak-mission/:id |
 | **Operational Actions** | تمركز وحدة، إطلاق مهمة ذروة، حلّ مهمة |
 | **Permissions** | `ops.deployments` (تنفيذ) · القراءة `authenticate` |
-| **Native Screen** | `OpsMapView` (مراكز على الخريطة — قراءة) |
-| **Native Status** | ◐ خريطة قراءة ✅ / التمركز والذروة ⛔ |
+| **Native Screen** | `OpsMapView` (مراكز على الخريطة — قراءة) · `PositioningOpsView` (تمركز الوحدات + خطط الذروة + المهام والتنبيهات) |
+| **Native Status** | ✅ مكتمل عمليًا — تمركز/تعديل الوحدات، خطط الذروة (إنشاء/تعديل/ختم وصول ومغادرة سيرفري/حذف)، مهام الذروة (إنشاء/حلّ التنبيه/حذف admin-director)، كلها بصلاحية `ops.deployments`. ⛔ متبقٍ: `map-locations` وخريطة `history-map` التاريخية |
 
 ## 12. النماذج (forms)
 
