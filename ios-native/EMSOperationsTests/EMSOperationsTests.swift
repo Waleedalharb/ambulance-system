@@ -262,4 +262,108 @@ final class EMSOperationsTests: XCTestCase {
         XCTAssertNil(dto.shift?.id)
         XCTAssertEqual(dto.prepShift?.type, "صباحية")
     }
+
+    // MARK: - مجال الجداول (ScheduleOps)
+
+    func testRosterMonthDTODecodesSnakeCase() throws {
+        let json = #"{"success": true, "roster": [{"id": 7, "employee_id": 42, "team_id": 3, "shift_date": "2026-09-05", "shift_code": "M1", "month": 9, "year": 2026, "employee_name": "محمد", "employee_code": "E-1042", "team_name": "جنوب 2"}]}"#.data(using: .utf8)!
+        let dto = try JSONDecoder().decode(RosterMonthDTO.self, from: json)
+        let e = try XCTUnwrap(dto.roster?.first)
+        XCTAssertEqual(e.id, 7)
+        XCTAssertEqual(e.employeeId, 42)
+        XCTAssertEqual(e.shiftDate, "2026-09-05")
+        XCTAssertEqual(e.shiftCode, "M1")
+        XCTAssertEqual(e.employeeCode, "E-1042")
+        XCTAssertEqual(e.teamName, "جنوب 2")
+        XCTAssertEqual(e.stableId, "7")
+    }
+
+    func testRosterEntryStableIdFallsBackWithoutId() throws {
+        let json = #"{"employee_id": 42, "shift_date": "2026-09-05", "shift_code": "M1"}"#.data(using: .utf8)!
+        let e = try JSONDecoder().decode(RosterMonthDTO.Entry.self, from: json)
+        XCTAssertNil(e.id)
+        XCTAssertEqual(e.stableId, "42-2026-09-05")
+    }
+
+    func testShiftCodesDTODisplayLabel() throws {
+        let json = #"{"success": true, "codes": [{"id": 1, "code": "M1", "name": "صباحية", "time_start": "07:00", "time_end": "19:00", "color": "#22c55e", "status": "active"}, {"id": 2, "code": "N1", "name": null, "status": "active"}]}"#.data(using: .utf8)!
+        let dto = try JSONDecoder().decode(ShiftCodesDTO.self, from: json)
+        XCTAssertEqual(dto.codes?.count, 2)
+        let m1 = try XCTUnwrap(dto.codes?.first)
+        XCTAssertEqual(m1.displayLabel, "M1 — صباحية")
+        XCTAssertEqual(m1.timeStart, "07:00")
+        let n1 = try XCTUnwrap(dto.codes?.last)
+        XCTAssertEqual(n1.displayLabel, "N1")
+    }
+
+    func testRosterAuditLogDecodesBeforeAfter() throws {
+        let json = #"{"success": true, "entries": [{"id": 9, "roster_id": 7, "employee_id": 42, "team_id": 3, "shift_date": "2026-09-05", "old_shift_code": "M1", "new_shift_code": "N1", "old_team_id": 3, "new_team_id": 3, "changed_by": "admin", "changed_by_name": "المدير", "change_type": "edit", "reason": "تعديل خلية", "created_at": "2026-09-05 10:00:00"}]}"#.data(using: .utf8)!
+        let dto = try JSONDecoder().decode(RosterAuditLogDTO.self, from: json)
+        let e = try XCTUnwrap(dto.entries?.first)
+        XCTAssertEqual(e.oldShiftCode, "M1")
+        XCTAssertEqual(e.newShiftCode, "N1")
+        XCTAssertEqual(e.changeType, "edit")
+        XCTAssertEqual(e.changedByName, "المدير")
+    }
+
+    func testRosterValidateResponseDecodesConflicts() throws {
+        let json = #"{"success": true, "valid": false, "conflicts": [{"type": "duplicate", "message": "يوجد سجل لهذا الموظف في هذا التاريخ", "employee_id": 42, "shift_date": "2026-09-05"}, {"type": "invalid_code", "message": "رمز غير معروف", "employee_id": 42, "shift_date": "2026-09-06"}]}"#.data(using: .utf8)!
+        let dto = try JSONDecoder().decode(RosterValidateResponseDTO.self, from: json)
+        XCTAssertEqual(dto.valid, false)
+        XCTAssertEqual(dto.conflicts?.count, 2)
+        XCTAssertEqual(dto.conflicts?.first?.type, "duplicate")
+    }
+
+    func testRosterDraftPendingLogic() throws {
+        let pending = #"{"id": 1, "draft_data_json": "[]", "operation_type": "edit", "created_at": "2026-09-05 10:00:00"}"#.data(using: .utf8)!
+        let d1 = try JSONDecoder().decode(RosterDraftsDTO.Draft.self, from: pending)
+        XCTAssertTrue(d1.isPending)
+        let applied = #"{"id": 2, "applied_at": "2026-09-05 11:00:00"}"#.data(using: .utf8)!
+        let d2 = try JSONDecoder().decode(RosterDraftsDTO.Draft.self, from: applied)
+        XCTAssertFalse(d2.isPending)
+    }
+
+    func testRosterCellUpdateRequestEncodesCamelCase() throws {
+        let req = RosterCellUpdateRequest(employeeCode: "E-1042", date: "2026-09-05", shiftCode: "M1")
+        let data = try JSONEncoder().encode(req)
+        let obj = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        // الخادم يتوقع camelCase هنا حرفيًا (validateBody في PUT /cell)
+        XCTAssertEqual(obj["employeeCode"] as? String, "E-1042")
+        XCTAssertEqual(obj["shiftCode"] as? String, "M1")
+        XCTAssertNil(obj["employee_code"])
+    }
+
+    func testSchedulePermissionKeysGrantAndWithhold() {
+        let all: [(String, ([String], Bool) -> Bool)] = [
+            ("schedule.edit_cell", PermissionMapper.canEditScheduleCell),
+            ("schedule.employees", PermissionMapper.canManageScheduleEmployees),
+            ("schedule.import", PermissionMapper.canImportSchedule),
+            ("schedule.bulk_update", PermissionMapper.canBulkUpdateSchedule),
+            ("schedule.swap", PermissionMapper.canSwapSchedule),
+            ("schedule.sync", PermissionMapper.canSyncSchedule),
+            ("schedule.export", PermissionMapper.canExportSchedule),
+            ("schedule.clear", PermissionMapper.canClearSchedule)
+        ]
+        for (key, check) in all {
+            XCTAssertTrue(check([key], false), "المفتاح \(key) يجب أن يُمنح")
+            XCTAssertFalse(check([], false), "المفتاح \(key) يجب أن يُحجب")
+            XCTAssertTrue(check([], true), "النجمة تمنح \(key)")
+        }
+        // مفتاح مشابه لا يفتح آخر — لا مطابقة جزئية
+        XCTAssertFalse(PermissionMapper.canEditScheduleCell(["schedule.edit"], false))
+        XCTAssertFalse(PermissionMapper.canViewSchedules(["schedule.view_all"], false))
+    }
+
+    @MainActor
+    func testDraftChangesDecodesArrayAndWrappedAndGarbage() {
+        let arr = #"[{"roster_id": 7, "shift_code": "M1"}]"#
+        let changes = ScheduleOpsViewModel.decodeDraftChanges(arr)
+        XCTAssertEqual(changes?.count, 1)
+        XCTAssertEqual(changes?.first?.roster_id, 7)
+        let wrapped = #"{"changes": [{"roster_id": 9, "shift_code": "N1"}]}"#
+        XCTAssertEqual(ScheduleOpsViewModel.decodeDraftChanges(wrapped)?.first?.roster_id, 9)
+        XCTAssertNil(ScheduleOpsViewModel.decodeDraftChanges("ليست JSON"))
+        XCTAssertNil(ScheduleOpsViewModel.decodeDraftChanges(nil))
+        XCTAssertNil(ScheduleOpsViewModel.decodeDraftChanges("[]"))
+    }
 }
