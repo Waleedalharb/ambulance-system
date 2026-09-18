@@ -315,8 +315,8 @@
 | **Delete** | conversation / participant |
 | **Operational Actions** | محادثة خاصة، مرفقات، إدارة مشاركين |
 | **Permissions** | `authenticate` (نظام داخلي عام) |
-| **Native Screen** | — |
-| **Native Status** | ⛔ غير موجود |
+| **Native Screen** | تبويب «المحادثات» في MainTabView: `ChatView` (قائمة + إنشاء مجموعة/خاصة + متصلون) + `ChatConversationView` (رسائل/إرسال/تعليم مقروء) + إدارة المشاركين/مغادرة/أرشفة |
+| **Native Status** | ✅ محادثات ورسائل ومشاركون — مؤجل: رفع المرفقات `POST /api/chat/upload` (multipart يتطلب دعمًا في APIClient وتحققًا على الجهاز) وتحديث لحظي عبر SSE/WebSocket (حاليًا تحديث بالسحب وإعادة الفتح) |
 
 ## 20. الإدارة (admin)
 

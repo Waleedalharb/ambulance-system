@@ -1089,4 +1089,42 @@ final class EMSOperationsTests: XCTestCase {
         XCTAssertTrue(PermissionMapper.canOpsAlerts(["ops.alerts"], false))
         XCTAssertFalse(PermissionMapper.canOpsAlerts(["ops.dispatch"], false))
     }
+
+    // MARK: - مجال الدردشة (§19)
+
+    func testChatConversationDecodesServerShape() throws {
+        // GET /api/chat/conversations — server.js:14240 (unread_count + last_message + participants)
+        let json = #"{"success": true, "conversations": [{"id": 5, "type": "private", "title": "أحمد", "created_by": "1", "unread_count": 2, "updated_at": "2026-09-18 10:00:00", "last_message": {"id": 9, "conversation_id": 5, "sender_id": "2", "sender_name": "أحمد", "content": "مرحبا", "type": "text", "created_at": "2026-09-18 09:59:00"}, "participants": [{"user_id": "1", "name": "أنا", "is_admin": 0}, {"user_id": 2, "name": "أحمد", "is_admin": 0}]}]}"#.data(using: .utf8)!
+        let dto = try JSONDecoder().decode(ChatConversationsDTO.self, from: json)
+        let conv = try XCTUnwrap(dto.conversations?.first)
+        XCTAssertEqual(conv.id, 5)
+        XCTAssertEqual(conv.unreadCount, 2)
+        XCTAssertEqual(conv.lastMessage?.senderName, "أحمد")
+        XCTAssertEqual(conv.participants?.count, 2)
+        // user_id رقمي في JOIN — يُفك نصيًا
+        XCTAssertEqual(conv.participants?.last?.userId, "2")
+    }
+
+    func testChatMessageToleratesNumericSenderId() throws {
+        let json = #"{"id": 9, "conversation_id": 5, "sender_id": 7, "sender_name": "سارة", "content": "تم", "type": "text", "created_at": "2026-09-18 10:00:00", "read_by": [{"user_id": 3, "read_at": "2026-09-18 10:01:00"}]}"#.data(using: .utf8)!
+        let msg = try JSONDecoder().decode(ChatMessageDTO.self, from: json)
+        XCTAssertEqual(msg.senderId, "7")
+        XCTAssertEqual(msg.readBy?.first?.userId, "3")
+    }
+
+    func testChatGroupCreateRequestUsesServerFieldNames() throws {
+        // server.js:14297 يتوقع title + participant_ids
+        let data = try JSONEncoder().encode(ChatGroupCreateRequestDTO(title: "مناوبة الخميس", participantIds: ["3", "7"]))
+        let obj = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        XCTAssertEqual(obj["title"] as? String, "مناوبة الخميس")
+        XCTAssertEqual(obj["participant_ids"] as? [String], ["3", "7"])
+        XCTAssertNil(obj["participantIds"])
+    }
+
+    func testChatPrivateRequestUsesUserIdSnakeCase() throws {
+        // server.js:14339 يتوقع user_id
+        let data = try JSONEncoder().encode(ChatPrivateCreateRequestDTO(userId: "7"))
+        let obj = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        XCTAssertEqual(obj["user_id"] as? String, "7")
+    }
 }

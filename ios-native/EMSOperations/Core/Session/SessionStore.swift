@@ -38,6 +38,12 @@ final class SessionStore: ObservableObject {
         return false
     }
 
+    /// المستخدم الحالي (للدردشة وتمييز رسائلي — §19).
+    var currentUser: AuthUser? {
+        if case .authenticated(let user) = state { return user }
+        return nil
+    }
+
     func restore() async {
         if let user = await auth.restore() {
             if BiometricGate.isEnabled && BiometricGate.isAvailable {

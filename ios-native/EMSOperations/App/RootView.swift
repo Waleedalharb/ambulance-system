@@ -65,7 +65,7 @@ struct MainTabView: View {
     @EnvironmentObject private var deepLinks: DeepLinkRouter
     @State private var selectedTab: AppTab = .home
 
-    enum AppTab: Hashable { case home, operations, scheduleOps, schedule, notifications, account }
+    enum AppTab: Hashable { case home, operations, scheduleOps, schedule, notifications, chat, account }
 
     private var showOperations: Bool { session.permissions.canAccessOperations }
     private var showScheduleOps: Bool { session.permissions.canViewSchedules }
@@ -95,6 +95,9 @@ struct MainTabView: View {
                     .tag(AppTab.notifications)
                     .badge(session.unreadNotifications > 0 ? session.unreadNotifications : 0)
             }
+            NavigationStack { ChatView() }
+                .tabItem { Label("المحادثات", systemImage: "bubble.left.and.bubble.right.fill") }
+                .tag(AppTab.chat)
             NavigationStack { ProfileView() }
                 .tabItem { Label("حسابي", systemImage: "person.crop.circle") }
                 .tag(AppTab.account)

@@ -100,6 +100,8 @@
 		5E400000000000000000005D /* AssetDetailViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000005D /* AssetDetailViews.swift */; };
 		5E400000000000000000005E /* HospitalsDTO.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000005E /* HospitalsDTO.swift */; };
 		5E400000000000000000005F /* HospitalsOpsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000005F /* HospitalsOpsView.swift */; };
+		5E4000000000000000000060 /* ChatDTO.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000060 /* ChatDTO.swift */; };
+		5E4000000000000000000061 /* ChatViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000061 /* ChatViews.swift */; };
 		5E400000000000000000004C /* ArchiveOpsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000004C /* ArchiveOpsViewModel.swift */; };
 		5E400000000000000000004D /* ArchiveOpsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000004D /* ArchiveOpsView.swift */; };
 		5E40000000000000000000E1 /* EMSOperationsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000E1 /* EMSOperationsTests.swift */; };
@@ -210,6 +212,8 @@
 		5E300000000000000000005D /* AssetDetailViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssetDetailViews.swift; sourceTree = "<group>"; };
 		5E300000000000000000005E /* HospitalsDTO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HospitalsDTO.swift; sourceTree = "<group>"; };
 		5E300000000000000000005F /* HospitalsOpsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HospitalsOpsView.swift; sourceTree = "<group>"; };
+		5E3000000000000000000060 /* ChatDTO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatDTO.swift; sourceTree = "<group>"; };
+		5E3000000000000000000061 /* ChatViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatViews.swift; sourceTree = "<group>"; };
 		5E300000000000000000004C /* ArchiveOpsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveOpsViewModel.swift; sourceTree = "<group>"; };
 		5E300000000000000000004D /* ArchiveOpsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveOpsView.swift; sourceTree = "<group>"; };
 		5E30000000000000000000D0 /* EMSOperations.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = EMSOperations.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -373,6 +377,7 @@
 				5E3000000000000000000059 /* TimelineOpsDTO.swift */,
 				5E300000000000000000005B /* AssetsDTO.swift */,
 				5E300000000000000000005E /* HospitalsDTO.swift */,
+				5E3000000000000000000060 /* ChatDTO.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -438,6 +443,7 @@
 				5E2000000000000000000060 /* ShiftLifecycle */,
 				5E2000000000000000000061 /* AssetsOps */,
 				5E2000000000000000000062 /* HospitalsOps */,
+				5E2000000000000000000063 /* Chat */,
 			);
 			path = Features;
 			sourceTree = "<group>";
@@ -521,6 +527,14 @@
 				5E300000000000000000005F /* HospitalsOpsView.swift */,
 			);
 			path = HospitalsOps;
+			sourceTree = "<group>";
+		};
+		5E2000000000000000000063 /* Chat */ = {
+			isa = PBXGroup;
+			children = (
+				5E3000000000000000000061 /* ChatViews.swift */,
+			);
+			path = Chat;
 			sourceTree = "<group>";
 		};
 		5E200000000000000000005F /* AdminOps */ = {
@@ -882,6 +896,8 @@
 				5E400000000000000000005D /* AssetDetailViews.swift in Sources */,
 				5E400000000000000000005E /* HospitalsDTO.swift in Sources */,
 				5E400000000000000000005F /* HospitalsOpsView.swift in Sources */,
+				5E4000000000000000000060 /* ChatDTO.swift in Sources */,
+				5E4000000000000000000061 /* ChatViews.swift in Sources */,
 				5E400000000000000000004C /* ArchiveOpsViewModel.swift in Sources */,
 				5E400000000000000000004D /* ArchiveOpsView.swift in Sources */,
 			);
