@@ -69,6 +69,9 @@
 		5E400000000000000000003C /* PositioningOpsDTO.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000003C /* PositioningOpsDTO.swift */; };
 		5E400000000000000000003D /* PositioningOpsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000003D /* PositioningOpsViewModel.swift */; };
 		5E400000000000000000003E /* PositioningOpsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000003E /* PositioningOpsView.swift */; };
+		5E400000000000000000003F /* DispatchOpsDTO.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000003F /* DispatchOpsDTO.swift */; };
+		5E4000000000000000000040 /* DispatchOpsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000040 /* DispatchOpsViewModel.swift */; };
+		5E4000000000000000000041 /* DispatchOpsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000041 /* DispatchOpsView.swift */; };
 		5E40000000000000000000E1 /* EMSOperationsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000E1 /* EMSOperationsTests.swift */; };
 		5E40000000000000000000F0 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000F0 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
@@ -146,6 +149,9 @@
 		5E300000000000000000003C /* PositioningOpsDTO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PositioningOpsDTO.swift; sourceTree = "<group>"; };
 		5E300000000000000000003D /* PositioningOpsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PositioningOpsViewModel.swift; sourceTree = "<group>"; };
 		5E300000000000000000003E /* PositioningOpsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PositioningOpsView.swift; sourceTree = "<group>"; };
+		5E300000000000000000003F /* DispatchOpsDTO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DispatchOpsDTO.swift; sourceTree = "<group>"; };
+		5E3000000000000000000040 /* DispatchOpsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DispatchOpsViewModel.swift; sourceTree = "<group>"; };
+		5E3000000000000000000041 /* DispatchOpsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DispatchOpsView.swift; sourceTree = "<group>"; };
 		5E30000000000000000000D0 /* EMSOperations.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = EMSOperations.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		5E30000000000000000000D1 /* EMSOperationsTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = EMSOperationsTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		5E30000000000000000000E1 /* EMSOperationsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EMSOperationsTests.swift; sourceTree = "<group>"; };
@@ -296,6 +302,7 @@
 				5E300000000000000000002C /* ScheduleOpsDTO.swift */,
 				5E3000000000000000000037 /* CompletionOpsDTO.swift */,
 				5E300000000000000000003C /* PositioningOpsDTO.swift */,
+				5E300000000000000000003F /* DispatchOpsDTO.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -353,6 +360,7 @@
 				5E2000000000000000000058 /* ScheduleOps */,
 				5E2000000000000000000059 /* CompletionOps */,
 				5E200000000000000000005A /* PositioningOps */,
+				5E200000000000000000005B /* DispatchOps */,
 			);
 			path = Features;
 			sourceTree = "<group>";
@@ -375,6 +383,15 @@
 				5E300000000000000000003E /* PositioningOpsView.swift */,
 			);
 			path = PositioningOps;
+			sourceTree = "<group>";
+		};
+		5E200000000000000000005B /* DispatchOps */ = {
+			isa = PBXGroup;
+			children = (
+				5E3000000000000000000040 /* DispatchOpsViewModel.swift */,
+				5E3000000000000000000041 /* DispatchOpsView.swift */,
+			);
+			path = DispatchOps;
 			sourceTree = "<group>";
 		};
 		5E2000000000000000000058 /* ScheduleOps */ = {
@@ -688,6 +705,9 @@
 				5E400000000000000000003C /* PositioningOpsDTO.swift in Sources */,
 				5E400000000000000000003D /* PositioningOpsViewModel.swift in Sources */,
 				5E400000000000000000003E /* PositioningOpsView.swift in Sources */,
+				5E400000000000000000003F /* DispatchOpsDTO.swift in Sources */,
+				5E4000000000000000000040 /* DispatchOpsViewModel.swift in Sources */,
+				5E4000000000000000000041 /* DispatchOpsView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

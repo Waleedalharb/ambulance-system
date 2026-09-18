@@ -453,4 +453,57 @@ final class EMSOperationsTests: XCTestCase {
         XCTAssertFalse(PermissionMapper.canDeployOps([], false))
         XCTAssertTrue(PermissionMapper.canDeployOps([], true))
     }
+
+    // MARK: - مجال البلاغات والتوزيع (DispatchOps)
+
+    func testCadSummaryDTODecodes() throws {
+        let json = #"{"success": true, "total": 5, "incidentsCount": 4, "activeCount": 2, "manualCount": 1, "byType": {"medical": 3}, "byCrew": {"جنوب 2": 2}, "incidents": [{"number": "10234", "type": "medical", "status": "active", "district": "النرجس", "severity": "yellow", "bestArrivalMin": 7.5, "crews": [{"unit": "جنوب 2", "counted": true, "manualCancelled": false, "respArrivalMin": 7.5}]}], "responseTime": {"arrival": {"avg": 8.2, "count": 3}, "mubashara": {"avg": 11.0, "count": 2}}, "mapStatus": {"sectorStatus": "yellow", "topDistrict": {"name": "النرجس", "count": 2}, "positionedCount": 2, "noLocationCount": 0}}"#.data(using: .utf8)!
+        let dto = try JSONDecoder().decode(CadSummaryDTO.self, from: json)
+        XCTAssertEqual(dto.total, 5)
+        XCTAssertEqual(dto.activeCount, 2)
+        XCTAssertEqual(dto.byCrew?["جنوب 2"], 2)
+        let incident = try XCTUnwrap(dto.incidents?.first)
+        XCTAssertEqual(incident.number, "10234")
+        XCTAssertEqual(incident.severity, "yellow")
+        XCTAssertEqual(incident.crews?.first?.counted, true)
+        XCTAssertEqual(dto.responseTime?.arrival?.avg, 8.2)
+        XCTAssertEqual(dto.mapStatus?.topDistrict?.name, "النرجس")
+    }
+
+    func testReportEntryListDTODecodes() throws {
+        let json = #"{"success": true, "records": [{"id": "1726600000000", "reportNumber": "5521", "type": "حادث مروري", "location": "طريق الملك فهد", "priority": "عاجل", "center": "الشفاء", "unit": "جنوب 8", "dispatchTime": "14:05", "arrivalTime": "14:20", "responseSeconds": 900, "date": "2026-09-18"}]}"#.data(using: .utf8)!
+        let dto = try JSONDecoder().decode(ReportEntryListDTO.self, from: json)
+        let entry = try XCTUnwrap(dto.records?.first)
+        XCTAssertEqual(entry.serverId, "1726600000000")
+        XCTAssertEqual(entry.type, "حادث مروري")
+        XCTAssertEqual(entry.priority, "عاجل")
+        XCTAssertEqual(entry.responseSeconds, 900)
+    }
+
+    func testReportEntryRequestOmitsNilFields() throws {
+        let req = ReportEntryRequest(type: "حالة مرضية", center: "الشفاء", unit: "جنوب 8",
+                                     dispatchTime: "14:00", arrivalTime: "14:15")
+        let data = try JSONEncoder().encode(req)
+        let obj = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        XCTAssertEqual(obj["type"] as? String, "حالة مرضية")
+        XCTAssertEqual(obj["unit"] as? String, "جنوب 8")
+        XCTAssertNil(obj["reportNumber"])
+        XCTAssertNil(obj["notes"])
+        // التاريخ والطابع والمناوبة تُختم سيرفريًا — لا تُرسل من العميل
+        XCTAssertNil(obj["date"])
+        XCTAssertNil(obj["timestamp"])
+        XCTAssertNil(obj["shiftId"])
+    }
+
+    func testDispatchPermissionKeys() {
+        XCTAssertTrue(PermissionMapper.canDispatch(["ops.dispatch"], false))
+        XCTAssertFalse(PermissionMapper.canDispatch(["ops.reports"], false))
+        XCTAssertTrue(PermissionMapper.canDispatch([], true))
+        XCTAssertTrue(PermissionMapper.canRevertReports(["ops.report_revert"], false))
+        XCTAssertFalse(PermissionMapper.canRevertReports(["ops.dispatch"], false))
+        XCTAssertTrue(PermissionMapper.canReportDetail(["ops.report_detail"], false))
+        XCTAssertFalse(PermissionMapper.canReportDetail(["ops.dispatch"], false))
+        // ops.report_revert يفتح وحدة العمليات مثل باقي مفاتيح ops.*
+        XCTAssertTrue(PermissionMapper.canAccessOperations(["ops.report_revert"], false))
+    }
 }

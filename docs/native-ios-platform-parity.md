@@ -157,8 +157,8 @@
 | **Delete** | report-entry/:id |
 | **Operational Actions** | توزيع بلاغ على فريق، تراجع عن توزيع، إلغاء/استعادة طاقم CAD |
 | **Permissions** | `ops.dispatch` (توزيع+طواقم) · `ops.report_revert` (تراجع) · `ops.report_detail` (تفصيلية) · `ops.reports` (اقتراح مكان) · `ops.forms` (lookup) |
-| **Native Screen** | `OpsEventsView` (الخط الزمني فقط) · `ReportsView` (بلاغات فرقتي للموظف) |
-| **Native Status** | ◐ عرض ✅ / التوزيع والتراجع والتفصيلية ⛔ |
+| **Native Screen** | `OpsEventsView` (الخط الزمني فقط) · `ReportsView` (بلاغات فرقتي للموظف) · `DispatchOpsView` (ملخص المناوبة + توزيع + تراجع + طواقم CAD + بلاغات تفصيلية) |
+| **Native Status** | ✅ مكتمل عمليًا — توزيع (`ops.dispatch`)، تراجع (`ops.report_revert`)، إلغاء/استعادة طواقم CAD بسبب اختياري، بلاغات تفصيلية إدخال/حذف (`ops.report_detail`)؛ العدّادات والخطورة مشتقة سيرفريًا وتُعرض كما هي. ⛔ متبقٍ: `locate-report`، `place-suggestion` (`ops.reports`)، `hospital-sighting`، `incidents/lookup`، طبقة `analytics/*` التاريخية (خريطة الذاكرة H1–H4)، `south-teams`، مسح الكل `DELETE /api/report-entry` (admin) |
 
 ## 10. المركبات (vehicles)
 

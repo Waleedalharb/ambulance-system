@@ -14,7 +14,7 @@ enum PermissionMapper {
     /// مفاتيح ops.* التي تفتح وحدة العمليات (حسب config/permissions.js).
     static let operationsKeys: [String] = [
         "ops.execute", "ops.completion", "ops.dispatch", "ops.reports",
-        "ops.report_detail", "ops.deployments", "ops.forms",
+        "ops.report_detail", "ops.report_revert", "ops.deployments", "ops.forms",
         "ops.team_exit", "ops.vehicles", "ops.alerts"
     ]
 
@@ -60,6 +60,21 @@ enum PermissionMapper {
     /// تمركز الوحدات وخطط/مهام الذروة.
     static func canDeployOps(_ permissions: [String], star: Bool) -> Bool {
         has(permissions, star: star, "ops.deployments")
+    }
+
+    /// توزيع البلاغات وإلغاء/استعادة طواقم CAD.
+    static func canDispatch(_ permissions: [String], star: Bool) -> Bool {
+        has(permissions, star: star, "ops.dispatch")
+    }
+
+    /// التراجع عن آخر بلاغ موزّع.
+    static func canRevertReports(_ permissions: [String], star: Bool) -> Bool {
+        has(permissions, star: star, "ops.report_revert")
+    }
+
+    /// البلاغات التفصيلية (إدخال/حذف).
+    static func canReportDetail(_ permissions: [String], star: Bool) -> Bool {
+        has(permissions, star: star, "ops.report_detail")
     }
 
     // ── مفاتيح الجداول التفصيلية (config/permissions.js — كلها منح فردية حصرًا) ──
@@ -132,6 +147,9 @@ final class PermissionStore: ObservableObject {
     var canCompleteOps: Bool { PermissionMapper.canCompleteOps(permissions, star: isStar) }
     var canVolunteers: Bool { PermissionMapper.canVolunteers(permissions, star: isStar) }
     var canDeployOps: Bool { PermissionMapper.canDeployOps(permissions, star: isStar) }
+    var canDispatch: Bool { PermissionMapper.canDispatch(permissions, star: isStar) }
+    var canRevertReports: Bool { PermissionMapper.canRevertReports(permissions, star: isStar) }
+    var canReportDetail: Bool { PermissionMapper.canReportDetail(permissions, star: isStar) }
     var canEditScheduleCell: Bool { PermissionMapper.canEditScheduleCell(permissions, star: isStar) }
     var canManageScheduleEmployees: Bool { PermissionMapper.canManageScheduleEmployees(permissions, star: isStar) }
     var canImportSchedule: Bool { PermissionMapper.canImportSchedule(permissions, star: isStar) }
