@@ -411,6 +411,7 @@ final class AdminSymbolsViewModel: ObservableObject {
 
     func lock() async throws {
         let res: AdminActionResponseDTO = try await api.post("/api/schedule-symbols/lock",
+                                                             body: EmptyBodyDTO(),
                                                              headers: unlockHeaders)
         if res.success == false { throw APIError.server(res.error ?? "فشل في القفل") }
         unlockToken = nil

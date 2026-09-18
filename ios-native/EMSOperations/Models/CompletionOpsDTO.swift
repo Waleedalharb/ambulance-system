@@ -50,20 +50,9 @@ struct VolunteerCandidatesDTO: Decodable {
     let candidates: [Candidate]?
 }
 
-// MARK: - GET /api/shift-events/:shiftId — أحداث المناوبة (id نصي)
-struct ShiftEventsDTO: Decodable {
-    struct Event: Decodable, Identifiable {
-        let id: String?
-        let type: String?
-        let description: String?
-        let timestamp: String?
-        let createdAt: String?
-    }
-    let success: Bool?
-    let events: [Event]?
-}
-
-// MARK: - POST /api/shift-completion — نتيجة حفظ أحداث الأشخاص
+// MARK: - نتيجة حفظ أحداث الأشخاص (POST /api/shift-completion)
+// ملاحظة: سجل أحداث المناوبة GET /api/shift-events/:shiftId يستخدم التعريف
+// القانوني الوحيد ShiftEventsDTO/ShiftEventDTO من TimelineOpsDTO (توحيد تكرار).
 struct CompletionSaveResponseDTO: Decodable {
     let success: Bool?
     let message: String?

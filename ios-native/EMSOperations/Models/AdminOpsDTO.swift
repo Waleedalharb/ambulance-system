@@ -216,6 +216,10 @@ struct TransferEmployeeRequestDTO: Encodable {
 }
 
 /// استجابة نجاح عامة للمسارات الإدارية البسيطة.
+/// جسم فارغ صريح لمسارات POST التي تتطلب headers بلا body —
+/// يحل استدلال some Encodable في APIClient.post(path,headers:) دون Any.
+struct EmptyBodyDTO: Encodable {}
+
 struct AdminActionResponseDTO: Decodable {
     let success: Bool?
     let id: Int?

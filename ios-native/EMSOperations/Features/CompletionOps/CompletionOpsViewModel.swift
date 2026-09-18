@@ -31,7 +31,7 @@ final class CompletionOpsViewModel: ObservableObject {
     @Published private(set) var shift: CurrentShiftDTO.Shift?
     @Published private(set) var state: StaffingStateDTO?
     @Published private(set) var supporters: [SupportPoolDTO.Supporter] = []
-    @Published private(set) var events: [ShiftEventsDTO.Event] = []
+    @Published private(set) var events: [ShiftEventDTO] = []
     @Published private(set) var absences: [CompletionRecordItem] = []
     @Published private(set) var notes: [CompletionRecordItem] = []
     @Published private(set) var recordsState: LoadState = .loading

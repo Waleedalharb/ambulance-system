@@ -116,12 +116,12 @@ struct CompletionRecordsView: View {
                                     .foregroundStyle(EMSTheme.Colors.textSecondary)
                             }
                             Spacer()
-                            if canWrite, let id = e.id {
+                            if canWrite {
                                 Button {
                                     confirm = ConfirmRequest(title: "حذف حدث",
                                                              message: "حذف هذا الحدث؟",
                                                              destructive: true) {
-                                        try await vm.deleteEvent(id)
+                                        try await vm.deleteEvent(e.id)
                                         return "حُذف الحدث"
                                     }
                                 } label: {

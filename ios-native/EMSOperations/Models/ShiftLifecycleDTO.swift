@@ -64,7 +64,7 @@ struct EmergencyShiftsResponseDTO: Decodable {
     let shifts: [EmergencyShiftDTO]?
 }
 
-struct EmergencyShiftDTO: Decodable {
+struct EmergencyShiftDTO: Decodable, Identifiable {   // id: Int? — هوية سيرفرية حقيقية
     let id: Int?
     let shiftName: String?
     let shiftDate: String?

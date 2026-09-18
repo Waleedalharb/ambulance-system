@@ -66,7 +66,9 @@ struct AdminSystemView: View {
             VStack(alignment: .leading, spacing: 10) {
                 EMSectionHeader(title: "الساعات المطلوبة شهريًا", systemImage: "clock.badge.checkmark")
                 if let value = vm.monthlyHours {
-                    EMSInfoRow(label: "القيمة الحالية", value: "\(value, specifier: "%.0f") ساعة")
+                    // تنسيق مسبق محليًا — specifier داخل interpolation ViewBuilder غير مضمون التحليل.
+                    let formattedHours = String(format: "%.0f", value)
+                    EMSInfoRow(label: "القيمة الحالية", value: "\(formattedHours) ساعة")
                 }
                 if canWrite {
                     HStack(spacing: 8) {
