@@ -270,6 +270,14 @@ struct OpsVehiclesView: View {
             VStack(alignment: .leading, spacing: 8) {
                 EMSectionHeader(title: "الدعم المفتوح")
                 ForEach(list) { s in
+                    // نص فريق الدعم يُحضَّر محليًا — بلا interpolation متداخل (Swift compile).
+                    let supportTeamText: String = {
+                        if let targetId = s.targetTeamId {
+                            if let resolved = vm.teamName(targetId), !resolved.isEmpty { return resolved }
+                            return "فريق رقم \(targetId)"
+                        }
+                        return "—"
+                    }()
                     EMSCard {
                         HStack(spacing: 10) {
                             Image(systemName: "arrow.triangle.swap")
@@ -278,7 +286,7 @@ struct OpsVehiclesView: View {
                                 Text(s.name ?? s.vehicleId ?? "مركبة")
                                     .font(.subheadline.weight(.semibold))
                                     .foregroundStyle(.white)
-                                Text("تدعم \(s.targetTeamId.flatMap { vm.teamName($0) } ?? "فريق رقم \(s.targetTeamId.map(String.init) ?? "—")")
+                                Text("تدعم \(supportTeamText)")
                                     .font(.caption)
                                     .foregroundStyle(EMSTheme.Colors.textMuted)
                             }

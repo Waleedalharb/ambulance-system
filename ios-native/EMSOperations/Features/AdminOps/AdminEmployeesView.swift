@@ -229,7 +229,12 @@ struct AdminEmployeesView: View {
                             VStack(alignment: .leading, spacing: 8) {
                                 EMSectionHeader(title: "توثيق الجوال", systemImage: "checkmark.shield")
                                 if emp.verified {
-                                    Text("الجوال موثق\(emp.phoneVerifiedBy.map { " بواسطة \($0)" } ?? "")")
+                                    // نص الموثِّق يُحضَّر محليًا — بلا interpolation متداخل (Swift compile).
+                                    let verifiedByText: String = {
+                                        guard let by = emp.phoneVerifiedBy, !by.isEmpty else { return "" }
+                                        return " بواسطة \(by)"
+                                    }()
+                                    Text("الجوال موثق\(verifiedByText)")
                                         .font(.caption).foregroundStyle(EMSTheme.Colors.emerald)
                                     Button("إلغاء التوثيق") {
                                         confirm = ConfirmRequest(title: "إلغاء توثيق الجوال",
