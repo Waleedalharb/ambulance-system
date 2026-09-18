@@ -109,8 +109,8 @@
 | **Delete** | roster row / schedule/employees / monthly-table (clear) |
 | **Operational Actions** | استيراد رسمي، توليد ذكي، تحقق تعارضات (`validate`)، تصدير PDF، تراجع/إعادة |
 | **Permissions** | `schedule.view` (قراءة+validate) · `schedule.edit_cell` · `schedule.employees` · `schedule.import` · `schedule.bulk_update` · `schedule.swap` · `schedule.sync` · `schedule.export` · `schedule.clear` — كلها منح فردية حصرًا؛ التوليد/التحديث `authorize(['admin','director'])` |
-| **Native Screen** | `ScheduleView` (جدول الموظف الشهري — قراءة) فقط |
-| **Native Status** | ◐ عرض جدولي ✅ / كل عمليات التحرير والاستيراد والتوليد ⛔ |
+| **Native Screen** | `ScheduleView` (جدول الموظف الشهري — قراءة) + مجال الجداول الإداري `Features/ScheduleOps/` (`ScheduleHubView` خمسة أوجه عرض · `ScheduleCellSheet` تحرير · `ScheduleHistoryView` تدقيق · `ScheduleAdvancedView` عمليات متقدمة) — التصميم: `docs/native-schedule-parity.md` |
+| **Native Status** | ✅ عرض شهر/يوم/فريق/موظف/مركز ✅ تعديل خلية (PUT /cell) ✅ إضافة/حذف سجل (validate → تأكيد) ✅ تبديل (swap) ✅ سجل تدقيق قبل/بعد ✅ تصدير PDF (تنزيل ثنائي + مشاركة) ✅ تصدير JSON (مشاركة) ✅ مسودات/تراجع/إعادة (إعادة تطبيق عبر bulk-update بعد تأكيد) ✅ توليد ذكي (admin/director) ✅ مسح بالمدى/كامل (تأكيد مزدوج) — ⛔ استيراد Excel (`import`/`official-import`/`schedule/files`) يبقى على الويب: فجوة موثقة تحتاج endpoint فكّ سيرفي · ⛔ الجدول الشهري الرسمي (`monthly-table`) والمزامنة (`schedule.sync`) و`shift-schedule/update` لم تُنقل بعد · التحديث الحي يعتمد pull-to-refresh (لا SSE في Native) |
 
 ## 7. التكميل (completion / staffing)
 
