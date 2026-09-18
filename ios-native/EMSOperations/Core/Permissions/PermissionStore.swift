@@ -16,7 +16,8 @@ enum PermissionMapper {
     static let operationsKeys: [String] = [
         "ops.execute", "ops.completion", "ops.dispatch", "ops.reports",
         "ops.report_detail", "ops.report_revert", "ops.deployments", "ops.forms",
-        "ops.team_exit", "ops.vehicles", "ops.alerts", "workflow.view"
+        "ops.team_exit", "ops.vehicles", "ops.alerts", "workflow.view",
+        "shift.lifecycle", "shift.approve"
     ]
 
     static func has(_ permissions: [String], star: Bool, _ key: String) -> Bool {
@@ -159,6 +160,18 @@ enum PermissionMapper {
     static func canManageSymbols(_ permissions: [String], star: Bool) -> Bool {
         has(permissions, star: star, "symbols.manage")
     }
+
+    // ── مفاتيح دورة المناوبة (§8) — منح فردية بنطاق shift (config/permissions.js:57-58) ──
+
+    /// بدء/إنهاء/تحديث المناوبة.
+    static func canShiftLifecycle(_ permissions: [String], star: Bool) -> Bool {
+        has(permissions, star: star, "shift.lifecycle")
+    }
+
+    /// اعتماد التسليم (pending_handover → archived).
+    static func canShiftApprove(_ permissions: [String], star: Bool) -> Bool {
+        has(permissions, star: star, "shift.approve")
+    }
 }
 
 @MainActor
@@ -208,6 +221,8 @@ final class PermissionStore: ObservableObject {
     var canClearSchedule: Bool { PermissionMapper.canClearSchedule(permissions, star: isStar) }
     var canManageUsers: Bool { PermissionMapper.canManageUsers(permissions, star: isStar) }
     var canManageSymbols: Bool { PermissionMapper.canManageSymbols(permissions, star: isStar) }
+    var canShiftLifecycle: Bool { PermissionMapper.canShiftLifecycle(permissions, star: isStar) }
+    var canShiftApprove: Bool { PermissionMapper.canShiftApprove(permissions, star: isStar) }
 
     /// بوابة مركز الإدارة (§20): دور admin/director أو أي مفتاح إداري —
     /// كل شاشة داخل المركز تُقيَّد بصلاحيتها الخاصة، والحسم النهائي سيرفري.

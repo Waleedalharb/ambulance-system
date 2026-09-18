@@ -141,8 +141,8 @@
 | **Delete** | `DELETE /api/shifts/:id` (admin) · emergency delete (admin) |
 | **Operational Actions** | دورة حياة كاملة + طوارئ + اعتماد تسليم |
 | **Permissions** | `shift.lifecycle` (بدء/إنهاء/تحديث) · `shift.approve` (تسليم) · أرشفة/طوارئ/تقارير `admin`/`director` · التنبيهات `ops.alerts` · القراءة `authenticate` |
-| **Native Screen** | `CurrentShiftView` (مناوبتي التفصيلية — قراءة) · سياق current-shift في `DecisionCenterView` |
-| **Native Status** | ◐ قراءة ✅ / دورة الحياة والطوارئ ⛔ |
+| **Native Screen** | `CurrentShiftView` + `ShiftLifecycleView` (بدء/إنهاء/اعتماد تسليم + طوارئ — موديول «دورة المناوبة» في غرفة العمليات) |
+| **Native Status** | ✅ دورة الحياة والطوارئ — مؤجل: اللوحات (daily/weekly/monthly/executive) والمؤشرات والمقارنة والبحث المتقدم (شاشات تحليلية ثقيلة تحتاج قرار تصميم مستقل) |
 
 ## 9. البلاغات والتوزيع (dispatch / reports)
 

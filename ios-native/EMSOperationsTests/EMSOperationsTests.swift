@@ -886,4 +886,55 @@ final class EMSOperationsTests: XCTestCase {
         XCTAssertEqual(obj["type"] as? String, "alert")
         XCTAssertNil(obj["recipientId"]) // لا camelCase في الجسم
     }
+
+    // MARK: - مجال دورة المناوبة (ShiftLifecycle)
+
+    func testShiftLifecycleResultToleratesEngineShapes() throws {
+        // نتيجة ShiftService حرة: shift_id أو shiftId أو بلا معرّف
+        let snake = #"{"success": true, "shift_id": 41}"#.data(using: .utf8)!
+        let camel = #"{"success": true, "shiftId": 42}"#.data(using: .utf8)!
+        let bare = #"{"success": false, "error": "المناوبة ليست بانتظار التسليم"}"#.data(using: .utf8)!
+        XCTAssertEqual(try JSONDecoder().decode(ShiftLifecycleResultDTO.self, from: snake).shiftId, 41)
+        XCTAssertEqual(try JSONDecoder().decode(ShiftLifecycleResultDTO.self, from: camel).shiftId, 42)
+        let failed = try JSONDecoder().decode(ShiftLifecycleResultDTO.self, from: bare)
+        XCTAssertEqual(failed.success, false)
+        XCTAssertEqual(failed.error, "المناوبة ليست بانتظار التسليم")
+        XCTAssertNil(failed.shiftId)
+    }
+
+    func testEndShiftRequestEncodesNotes() throws {
+        let data = try JSONEncoder().encode(EndShiftRequestDTO(handoverNotes: "تسليم نظيف"))
+        let obj = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        XCTAssertEqual(obj["handoverNotes"] as? String, "تسليم نظيف")
+    }
+
+    func testEmergencyShiftsDecodeRawSqliteRows() throws {
+        // صفوف SQLite خام — server.js:3568
+        let json = #"{"success": true, "count": 1, "shifts": [{"id": 41, "shift_name": "مناوبة 41", "shift_date": "2026-09-18", "shift_type": "مسائية", "status": "active", "start_time": "2026-09-18 20:00", "total_reports": 3}]}"#.data(using: .utf8)!
+        let dto = try JSONDecoder().decode(EmergencyShiftsResponseDTO.self, from: json)
+        let shift = try XCTUnwrap(dto.shifts?.first)
+        XCTAssertEqual(shift.stableId, 41)
+        XCTAssertEqual(shift.shiftType, "مسائية")
+        XCTAssertEqual(shift.totalReports, 3)
+        XCTAssertEqual(shift.displayName, "مناوبة 41")
+    }
+
+    func testEmergencyEditRequestOmitsEmptyFields() throws {
+        // edit-shift يبني SET من الحقول الممررة فقط — server.js:3614
+        let data = try JSONEncoder().encode(EmergencyShiftRequestDTO(shiftId: 41, shiftType: nil, shiftDate: "2026-09-19"))
+        let obj = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        XCTAssertEqual(obj["shiftId"] as? Int, 41)
+        XCTAssertNil(obj["shiftType"])
+        XCTAssertEqual(obj["shiftDate"] as? String, "2026-09-19")
+    }
+
+    func testShiftLifecyclePermissionKeys() {
+        XCTAssertTrue(PermissionMapper.canShiftLifecycle(["shift.lifecycle"], false))
+        XCTAssertFalse(PermissionMapper.canShiftLifecycle(["shift.approve"], false))
+        XCTAssertTrue(PermissionMapper.canShiftApprove(["shift.approve"], false))
+        XCTAssertFalse(PermissionMapper.canShiftApprove(["shift.lifecycle"], false))
+        // مفاتيح دورة المناوبة تفتح وحدة العمليات
+        XCTAssertTrue(PermissionMapper.canAccessOperations(["shift.lifecycle"], false))
+        XCTAssertTrue(PermissionMapper.canAccessOperations(["shift.approve"], false))
+    }
 }
