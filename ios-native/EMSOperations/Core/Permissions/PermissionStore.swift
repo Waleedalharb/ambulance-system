@@ -77,6 +77,11 @@ enum PermissionMapper {
         has(permissions, star: star, "ops.report_detail")
     }
 
+    /// أحداث المركبات: إسناد/تبديل/دعم/حالة ميكانيكية.
+    static func canVehicleOps(_ permissions: [String], star: Bool) -> Bool {
+        has(permissions, star: star, "ops.vehicles")
+    }
+
     // ── مفاتيح الجداول التفصيلية (config/permissions.js — كلها منح فردية حصرًا) ──
     // من لا يملك المفتاح لا يرى الإجراء إطلاقًا؛ الحسم النهائي على الخادم (403).
 
@@ -136,6 +141,9 @@ final class PermissionStore: ObservableObject {
     /// دور الإدارة/القيادة — بوابة الإجراءات المقيدة سيرفريًا بالدور (لا مفتاح منح).
     var isAdminOrDirector: Bool { role == "admin" || role == "director" }
 
+    /// دور الإدارة حصرًا — سجل المركبات المرجعي ومسارات authorize(['admin']).
+    var isAdmin: Bool { role == "admin" }
+
     /// التوليد الذكي للجداول مقيد سيرفريًا بدور admin/director (لا مفتاح منح).
     var canGenerateSchedule: Bool { isAdminOrDirector }
 
@@ -150,6 +158,7 @@ final class PermissionStore: ObservableObject {
     var canDispatch: Bool { PermissionMapper.canDispatch(permissions, star: isStar) }
     var canRevertReports: Bool { PermissionMapper.canRevertReports(permissions, star: isStar) }
     var canReportDetail: Bool { PermissionMapper.canReportDetail(permissions, star: isStar) }
+    var canVehicleOps: Bool { PermissionMapper.canVehicleOps(permissions, star: isStar) }
     var canEditScheduleCell: Bool { PermissionMapper.canEditScheduleCell(permissions, star: isStar) }
     var canManageScheduleEmployees: Bool { PermissionMapper.canManageScheduleEmployees(permissions, star: isStar) }
     var canImportSchedule: Bool { PermissionMapper.canImportSchedule(permissions, star: isStar) }

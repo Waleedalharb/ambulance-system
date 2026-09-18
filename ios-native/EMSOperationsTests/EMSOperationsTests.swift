@@ -506,4 +506,52 @@ final class EMSOperationsTests: XCTestCase {
         // ops.report_revert يفتح وحدة العمليات مثل باقي مفاتيح ops.*
         XCTAssertTrue(PermissionMapper.canAccessOperations(["ops.report_revert"], false))
     }
+
+    // MARK: - مجال المركبات (VehiclesOps)
+
+    func testVehicleHistoryDTODecodes() throws {
+        let json = #"{"success": true, "vehicle": {"id": "veh_1", "name": "إسعاف 12", "plateNumber": "أ ب ج 1234", "vehicleType": "إسعاف", "modelYear": 2023, "designation": "أساسية"}, "current": {"status": "active", "teamId": 3, "teamName": "جنوب 2"}, "events": [{"id": 9, "domain": "vehicle", "eventType": "assignment", "teamId": 3, "teamName": "جنوب 2", "shiftDate": "2026-09-18", "actorName": "مشرف", "createdAt": "2026-09-18T06:00:00Z", "createdAtRiyadh": "2026-09-18 09:00:00"}]}"#.data(using: .utf8)!
+        let dto = try JSONDecoder().decode(VehicleHistoryDTO.self, from: json)
+        XCTAssertEqual(dto.vehicle?.plateNumber, "أ ب ج 1234")
+        XCTAssertEqual(dto.current?.teamName, "جنوب 2")
+        let event = try XCTUnwrap(dto.events?.first)
+        XCTAssertEqual(event.eventType, "assignment")
+        XCTAssertEqual(event.teamId, 3)
+        XCTAssertEqual(event.createdAtRiyadh, "2026-09-18 09:00:00")
+    }
+
+    func testVehicleRegistryDTODecodesSnakeCase() throws {
+        let json = #"{"success": true, "vehicles": [{"id": "veh_1", "plate_number": "1234", "call_sign": "إسعاف 12", "vehicle_type": "إسعاف", "model_year": 2023, "category": "نوع أ", "designation": "أساسية", "admin_status": "أساسية", "sort_order": 1}]}"#.data(using: .utf8)!
+        let dto = try JSONDecoder().decode(VehicleRegistryDTO.self, from: json)
+        let item = try XCTUnwrap(dto.vehicles?.first)
+        XCTAssertEqual(item.plateNumber, "1234")
+        XCTAssertEqual(item.modelYear, 2023)
+        XCTAssertEqual(item.adminStatus, "أساسية")
+    }
+
+    func testVehicleRegistryRequestEncodesSnakeCase() throws {
+        let req = VehicleRegistryRequest(plateNumber: "1234", vehicleType: "إسعاف",
+                                         category: "نوع أ", designation: "أساسية", modelYear: 2023)
+        let data = try JSONEncoder().encode(req)
+        let obj = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        XCTAssertEqual(obj["plate_number"] as? String, "1234")
+        XCTAssertEqual(obj["model_year"] as? Int, 2023)
+        XCTAssertNil(obj["call_sign"])
+        XCTAssertNil(obj["notes"])
+    }
+
+    func testVehicleStatusEventRequestOmitsNil() throws {
+        let req = VehicleStatusEventRequest(vehicleId: "veh_1", status: "active")
+        let data = try JSONEncoder().encode(req)
+        let obj = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        XCTAssertEqual(obj["status"] as? String, "active")
+        XCTAssertNil(obj["reason"]) // السبب يُرسل فقط عند breakdown/out_of_service
+        XCTAssertNil(obj["note"])
+    }
+
+    func testVehicleOpsPermissionKey() {
+        XCTAssertTrue(PermissionMapper.canVehicleOps(["ops.vehicles"], false))
+        XCTAssertFalse(PermissionMapper.canVehicleOps(["ops.dispatch"], false))
+        XCTAssertTrue(PermissionMapper.canVehicleOps([], true))
+    }
 }

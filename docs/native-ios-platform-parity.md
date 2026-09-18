@@ -173,8 +173,8 @@
 | **Delete** | — (قانون append-only — لا حذف إطلاقًا) |
 | **Operational Actions** | إسناد مركبة لفريق، تبديل، دعم، تسجيل حالة ميكانيكية |
 | **Permissions** | `ops.vehicles` (تنفيذ) · registry `admin` · قراءة `authenticate` |
-| **Native Screen** | `OpsVehiclesView` (لوحة قراءة) · `VehicleView` (مركبة الموظف) |
-| **Native Status** | ◐ قراءة ✅ / الإسناد والدعم والأحداث ⛔ |
+| **Native Screen** | `OpsVehiclesView` (لوحة + إسناد/تبديل/دعم/حالة) · `VehicleHistoryView` (التاريخ عبر المناوبات) · `VehicleRegistryView` (السجل المرجعي — admin) · `VehicleView` (مركبة الموظف) |
+| **Native Status** | ✅ مكتمل عمليًا — تغيير الحالة (سبب إلزامي عند breakdown/out_of_service)، إسناد/إنهاء/تبديل، دعم/إنهاء دعم (`ops.vehicles`)، تاريخ المركبة، سجل مرجعي إضافة/تعديل (admin حصرًا — `isAdmin`). ⛔ متبقٍ: أحداث الورشة (عقد تعريفي بلا مسار خادم)، مؤشرات `vehicles/indicators` و`timeline` التفصيلية، `vehicles/centers` |
 
 ## 11. التمركز والخريطة (deployments / map)
 
