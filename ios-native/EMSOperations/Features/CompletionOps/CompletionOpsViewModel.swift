@@ -53,7 +53,7 @@ final class CompletionOpsViewModel: ObservableObject {
         if case .loaded = bootState { return }
         bootState = .loading
         do {
-            let cur: CurrentShiftDTO = try await api.get("/api/smart-operator/current-shift")
+            let cur: CurrentShiftDTO = try await api.get("/api/current-shift")
             shift = cur.shift
             guard let id = cur.shift?.id else {
                 // لا مناوبة نشطة — حالة فراغ صادقة (التكميل يتطلب مناوبة سيرفريًا)
