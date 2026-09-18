@@ -190,6 +190,11 @@ enum PermissionMapper {
     static func canAssetsInventory(_ permissions: [String], star: Bool) -> Bool {
         has(permissions, star: star, "assets.inventory") || has(permissions, star: star, "assets.manage")
     }
+
+    /// إقرار التنبيهات التشغيلية (ops.alerts — إقرار تنبيهات مراقبة المستشفيات والمناوبة).
+    static func canOpsAlerts(_ permissions: [String], star: Bool) -> Bool {
+        has(permissions, star: star, "ops.alerts")
+    }
 }
 
 @MainActor
@@ -244,6 +249,7 @@ final class PermissionStore: ObservableObject {
     var canAssetsView: Bool { PermissionMapper.canAssetsView(permissions, star: isStar) }
     var canAssetsManage: Bool { PermissionMapper.canAssetsManage(permissions, star: isStar) }
     var canAssetsInventory: Bool { PermissionMapper.canAssetsInventory(permissions, star: isStar) }
+    var canOpsAlerts: Bool { PermissionMapper.canOpsAlerts(permissions, star: isStar) }
 
     /// بوابة مركز الإدارة (§20): دور admin/director أو أي مفتاح إداري —
     /// كل شاشة داخل المركز تُقيَّد بصلاحيتها الخاصة، والحسم النهائي سيرفري.

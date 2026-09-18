@@ -283,8 +283,8 @@
 | **Delete** | — |
 | **Operational Actions** | تأكيد تنبيه مراقبة مستشفى |
 | **Permissions** | ack `ops.alerts` · القراءة `authenticate` |
-| **Native Screen** | — |
-| **Native Status** | ⛔ غير موجود |
+| **Native Screen** | `HospitalsOpsView` (موديول «المستشفيات» في غرفة العمليات: مراقبة — ملخص/تنبيهات مع إقرار ops.alerts/تاريخ رحلة — + السجل) |
+| **Native Status** | ✅ مراقبة وسجل — مؤجل: كتابة سجل المستشفيات `POST /api/hospitals` (كتابة JSON كاملة قديمة بخطر استبدال الكل — لا تُبنى دون قرار) |
 
 ## 18. الذكاء والمشغل الذكي (AI / smart operator)
 

@@ -1050,4 +1050,43 @@ final class EMSOperationsTests: XCTestCase {
         // مفاتيح العهد تفتح وحدة العمليات
         XCTAssertTrue(PermissionMapper.canAccessOperations(["assets.view"], false))
     }
+
+    // MARK: - مجال المستشفيات (§17)
+
+    func testHospitalDecodesRegistryShape() throws {
+        // hospitals.json — حقول الواجهة: name/specialty/type/hours/lat/lng
+        let json = #"{"success": true, "data": [{"name": "مستشفى الملك فهد", "specialty": "عام", "type": "عام", "hours": "24 ساعة", "lat": 24.7, "lng": 46.7}]}"#.data(using: .utf8)!
+        let dto = try JSONDecoder().decode(HospitalsListDTO.self, from: json)
+        let h = try XCTUnwrap(dto.data?.first)
+        XCTAssertEqual(h.name, "مستشفى الملك فهد")
+        XCTAssertEqual(h.type, "عام")
+        XCTAssertEqual(h.lat, 24.7)
+    }
+
+    func testHospitalMonitorSummaryDecodesFacilitiesAndAlerts() throws {
+        // summarize + alertsInWindow — hospital-monitor-service.js
+        let json = #"{"success": true, "window": {"label": "current-shift", "from": "2026-09-18T05:00:00.000Z", "to": null}, "totalTransferred": 8, "currentAtHospital": 3, "lastKnownOnly": 4, "monitoringLost": 1, "avgDwellMin": 12.5, "exceedances": 2, "ongoing": 3, "unmeasured": 1, "facilities": [{"facility": "مستشفى الملك فهد", "cases": 5, "avgDwellMin": 11.0, "exceedances": 1, "ongoing": 2, "unmeasured": 0, "monitoringLost": 0, "journeys": [{"key": "k1", "unitCode": "U-12", "episodeState": "at-hospital", "dwellMin": 15.0, "ongoing": true}]}], "alerts": [{"id": "k1|dwell-exceed", "key": "k1", "type": "dwell-exceed", "state": "open", "facility": "مستشفى الملك فهد", "dwellMin": 15.0, "firstRaisedAt": "2026-09-18T10:00:00.000Z", "unreliable": false}], "activeAlerts": 1}"#.data(using: .utf8)!
+        let dto = try JSONDecoder().decode(HospitalMonitorSummaryDTO.self, from: json)
+        XCTAssertEqual(dto.totalTransferred, 8)
+        XCTAssertEqual(dto.activeAlerts, 1)
+        let fac = try XCTUnwrap(dto.facilities?.first)
+        XCTAssertEqual(fac.facility, "مستشفى الملك فهد")
+        XCTAssertEqual(fac.journeys?.first?.episodeState, "at-hospital")
+        let alert = try XCTUnwrap(dto.alerts?.first)
+        XCTAssertEqual(alert.id, "k1|dwell-exceed")
+        XCTAssertEqual(alert.state, "open")
+    }
+
+    func testHospitalHistoryDecodesEntries() throws {
+        let json = #"{"success": true, "key": "k1", "history": [{"at": "2026-09-18T10:00:00.000Z", "key": "k1", "field": "alert", "alert": "raised", "dwellMin": 15.0, "facility": "مستشفى الملك فهد"}]}"#.data(using: .utf8)!
+        let dto = try JSONDecoder().decode(HospitalHistoryDTO.self, from: json)
+        XCTAssertEqual(dto.history?.first?.alert, "raised")
+        XCTAssertEqual(dto.history?.first?.dwellMin, 15.0)
+    }
+
+    func testOpsAlertsPermissionKey() {
+        // إقرار تنبيهات المراقبة مقيد بـ ops.alerts — server.js:5603
+        XCTAssertTrue(PermissionMapper.canOpsAlerts(["ops.alerts"], false))
+        XCTAssertFalse(PermissionMapper.canOpsAlerts(["ops.dispatch"], false))
+    }
 }
