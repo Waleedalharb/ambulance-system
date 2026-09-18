@@ -17,7 +17,8 @@ enum PermissionMapper {
         "ops.execute", "ops.completion", "ops.dispatch", "ops.reports",
         "ops.report_detail", "ops.report_revert", "ops.deployments", "ops.forms",
         "ops.team_exit", "ops.vehicles", "ops.alerts", "workflow.view",
-        "shift.lifecycle", "shift.approve"
+        "shift.lifecycle", "shift.approve",
+        "assets.view", "assets.manage", "assets.inventory"
     ]
 
     static func has(_ permissions: [String], star: Bool, _ key: String) -> Bool {
@@ -172,6 +173,23 @@ enum PermissionMapper {
     static func canShiftApprove(_ permissions: [String], star: Bool) -> Bool {
         has(permissions, star: star, "shift.approve")
     }
+
+    // ── مفاتيح العهد والأصول (§16) — server.js: assets.view / assets.manage / assets.inventory ──
+
+    /// قراءة سجل الأصول واللوحة والفروقات والتقارير.
+    static func canAssetsView(_ permissions: [String], star: Bool) -> Bool {
+        has(permissions, star: star, "assets.view")
+    }
+
+    /// إدارة العهد: اعتماد الاستيراد والجلسات، النقل، حسم المراجعة، دورات الجرد.
+    static func canAssetsManage(_ permissions: [String], star: Bool) -> Bool {
+        has(permissions, star: star, "assets.manage")
+    }
+
+    /// تنفيذ الجرد (INV_EXEC في server.js: assets.inventory أو assets.manage).
+    static func canAssetsInventory(_ permissions: [String], star: Bool) -> Bool {
+        has(permissions, star: star, "assets.inventory") || has(permissions, star: star, "assets.manage")
+    }
 }
 
 @MainActor
@@ -223,6 +241,9 @@ final class PermissionStore: ObservableObject {
     var canManageSymbols: Bool { PermissionMapper.canManageSymbols(permissions, star: isStar) }
     var canShiftLifecycle: Bool { PermissionMapper.canShiftLifecycle(permissions, star: isStar) }
     var canShiftApprove: Bool { PermissionMapper.canShiftApprove(permissions, star: isStar) }
+    var canAssetsView: Bool { PermissionMapper.canAssetsView(permissions, star: isStar) }
+    var canAssetsManage: Bool { PermissionMapper.canAssetsManage(permissions, star: isStar) }
+    var canAssetsInventory: Bool { PermissionMapper.canAssetsInventory(permissions, star: isStar) }
 
     /// بوابة مركز الإدارة (§20): دور admin/director أو أي مفتاح إداري —
     /// كل شاشة داخل المركز تُقيَّد بصلاحيتها الخاصة، والحسم النهائي سيرفري.

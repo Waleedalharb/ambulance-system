@@ -267,8 +267,8 @@
 | **Delete** | — |
 | **Operational Actions** | دورة جرد كاملة، اعتماد استيراد، نقل عهدة |
 | **Permissions** | `assets.view` (قراءة) · `assets.manage` (إدارة) · `assets.inventory` (تنفيذ الجرد — منح فردي) |
-| **Native Screen** | `InventoryView` (عهدة الموظف — قراءة) |
-| **Native Status** | ◐ عهدتي ✅ / إدارة العهد والجرد ⛔ |
+| **Native Screen** | `InventoryView` (عهدة الموظف) + `AssetsHomeView` (موديول «العهد والأصول»: لوحة/سجل/فروقات/جرد) + `AssetCardView` (بطاقة الجهاز + نقل/حسم/توثيق فقد) + `InventorySessionView` (تسجيل نتائج/مكتشف/إرسال + اعتماد/إعادة فتح) |
+| **Native Status** | ✅ إدارة العهد والجرد — مؤجل: تصدير CSV للتقارير (custody/cycle/discrepancies بصيغة csv) ومعاينة صفوف الاستيراد التفصيلية (تُعرض الإجماليات فقط) |
 
 ## 17. المستشفيات (hospitals)
 

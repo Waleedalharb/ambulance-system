@@ -995,4 +995,59 @@ final class EMSOperationsTests: XCTestCase {
         XCTAssertEqual(obj["description"] as? String, "ملاحظة")
         XCTAssertNil(obj["timestamp"])
     }
+
+    // MARK: - مجال العهد والأصول (§16)
+
+    func testAssetDecodesRawSqliteRow() throws {
+        // جدول assets — db.js:4248
+        let json = #"{"id": 12, "asset_code": "ASSET-0012", "type_name": "جهاز صدمات", "original_name": null, "serial_number": "SN123", "status": "working", "team_name": "فريق 1", "center_name": "مركز الشفا", "custody": "exclusive", "is_new": 0, "needs_review": 1}"#.data(using: .utf8)!
+        let asset = try JSONDecoder().decode(AssetDTO.self, from: json)
+        XCTAssertEqual(asset.id, 12)
+        XCTAssertEqual(asset.assetCode, "ASSET-0012")
+        XCTAssertEqual(asset.status, "working")
+        XCTAssertEqual(asset.needsReview, 1)
+    }
+
+    func testInventoryCycleDecodesSessionProgress() throws {
+        // GET /api/assets/inventory/cycles — server.js:6123 يلحق عدادات الجلسات
+        let json = #"{"success": true, "cycles": [{"id": 3, "label": "الجرد التأسيسي", "status": "active", "sessions_total": 5, "sessions_submitted": 2, "sessions_approved": 1, "sessions": [{"id": 9, "team_name": "فريق 1", "status": "open", "conductor_name": null}]}]}"#.data(using: .utf8)!
+        let dto = try JSONDecoder().decode(InventoryCyclesDTO.self, from: json)
+        let cycle = try XCTUnwrap(dto.cycles?.first)
+        XCTAssertEqual(cycle.sessionsTotal, 5)
+        XCTAssertEqual(cycle.sessions?.first?.teamName, "فريق 1")
+        XCTAssertEqual(cycle.sessions?.first?.status, "open")
+    }
+
+    func testInventoryItemRequestUsesServerFieldNames() throws {
+        // server.js:6184 يتوقع asset_id/result/serial_seen/location_note (snake_case)
+        let data = try JSONEncoder().encode(InventoryItemRequestDTO(
+            assetId: 12, result: "missing", reason: "فُقد أثناء النقل", serialSeen: nil, locationNote: nil, discovered: nil))
+        let obj = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        XCTAssertEqual(obj["asset_id"] as? Int, 12)
+        XCTAssertEqual(obj["result"] as? String, "missing")
+        XCTAssertEqual(obj["reason"] as? String, "فُقد أثناء النقل")
+        XCTAssertNil(obj["serial_seen"])
+    }
+
+    func testDiscrepancyCaseDecodesServerShape() throws {
+        // computeDiscrepancies — server.js:6425
+        let json = #"{"success": true, "cases": [{"key": "missing-12", "category": "missing", "priority": "high", "suggested_action": "document_missing", "asset_id": 12, "asset_code": "ASSET-0012", "type_name": "جهاز صدمات", "serial_number": "SN123", "status": "missing", "team_name": "فريق 1", "raised_at": "2026-09-01 10:00:00", "explanation": "مفقود منذ الجرد الأخير"}], "category_labels": {"missing": "مفقود"}}"#.data(using: .utf8)!
+        let dto = try JSONDecoder().decode(DiscrepanciesDTO.self, from: json)
+        let c = try XCTUnwrap(dto.cases?.first)
+        XCTAssertEqual(c.suggestedAction, "document_missing")
+        XCTAssertEqual(c.assetId, 12)
+        XCTAssertEqual(dto.categoryLabels?["missing"], "مفقود")
+    }
+
+    func testAssetsPermissionKeys() {
+        XCTAssertTrue(PermissionMapper.canAssetsView(["assets.view"], false))
+        XCTAssertFalse(PermissionMapper.canAssetsView(["assets.manage"], false))
+        XCTAssertTrue(PermissionMapper.canAssetsManage(["assets.manage"], false))
+        // INV_EXEC: الجرد متاح لحامل assets.inventory أو assets.manage
+        XCTAssertTrue(PermissionMapper.canAssetsInventory(["assets.inventory"], false))
+        XCTAssertTrue(PermissionMapper.canAssetsInventory(["assets.manage"], false))
+        XCTAssertFalse(PermissionMapper.canAssetsInventory(["assets.view"], false))
+        // مفاتيح العهد تفتح وحدة العمليات
+        XCTAssertTrue(PermissionMapper.canAccessOperations(["assets.view"], false))
+    }
 }
