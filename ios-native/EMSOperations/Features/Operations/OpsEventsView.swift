@@ -2,26 +2,50 @@
 //  OpsEventsView.swift
 //  EMSOperations
 //
-//  الأحداث التشغيلية (تفعيل المنصة الأصلية): الخط الزمني من GET /api/timeline.
-//  عرض فقط — قراءة، بلا أي مسار كتابة.
+//  الأحداث التشغيلية (§14): أربعة أقسام — عام (/api/timeline) + الكادر
+//  (/api/staffing/timeline) + المركبات (/api/vehicles/timeline) + المناوبة
+//  (/api/shifts/:id/timeline + shift-events). الكتابة فقط في أحداث المناوبة
+//  اليدوية ومقيدة بـ ops.completion كما في server.js.
 //
 
 import SwiftUI
 
 struct OpsEventsView: View {
     @StateObject private var vm = OpsEventsViewModel()
+    @State private var segment: Segment = .general
+
+    enum Segment: String, CaseIterable, Identifiable {
+        case general, staffing, vehicles, shift
+        var id: String { rawValue }
+        var title: String {
+            switch self {
+            case .general: return "عام"
+            case .staffing: return "الكادر"
+            case .vehicles: return "المركبات"
+            case .shift: return "المناوبة"
+            }
+        }
+    }
 
     var body: some View {
         ScrollView {
             VStack(spacing: EMSTheme.spacing) {
-                switch vm.state {
-                case .loading:
-                    EMSSkeletonCard(lines: 4)
-                    EMSSkeletonCard(lines: 3)
-                case .failed(let message):
-                    EMSErrorView(message: message) { Task { await vm.load() } }
-                case .loaded:
-                    content
+                Picker("القسم", selection: $segment) {
+                    ForEach(Segment.allCases) { s in
+                        Text(s.title).tag(s)
+                    }
+                }
+                .pickerStyle(.segmented)
+
+                switch segment {
+                case .general:
+                    generalContent
+                case .staffing:
+                    StaffingTimelineView()
+                case .vehicles:
+                    VehiclesTimelineView()
+                case .shift:
+                    ShiftTimelineView()
                 }
             }
             .padding(EMSTheme.pagePadding)
@@ -29,6 +53,19 @@ struct OpsEventsView: View {
         .refreshable { await vm.load() }
         .emsPage("الأحداث التشغيلية")
         .task { await vm.load() }
+    }
+
+    @ViewBuilder
+    private var generalContent: some View {
+        switch vm.state {
+        case .loading:
+            EMSSkeletonCard(lines: 4)
+            EMSSkeletonCard(lines: 3)
+        case .failed(let message):
+            EMSErrorView(message: message) { Task { await vm.load() } }
+        case .loaded:
+            content
+        }
     }
 
     @ViewBuilder

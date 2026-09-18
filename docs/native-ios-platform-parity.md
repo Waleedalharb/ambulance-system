@@ -236,8 +236,8 @@
 | **Update / Delete** | shift-events/:eventId |
 | **Operational Actions** | تسجيل حدث تشغيلي يدوي |
 | **Permissions** | القراءة `authenticate` · الكتابة admin / `ops.completion` |
-| **Native Screen** | `OpsEventsView` (الخط الزمني العام) |
-| **Native Status** | ◐ عام ✅ / خطوط الكادر والمركبات والمناوبة ⛔ |
+| **Native Screen** | `OpsEventsView` بأربعة أقسام: عام (`/api/timeline`) + الكادر (`/api/staffing/timeline` بسجلات التأخير والتغطية) + المركبات (`/api/vehicles/timeline`) + المناوبة (`/api/shifts/:id/timeline` + أحداث يدوية `shift-events` إضافة/حذف بصلاحية ops.completion) |
+| **Native Status** | ✅ عام والكادر والمركبات والمناوبة — مؤجل: الكتابة في الخط العام `POST /api/timeline` (كتابة JSON كاملة قديمة — خطر استبدال الكل؛ لا تُبنى أصلًا دون قرار) |
 
 ## 15. الأرشيف والسلامة (archive)
 

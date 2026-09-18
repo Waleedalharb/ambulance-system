@@ -937,4 +937,62 @@ final class EMSOperationsTests: XCTestCase {
         XCTAssertTrue(PermissionMapper.canAccessOperations(["shift.lifecycle"], false))
         XCTAssertTrue(PermissionMapper.canAccessOperations(["shift.approve"], false))
     }
+
+    // MARK: - مجال خطوط الأحداث (§14)
+
+    func testOpEventDecodesRawSqliteRow() throws {
+        // صف operational_events خام — مخطط db.js
+        let json = #"{"id": 7, "shift_id": 41, "domain": "staffing", "entity_id": "أحمد", "entity_name": null, "team_id": "فريق 1", "center": null, "event_type": "arrival", "status": null, "reason": null, "payload": null, "note": "حضر", "actor_id": "3", "actor_name": "مدير", "created_at": "2026-09-18 17:20:00"}"#.data(using: .utf8)!
+        let ev = try JSONDecoder().decode(OpEventDTO.self, from: json)
+        XCTAssertEqual(ev.rowId, 7)
+        XCTAssertEqual(ev.shiftId, 41)
+        XCTAssertEqual(ev.entityId, "أحمد")
+        XCTAssertEqual(ev.eventType, "arrival")
+        XCTAssertEqual(ev.actorName, "مدير")
+        XCTAssertNil(ev.entityName)
+    }
+
+    func testStaffingTimelineDecodesDerivedRecords() throws {
+        // lateRecords/coverageRecords مشتقة سيرفريًا — staffing-events-service.js
+        let json = #"{"success": true, "shiftId": 41, "events": [], "lateRecords": [{"employee": "أحمد", "teamId": "فريق 1", "startedAt": "2026-09-18T05:00:00.000Z", "arrivedAt": "2026-09-18T05:20:00.000Z", "durationMinutes": 20, "status": "arrived", "sourceEventType": "late", "jobTitle": "مسعف", "carriedFromShiftId": 40}], "coverageRecords": [{"employee": "سارة", "fromCenter": "مركز الشفا", "coverageType": "volunteer", "coverageTypeLabel": "تطوع", "startedAt": "2026-09-18T06:00:00.000Z", "endedAt": null, "durationMinutes": null, "status": "active", "approvedBy": "مدير"}]}"#.data(using: .utf8)!
+        let dto = try JSONDecoder().decode(StaffingTimelineDTO.self, from: json)
+        let late = try XCTUnwrap(dto.lateRecords?.first)
+        XCTAssertEqual(late.status, "arrived")
+        XCTAssertEqual(late.durationMinutes, 20)
+        XCTAssertEqual(late.carriedFromShiftId, 40)
+        let cov = try XCTUnwrap(dto.coverageRecords?.first)
+        XCTAssertEqual(cov.coverageTypeLabel, "تطوع")
+        XCTAssertEqual(cov.status, "active")
+        XCTAssertNil(cov.endedAt)
+    }
+
+    func testShiftTimelineEventDecodesSnakeCase() throws {
+        // صف shift_timeline_events — db.js getByShift
+        let json = #"{"id": 3, "shift_id": 41, "event_type": "status", "event_title": "بدء المناوبة", "event_description": null, "event_time": "2026-09-18 05:00:00", "created_by_name": "مدير"}"#.data(using: .utf8)!
+        let ev = try JSONDecoder().decode(ShiftTimelineEventDTO.self, from: json)
+        XCTAssertEqual(ev.rowId, 3)
+        XCTAssertEqual(ev.eventTitle, "بدء المناوبة")
+        XCTAssertEqual(ev.eventTime, "2026-09-18 05:00:00")
+        XCTAssertEqual(ev.createdByName, "مدير")
+    }
+
+    func testShiftEventToleratesNumericAndStringIds() throws {
+        // العقد المشتق يعيد id نصيًا (String(rowId)) والصف الخام قد يعيد رقمًا
+        let strJson = #"{"id": "1726", "shiftId": 41, "type": "note", "description": "ملاحظة", "timestamp": "2026-09-18T10:00:00.000Z", "createdAt": "2026-09-18T10:00:01.000Z"}"#.data(using: .utf8)!
+        let numJson = #"{"id": 1726, "shiftId": 41, "type": "note", "description": "ملاحظة"}"#.data(using: .utf8)!
+        let a = try JSONDecoder().decode(ShiftEventDTO.self, from: strJson)
+        let b = try JSONDecoder().decode(ShiftEventDTO.self, from: numJson)
+        XCTAssertEqual(a.id, "1726")
+        XCTAssertEqual(b.id, "1726")
+        XCTAssertEqual(a.shiftId, 41)
+    }
+
+    func testShiftEventCreateRequestOmitsNilTimestamp() throws {
+        // server.js يختم timestamp سيرفريًا عند غيابه — لا يرسل العميل وقتًا
+        let data = try JSONEncoder().encode(ShiftEventCreateRequestDTO(type: "note", description: "ملاحظة", timestamp: nil))
+        let obj = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        XCTAssertEqual(obj["type"] as? String, "note")
+        XCTAssertEqual(obj["description"] as? String, "ملاحظة")
+        XCTAssertNil(obj["timestamp"])
+    }
 }

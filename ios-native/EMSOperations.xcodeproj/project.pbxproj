@@ -93,6 +93,8 @@
 		5E4000000000000000000056 /* AdminNotificationsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000056 /* AdminNotificationsView.swift */; };
 		5E4000000000000000000057 /* ShiftLifecycleDTO.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000057 /* ShiftLifecycleDTO.swift */; };
 		5E4000000000000000000058 /* ShiftLifecycleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000058 /* ShiftLifecycleView.swift */; };
+		5E4000000000000000000059 /* TimelineOpsDTO.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000059 /* TimelineOpsDTO.swift */; };
+		5E400000000000000000005A /* OpsTimelinesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000005A /* OpsTimelinesView.swift */; };
 		5E400000000000000000004C /* ArchiveOpsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000004C /* ArchiveOpsViewModel.swift */; };
 		5E400000000000000000004D /* ArchiveOpsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000004D /* ArchiveOpsView.swift */; };
 		5E40000000000000000000E1 /* EMSOperationsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000E1 /* EMSOperationsTests.swift */; };
@@ -196,6 +198,8 @@
 		5E3000000000000000000056 /* AdminNotificationsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminNotificationsView.swift; sourceTree = "<group>"; };
 		5E3000000000000000000057 /* ShiftLifecycleDTO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShiftLifecycleDTO.swift; sourceTree = "<group>"; };
 		5E3000000000000000000058 /* ShiftLifecycleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShiftLifecycleView.swift; sourceTree = "<group>"; };
+		5E3000000000000000000059 /* TimelineOpsDTO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimelineOpsDTO.swift; sourceTree = "<group>"; };
+		5E300000000000000000005A /* OpsTimelinesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpsTimelinesView.swift; sourceTree = "<group>"; };
 		5E300000000000000000004C /* ArchiveOpsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveOpsViewModel.swift; sourceTree = "<group>"; };
 		5E300000000000000000004D /* ArchiveOpsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveOpsView.swift; sourceTree = "<group>"; };
 		5E30000000000000000000D0 /* EMSOperations.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = EMSOperations.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -356,6 +360,7 @@
 				5E300000000000000000004E /* SmartOpsDTO.swift */,
 				5E300000000000000000004F /* AdminOpsDTO.swift */,
 				5E3000000000000000000057 /* ShiftLifecycleDTO.swift */,
+				5E3000000000000000000059 /* TimelineOpsDTO.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -530,6 +535,7 @@
 				5E300000000000000000002B /* DecisionCenterView.swift */,
 				5E3000000000000000000043 /* VehicleHistoryView.swift */,
 				5E3000000000000000000044 /* VehicleRegistryView.swift */,
+				5E300000000000000000005A /* OpsTimelinesView.swift */,
 			);
 			path = Operations;
 			sourceTree = "<group>";
@@ -838,6 +844,8 @@
 				5E4000000000000000000056 /* AdminNotificationsView.swift in Sources */,
 				5E4000000000000000000057 /* ShiftLifecycleDTO.swift in Sources */,
 				5E4000000000000000000058 /* ShiftLifecycleView.swift in Sources */,
+				5E4000000000000000000059 /* TimelineOpsDTO.swift in Sources */,
+				5E400000000000000000005A /* OpsTimelinesView.swift in Sources */,
 				5E400000000000000000004C /* ArchiveOpsViewModel.swift in Sources */,
 				5E400000000000000000004D /* ArchiveOpsView.swift in Sources */,
 			);
