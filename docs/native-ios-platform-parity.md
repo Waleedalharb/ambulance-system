@@ -1,0 +1,439 @@
+# Native iOS — Platform Parity Inventory
+
+**الغاية (§12 من وثيقة FULL PLATFORM PARITY):** جرد كامل للمنصة القائمة من
+المستودع — كل وحدة، قدرتها على الويب، مساراتها، عملياتها R/C/U/D، إجراءاتها
+التشغيلية، صلاحياتها، وما يقابلها حاليًا في التطبيق الأصلي وحالته.
+
+**مصادر الجرد (مستودع `feature/native-ios-app`):**
+- `server.js` — 416 مسارًا (15,207 سطرًا)، فُحصت كلها مع حراساتها.
+- `config/permissions.js` — 33 مفتاح صلاحية + 5 أدوار تشغيلية + 3 تقنية.
+- `public/*.html` — 35 صفحة ويب قائمة.
+- `ios-native/EMSOperations/Features/**` — الشاشات الأصلية الحالية.
+
+**رموز الحالة الأصلية:**
+- ✅ مبني — التدفق يعمل من التطبيق فعليًا.
+- ◐ جزئي — قراءة فقط، أو جزء من التدفق.
+- ⛔ غير موجود — لا شاشة أصلية بعد.
+
+**قاعدة:** القراءات العملياتية محروسة بـ`authenticate` فقط (قرار ① ربط
+العمليات)؛ مفاتيح `ops.*`/`schedule.*` تحرس التنفيذ. `admin = '*'`.
+
+---
+
+## 1. المصادقة والجلسة
+
+| الحقل | القيمة |
+|---|---|
+| **Module** | المصادقة والجلسة (auth) |
+| **Web Capability** | دخول/خروج، تحديث توكن، نسيت كلمة المرور (رمز → إعادة تعيين)، تغيير كلمة المرور، جلسات المستخدم |
+| **Existing API** | `POST /api/auth/login` · `POST /api/auth/refresh` · `POST /api/auth/logout` · `POST /api/auth/forgot-password` · `POST /api/auth/verify-reset-code` · `POST /api/auth/reset-password` · `POST /api/auth/change-password` · `GET /api/auth/me` · `GET /api/auth/me/permissions` · `GET /api/auth/sessions` |
+| **Read** | `me`، `me/permissions`، `sessions` (admin) |
+| **Create** | login/refresh/logout/forgot/reset/change-password |
+| **Update / Delete** | — |
+| **Operational Actions** | استعادة كلمة المرور عبر الرمز، إبطال الجلسة عند الخروج |
+| **Permissions** | عامة (بلا حارس) ما عدا `sessions` → `authorize(['admin'])` |
+| **Native Screen** | `LoginView` + `SessionStore` + `AuthService` + `Keychain` + `BiometricGate` |
+| **Native Status** | ✅ مبني (دخول/خروج/تحديث/Face ID) — ⛔ نسيت كلمة المرور وتغييرها من التطبيق |
+
+## 2. الصلاحيات والأدوار
+
+| الحقل | القيمة |
+|---|---|
+| **Module** | إدارة الصلاحيات (permissions) |
+| **Web Capability** | كتالوج الصلاحيات، منح/سحب/مسح فردي، قائمة المستخدمين وصلاحياتهم (`admin-users.html`) |
+| **Existing API** | `GET /api/permissions/catalog` · `GET /api/permissions/user/:userId` · `GET /api/permissions/users` · `POST /api/permissions/grant` · `POST /api/permissions/revoke` · `POST /api/permissions/clear` |
+| **Read** | catalog / user / users |
+| **Create** | grant / revoke |
+| **Update** | revoke→grant (استبدال) |
+| **Delete** | clear |
+| **Operational Actions** | منح فردي فوق الدور، سحب فردي، مسح كامل المنح |
+| **Permissions** | كلها `admin.users_manage` |
+| **Native Screen** | `PermissionStore` + `PermissionMapper` (استهلاك داخلي للصلاحيات) — لا شاشة إدارة |
+| **Native Status** | ◐ استهلاك ✅ / إدارة ⛔ |
+
+## 3. بوابة الموظف التشغيلية (my-ems)
+
+| الحقل | القيمة |
+|---|---|
+| **Module** | بوابة الموظف (`my-ems.html` ← 19 مسار `/api/my/*`) |
+| **Web Capability** | ملفي، جدولي الشهري، تكليفاتي، بلاغات فرقتي، مركبتي، عهدتي، فحص المناوبة (تكميل الموظف)، زملائي، إشعاراتي، تغييرات جدولي، أقسامي، تسجيل جهاز Push |
+| **Existing API** | `GET /api/my/profile` · `GET /api/my/schedule` · `GET /api/my/assignments` · `GET /api/my/team-incidents` · `GET /api/my/sections` · `GET /api/my/vehicle` · `GET /api/my/inventory` · `GET /api/my/check-session` · `POST /api/my/check-session/items` · `POST .../no-change` · `POST .../vehicle-fields` · `POST .../confirm` · `GET /api/my/shift-mates` · `GET /api/my/notifications` · `POST /api/my/notifications/:id/read` · `POST .../ack` · `POST /api/my/push/register` · `POST /api/my/push/unregister` · `GET /api/my/schedule-changes` |
+| **Read** | كل GET أعلاه |
+| **Create** | check-session items/confirm/no-change/vehicle-fields · notifications read/ack · push register/unregister |
+| **Update / Delete** | — |
+| **Operational Actions** | تأكيد فحص المناوبة، إقرار الإشعار (Ack)، تسجيل الجهاز للإشعارات |
+| **Permissions** | `ops.my_portal` (منح فردي حصرًا) |
+| **Native Screen** | `ProfileView` · `ScheduleView` · `AssignmentsView` · `ReportsView`(بلاغات فرقتي) · `VehicleView` · `InventoryView` · `CompletionView`(فحص المناوبة) · `ShiftMatesView` · `NotificationsView` · `ScheduleChangesView` + `PushService` |
+| **Native Status** | ✅ مبني بالكامل (v1–v5) |
+
+## 4. الرئيسية ولوحة القيادة
+
+| الحقل | القيمة |
+|---|---|
+| **Module** | الرئيسية التشغيلية (home) |
+| **Web Capability** | ملخص حي: المناوبة، الفريق، نبض العمليات، إجراءات سريعة، تنبيهات (`index.html` + `operations-dashboard.html`) |
+| **Existing API** | `GET /api/dashboard` · `GET /api/data` · `GET /api/current-shift` · `GET /api/staffing/state` · `GET /api/vehicles/board` · `GET /api/last-update` · `GET /api/sse` (بث) |
+| **Read** | كلها قراءات (`POST /api/dashboard` → admin لحفظ تخطيط) |
+| **Create/Update/Delete** | — |
+| **Operational Actions** | بث حي SSE على الويب |
+| **Permissions** | `authenticate` (قراءة) |
+| **Native Screen** | `HomeView` + `HomeViewModel` (نبض العمليات الحي) + `NetworkMonitor` + `SafeCache` |
+| **Native Status** | ✅ مبني — ⛔ بث SSE (التطبيق يعتمد pull-to-refresh) |
+
+## 5. الإشعارات
+
+| الحقل | القيمة |
+|---|---|
+| **Module** | الإشعارات (notifications) |
+| **Web Capability** | مركز إشعارات، إرسال إشعار، سجل الإشعارات، تعقّب التسليم/القراءة، APNs push |
+| **Existing API** | `GET /api/notifications` · `GET /api/notifications/log` · `POST /api/notifications` · `POST /api/notifications/send` · `POST /api/notifications/read` · `POST /api/notifications/:id/read` · `POST /api/notifications/:id/delivered` + مسارات `/api/my/notifications*` و`/api/my/push/*` |
+| **Read** | notifications / log |
+| **Create** | إنشاء + إرسال |
+| **Update** | read/delivered |
+| **Delete** | — |
+| **Operational Actions** | إرسال إشعار جماعي/فردي (admin/director)، تتبع التسليم |
+| **Permissions** | الإرسال `authorize(['admin','director'])`؛ القراءة `authenticate` |
+| **Native Screen** | `NotificationsView` (بوابة الموظف) + `PushService` + `DeepLinkRouter` |
+| **Native Status** | ◐ إشعارات الموظف ✅ / إشعارات النظام العامة والإرسال ⛔ |
+
+## 6. الجداول (schedule / roster)
+
+| الحقل | القيمة |
+|---|---|
+| **Module** | الجداول — العرض والتحرير الكامل (`index.html` تبويب الجداول + `smart-schedule.html`) |
+| **Web Capability** | عرض شهري/يومي/فريق/موظف/مركز، تعديل خلية، استيراد Excel، توليد ذكي، استبدال، تراجع/إعادة، تحديث جماعي ومسودات، مزامنة، تصدير PDF، سجل تدقيق، إدارة موظفي الجدول، مسح (حساس)، الجدول الشهري الرسمي |
+| **Existing API** | `GET /api/shift-roster` · `GET /api/shift-roster/:id` · `GET /api/shift-roster/months` · `GET /api/shift-roster/stats` · `GET /api/shift-roster/audit-log` · `GET /api/shift-roster/drafts` · `GET /api/shift-roster/employee-schedule/:employeeId` · `POST /api/shift-roster/validate` · `PUT /api/shift-roster/cell` · `POST /api/shift-roster` · `PUT/DELETE /api/shift-roster/:id` · `POST /api/shift-roster/import` · `POST /api/shift-roster/export` · `POST /api/shift-roster/swap` · `POST /api/shift-roster/undo` · `POST /api/shift-roster/redo` · `POST /api/shift-roster/bulk-update` · `POST /api/shift-roster/draft` · `POST /api/shift-roster/audit-log` · `POST /api/shift-roster/clear` · `POST /api/shift-roster/clear-all` · `GET/POST/DELETE /api/schedule/employees` · `GET/POST /api/schedule/files` · `POST /api/schedule/official-import` · `GET /api/schedule/pdf` · `GET /api/schedule/metrics` · `POST /api/upload-monthly-table` · `GET /api/get-monthly-table` · `GET /api/check-monthly-table` · `DELETE /api/monthly-table` · `POST /api/shift-schedule/generate` · `POST /api/shift-schedule/update` |
+| **Read** | roster + months/stats/audit-log/drafts/employee-schedule + schedule/employees/files/metrics + monthly-table |
+| **Create** | import / draft / generate / roster rows |
+| **Update** | cell / bulk-update / swap / undo/redo / roster rows / schedule/files / shift-schedule/update |
+| **Delete** | roster row / schedule/employees / monthly-table (clear) |
+| **Operational Actions** | استيراد رسمي، توليد ذكي، تحقق تعارضات (`validate`)، تصدير PDF، تراجع/إعادة |
+| **Permissions** | `schedule.view` (قراءة+validate) · `schedule.edit_cell` · `schedule.employees` · `schedule.import` · `schedule.bulk_update` · `schedule.swap` · `schedule.sync` · `schedule.export` · `schedule.clear` — كلها منح فردية حصرًا؛ التوليد/التحديث `authorize(['admin','director'])` |
+| **Native Screen** | `ScheduleView` (جدول الموظف الشهري — قراءة) فقط |
+| **Native Status** | ◐ عرض جدولي ✅ / كل عمليات التحرير والاستيراد والتوليد ⛔ |
+
+## 7. التكميل (completion / staffing)
+
+| الحقل | القيمة |
+|---|---|
+| **Module** | التكميل — شاشة تكميل المناوبة (`index.html` + `check-review.html` + `radio-completion.html`) |
+| **Web Capability** | تكميل الفرق (حالة جاهز/ناقص/خارج الخدمة + سبب)، دعم خارجي/تطوعي، تفعيل أوفرلاب، غياب/تأخر، ملاحظات الفريق، مراجعة التكميل، الدعم المتاح، مرشحو التطوع، مؤشرات الكادر |
+| **Existing API** | `POST /api/shift-completion` · `GET /api/shift-completion/:shiftId/:teamName` · `GET /api/completion/latest` · `GET /api/staffing/state` · `GET /api/staffing/available-support` · `GET /api/staffing/volunteer-candidates` · `GET /api/staffing/indicators` · `GET /api/staffing/timeline` · `POST /api/staffing/activation` · `POST /api/staffing/activation/end` · `POST /api/staffing/volunteer` · `GET/POST /api/shift-events/:shiftId` · `DELETE /api/shift-events/:shiftId/:eventId` · `GET/POST /api/shift-absences/:shiftId` · `DELETE /api/shift-absences/:shiftId/:absenceId` · `GET/POST /api/shift-notes/:shiftId` · `DELETE /api/shift-notes/:shiftId/:noteId` · `GET /api/staffing-recommendations` · `GET /api/staffing-levels` · `GET /api/staffing-alerts` · `GET /api/ops/readiness/today` · `GET /api/ops/readiness/teams` · `GET /api/ops/readiness/session/:id` |
+| **Read** | state / latest / available-support / volunteer-candidates / indicators / timeline / readiness |
+| **Create** | shift-completion / activation / volunteer / events / absences / notes |
+| **Update** | إنهاء تفعيل (activation/end) |
+| **Delete** | event / absence / note |
+| **Operational Actions** | قرار حالة الفريق، إسناد دعم، تطوع، تفعيل أوفرلاب، تسجيل غياب/تأخر |
+| **Permissions** | التنفيذ `ops.completion` · التطوع `ops.volunteers` · القراءة `authenticate` |
+| **Native Screen** | `OpsReadinessView` (قراءة الحالة والعدّادات) · `CompletionView` (فحص الموظف — مسار مختلف) |
+| **Native Status** | ◐ قراءة ✅ / تنفيذ التكميل بكل مصادره ⛔ |
+
+## 8. دورة المناوبة (shifts lifecycle)
+
+| الحقل | القيمة |
+|---|---|
+| **Module** | المناوبات — بدء/إنهاء/اعتماد/أرشفة/استعادة + لوحات (يومية/أسبوعية/شهرية/تنفيذية) |
+| **Web Capability** | بدء مناوبة، إنهاء، تسليم واعتماد، أرشفة واستعادة، تعديل بيانات، طوارئ (أرشفة/حذف/تعديل قسري)، سلامة ولقطات، مؤشرات وتقارير، مقارنة مناوبات، بحث |
+| **Existing API** | `GET /api/current-shift` · `GET /api/shifts` · `GET /api/shifts/:id` · `GET /api/shifts/:id/detail` · `GET /api/shifts/:id/timeline` · `GET /api/shifts/:id/metrics` · `GET /api/shifts/:id/health-score` · `GET /api/shifts/:id/export` · `GET /api/shifts/daily-dashboard` · `GET /api/shifts/weekly-dashboard` · `GET /api/shifts/monthly-dashboard` · `GET /api/shifts/executive-dashboard` · `GET /api/shifts/search` · `GET /api/shifts/alerts` · `POST /api/start-new-shift` · `POST /api/shift/:id/end` · `POST /api/shift/:id/handover-approve` · `POST /api/shift/:id/archive` · `POST /api/shift/:id/restore` · `POST /api/update-shift-data` · `POST /api/shift-save` · `POST /api/shift-archive` · `DELETE /api/shifts/:id` · `POST /api/shifts/alerts/:id/acknowledge` · `POST /api/shifts/alerts/calculate` · `POST /api/shifts/:id/metrics/calculate` · `POST /api/shifts/metrics/calculate-all` · `POST /api/shifts/reports/generate` · `POST /api/shifts/compare` · `GET /api/shifts/comparison/:id` · `POST /api/shifts/export` · `GET/POST /api/shifts/audit-trail` · `GET /api/emergency/active-shifts` · `POST /api/emergency/archive-shift` · `POST /api/emergency/delete-shift` · `POST /api/emergency/edit-shift` |
+| **Read** | كل GET أعلاه |
+| **Create** | start-new-shift / reports/generate / compare |
+| **Update** | end / handover-approve / update-shift-data / shift-save / alerts ack / metrics calculate / emergency edit |
+| **Delete** | `DELETE /api/shifts/:id` (admin) · emergency delete (admin) |
+| **Operational Actions** | دورة حياة كاملة + طوارئ + اعتماد تسليم |
+| **Permissions** | `shift.lifecycle` (بدء/إنهاء/تحديث) · `shift.approve` (تسليم) · أرشفة/طوارئ/تقارير `admin`/`director` · التنبيهات `ops.alerts` · القراءة `authenticate` |
+| **Native Screen** | `CurrentShiftView` (مناوبتي التفصيلية — قراءة) · سياق current-shift في `DecisionCenterView` |
+| **Native Status** | ◐ قراءة ✅ / دورة الحياة والطوارئ ⛔ |
+
+## 9. البلاغات والتوزيع (dispatch / reports)
+
+| الحقل | القيمة |
+|---|---|
+| **Module** | البلاغات — توزيع، تراجع، تفصيلية، CAD (`index.html` + `report-entry.html` + `cad-report-prototype.html`) |
+| **Web Capability** | تسجيل/توزيع بلاغ على الفرق، تراجع (undo)، بلاغات تفصيلية (إدخال/حذف)، بلاغات CAD (إنشاء/إلغاء طاقم/استعادة/اقتراح مكان/رصد مستشفى)، بلاغات فرق الجنوب، تحديد موقع بلاغ |
+| **Existing API** | `GET /api/cad-reports` · `GET /api/cad-reports/south-teams` · `POST /api/cad-reports` · `POST /api/report` · `POST /api/undo` · `GET/POST /api/report-entry` · `DELETE /api/report-entry/:id` · `DELETE /api/report-entry` (admin) · `GET /api/incidents/lookup` · `POST /api/cad-reports/:number/crews/:unit/cancel` · `POST .../restore` · `GET /api/cad-reports/:number/place-suggestion` · `POST /api/cad-reports/hospital-sighting` · `POST /api/locate-report` · `GET /api/analytics/incidents` · `GET /api/analytics/incident-detail` · `GET /api/analytics/patterns` · `GET /api/analytics/coverage` · `GET /api/analytics/recommendations` |
+| **Read** | cad-reports / south-teams / report-entry / incidents/lookup / analytics |
+| **Create** | report / cad-reports / report-entry / locate-report / hospital-sighting |
+| **Update** | crews cancel/restore |
+| **Delete** | report-entry/:id |
+| **Operational Actions** | توزيع بلاغ على فريق، تراجع عن توزيع، إلغاء/استعادة طاقم CAD |
+| **Permissions** | `ops.dispatch` (توزيع+طواقم) · `ops.report_revert` (تراجع) · `ops.report_detail` (تفصيلية) · `ops.reports` (اقتراح مكان) · `ops.forms` (lookup) |
+| **Native Screen** | `OpsEventsView` (الخط الزمني فقط) · `ReportsView` (بلاغات فرقتي للموظف) |
+| **Native Status** | ◐ عرض ✅ / التوزيع والتراجع والتفصيلية ⛔ |
+
+## 10. المركبات (vehicles)
+
+| الحقل | القيمة |
+|---|---|
+| **Module** | المركبات — لوحة، سجل، إسناد، دعم، أحداث (`index.html` + `admin-vehicles.html`) |
+| **Web Capability** | لوحة الأسطول، تعيين/إنهاء/تبديل إسناد، دعم مركبة لفريق، تسجيل أحداث (عطل/ورشة/عودة)، تاريخ المركبة، سجل مرجعي (إضافة/تعديل — admin)، مؤشرات |
+| **Existing API** | `GET /api/vehicles/board` · `GET /api/vehicles/state` · `GET /api/vehicles/registry` · `GET /api/vehicles/centers` · `GET /api/vehicles/:id/history` · `GET /api/vehicles/indicators` · `GET /api/vehicles/timeline` · `POST /api/vehicles/events` · `POST /api/vehicles/assignment` · `POST /api/vehicles/assignment/end` · `POST /api/vehicles/assignment/switch` · `POST /api/vehicles/support` · `POST /api/vehicles/support/end` · `POST /api/vehicles/registry` · `PUT /api/vehicles/registry/:id` |
+| **Read** | board / state / registry / centers / history / indicators / timeline |
+| **Create** | events / assignment / support / registry (admin) |
+| **Update** | assignment end/switch · support/end · registry (admin) |
+| **Delete** | — (قانون append-only — لا حذف إطلاقًا) |
+| **Operational Actions** | إسناد مركبة لفريق، تبديل، دعم، تسجيل حالة ميكانيكية |
+| **Permissions** | `ops.vehicles` (تنفيذ) · registry `admin` · قراءة `authenticate` |
+| **Native Screen** | `OpsVehiclesView` (لوحة قراءة) · `VehicleView` (مركبة الموظف) |
+| **Native Status** | ◐ قراءة ✅ / الإسناد والدعم والأحداث ⛔ |
+
+## 11. التمركز والخريطة (deployments / map)
+
+| الحقل | القيمة |
+|---|---|
+| **Module** | التمركزات — مواقع الوحدات، خطط الذروة، مهام الذروة، الخريطة (`index.html` + `history-map.html`) |
+| **Web Capability** | تمركز وحدات على الخريطة، عناوين المواقع، خطط ذروة (إنشاء/تعديل/حذف)، مهمة ذروة وحلّها، إحداثيات المراكز، مواقع الخريطة، خريطة تاريخية |
+| **Existing API** | `GET/POST /api/unit-locations` · `POST /api/unit-location-addresses` · `GET /api/map-locations` · `GET /api/center-geo` · `GET/POST /api/peak-plans` · `PUT/DELETE /api/peak-plans/:id` · `POST /api/peak-mission` · `POST /api/peak-resolve` · `DELETE /api/peak-mission/:id` · `GET /api/peak-data` · `GET /api/peak-plans` |
+| **Read** | unit-locations / map-locations / center-geo / peak-plans / peak-data |
+| **Create** | unit-locations / peak-plans / peak-mission |
+| **Update** | peak-plans/:id / peak-resolve |
+| **Delete** | peak-plans/:id / peak-mission/:id |
+| **Operational Actions** | تمركز وحدة، إطلاق مهمة ذروة، حلّ مهمة |
+| **Permissions** | `ops.deployments` (تنفيذ) · القراءة `authenticate` |
+| **Native Screen** | `OpsMapView` (مراكز على الخريطة — قراءة) |
+| **Native Status** | ◐ خريطة قراءة ✅ / التمركز والذروة ⛔ |
+
+## 12. النماذج (forms)
+
+| الحقل | القيمة |
+|---|---|
+| **Module** | النماذج التشغيلية — بلاغات، تصعيدات، حالات إلكترونية، تقارير يومية، مناوبات كبار، إسعاف جوي، ملاحظات التحكم، إجازات مجدولة |
+| **Web Capability** | فتح نموذج، حقول وتحقق، رفع مرفقات، إرسال، حالة، سجل، حذف (`workflow-prototype`/`report-entry`… ضمن index) |
+| **Existing API** | `GET/POST /api/incidents` · `DELETE /api/incidents/:id` · `GET/POST /api/escalations` · `DELETE /api/escalations/:id` · `GET/POST /api/e-cases` · `DELETE /api/e-cases/:id` · `GET/POST /api/daily-reports` · `DELETE /api/daily-reports/:id` · `GET/POST /api/senior-shifts` · `DELETE /api/senior-shifts/:id` · `GET /api/air-ambulance` · `POST /api/save-air-ambulance` · `DELETE /api/delete-air-ambulance/:id` · `DELETE /api/clear-air-ambulance` · `GET /api/control-notes` · `POST /api/save-control-notes` · `DELETE /api/control-notes` · `GET /api/vacations` · `POST /api/save-vacations` · `DELETE /api/vacations` |
+| **Read** | incidents / escalations / e-cases / daily-reports / senior-shifts / air-ambulance / control-notes / vacations |
+| **Create** | نفس المسارات POST |
+| **Update** | — (حذف وإعادة إنشاء) |
+| **Delete** | :id لكل نموذج + clear-air-ambulance |
+| **Operational Actions** | تسجيل نموذج تشغيلي بأنواعه، متابعة، حذف |
+| **Permissions** | `ops.forms` (كل الإنشاء/الحذف) · القراءة `authenticate` · بعض الحذف `admin` |
+| **Native Screen** | — |
+| **Native Status** | ⛔ غير موجود (قراءة النماذج وتقديمها) |
+
+## 13. سير العمل (workflow)
+
+| الحقل | القيمة |
+|---|---|
+| **Module** | سير العمل — إعداد، إصدار، اعتماد، تدقيق، PDF (`workflow.html`) |
+| **Web Capability** | إعداد سير عمل للمناوبة، تعديل نسخة، اعتماد، إعادة إصدار، سجل تدقيق، تصدير PDF |
+| **Existing API** | `POST /api/workflow/prepare` · `GET /api/workflow/shift/:shiftId` · `GET /api/workflow/version/:id` · `PUT /api/workflow/version/:id` · `GET /api/workflow/version/:id/audit` · `POST /api/workflow/version/:id/approve` · `POST /api/workflow/version/:id/reissue` · `GET /api/workflow/version/:id/pdf` |
+| **Read** | shift / version / audit / pdf |
+| **Create** | prepare |
+| **Update** | version / reissue |
+| **Delete** | — |
+| **Operational Actions** | اعتماد سير العمل (القيادة الميدانية)، إعادة إصدار بعد التعديل |
+| **Permissions** | `workflow.view` · `workflow.manage` · `workflow.approve` · audit `admin` |
+| **Native Screen** | — |
+| **Native Status** | ⛔ غير موجود |
+
+## 14. الأحداث والخط الزمني (events / timeline)
+
+| الحقل | القيمة |
+|---|---|
+| **Module** | الأحداث التشغيلية — الخط الزمني العام + خطوط الكادر/المركبات |
+| **Web Capability** | خط زمني للمناوبة، أحداث كادر/مركبات، سجل أحداث (`index.html` تبويب الأحداث) |
+| **Existing API** | `GET /api/timeline` · `POST /api/timeline` (admin) · `GET /api/staffing/timeline` · `GET /api/vehicles/timeline` · `GET /api/shifts/:id/timeline` · `GET/POST /api/shift-events/:shiftId` · `DELETE /api/shift-events/:shiftId/:eventId` |
+| **Read** | timeline / staffing/timeline / vehicles/timeline / shifts/:id/timeline |
+| **Create** | timeline (admin) / shift-events |
+| **Update / Delete** | shift-events/:eventId |
+| **Operational Actions** | تسجيل حدث تشغيلي يدوي |
+| **Permissions** | القراءة `authenticate` · الكتابة admin / `ops.completion` |
+| **Native Screen** | `OpsEventsView` (الخط الزمني العام) |
+| **Native Status** | ◐ عام ✅ / خطوط الكادر والمركبات والمناوبة ⛔ |
+
+## 15. الأرشيف والسلامة (archive)
+
+| الحقل | القيمة |
+|---|---|
+| **Module** | الأرشيف — أرشفة، لقطات، سلامة، تحقق، سجل تدقيق |
+| **Web Capability** | أرشفة مناوبة، لقطة كاملة، فحص سلامة، تحقق من الأرشيف، سجل تدقيق الأرشيف، إعادة أرشفة |
+| **Existing API** | `GET /api/shifts/archive` · `GET /api/shifts/:id/archive-log` · `GET /api/shifts/:id/verify-archive` · `GET /api/shift-snapshot/:shiftId` · `GET /api/shift-integrity/:shiftId` · `POST /api/shift/:id/archive` · `POST /api/shift/:id/restore` · `POST /api/shift-archive` · `POST /api/shifts/:id/rearchive` · `GET/POST /api/audit-log` · `GET/POST /api/shifts/audit-trail` |
+| **Read** | archive / snapshot / integrity / verify-archive / audit-log |
+| **Create** | archive / rearchive / restore |
+| **Update / Delete** | — |
+| **Operational Actions** | أرشفة رسمية، استعادة من الأرشيف، تحقق سلامة |
+| **Permissions** | أرشيف حساس `archive.sensitive` · أرشفة/استعادة `admin`/`director` · audit-log `authenticate` |
+| **Native Screen** | — |
+| **Native Status** | ⛔ غير موجود |
+
+## 16. العهد والأصول (assets)
+
+| الحقل | القيمة |
+|---|---|
+| **Module** | العهد والأصول (`assets-*.html` — 7 صفحات) |
+| **Web Capability** | سجل الأصول، بطاقة جهاز، بحث، لوحة، استيراد (staging→اعتماد)، دورات جرد، جلسات جرد (عناصر/مكتشف/تقديم/اعتماد/إعادة فتح/مراجعة)، فروقات، نقل عهدة، توثيق مفقود، حل مجموعات تسلسلية، تقارير (عهدة/دورة/فروقات) |
+| **Existing API** | 25 مسارًا تحت `/api/assets*` (انظر routes: import/stage+preview+approve · inventory/cycles+sessions · discrepancies · reports/custody+cycle+discrepancies · transfer · resolve-review · document-missing · resolve-serial-group) |
+| **Read** | assets / :id / dashboard / preview / cycles / sessions/:id / discrepancies / reports |
+| **Create** | stage / cycles / sessions items / discovered |
+| **Update** | activate / close / submit / approve / reopen / resolve-review / document-missing / transfer |
+| **Delete** | — |
+| **Operational Actions** | دورة جرد كاملة، اعتماد استيراد، نقل عهدة |
+| **Permissions** | `assets.view` (قراءة) · `assets.manage` (إدارة) · `assets.inventory` (تنفيذ الجرد — منح فردي) |
+| **Native Screen** | `InventoryView` (عهدة الموظف — قراءة) |
+| **Native Status** | ◐ عهدتي ✅ / إدارة العهد والجرد ⛔ |
+
+## 17. المستشفيات (hospitals)
+
+| الحقل | القيمة |
+|---|---|
+| **Module** | المستشفيات ومراقبتها |
+| **Web Capability** | سجل المستشفيات، مراقبة (ملخص/تاريخ)، تأكيد تنبيه |
+| **Existing API** | `GET /api/hospitals` · `POST /api/hospitals` (admin) · `GET /api/hospital-monitor/summary` · `GET /api/hospital-monitor/history` · `POST /api/hospital-monitor/alerts/:alertId/ack` |
+| **Read** | hospitals / summary / history |
+| **Create** | hospitals (admin) |
+| **Update** | alerts ack |
+| **Delete** | — |
+| **Operational Actions** | تأكيد تنبيه مراقبة مستشفى |
+| **Permissions** | ack `ops.alerts` · القراءة `authenticate` |
+| **Native Screen** | — |
+| **Native Status** | ⛔ غير موجود |
+
+## 18. الذكاء والمشغل الذكي (AI / smart operator)
+
+| الحقل | القيمة |
+|---|---|
+| **Module** | الذكاء — مساعد، قاعدة معرفة، مشغل ذكي (`ai-dashboard.html` + `smart-operator.html` + `admin-knowledge.html`) |
+| **Web Capability** | محادثة AI (v1/v2/agent)، تاريخ وإحصاءات، قاعدة معرفة (رفع/معالجة/حذف/إدارة)، أسئلة بلا إجابة (حل/تجاهل)، تقييم المشغل الذكي، ذاكرة القرار وأنماطه، «اسأل» |
+| **Existing API** | `POST /api/ai/chat` · `GET /api/ai/history` · `GET /api/ai/stats` · `POST /api/ai/v2/chat` · `POST /api/ai/v2/feedback` · `GET/POST /api/ai/v2/knowledge` · `DELETE /api/ai/v2/knowledge/:id` · `GET /api/ai/v2/unanswered` · `POST .../resolve` · `POST .../dismiss` · `GET /api/ai/v2/stats` · `POST /api/agent/chat` · `GET /api/kb/documents` · `POST /api/kb/upload` · `POST /api/kb/process/:id` · `DELETE /api/kb/documents/:id` · `GET /api/smart-operator/assessment` · `GET /api/smart-operator/memory` · `GET /api/smart-operator/memory/patterns` · `POST /api/smart-operator/ask` |
+| **Read** | history / stats / knowledge / unanswered / memory / patterns / assessment |
+| **Create** | chat / ask / feedback / knowledge / kb upload |
+| **Update** | resolve / dismiss / kb process |
+| **Delete** | knowledge/:id / kb/:id |
+| **Operational Actions** | سؤال المشغل الذكي، معالجة أسئلة بلا إجابة |
+| **Permissions** | AI/kb إدارة `admin`/`director` · smart-operator `authenticate` |
+| **Native Screen** | `DecisionCenterView` (تقييم + ملخص + مخاطر + توصيات — قراءة) |
+| **Native Status** | ◐ التقييم ✅ / الذاكرة و«اسأل» وAI ⛔ |
+
+## 19. الدردشة (chat)
+
+| الحقل | القيمة |
+|---|---|
+| **Module** | الدردشة الداخلية (`chat.html`) |
+| **Web Capability** | محادثات جماعية وخاصة، رسائل، مشاركون (إضافة/حذف/مغادرة)، رفع مرفق، متصلون الآن، قراءة رسائل |
+| **Existing API** | `GET /api/chat/conversations` · `GET /api/chat/conversations/:id/messages` · `GET /api/chat/online` · `GET /api/chat/users` · `POST /api/chat/conversations` · `POST /api/chat/conversations/private` · `POST /api/chat/conversations/:id/messages` · `POST /api/chat/conversations/:id/participants` · `POST /api/chat/upload` · `PUT /api/chat/messages/:id/read` · `PUT /api/chat/conversations/:id/leave` · `DELETE /api/chat/conversations/:id` · `DELETE /api/chat/conversations/:id/participants/:user_id` |
+| **Read** | conversations / messages / online / users |
+| **Create** | conversations / private / messages / upload |
+| **Update** | read / leave |
+| **Delete** | conversation / participant |
+| **Operational Actions** | محادثة خاصة، مرفقات، إدارة مشاركين |
+| **Permissions** | `authenticate` (نظام داخلي عام) |
+| **Native Screen** | — |
+| **Native Status** | ⛔ غير موجود |
+
+## 20. الإدارة (admin)
+
+| الحقل | القيمة |
+|---|---|
+| **Module** | الإدارة — مستخدمون، موظفون، فرق، تعيينات، رموز، إعدادات، مراقبة تقنية (`admin-*.html` — 6 صفحات) |
+| **Web Capability** | إدارة مستخدمين وأدوار، موظفون (CRUD + نقل + نمط + جوال + توثيق + استيراد جوالات)، فرق (CRUD)، تعيينات فرق (CRUD)، رموز مناوبات (CRUD)، رموز جداول (CRUD + قفل سري + تدقيق)، أنماط مناوبات، إعدادات (ساعات شهرية/ثيم/هوية)، مراقبة تقنية (صحة/إحصاءات/تنبيهات/سجلات/إصلاح/تدمير)، سجل تدقيق، استخدام القرص |
+| **Existing API** | `GET/POST /api/users` · `POST /api/users/:id/role` · `GET/POST/PUT/DELETE /api/employees*` (+transfer/pattern/phone/verify-phone/phones/import/search/profile) · `GET/POST/PUT/DELETE /api/teams*` · `GET/POST/PUT/DELETE /api/team-assignments*` · `GET/POST/PUT/DELETE /api/shift-codes*` · `GET/POST/PUT /api/schedule-symbols*` (+lock/unlock/secret/audit/status) · `GET/PUT /api/shift-patterns*` · `GET/PUT /api/settings/monthly-required-hours` · `GET/POST /api/references` · `GET /api/theme-settings` + upload/remove · `GET /api/admin/stats` · `GET /api/admin/monitor/*` · `POST /api/admin/auto-fix` · `POST /api/admin/destroy-db` · `GET/POST /api/audit-log` · `GET /api/disk-usage` |
+| **Read** | users / employees / teams / assignments / codes / symbols / settings / monitor / audit-log |
+| **Create** | نفسها POST |
+| **Update** | نفسها PUT |
+| **Delete** | employees / teams / codes / symbols(status) |
+| **Operational Actions** | نقل موظف، توثيق جوال، قفل رموز سري، مراقبة وإصلاح تلقائي |
+| **Permissions** | `admin.users_manage` · `employees.manage` · `symbols.manage` · `admin.settings` · `admin.tech` · `data.delete` + أدوار admin/director |
+| **Native Screen** | — |
+| **Native Status** | ⛔ غير موجود |
+
+## 21. المؤشرات والتحليلات (indicators / analytics)
+
+| الحقل | القيمة |
+|---|---|
+| **Module** | مؤشرات المساهمة + تحليلات البلاغات + أداء الطواقم (`contribution-stats.html` + `daily-report.html`) |
+| **Web Capability** | مؤشر مساهمة الموظف (شهر/سنة)، لوحة مؤشرات، أداء الطواقم، إحصاءات القوى، تحليلات بلاغات (أنماط/تغطية/توصيات)، تقرير يومي |
+| **Existing API** | `GET /api/indicators/contribution` · `GET /api/indicators/dashboard` · `GET /api/crew-performance/activity` · `GET /api/workforce-stats/:shiftId` · `GET /api/analytics/*` (5 مسارات) · `GET /api/daily-report` · `GET /api/daily-reports` |
+| **Read** | كلها قراءات |
+| **Create/Update/Delete** | — |
+| **Operational Actions** | — |
+| **Permissions** | `indicators.contribution` (المساهمة) · الباقي `authenticate` |
+| **Native Screen** | بطاقة «مؤشرات المساهمة» في `HomeView` (تشير للويب) |
+| **Native Status** | ⛔ غير موجود (العرض الفعلي) |
+
+## 22. الملفات التشغيلية (ops files)
+
+| الحقل | القيمة |
+|---|---|
+| **Module** | الملفات التشغيلية — رفع/تنزيل/حذف + مستندات عامة + هوية |
+| **Web Capability** | رفع ملف تشغيلي، قائمة، تنزيل، حذف، مستندات (upload-doc/download-doc)، ملف الهوية |
+| **Existing API** | `GET /api/ops-files` · `POST /api/ops-files` · `DELETE /api/ops-files/:id` · `GET /api/operational-files` · `POST /api/upload-operational` · `GET /api/download-operational/:id` · `DELETE /api/delete-operational/:id` · `POST /api/upload-doc` · `GET /api/download-doc/:id` · `DELETE /api/delete-doc/:id` · `GET /api/docs` · `GET /api/get-identity` · `POST /api/upload-identity` · `GET /api/download-identity` |
+| **Read** | ops-files / operational-files / docs / get-identity / download |
+| **Create** | upload |
+| **Update / Delete** | delete :id |
+| **Operational Actions** | رفع ملف تشغيلي لمناوبة |
+| **Permissions** | `ops.files` (رفع/حذف — منح فردي) · القراءة `authenticate` |
+| **Native Screen** | — |
+| **Native Status** | ⛔ غير موجود |
+
+## 23. الإعلانات (announcements)
+
+| الحقل | القيمة |
+|---|---|
+| **Module** | الإعلانات |
+| **Web Capability** | عرض إعلانات، إضافة (admin)، حذف (admin) |
+| **Existing API** | `GET /api/announcements` · `POST /api/announcements` · `POST /api/announcements/add` · `DELETE /api/announcements/:id` |
+| **Read** | announcements |
+| **Create** | announcements / add (admin) |
+| **Update / Delete** | :id (admin) |
+| **Operational Actions** | نشر إعلان |
+| **Permissions** | القراءة `authenticate` · الكتابة `admin` |
+| **Native Screen** | — (تظهر ضمن سياق التنبيهات على الويب) |
+| **Native Status** | ⛔ غير موجود |
+
+## 24. الإجازات وطلبات الإجازة (leave)
+
+| الحقل | القيمة |
+|---|---|
+| **Module** | الإجازات — طلبات + مجدولة |
+| **Web Capability** | طلب إجازة، قائمة، اعتماد/تعديل، حذف، إجازات مجدولة (حفظ/حذف) |
+| **Existing API** | `GET/POST /api/leave-requests` · `PUT /api/leave-requests/:id` · `POST /api/leave-requests/:id/approve` · `DELETE /api/leave-requests/:id` · `GET /api/vacations` · `POST /api/save-vacations` · `DELETE /api/vacations` |
+| **Read** | leave-requests / vacations |
+| **Create** | leave-requests / save-vacations |
+| **Update** | leave-requests/:id / approve |
+| **Delete** | leave-requests/:id / vacations |
+| **Operational Actions** | اعتماد طلب إجازة |
+| **Permissions** | الاعتماد `admin`/`director` · الطلب `authenticate` |
+| **Native Screen** | — |
+| **Native Status** | ⛔ غير موجود |
+
+## 25. طلبات تغيير المناوبة (shift change requests)
+
+| الحقل | القيمة |
+|---|---|
+| **Module** | طلبات تغيير المناوبة |
+| **Web Capability** | تقديم طلب تغيير، قائمة، مراجعة (قبول/رفض) |
+| **Existing API** | `GET/POST /api/shift-change-request` · `POST /api/shift-change-request/:id/review` |
+| **Read** | shift-change-request (admin/director) |
+| **Create** | shift-change-request |
+| **Update** | review |
+| **Delete** | — |
+| **Operational Actions** | مراجعة طلب تغيير |
+| **Permissions** | المراجعة `admin`/`director` |
+| **Native Screen** | — (الموظف يرى «تغييرات جدولي» — نتائج لا طلبات) |
+| **Native Status** | ⛔ غير موجود |
+
+## 26. البنية التحتية والمتفرقات
+
+| الحقل | القيمة |
+|---|---|
+| **Module** | بنية تحتية — SSE، صحة، قرص، نسخ احتياطي، سجلات واجهة، تصدير عام، CAD overlay، توقيع/خروج فرق، إحالة/مرجعيات، كلمات مرور تشغيلية |
+| **Existing API** | `GET /api/sse` · `GET /health` · `GET /api/disk-usage` · `GET /api/last-update` · `POST /api/frontend-errors` · `GET /api/export` · `GET /api/cad-overlay/package` · `GET/POST /api/signouts` · `GET /api/signouts/suggest` · `GET/POST /api/references` · `GET /api/get-password` · `POST /api/change-password` · `GET /api/data` · `GET /api/settings/monthly-required-hours` |
+| **Operational Actions** | تسجيل خروج فريق (`signouts` ← `ops.team_exit`) |
+| **Permissions** | `ops.team_exit` · `admin`/`director` للحساس |
+| **Native Screen** | — |
+| **Native Status** | ⛔ غير موجود (تسجيل خروج الفرق تحديدًا مطلوب ضمن التكميل) |
+
+---
+
+## ملخص التكافؤ الحالي
+
+| الفئة | العدد |
+|---|---|
+| وحدات ✅ مبنية بالكامل | 3 (المصادقة، بوابة الموظف، الرئيسية) |
+| وحدات ◐ جزئية | 6 (صلاحيات، إشعارات، جداول، تكميل، مناوبات، بلاغات، مركبات، تمركز، أحداث، عهد، ذكاء — قراءات مبنية وتنفيذ ينقص) |
+| وحدات ⛔ غير موجودة | نماذج، سير عمل، أرشيف، مستشفيات، دردشة، إدارة، مؤشرات، ملفات، إعلانات، إجازات، طلبات تغيير، بنية تحتية |
+
+**عدد المسارات الكلي:** 416 — المربوط منها في التطبيق الأصلي حاليًا ~30 (كلها
+ضمن بوابة الموظف + قراءات العمليات السبع + المصادقة).
+
+**قواعد ثابتة لأي توسعة:** لا قاعدة بيانات ثانية · الـBackend مصدر الحقيقة ·
+لا endpoint جديد إلا عند ثبوت فجوة تكافؤ حقيقية وبعد عرض التصور · الويب يبقى
+يعمل · التنفيذ بمجالات وظيفية (§13) لا بعدد الشاشات.
