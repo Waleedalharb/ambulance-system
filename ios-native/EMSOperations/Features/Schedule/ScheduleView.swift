@@ -91,6 +91,9 @@ struct ScheduleView: View {
                 EMSStatusPill(text: "تغطية جزئية \(s.coveredDays ?? 0)/\(s.elapsedDays ?? 0)", tone: .monitor)
             } else if s.coverage == "complete" {
                 EMSStatusPill(text: "تغطية مكتملة", tone: .normal)
+            } else if s.coverage == "none" {
+                // نفس لفظ الويب عند غياب بيانات الشهر
+                EMSStatusPill(text: "لا تتوفر بيانات جدول لهذا الشهر", tone: .monitor)
             }
             Spacer()
             if let upd = s.lastUpdate {
@@ -127,7 +130,7 @@ struct ScheduleView: View {
                     ForEach(cells, id: \.self) { cell in
                         switch cell {
                         case .blank:
-                            Color.clear.frame(height: 52)
+                            Color.clear.frame(height: 64)
                         case .day(let dateStr, let dayNum, let isToday):
                             dayCell(dateStr: dateStr, dayNum: dayNum, isToday: isToday,
                                     info: daysByDate[dateStr])
@@ -144,27 +147,39 @@ struct ScheduleView: View {
     }
 
     private func dayCell(dateStr: String, dayNum: Int, isToday: Bool, info: ScheduleDTO.Day?) -> some View {
-        VStack(spacing: 3) {
+        VStack(spacing: 2) {
             Text("\(dayNum)")
                 .font(.caption.weight(isToday ? .bold : .regular))
                 .foregroundStyle(isToday ? EMSTheme.Colors.navy : .white)
             if let code = info?.shiftCode {
                 Text(code)
                     .font(.system(size: 9, weight: .semibold))
-                    .foregroundStyle(EMSTheme.Colors.teal)
+                    .foregroundStyle(isToday ? EMSTheme.Colors.navy : EMSTheme.Colors.teal)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
             }
-            if let team = info?.teamName {
-                Text(team)
+            // الوردية بالاسم الرسمي من قاموس الرموز (دوام 12 صباحاً…) — مواصفة المالك
+            if let name = info?.shiftName, name != info?.shiftCode {
+                Text(name)
                     .font(.system(size: 8))
-                    .foregroundStyle(EMSTheme.Colors.textMuted)
+                    .foregroundStyle(isToday ? EMSTheme.Colors.navy.opacity(0.8) : EMSTheme.Colors.textMuted)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
+            }
+            // الفريق · المركز عند توفره في بيانات الجدولة
+            let place = [info?.teamName, info?.center].compactMap { $0 }.filter { !$0.isEmpty }
+                .reduce(into: [String]()) { acc, v in if !acc.contains(v) { acc.append(v) } }
+                .joined(separator: " · ")
+            if !place.isEmpty {
+                Text(place)
+                    .font(.system(size: 8))
+                    .foregroundStyle(isToday ? EMSTheme.Colors.navy.opacity(0.8) : EMSTheme.Colors.textMuted)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
             }
         }
         .frame(maxWidth: .infinity)
-        .frame(height: 52)
+        .frame(height: 64)
         .background(isToday ? EMSTheme.Colors.teal : (info?.shiftCode != nil ? Color.white.opacity(0.07) : Color.clear))
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         .accessibilityLabel("\(dateStr) \(info?.shiftName ?? "")")
