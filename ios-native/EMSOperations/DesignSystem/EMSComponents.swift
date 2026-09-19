@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import UIKit
 
 // MARK: - بطاقة
 struct EMSCard<Content: View>: View {
@@ -227,5 +228,60 @@ extension View {
     func emsNumericInput() -> some View {
         environment(\.layoutDirection, .leftToRight)
             .multilineTextAlignment(.leading)
+    }
+}
+
+// MARK: - حقل رقمي UIKit (تجربة محصورة في LoginView — اعتماد المالك 2026-09-20)
+/// ثلاث نسخ SwiftUI (بيئة LTR / محاذاة leading / طبيعي) فشلت على الجهاز بنفس
+/// التوقيع: الـcaret ينجذب للجهة المعاكسة أثناء التحرير والنص يُقصّ خارج الرؤية.
+/// السبب أن SwiftUI TextField في iOS 16 لا يضبط طبقة UITextField الحية تحت
+/// RTL المفروض — فهذا الـwrapper يضبط الحقل الحقيقي صراحة: محاذاة يمين +
+/// دلالة RTL + numberPad + ألوان ثابتة، والقيمة/المؤشر لا يُعاد رسمهما
+/// أثناء الكتابة (updateUIView لا يلمس النص إلا عند اختلاف خارجي).
+/// لا تعميم على النماذج قبل نجاح اختبار A/B/C/D على الجهاز.
+struct EMSNumericField: UIViewRepresentable {
+    @Binding var text: String
+    @Binding var isFocused: Bool
+    var placeholder: String = ""
+
+    func makeCoordinator() -> Coordinator { Coordinator(text: $text, isFocused: $isFocused) }
+
+    func makeUIView(context: Context) -> UITextField {
+        let field = UITextField()
+        field.textAlignment = .right
+        field.semanticContentAttribute = .forceRightToLeft
+        field.keyboardType = .numberPad
+        field.textColor = .white
+        field.tintColor = UIColor(EMSTheme.Colors.teal)
+        field.attributedPlaceholder = NSAttributedString(
+            string: placeholder,
+            attributes: [.foregroundColor: UIColor(EMSTheme.Colors.textMuted)])
+        field.autocorrectionType = .no
+        field.autocapitalizationType = .none
+        field.textContentType = .username
+        field.delegate = context.coordinator
+        field.addTarget(context.coordinator, action: #selector(Coordinator.editingChanged(_:)),
+                        for: .editingChanged)
+        field.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        field.setContentCompressionResistancePriority(.required, for: .vertical)
+        return field
+    }
+
+    func updateUIView(_ uiView: UITextField, context: Context) {
+        if uiView.text != text { uiView.text = text }
+        if isFocused, !uiView.isFirstResponder { uiView.becomeFirstResponder() }
+        else if !isFocused, uiView.isFirstResponder { uiView.resignFirstResponder() }
+    }
+
+    final class Coordinator: NSObject, UITextFieldDelegate {
+        let text: Binding<String>
+        let isFocused: Binding<Bool>
+        init(text: Binding<String>, isFocused: Binding<Bool>) {
+            self.text = text
+            self.isFocused = isFocused
+        }
+        @objc func editingChanged(_ sender: UITextField) { text.wrappedValue = sender.text ?? "" }
+        func textFieldDidBeginEditing(_ textField: UITextField) { isFocused.wrappedValue = true }
+        func textFieldDidEndEditing(_ textField: UITextField) { isFocused.wrappedValue = false }
     }
 }

@@ -13,6 +13,8 @@ struct LoginView: View {
     @FocusState private var focus: Field?
     @State private var showForgot = false
     @State private var showPassword = false
+    /// تجربة EMSNumericField المحصورة: تركيز حقل رقم الموظف (UIKit).
+    @State private var usernameFocused = false
 
     enum Field { case username, password }
 
@@ -64,17 +66,9 @@ struct LoginView: View {
                     HStack {
                         Image(systemName: "person.fill")
                             .foregroundColor(EMSTheme.Colors.textMuted)
-                        TextField("", text: $vm.username, prompt: Text("اسم المستخدم / الرقم الوظيفي").foregroundColor(EMSTheme.Colors.textMuted))
-                            .textContentType(.username)
-                            .keyboardType(.numberPad)
-                            // تجربة محصورة (اعتماد المالك 2026-09-20): لا فرض محاذاة ولا
-                            // اتجاه — حقل RTL طبيعي؛ الأرقام تُقرأ LTR داخليًا بلا تعارض
-                            // UIKit أثناء التحرير. لا تعميم قبل نجاح اختبار A/B/C/D.
-                            .focused($focus, equals: .username)
-                            .foregroundColor(.white)
-                            .tint(EMSTheme.Colors.teal)
-                            .autocorrectionDisabled()
-                            .textInputAutocapitalization(.never)
+                        EMSNumericField(text: $vm.username, isFocused: $usernameFocused,
+                                        placeholder: "اسم المستخدم / الرقم الوظيفي")
+                            .fixedSize(horizontal: false, vertical: true)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 8)
                             .background(Color.white.opacity(0.07))
@@ -129,6 +123,7 @@ struct LoginView: View {
                 isDisabled: !vm.canSubmit
             ) {
                 focus = nil
+                usernameFocused = false
                 Task { await vm.login(session: session) }
             }
 
