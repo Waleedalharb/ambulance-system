@@ -148,23 +148,48 @@ struct CrewActivityDTO: Decodable {
         }
     }
     struct Standing: Decodable, Identifiable {
+        /// تفاصيل مناوبة واحدة ضمن الفريق — الخادم يرتبها تنازليًا حسب shift_date
+        struct ShiftDetail: Decodable {
+            let shiftId: Int?
+            let shiftDate: String?
+            let shiftType: String?
+            let reportsCount: Int?
+            let members: [String]?
+            let membersIncomplete: Bool?
+
+            enum CodingKeys: String, CodingKey {
+                case members
+                case shiftId = "shift_id"
+                case shiftDate = "shift_date"
+                case shiftType = "shift_type"
+                case reportsCount = "reports_count"
+                case membersIncomplete = "members_incomplete"
+            }
+        }
+
         let rank: Int?
         let team: String?
         let center: String?
         let reportsCount: Int?
-        let members: Int?
-        let membersIncomplete: Int?
+        /// أسماء الطاقم المجمّعة عبر الفترة — تُعرض فقط في current_shift/today (قاعدة الويب)
+        let members: [String]?
+        let membersIncomplete: Bool?
         let shiftMinutes: Int?
         let activeMinutes: Int?
+        let activeMinutesEstimated: Bool?
+        let activityRatePerHour: Double?
+        let shifts: [ShiftDetail]?
 
         var id: String { team ?? "\(rank ?? 0)" }
 
         enum CodingKeys: String, CodingKey {
-            case rank, team, center, members
+            case rank, team, center, members, shifts
             case reportsCount = "reports_count"
             case membersIncomplete = "members_incomplete"
             case shiftMinutes = "shift_minutes"
             case activeMinutes = "active_minutes"
+            case activeMinutesEstimated = "active_minutes_estimated"
+            case activityRatePerHour = "activity_rate_per_hour"
         }
     }
     struct Meta: Decodable {

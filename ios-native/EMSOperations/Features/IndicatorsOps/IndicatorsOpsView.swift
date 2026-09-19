@@ -379,18 +379,54 @@ final class ContributionViewModel: ObservableObject {
     }
 }
 
-// MARK: - نشاط الفرق
+// MARK: - نشاط الفرق (مطابقة الويب crew-achievement-board.js حرفيًا)
 
 struct CrewActivitySegment: View {
     @StateObject private var vm = CrewActivityViewModel()
     @State private var period = "current_shift"
 
     private let periods: [(String, String)] = [
-        ("current_shift", "المناوبة الحالية"),
+        ("current_shift", "الحالية"),
         ("today", "اليوم"),
-        ("week", "الأسبوع"),
-        ("month", "الشهر")
+        ("week", "أسبوع"),
+        ("month", "شهر")
     ]
+    /// مؤهل الفترة كما في الويب (PERIODS[].qualifier)
+    private var periodQualifier: String {
+        switch period {
+        case "today": return "اليوم"
+        case "week": return "هذا الأسبوع"
+        case "month": return "هذا الشهر"
+        default: return "مباشرة"
+        }
+    }
+    private var isLongPeriod: Bool { period == "week" || period == "month" }
+
+    /// جمع البلاغات كما في المخطط المعتمد: 3..10 «بلاغات»، وإلا «بلاغ»
+    private func pluralReports(_ n: Int) -> String {
+        (3...10).contains(n) ? "بلاغات" : "بلاغ"
+    }
+
+    private func medal(_ rank: Int) -> String {
+        switch rank {
+        case 1: return "🥇"
+        case 2: return "🥈"
+        case 3: return "🥉"
+        default: return "\(rank)."
+        }
+    }
+
+    /// '2026-08-18' ← «18 أغسطس» (تاريخ مجرد، بلا تحويل ساعات)
+    private func formatShiftDate(_ ymd: String?) -> String {
+        guard let ymd = ymd else { return "—" }
+        let parts = ymd.split(separator: "-")
+        guard parts.count >= 3,
+              let m = Int(parts[1]), let d = Int(parts[2]),
+              (1...12).contains(m), (1...31).contains(d) else { return ymd }
+        let months = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
+                      "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"]
+        return "\(d) \(months[m - 1])"
+    }
 
     var body: some View {
         Picker("الفترة", selection: $period) {
@@ -412,43 +448,24 @@ struct CrewActivitySegment: View {
         switch vm.state {
         case .loading:
             EMSSkeletonCard(lines: 3)
+        case .noActiveShift:
+            // 404 من الخادم (current_shift بلا مناوبة نشطة) — حالة صادقة وليست خطأ
+            EMSEmptyView(icon: "moon.zzz", title: "لا توجد مناوبة نشطة",
+                         detail: "يبدأ السباق مع المناوبة القادمة")
         case .failed(let message):
             EMSErrorView(message: message) { Task { await vm.load(period: period) } }
         case .loaded:
             let standings = vm.data?.standings ?? []
             if standings.isEmpty {
-                EMSEmptyView(icon: "person.3", title: "لا فرق", detail: "لا فرق نشطة في هذه الفترة")
+                EMSEmptyView(icon: "flag.checkered", title: "السباق لم يبدأ",
+                             detail: "أول بلاغ يصنع المتصدر 🚑")
             } else {
+                Text("الأكثر نشاطًا")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(EMSTheme.Colors.textMuted)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 ForEach(standings) { s in
-                    EMSCard {
-                        HStack(spacing: 12) {
-                            Text("#\(s.rank ?? 0)")
-                                .font(.headline.weight(.bold))
-                                .foregroundStyle(EMSTheme.Colors.teal)
-                                .frame(width: 34)
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(s.team ?? "—")
-                                    .font(.subheadline.weight(.semibold))
-                                    .foregroundStyle(.white)
-                                if let center = s.center {
-                                    Text(center)
-                                        .font(.caption2)
-                                        .foregroundStyle(EMSTheme.Colors.textMuted)
-                                }
-                            }
-                            Spacer()
-                            VStack(alignment: .trailing, spacing: 3) {
-                                Text("\(s.reportsCount ?? 0) بلاغ")
-                                    .font(.caption.weight(.semibold))
-                                    .foregroundStyle(.white)
-                                if let members = s.members {
-                                    Text("\(members) عضو")
-                                        .font(.caption2)
-                                        .foregroundStyle(EMSTheme.Colors.textMuted)
-                                }
-                            }
-                        }
-                    }
+                    standingCard(s)
                 }
             }
         }
@@ -456,11 +473,84 @@ struct CrewActivitySegment: View {
         Color.clear.frame(height: 0)
             .task { await vm.load(period: period) }
     }
+
+    @ViewBuilder
+    private func standingCard(_ s: CrewActivityDTO.Standing) -> some View {
+        // قاعدة الأسماء (تعديل المالك — مطابقة الويب):
+        // current_shift/today ← members؛ week/month ← shifts[0].members (أحدث مناوبة)
+        // + سطر «مناوبة <تاريخها>»، وحقل members المجمّع لا يُعرض إطلاقًا في week/month.
+        let latest = isLongPeriod ? s.shifts?.first : nil
+        let names = isLongPeriod ? latest?.members : s.members
+        let incomplete = isLongPeriod ? (latest?.membersIncomplete ?? false) : (s.membersIncomplete ?? false)
+        let count = s.reportsCount ?? 0
+        let rank = s.rank ?? 0
+
+        EMSCard {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 10) {
+                    Text(medal(rank))
+                        .font(.headline)
+                        .frame(width: 34, alignment: .leading)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(s.team ?? "—")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.white)
+                        if let center = s.center {
+                            Text("📍 \(center)")
+                                .font(.caption2)
+                                .foregroundStyle(EMSTheme.Colors.textMuted)
+                        }
+                    }
+                    Spacer()
+                    VStack(alignment: .trailing, spacing: 3) {
+                        Text("🚑 \(count) \(pluralReports(count)) \(periodQualifier)")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.white)
+                        if let rate = s.activityRatePerHour {
+                            Text("⚡ \(rate, specifier: "%.2f") بلاغ/ساعة")
+                                .font(.caption2)
+                                .foregroundStyle(EMSTheme.Colors.textMuted)
+                        } else {
+                            Text("⚡ —")
+                                .font(.caption2)
+                                .foregroundStyle(EMSTheme.Colors.textMuted)
+                        }
+                    }
+                }
+
+                // الطاقم: تعذّر إثبات التشكيل ← رسالة صادقة بلا تخمين
+                if incomplete && (names?.isEmpty ?? true) {
+                    Text("⚠️ بيانات طاقم المناوبة غير مكتملة")
+                        .font(.caption2)
+                        .foregroundStyle(EMSTheme.Colors.warning)
+                } else if let names = names, !names.isEmpty {
+                    Text("👥 طاقم المناوبة")
+                        .font(.caption2)
+                        .foregroundStyle(EMSTheme.Colors.textMuted)
+                    ForEach(names, id: \.self) { name in
+                        Text("👤 \(name)")
+                            .font(.caption)
+                            .foregroundStyle(.white)
+                    }
+                }
+
+                if isLongPeriod, let latest = latest {
+                    Text("🕐 مناوبة \(formatShiftDate(latest.shiftDate))")
+                        .font(.caption2)
+                        .foregroundStyle(EMSTheme.Colors.textMuted)
+                } else if !isLongPeriod, rank == 1 {
+                    Text("✨ طاقم هذه المناوبة")
+                        .font(.caption2)
+                        .foregroundStyle(EMSTheme.Colors.teal)
+                }
+            }
+        }
+    }
 }
 
 @MainActor
 final class CrewActivityViewModel: ObservableObject {
-    enum LoadState: Equatable { case loading, loaded, failed(String) }
+    enum LoadState: Equatable { case loading, loaded, noActiveShift, failed(String) }
     @Published var state: LoadState = .loading
     @Published var data: CrewActivityDTO?
     private let api = APIClient.shared
@@ -471,6 +561,10 @@ final class CrewActivityViewModel: ObservableObject {
             data = try await api.get("/api/crew-performance/activity",
                 query: ["scope": "south", "period": period, "top": "5"])
             state = .loaded
+        } catch APIError.notFound {
+            // الخادم يرمي 404 فقط عند current_shift بلا مناوبة نشطة — حالة صادقة وليست خطأ
+            data = nil
+            state = .noActiveShift
         } catch let e as APIError {
             state = .failed(e.userMessage)
         } catch {
