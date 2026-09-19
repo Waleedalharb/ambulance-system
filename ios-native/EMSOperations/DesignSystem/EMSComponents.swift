@@ -221,15 +221,11 @@ struct EMSPageModifier: ViewModifier {
 extension View {
     func emsPage(_ title: String) -> some View { modifier(EMSPageModifier(title: title)) }
 
-    /// الحقول الرقمية/الأكواد/التواريخ/الجوال (توجيه المالك 2026-09-20 — بند 2).
-    /// مراجعة Focus (2026-09-20): الاختبار على iPhone أثبت أن فرض
-    /// `environment(\.layoutDirection, .leftToRight)` على الحقل نفسه يجعل النص
-    /// المدخل يختفي أثناء التركيز ويظهر بعد فقدانه — حقل UIKit الحي يحتفظ
-    /// بدلالة RTL للتطبيق بينما SwiftUI يصفّه LTR فيُقصّ النص خارج الرؤية
-    /// أثناء الكتابة، وعند فقدان التركيز يُرسم كـText ثابت فيظهر.
-    /// الحل المتوافق: محاذاة يسار فقط — الأرقام ضعيفة الاتجاه فتُقرأ LTR
-    /// طبيعيًا وتبقى ظاهرة أثناء التركيز وخارجه، والواجهة العربية RTL كما هي.
+    /// الحقول الرقمية/الأكواد/التواريخ/الجوال (توجيه المالك 2026-09-20 — بند 2):
+    /// سلوك LTR مستقر داخل واجهة RTL — لا تختفي الأرقام ولا ينقلب تموضع
+    /// المؤشر، مع بقاء التصميم العربي حولها كما هو.
     func emsNumericInput() -> some View {
-        multilineTextAlignment(.leading)
+        environment(\.layoutDirection, .leftToRight)
+            .multilineTextAlignment(.leading)
     }
 }
