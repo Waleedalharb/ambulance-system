@@ -19,6 +19,9 @@ actor APIClient {
     nonisolated(unsafe) var tokenProvider: (@Sendable () -> String?)?
     /// مُحدّث الجلسة عند 401 — يعيد توكنًا جديدًا أو nil (يُحقن من AuthService).
     nonisolated(unsafe) var refreshHandler: (@Sendable () async -> String?)?
+    /// يُستدعى عند موت الجلسة نهائيًا (401 بعد فشل التحديث) — SessionStore يحقنه
+    /// ليصفّر الجلسة محليًا بدل أن يعلق المستخدم على بطاقات خطأ في كل شاشة.
+    nonisolated(unsafe) var authFailureHandler: (@Sendable () async -> Void)?
 
     private init() {
         let cfg = URLSessionConfiguration.default
@@ -150,6 +153,7 @@ actor APIClient {
                 _ = newToken
                 return try await sendUpload(path, fileField: fileField, files: files, fields: fields, retried: true)
             }
+            await authFailureHandler?()
             throw APIError.unauthenticated
         case 403:
             throw APIError.forbidden
@@ -219,6 +223,7 @@ actor APIClient {
                 _ = newToken
                 return try await sendRaw(method, path, jsonBody: jsonBody, retried: true)
             }
+            await authFailureHandler?()
             throw APIError.unauthenticated
         case 403:
             throw APIError.forbidden
@@ -290,6 +295,7 @@ actor APIClient {
                 _ = newToken
                 return try await sendDownload(path, query: query, retried: true)
             }
+            await authFailureHandler?()
             throw APIError.unauthenticated
         case 403:
             throw APIError.forbidden
@@ -382,6 +388,8 @@ actor APIClient {
                 _ = newToken
                 return try await send(method, path, query: query, body: body, authorized: authorized, retried: true, extraHeaders: extraHeaders)
             }
+            // postPublic (login) لا يصفّر جلسة — فشل الدخول ليس موت جلسة
+            if authorized { await authFailureHandler?() }
             throw APIError.unauthenticated
         case 403:
             throw APIError.forbidden

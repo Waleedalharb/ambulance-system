@@ -31,6 +31,8 @@ final class SessionStore: ObservableObject {
         // حقن مزوّدي APIClient (كسر الاعتماد الدائري)
         APIClient.shared.tokenProvider = { AuthService.shared.storedAccessToken() }
         APIClient.shared.refreshHandler = { await AuthService.shared.refreshAccessToken() }
+        // موت الجلسة أثناء التصفح (401 بعد فشل التحديث) → تصفير محلي فوري
+        APIClient.shared.authFailureHandler = { [weak self] in await self?.sessionExpired() }
     }
 
     var isAuthenticated: Bool {
@@ -76,6 +78,18 @@ final class SessionStore: ObservableObject {
 
     func logout() async {
         await auth.logout()
+        PushService.shared.invalidateRegistrationCache()
+        permissions.reset()
+        SafeCache.clear()
+        unreadNotifications = 0
+        state = .unauthenticated
+    }
+
+    /// جلسة ميتة اكتشفها APIClient (401 بعد فشل التحديث) — تصفير محلي بلا نداء
+    /// خادم (التوكن أصلًا مرفوض). يعيد المستخدم لشاشة الدخول بدل بطاقات الخطأ.
+    func sessionExpired() async {
+        guard isAuthenticated else { return }
+        KeychainService.clearSession()
         PushService.shared.invalidateRegistrationCache()
         permissions.reset()
         SafeCache.clear()

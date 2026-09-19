@@ -12,6 +12,7 @@ struct LoginView: View {
     @StateObject private var vm = LoginViewModel()
     @FocusState private var focus: Field?
     @State private var showForgot = false
+    @State private var showPassword = false
 
     enum Field { case username, password }
 
@@ -63,20 +64,52 @@ struct LoginView: View {
                     HStack {
                         Image(systemName: "person.fill")
                             .foregroundStyle(EMSTheme.Colors.textMuted)
-                        TextField("اسم المستخدم / الرقم الوظيفي", text: $vm.username)
+                        TextField("", text: $vm.username, prompt: Text("اسم المستخدم / الرقم الوظيفي").foregroundStyle(EMSTheme.Colors.textMuted))
                             .textContentType(.username)
                             .keyboardType(.numberPad)
                             .focused($focus, equals: .username)
                             .foregroundStyle(.white)
+                            .tint(EMSTheme.Colors.teal)
+                            .multilineTextAlignment(.leading)
+                            .autocorrectionDisabled()
+                            .textInputAutocapitalization(.never)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 8)
+                            .background(Color.white.opacity(0.07))
+                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                     }
                     Divider().overlay(EMSTheme.Colors.divider)
                     HStack {
                         Image(systemName: "lock.fill")
                             .foregroundStyle(EMSTheme.Colors.textMuted)
-                        SecureField("كلمة المرور", text: $vm.password)
-                            .textContentType(.password)
-                            .focused($focus, equals: .password)
-                            .foregroundStyle(.white)
+                        Group {
+                            if showPassword {
+                                TextField("", text: $vm.password, prompt: Text("كلمة المرور").foregroundStyle(EMSTheme.Colors.textMuted))
+                                    .textContentType(.password)
+                            } else {
+                                SecureField("", text: $vm.password, prompt: Text("كلمة المرور").foregroundStyle(EMSTheme.Colors.textMuted))
+                                    .textContentType(.password)
+                            }
+                        }
+                        .focused($focus, equals: .password)
+                        .foregroundStyle(.white)
+                        .tint(EMSTheme.Colors.teal)
+                        .multilineTextAlignment(.leading)
+                        .autocorrectionDisabled()
+                        .textInputAutocapitalization(.never)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 8)
+                        .background(Color.white.opacity(0.07))
+                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        // إظهار/إخفاء كلمة المرور — مخفية افتراضيًا
+                        Button {
+                            showPassword.toggle()
+                        } label: {
+                            Image(systemName: showPassword ? "eye.slash.fill" : "eye.fill")
+                                .foregroundStyle(EMSTheme.Colors.textMuted)
+                                .frame(width: 34, height: 34)
+                        }
+                        .accessibilityLabel(showPassword ? "إخفاء كلمة المرور" : "إظهار كلمة المرور")
                     }
                 }
             }
