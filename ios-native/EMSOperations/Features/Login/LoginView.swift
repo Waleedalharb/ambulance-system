@@ -48,11 +48,11 @@ struct LoginView: View {
                 .frame(width: 88, height: 88)
             Text("منظومة العمليات الإسعافية")
                 .font(.title3.weight(.bold))
-                .foregroundStyle(.white)
+                .foregroundColor(.white)
             Text("EMS OPERATIONS")
                 .font(.system(.caption, design: .monospaced))
                 .tracking(3)
-                .foregroundStyle(EMSTheme.Colors.teal)
+                .foregroundColor(EMSTheme.Colors.teal)
         }
         .accessibilityElement(children: .combine)
     }
@@ -63,12 +63,12 @@ struct LoginView: View {
                 VStack(spacing: 14) {
                     HStack {
                         Image(systemName: "person.fill")
-                            .foregroundStyle(EMSTheme.Colors.textMuted)
-                        TextField("", text: $vm.username, prompt: Text("اسم المستخدم / الرقم الوظيفي").foregroundStyle(EMSTheme.Colors.textMuted))
+                            .foregroundColor(EMSTheme.Colors.textMuted)
+                        TextField("", text: $vm.username, prompt: Text("اسم المستخدم / الرقم الوظيفي").foregroundColor(EMSTheme.Colors.textMuted))
                             .textContentType(.username)
                             .keyboardType(.numberPad)
                             .focused($focus, equals: .username)
-                            .foregroundStyle(.white)
+                            .foregroundColor(.white)
                             .tint(EMSTheme.Colors.teal)
                             .multilineTextAlignment(.leading)
                             .autocorrectionDisabled()
@@ -81,18 +81,18 @@ struct LoginView: View {
                     Divider().overlay(EMSTheme.Colors.divider)
                     HStack {
                         Image(systemName: "lock.fill")
-                            .foregroundStyle(EMSTheme.Colors.textMuted)
+                            .foregroundColor(EMSTheme.Colors.textMuted)
                         Group {
                             if showPassword {
-                                TextField("", text: $vm.password, prompt: Text("كلمة المرور").foregroundStyle(EMSTheme.Colors.textMuted))
+                                TextField("", text: $vm.password, prompt: Text("كلمة المرور").foregroundColor(EMSTheme.Colors.textMuted))
                                     .textContentType(.password)
                             } else {
-                                SecureField("", text: $vm.password, prompt: Text("كلمة المرور").foregroundStyle(EMSTheme.Colors.textMuted))
+                                SecureField("", text: $vm.password, prompt: Text("كلمة المرور").foregroundColor(EMSTheme.Colors.textMuted))
                                     .textContentType(.password)
                             }
                         }
                         .focused($focus, equals: .password)
-                        .foregroundStyle(.white)
+                        .foregroundColor(.white)
                         .tint(EMSTheme.Colors.teal)
                         .multilineTextAlignment(.leading)
                         .autocorrectionDisabled()
@@ -106,7 +106,7 @@ struct LoginView: View {
                             showPassword.toggle()
                         } label: {
                             Image(systemName: showPassword ? "eye.slash.fill" : "eye.fill")
-                                .foregroundStyle(EMSTheme.Colors.textMuted)
+                                .foregroundColor(EMSTheme.Colors.textMuted)
                                 .frame(width: 34, height: 34)
                         }
                         .accessibilityLabel(showPassword ? "إخفاء كلمة المرور" : "إظهار كلمة المرور")
@@ -117,7 +117,7 @@ struct LoginView: View {
             if let error = vm.errorMessage {
                 Text(error)
                     .font(.caption)
-                    .foregroundStyle(EMSTheme.Colors.danger)
+                    .foregroundColor(EMSTheme.Colors.danger)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
 
@@ -132,11 +132,11 @@ struct LoginView: View {
 
             Button("نسيت كلمة المرور؟") { showForgot = true }
                 .font(.caption)
-                .foregroundStyle(EMSTheme.Colors.teal)
+                .foregroundColor(EMSTheme.Colors.teal)
 
             Text("نسعى لنحييها")
                 .font(.caption)
-                .foregroundStyle(EMSTheme.Colors.textMuted)
+                .foregroundColor(EMSTheme.Colors.textMuted)
                 .padding(.top, 8)
         }
     }
