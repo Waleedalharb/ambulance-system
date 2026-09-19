@@ -314,11 +314,6 @@ struct AutoScheduleMonthDTO: Decodable {
     let alerts: [ScheduleGenerateResponseDTO.ScheduleAlert]?
 }
 
-// MARK: - GET /api/check-monthly-table
-struct MonthlyTableCheckDTO: Decodable {
-    let exists: Bool?
-}
-
 // MARK: - GET /api/schedule/metrics — مؤشرات الساعات (من ScheduleMetricsService)
 struct ScheduleMetricsDTO: Decodable {
     struct EmployeeMetric: Decodable, Identifiable {
