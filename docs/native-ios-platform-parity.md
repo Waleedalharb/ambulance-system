@@ -316,7 +316,7 @@
 | **Operational Actions** | محادثة خاصة، مرفقات، إدارة مشاركين |
 | **Permissions** | `authenticate` (نظام داخلي عام) |
 | **Native Screen** | تبويب «المحادثات» في MainTabView: `ChatView` (قائمة + إنشاء مجموعة/خاصة + متصلون) + `ChatConversationView` (رسائل/إرسال/تعليم مقروء) + إدارة المشاركين/مغادرة/أرشفة |
-| **Native Status** | ✅ محادثات ورسائل ومشاركون — مؤجل: رفع المرفقات `POST /api/chat/upload` (multipart يتطلب دعمًا في APIClient وتحققًا على الجهاز) وتحديث لحظي عبر SSE/WebSocket (حاليًا تحديث بالسحب وإعادة الفتح) |
+| **Native Status** | ✅ محادثات ورسائل ومشاركون ومرفقات (`POST /api/chat/upload` multipart + رسالة `file_url` — commit `e844bfc`) — مؤجل: تحديث لحظي عبر SSE/WebSocket (حاليًا تحديث بالسحب وإعادة الفتح) |
 
 ## 20. الإدارة (admin)
 
@@ -361,7 +361,7 @@
 | **Operational Actions** | رفع ملف تشغيلي لمناوبة |
 | **Permissions** | `ops.files` (رفع/حذف — منح فردي) · القراءة `authenticate` |
 | **Native Screen** | `FilesOpsView` (قائمة + تنزيل عبر ورقة النظام + حذف بـops.files — موديول «الملفات» في العمليات) |
-| **Native Status** | ◐ جزئي — قراءة/تنزيل/حذف ✅ · الرفع multipart مؤجل موثقًا (لا يدعمه APIClient) · ملف الهوية get/upload-identity مؤجل |
+| **Native Status** | ✅ قراءة/تنزيل/حذف/رفع multipart (`POST /api/upload-operational` بعقد multer حرفيًا — commit `c4b6370`) — مؤجل موثقًا: ملف الهوية get/upload-identity |
 
 ## 23. الإعلانات (announcements)
 
@@ -427,14 +427,14 @@
 
 | الفئة | العدد |
 |---|---|
-| وحدات ✅ مبنية | 24 من 26 (§1–§21، §23–§25 — بعضها بفجوات موثقة داخلية) |
-| وحدات ◐ جزئية | 2 (§22 الملفات — الرفع multipart مؤجل · §26 البنية التحتية — خروج الفرق مبني والباقي لا يلزم للعميل) |
+| وحدات ✅ مبنية | 25 من 26 (§1–§22، §23–§25 — بعضها بفجوات موثقة داخلية) |
+| وحدات ◐ جزئية | 1 (§26 البنية التحتية — خروج الفرق مبني والباقي لا يلزم للعميل) |
 | وحدات ⛔ غير موجودة | 0 |
 
 **الفجوات الموثقة المؤجلة (قرارات واعية، ليست نقصًا مجهولًا):**
 - كتابات JSON الكاملة القديمة (خطر استبدال الكل): `POST /api/timeline`، `POST /api/hospitals`،
   `POST /api/save-vacations`، `POST /api/announcements` (الجماعية) — لا تُبنى أصلًا دون قرار مالك.
-- الرفع multipart: ملفات تشغيلية (§22)، مرفقات الدردشة (§19)، theme/هوية — يتطلب دعم multipart في APIClient.
+- الرفع multipart: theme/هوية فقط — §22 و§19 أُغلقتا (APIClient صار يدعم multipart/form-data بأسماء RFC 5987).
 - استيراد Excel للجداول (§6): يحتاج endpoint فكّ سيرفي.
 - شاشات تحليلية ثقيلة تحتاج قرار تصميم: لوحات دورة المناوبة (§8)، تحليلات `/api/analytics/*` (§21)،
   محادثة AI وإدارة المعرفة (§18).
@@ -465,7 +465,8 @@
 
 - **التطبيق (كامل):** AppDelegate hooks + تفويض مركز الإشعارات + طلب صلاحية alert/sound/badge + تسجيل التوكن بعد المصادقة فقط + willPresent يعرض banner/sound/badge + الضغط يوجّه عبر DeepLinkRouter + entitlement `aps-environment=development` مطابق لبناء Xcode. أُضيفت تشخيصات DEBUG المطلوبة (حالة الصلاحية وتفاصيلها، تسجيل التوكن، نتيجة الربط الخادمي بنوع الخطأ، الاستلام/العرض/الضغط) وإصلاح ربط الجهاز عند تبديل الحساب — commit `5d0857a`.
 - **الخادم (origin/main):** مسارات `/api/my/push/register|unregister` و`push-gateway` سليمة — Alert Push حقيقي (`aps.alert` + sound + badge)، توجيه sandbox/production لكل جهاز، فصل التوكنات الميتة، وضع معطَّل آمن بلا مفاتيح.
-- **نقطة الانقطاع الوحيدة (قرار مالك، ليست كود):** نشر Render الحالي يسبق دمج فرع Push — `push/register` يعيد 404 في الإنتاج، ومفاتيح `APNS_*` لم تُضبط بعد. الخطوتان معلّقتان على موافقة المالك (Deploy + Secrets) ولا حل برمجيًا لهما من طرف التطبيق.
+- **نقطة الانقطاع الوحيدة كانت (قرار مالك، ليست كود):** نشر Render يسبق دمج فرع Push + مفاتيح `APNS_*` غير مضبوطة.
+- **✅ محسومة (2026-09-19):** بعد ضبط `APNS_KEY/APNS_KEY_ID/APNS_TEAM_ID` في Render، تحقق المالك على iPhone حقيقي من السلسلة كاملة: صلاحية authorized (alert/sound/badge مفعّلة) ← تسجيل الجهاز 200 ← إشعار تغيير مناوبة ← **Native iOS Banner خارج التطبيق**. Push End-to-End مكتمل ولا يُعدَّل مساره.
 
 ### تدقيق عقود API الآلي
 
