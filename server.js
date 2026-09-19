@@ -1777,9 +1777,12 @@ app.post('/api/users', authenticate, authorizePerm('admin.users_manage'), valida
             return res.status(409).json({ error: 'يوجد حساب مرتبط بهذا الموظف مسبقًا', code: 'ACCOUNT_EXISTS' });
         }
 
-        // 5) كلمة المرور المؤقتة تُولَّد خادميًا ولا تُقبل من العميل إطلاقًا
-        //    ملاحظة: نظام المصادقة الحالي لا يدعم إلزام تغيير كلمة المرور عند أول دخول (تحفظ معتمد في المواصفة)
-        const tempPassword = crypto.randomBytes(8).toString('base64url').slice(0, 10);
+        // 5) كلمة المرور الأولية = الكود الوظيفي (قرار المالك 2026-09-20 — دخول جميع الموظفين)
+        //    تسري على الحسابات الجديدة فقط؛ حسابات المستخدمين الحاليين وكلمات مرورهم لا تُمس.
+        //    لا تُقبل كلمة مرور من العميل إطلاقًا — الخادم وحده يعيّنها.
+        //    ملاحظة: نظام المصادقة الحالي لا يدعم إلزام تغيير كلمة المرور عند أول دخول
+        //    (تحفظ معتمد في المواصفة) — العميل Native يعرض تنبيهًا استشاريًا فقط.
+        const tempPassword = employeeCode;
         const salt = await bcrypt.genSalt(12);
         const hashedPassword = await bcrypt.hash(tempPassword, salt);
 
@@ -1798,12 +1801,12 @@ app.post('/api/users', authenticate, authorizePerm('admin.users_manage'), valida
         if (db.AuditLog && db.AuditLog.create) {
             await db.AuditLog.create({
                 user_id: req.user.id, user_name: req.user.name, action: 'user_create',
-                detail: `إنشاء حساب ${newUser.name} (${newUser.username}) · الدور: ${ROLE_LABELS_MAP[role] || role} · كلمة مرور مؤقتة (لم تُسجَّل) · صلاحيات ممنوحة: لا شيء`,
+                detail: `إنشاء حساب ${newUser.name} (${newUser.username}) · الدور: ${ROLE_LABELS_MAP[role] || role} · كلمة مرور أولية = الكود الوظيفي (لم تُسجَّل) · صلاحيات ممنوحة: لا شيء`,
                 type: 'permissions'
             });
         }
 
-        // tempPassword تُعاد مرة واحدة في هذه الاستجابة فقط — تسليمها الآمن مسؤولية المنفذ
+        // tempPassword = الكود الوظيفي (معروف للمنفذ أصلًا) — تُعاد لاستقرار العقد مع واجهات الإدارة
         res.status(201).json({
             success: true,
             user: { id: newUser.id, username: newUser.username, name: newUser.name, role: newUser.role },
