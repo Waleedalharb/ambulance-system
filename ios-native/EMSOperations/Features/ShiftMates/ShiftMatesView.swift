@@ -67,7 +67,10 @@ struct ShiftMatesView: View {
                                         .foregroundStyle(EMSTheme.Colors.teal)
                                 }
                             }
-                            Text(person.jobTitle ?? "")
+                            // نفس صيغة الويب: المسمى · الرمز · الفريق — تمييز حاسم
+                            // بين حملة الاسم نفسه (بلاها يبدو شخصان مختلفان «تكرارًا»)
+                            Text([person.jobTitle, person.shiftCode, person.teamName]
+                                .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · "))
                                 .font(.caption)
                                 .foregroundStyle(EMSTheme.Colors.textMuted)
                         }
@@ -84,10 +87,12 @@ struct ShiftMatesView: View {
         }
     }
 
-    /// اتصال/واتساب — فقط عند وصول الرقم من الخادم (الصلاحية مطبقة خادميًا).
+    /// اتصال/رسالة — فقط عند وصول الرقم من الخادم (staff.phone_view مطبقة خادميًا).
+    /// 📞 اتصال → اتصال iPhone · 💬 رسالة → تطبيق الرسائل (قرار المالك — لا Chat).
     private func contactButtons(phone: String) -> some View {
-        HStack(spacing: 12) {
-            if let tel = URL(string: "tel://\(phone.filter(\.isNumber))") {
+        let digits = phone.filter(\.isNumber)
+        return HStack(spacing: 12) {
+            if let tel = URL(string: "tel://\(digits)"), !digits.isEmpty {
                 Link(destination: tel) {
                     Image(systemName: "phone.fill")
                         .foregroundStyle(EMSTheme.Colors.emerald)
@@ -97,28 +102,17 @@ struct ShiftMatesView: View {
                 }
                 .accessibilityLabel("اتصال")
             }
-            if let wa = whatsappURL(phone) {
-                Link(destination: wa) {
+            if let sms = URL(string: "sms:\(digits)"), !digits.isEmpty {
+                Link(destination: sms) {
                     Image(systemName: "message.fill")
                         .foregroundStyle(EMSTheme.Colors.teal)
                         .frame(width: 34, height: 34)
                         .background(EMSTheme.Colors.teal.opacity(0.14))
                         .clipShape(Circle())
                 }
-                .accessibilityLabel("واتساب")
+                .accessibilityLabel("رسالة")
             }
         }
-    }
-
-    /// نفس تطبيع الويب: 05xxxxxxxx / 5xxxxxxxx / 9665xxxxxxxx → wa.me/9665…
-    private func whatsappURL(_ phone: String) -> URL? {
-        let digits = phone.filter(\.isNumber)
-        var normalized: String?
-        if digits.count == 10, digits.hasPrefix("05") { normalized = "966" + digits.dropFirst() }
-        else if digits.count == 9, digits.hasPrefix("5") { normalized = "966" + digits }
-        else if digits.count == 12, digits.hasPrefix("9665") { normalized = digits }
-        guard let n = normalized else { return nil }
-        return URL(string: "https://wa.me/\(n)")
     }
 }
 
@@ -132,12 +126,28 @@ final class ShiftMatesViewModel: ObservableObject {
     func load() async {
         state = .loading
         do {
-            mates = try await APIClient.shared.get("/api/my/shift-mates")
+            let dto: ShiftMatesDTO = try await APIClient.shared.get("/api/my/shift-mates")
+            mates = Self.deduped(dto)
             state = .loaded
         } catch let e as APIError {
             state = .failed(e.userMessage)
         } catch {
             state = .failed(APIError.unknown.userMessage)
         }
+    }
+
+    /// dedup بنيوي بمفتاح employeeId — مصدر البيانات أثبتنا خلوه من التكرار،
+    /// لكن إن ورد سجل مكرر للشخص نفسه في قسم واحد يُدمج (لا يُخفى شخص مختلف).
+    private static func deduped(_ dto: ShiftMatesDTO) -> ShiftMatesDTO {
+        func unique(_ people: [ShiftMatesDTO.Person]?) -> [ShiftMatesDTO.Person]? {
+            guard let people else { return nil }
+            var seen = Set<Int>()
+            return people.filter { p in
+                guard let id = p.id else { return true }   // بلا معرف يبقى كما هو — لا حذف تخميني
+                return seen.insert(id).inserted
+            }
+        }
+        return ShiftMatesDTO(available: dto.available, window: dto.window, me: dto.me,
+                             team: unique(dto.team), leadership: unique(dto.leadership), ops: unique(dto.ops))
     }
 }

@@ -84,6 +84,8 @@ struct ShiftMatesDTO: Decodable {
         let teamName: String?
     }
     struct Person: Decodable, Identifiable {
+        /// الخادم يرسل employeeId — بلا هذا الربط يكون id=nil دائمًا وينهار
+        /// تمييز ForEach (صفوف متطابقة الهوية ⟵ سبب ظهور أسماء «مكررة»).
         let id: Int?
         let name: String
         let jobTitle: String?
@@ -91,6 +93,11 @@ struct ShiftMatesDTO: Decodable {
         let shiftCode: String?
         let phone: String?      // يصل فقط لحامل staff.phone_view — الخادم يطبق الصلاحية
         let isMe: Bool?
+
+        enum CodingKeys: String, CodingKey {
+            case id = "employeeId"
+            case name, jobTitle, teamName, shiftCode, phone, isMe
+        }
     }
     let available: Bool
     let window: Window?

@@ -74,7 +74,7 @@ struct OpsEventsView: View {
         if items.isEmpty {
             EMSEmptyView(
                 icon: "bolt",
-                title: "لا توجد أحداث مسجلة",
+                title: "لا توجد أحداث تشغيلية حاليًا",
                 detail: "تظهر الأحداث التشغيلية هنا أولًا بأول")
         } else {
             ForEach(items) { item in

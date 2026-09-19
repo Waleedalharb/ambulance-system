@@ -172,6 +172,16 @@ struct TimelineDTO: Decodable {
     }
     let success: Bool?
     let data: [Item]?
+
+    /// الخادم يقرأ timeline.json خامًا — قد يكون كائنًا قديمًا لا مصفوفة.
+    /// نتسامح مع الشكلين: غير-المصفوفة = لا أحداث (حالة صادقة لا خطأ فكّ ترميز).
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        success = try c.decodeIfPresent(Bool.self, forKey: .success)
+        data = (try? c.decodeIfPresent([Item].self, forKey: .data)) ?? nil
+    }
+
+    private enum CodingKeys: String, CodingKey { case success, data }
 }
 
 // MARK: - /api/center-geo — إحداثيات المراكز للخريطة
