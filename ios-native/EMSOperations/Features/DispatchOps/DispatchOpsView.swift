@@ -378,7 +378,7 @@ struct DispatchOpsView: View {
                 }
             }
         }
-        .presentationDetents([.medium, .large])
+        .presentationDetents([.large])
     }
 
     private var dispatchSheet: some View {
@@ -509,7 +509,7 @@ struct DispatchOpsView: View {
                 }
             }
         }
-        .presentationDetents([.medium])
+        .presentationDetents([.large])
     }
 
     private func execute(_ work: @escaping () async throws -> String?) {

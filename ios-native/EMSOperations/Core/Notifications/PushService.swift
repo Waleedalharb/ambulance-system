@@ -149,16 +149,18 @@ final class PushService: NSObject, UNUserNotificationCenterDelegate {
         return [.banner, .sound, .badge]
     }
 
-    /// الضغط على الإشعار — توجيه مركزي (قسم 18).
+    /// الضغط على الإشعار — توجيه مركزي (قسم 18 + بند 11: تمركزات الذروة).
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter,
                                             didReceive response: UNNotificationResponse) async {
-        let data = response.notification.request.content.userInfo
-        let kind = data["kind"] as? String
+        let content = response.notification.request.content
+        let kind = content.userInfo["kind"] as? String
         #if DEBUG
         AppLogger.push.info("notification tapped (kind: \(kind ?? "—", privacy: .public))")
         #endif
+        let title = content.title
+        let body = content.body
         Task { @MainActor in
-            self.deepLinks?.route(kind: kind)
+            self.deepLinks?.route(kind: kind, title: title, body: body)
         }
     }
 }

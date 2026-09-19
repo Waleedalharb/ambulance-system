@@ -11,6 +11,8 @@ import SwiftUI
 struct NotificationsView: View {
     @EnvironmentObject private var session: SessionStore
     @StateObject private var vm = NotificationsViewModel()
+    /// بند 11: بطاقة تفاصيل التمركز عند فتح إشعار تمركز من القائمة.
+    @State private var noticeSheet: PositioningNotice?
 
     var body: some View {
         ScrollView {
@@ -36,6 +38,9 @@ struct NotificationsView: View {
         .refreshable { await vm.load(session: session) }
         .emsPage("إشعاراتي")
         .task { await vm.load(session: session) }
+        .sheet(item: $noticeSheet) { notice in
+            PositioningNoticeView(notice: notice)
+        }
     }
 
     private func notificationCard(_ n: PortalNotificationsDTO.Item) -> some View {
@@ -79,6 +84,16 @@ struct NotificationsView: View {
                         }
                     }
                 }
+                // بند 11: إشعار تمركز يحمل بطاقة تفاصيل منظمة
+                if n.message.contains("[تمركز #") {
+                    Button {
+                        noticeSheet = PositioningNotice(title: "تمركز وقت الذروة", message: n.message)
+                    } label: {
+                        Label("عرض تفاصيل التمركز", systemImage: "mappin.and.ellipse")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(EMSTheme.Colors.teal)
+                    }
+                }
             }
         }
         .accessibilityElement(children: .combine)
@@ -120,5 +135,78 @@ final class NotificationsViewModel: ObservableObject {
             let _: MarkStatusResponse = try await api.post("/api/my/notifications/\(n.id)/ack", body: Optional<String>.none)
             await load(session: session)
         } catch { /* نفس الاعتبار */ }
+    }
+}
+
+// MARK: - بند 11 (اعتماد المالك 2026-09-20): بطاقة تفاصيل تمركز وقت الذروة
+
+/// حمولة البطاقة — من Push (DeepLinkRouter) أو من إشعار داخلي في القائمة.
+struct PositioningNotice: Identifiable {
+    let id = UUID()
+    let title: String
+    let message: String
+}
+
+/// بطاقة «تفاصيل التمركز»: تعرض سطور الرسالة الموسومة (الفرقة/الموقع/البداية/…)
+/// كصفوف منظمة، وتخفي مُعرّف التمركز الداخلي [تمركز #id]. عرض فقط — بلا منطق.
+struct PositioningNoticeView: View {
+    @Environment(\.dismiss) private var dismiss
+    let notice: PositioningNotice
+
+    private struct Row: Identifiable {
+        let id = UUID()
+        let label: String   // فارغ = سطر حر (الجملة الافتتاحية)
+        let value: String
+    }
+
+    private var rows: [Row] {
+        notice.message.components(separatedBy: "\n").compactMap { raw in
+            let line = raw.trimmingCharacters(in: .whitespaces)
+            guard !line.isEmpty else { return nil }
+            if line.hasPrefix("["), line.hasSuffix("]") { return nil } // مُعرّف داخلي
+            if let sep = line.firstIndex(of: ":") {
+                let label = String(line[..<sep]).trimmingCharacters(in: .whitespaces)
+                let value = String(line[line.index(after: sep)...]).trimmingCharacters(in: .whitespaces)
+                if !label.isEmpty, !value.isEmpty, label.count <= 12 {
+                    return Row(label: label, value: value)
+                }
+            }
+            return Row(label: "", value: line)
+        }
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                EMSCard {
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "mappin.and.ellipse")
+                                .foregroundStyle(EMSTheme.Colors.teal)
+                            Text(notice.title)
+                                .font(.headline.weight(.bold))
+                                .foregroundStyle(EMSTheme.Colors.textPrimary)
+                        }
+                        .padding(.bottom, 4)
+                        ForEach(rows) { row in
+                            if row.label.isEmpty {
+                                Text(row.value)
+                                    .font(.subheadline)
+                                    .foregroundStyle(EMSTheme.Colors.textSecondary)
+                            } else {
+                                EMSInfoRow(label: row.label, value: row.value)
+                            }
+                        }
+                    }
+                }
+                .padding(EMSTheme.pagePadding)
+            }
+            .emsPage(notice.title)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("إغلاق") { dismiss() }.tint(EMSTheme.Colors.teal)
+                }
+            }
+        }
     }
 }

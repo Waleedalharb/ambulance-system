@@ -52,7 +52,7 @@ struct ScheduleView: View {
             .padding(EMSTheme.pagePadding)
         }
         .refreshable { await vm.load() }
-        .emsPage("الجدول")
+        .emsPage("مناوباتي")
         .task { await vm.load() }
         // Deep Link من إشعار «تغيير جدول» (قسم 18)
         .navigationDestination(isPresented: $deepLinks.requestScheduleChanges) {

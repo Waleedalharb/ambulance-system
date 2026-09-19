@@ -429,7 +429,7 @@ struct OpsVehiclesView: View {
                 }
             }
         }
-        .presentationDetents([.medium, .large])
+        .presentationDetents([.large])
     }
 
     private func reasonSheet(_ req: ReasonRequest) -> some View {
@@ -463,7 +463,7 @@ struct OpsVehiclesView: View {
                 }
             }
         }
-        .presentationDetents([.medium])
+        .presentationDetents([.large])
     }
 
     private func execute(_ work: @escaping () async throws -> String?) {

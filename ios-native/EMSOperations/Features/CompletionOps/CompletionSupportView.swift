@@ -173,7 +173,7 @@ struct CompletionSupportView: View {
                 }
             }
         }
-        .presentationDetents([.medium, .large])
+        .presentationDetents([.large])
     }
 
     // MARK: - التطوع

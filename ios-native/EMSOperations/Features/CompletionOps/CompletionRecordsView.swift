@@ -371,7 +371,7 @@ struct CompletionRecordsView: View {
                 }
             }
         }
-        .presentationDetents([.medium, .large])
+        .presentationDetents([.large])
     }
 
     private func sheetField(_ placeholder: String, text: Binding<String>, multiline: Bool = false) -> some View {

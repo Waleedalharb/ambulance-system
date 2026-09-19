@@ -308,7 +308,7 @@ struct FormsOpsView: View {
                 }
             }
         }
-        .presentationDetents([.medium, .large])
+        .presentationDetents([.large])
     }
 
     // MARK: - نماذج CAD (بحث → تحقق → حقول)

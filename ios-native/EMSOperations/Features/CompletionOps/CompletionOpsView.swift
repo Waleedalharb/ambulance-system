@@ -428,6 +428,6 @@ struct CompletionOpsView: View {
                 }
             }
         }
-        .presentationDetents([.medium])
+        .presentationDetents([.large])
     }
 }

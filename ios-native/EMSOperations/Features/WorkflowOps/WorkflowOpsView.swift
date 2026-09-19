@@ -202,7 +202,7 @@ struct WorkflowOpsView: View {
                 }
             }
         }
-        .presentationDetents([.medium, .large])
+        .presentationDetents([.large])
     }
 
     private func fieldEditor(_ label: String, text: Binding<String>) -> some View {
@@ -380,7 +380,7 @@ struct WorkflowOpsView: View {
                 }
             }
         }
-        .presentationDetents([.medium])
+        .presentationDetents([.large])
     }
 
     private func statusTone(_ status: String?) -> EMSTheme.StatusTone {

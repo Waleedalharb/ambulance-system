@@ -67,6 +67,9 @@ struct MainTabView: View {
 
     enum AppTab: Hashable { case home, operations, scheduleOps, schedule, notifications, chat, account }
 
+    /// بند 11: بطاقة تفاصيل التمركز المنبثقة من إشعار Push.
+    @State private var positioningNotice: PositioningNotice?
+
     private var showOperations: Bool { session.permissions.canAccessOperations }
     private var showScheduleOps: Bool { session.permissions.canViewSchedules }
     private var showPortalTabs: Bool { session.permissions.canAccessEmployeePortal }
@@ -88,7 +91,7 @@ struct MainTabView: View {
             }
             if showPortalTabs {
                 NavigationStack { ScheduleView() }
-                    .tabItem { Label("الجدول", systemImage: "calendar") }
+                    .tabItem { Label("مناوباتي", systemImage: "calendar") }
                     .tag(AppTab.schedule)
                 NavigationStack { NotificationsView() }
                     .tabItem { Label("الإشعارات", systemImage: "bell.fill") }
@@ -123,8 +126,17 @@ struct MainTabView: View {
                 }
             case .notifications:
                 if showPortalTabs { selectedTab = .notifications }
+            case .positioning:
+                // بند 11: الضغط على إشعار التمركز يفتح بطاقة التفاصيل مباشرة
+                // فوق التبويب الحالي — لا نقل لقائمة الإشعارات.
+                positioningNotice = PositioningNotice(
+                    title: link.title?.isEmpty == false ? link.title! : "تمركز وقت الذروة",
+                    message: link.body ?? "")
             }
             deepLinks.pending = nil
+        }
+        .sheet(item: $positioningNotice) { notice in
+            PositioningNoticeView(notice: notice)
         }
     }
 }

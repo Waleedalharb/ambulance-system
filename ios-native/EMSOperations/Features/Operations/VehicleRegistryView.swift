@@ -210,7 +210,7 @@ struct VehicleRegistryView: View {
                 }
             }
         }
-        .presentationDetents([.medium, .large])
+        .presentationDetents([.large])
     }
 
     private func execute(_ work: @escaping () async throws -> String?) {

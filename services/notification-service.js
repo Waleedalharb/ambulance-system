@@ -124,7 +124,9 @@ async function notifyOperational({ eventKey, title, message }) {
 
 // إشعار شخصي: صف واحد لصاحبه + بث موجَّه للمستهدف فقط (D-21).
 // النوع: eventKey يُصنَّف عبر الخريطة إن وُجد، وإلا يُطبَّع type الصريح.
-async function notifyPersonal(userId, { eventKey, title, message, type }) {
+// pushExtra (بند 11 — تمركزات الذروة): حقول إضافية تُدمج في data الـPush
+// (kind/plan_id) حتى يفتح الضغط على الإشعار وجهة الحدث لا قائمة الإشعارات.
+async function notifyPersonal(userId, { eventKey, title, message, type }, pushExtra) {
     const d = resolveDeps();
     const finalType = eventKey ? classify(eventKey) : normalizeType(type);
     const targetUserId = String(userId);
@@ -142,7 +144,7 @@ async function notifyPersonal(userId, { eventKey, title, message, type }) {
     if (d.pushGateway && typeof d.pushGateway.sendToUsers === 'function') {
         push = await d.pushGateway.sendToUsers([targetUserId], {
             title, body: message || '', badge: 'auto',
-            data: { kind: 'notification', notification_id: id }
+            data: { kind: 'notification', notification_id: id, ...(pushExtra || {}) }
         });
     }
     return { id, type: finalType, push };
