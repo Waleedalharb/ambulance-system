@@ -21,6 +21,10 @@ struct HomeView: View {
                 if let banner = network.bannerText {
                     EMSStatusPill(text: banner, tone: network.isOffline ? .danger : .monitor)
                 }
+                // تنبيه كلمة المرور الأولية (= الكود) — يظهر حتى يغيّرها من «حسابي» (قرار المالك 2026-09-20)
+                if InitialPasswordAdvisory.isPending(for: session.currentUser?.username) {
+                    EMSStatusPill(text: "كلمة المرور الحالية هي كود الموظف — ننصحك بتغييرها من تبويب «حسابي»", tone: .action)
+                }
                 switch vm.state {
                 case .loading:
                     EMSSkeletonCard()

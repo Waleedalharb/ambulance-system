@@ -29,6 +29,8 @@ final class LoginViewModel: ObservableObject {
                 username: username.trimmingCharacters(in: .whitespaces),
                 password: password)
             lastUser = user
+            // تنبيه استشاري فقط إن دخل بكلمة المرور الأولية (= الكود) — لا تخزين لكلمة المرور
+            InitialPasswordAdvisory.markIfCode(username: user.username, password: password)
             password = "" // لا نحتفظ بكلمة المرور إطلاقًا (قسم 29)
             // عرض تفعيل Face ID بعد أول دخول ناجح (قسم 9) — اختياري
             if BiometricGate.isAvailable && !BiometricGate.isEnabled {

@@ -47,6 +47,12 @@ struct RefreshResponse: Decodable {
     let user: AuthUser
 }
 
+// MARK: - /api/auth/me (authenticate فقط — لا تتطلب أي صلاحية، بخلاف /api/my/profile)
+struct MeResponseDTO: Decodable {
+    let success: Bool?
+    let user: AuthUser?
+}
+
 struct SimpleSuccess: Decodable {
     let success: Bool?
 }

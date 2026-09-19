@@ -31,8 +31,10 @@ actor AuthService {
     func restore() async -> AuthUser? {
         guard KeychainService.read(.accessToken) != nil else { return nil }
         do {
-            // تحقق حي بأخف مسار موثق — profile (يتضمن منطق 401/refresh في APIClient)
-            let _: ProfileDTO = try await api.get("/api/my/profile")
+            // تحقق حي بأخف مسار موثق — /api/auth/me (يتضمن منطق 401/refresh في APIClient).
+            // لا نستخدم /api/my/profile هنا: مقيد بـops.my_portal سيرفريًا، وأي حساب
+            // بلا بوابة (مسعف/أخصائي جديد) كان يُصنَّف خطأً كانقطاع شبكة (قرار المالك 2026-09-20).
+            let _: MeResponseDTO = try await api.get("/api/auth/me")
             return storedUser()
         } catch APIError.unauthenticated {
             return nil

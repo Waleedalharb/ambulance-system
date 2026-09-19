@@ -5,7 +5,8 @@
 //  المستخدمون والأدوار (§20): قائمة الحسابات (admin) + تغيير الدور +
 //  إنشاء حساب موظف (admin.users_manage). قيود الخادم معروضة كما هي:
 //  عقد الهوية (username = الكود الوظيفي)، حاجز التعديل الذاتي، وكلمة
-//  المرور المؤقتة تُعاد مرة واحدة وتُعرض للمنفذ فقط.
+//  المرور الأولية = الكود الوظيفي (قرار المالك 2026-09-20 — للحسابات
+//  الجديدة فقط، ويغيّرها الموظف بنفسه من «حسابي» بعد أول دخول).
 //
 
 import SwiftUI
@@ -45,11 +46,10 @@ struct AdminUsersView: View {
         .emsPage("المستخدمون")
         .task { await vm.load() }
         .sheet(isPresented: $showCreate) { createSheet }
-        .alert("كلمة المرور المؤقتة", isPresented: Binding(get: { tempPassword != nil }, set: { if !$0 { tempPassword = nil } })) {
-            Button("نسخ") { UIPasteboard.general.string = tempPassword }
+        .alert("تم إنشاء الحساب", isPresented: Binding(get: { tempPassword != nil }, set: { if !$0 { tempPassword = nil } })) {
             Button("تم", role: .cancel) {}
         } message: {
-            Text("أُنشئ الحساب. كلمة المرور المؤقتة (تُعرض مرة واحدة فقط):\n\n\(tempPassword ?? "")\n\nسلّمها للموظف بقناة آمنة.")
+            Text("كلمة المرور الأولية = كود الموظف (\(tempPassword ?? "")) — يدخل بها الموظف أول مرة، ثم يغيّرها بنفسه من تبويب «حسابي».")
         }
         .alert(item: $confirm) { req in
             Alert(title: Text(req.title), message: Text(req.message),

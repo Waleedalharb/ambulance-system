@@ -100,3 +100,29 @@ final class SessionStore: ObservableObject {
         state = .unauthenticated
     }
 }
+
+// MARK: - تنبيه كلمة المرور الأولية (قرار المالك 2026-09-20 — دخول جميع الموظفين)
+
+/// الحسابات الجديدة تُنشأ بكلمة مرور أولية = الكود الوظيفي. هذا تلميح عرض فقط:
+/// يُضبط عند دخول ناجح كتب فيه المستخدم كلمة مرور تطابق اسم المستخدم، ويُزال
+/// بعد نجاح تغيير كلمة المرور من «حسابي». لا يُخزَّن أي جزء من كلمة المرور —
+/// فقط علم منطقي لكل اسم مستخدم.
+enum InitialPasswordAdvisory {
+    private static func key(for username: String) -> String { "ems.initialPasswordAdvisory." + username }
+
+    /// يُستدعى بعد نجاح المصادقة — قبل مسح كلمة المرور من الذاكرة.
+    static func markIfCode(username: String?, password: String) {
+        guard let u = username?.trimmingCharacters(in: .whitespaces), !u.isEmpty, password == u else { return }
+        UserDefaults.standard.set(true, forKey: key(for: u))
+    }
+
+    static func isPending(for username: String?) -> Bool {
+        guard let u = username, !u.isEmpty else { return false }
+        return UserDefaults.standard.bool(forKey: key(for: u))
+    }
+
+    static func clear(for username: String?) {
+        guard let u = username, !u.isEmpty else { return }
+        UserDefaults.standard.removeObject(forKey: key(for: u))
+    }
+}

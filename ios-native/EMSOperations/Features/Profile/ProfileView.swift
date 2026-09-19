@@ -388,6 +388,8 @@ private struct ChangePasswordSheet: View {
             let _: BasicSuccessDTO = try await APIClient.shared.post(
                 "/api/auth/change-password",
                 body: ChangePasswordBody(currentPassword: current, newPassword: new_))
+            // نجح التغيير — لم تعد كلمة المرور هي الكود، أزل التنبيه الاستشاري
+            InitialPasswordAdvisory.clear(for: AuthService.shared.storedUser()?.username)
             done = true
         } catch let e as APIError {
             errorMessage = e.userMessage
