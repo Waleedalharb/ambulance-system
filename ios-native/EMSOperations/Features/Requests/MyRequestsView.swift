@@ -222,7 +222,7 @@ struct MyRequestsView: View {
 // MARK: - ViewModel
 @MainActor
 final class MyRequestsViewModel: ObservableObject {
-    enum LoadState { case loading, loaded, failed(String) }
+    enum LoadState: Equatable { case loading, loaded, failed(String) }
 
     @Published var state: LoadState = .loading
     @Published var announcements: [AnnouncementDTO] = []
@@ -281,7 +281,7 @@ final class MyRequestsViewModel: ObservableObject {
     func load(isAdminDirector: Bool = false) async {
         // يُحفظ لإعادات التحميل الداخلية بعد الإرسال/الإلغاء
         if isAdminDirector { self.isAdminDirector = true }
-        state = .loading
+        if state != .loaded { state = .loading }
         do {
             // معرف الموظف من ملفي — المصدر الوحيد لربط الطلبات بصاحبها.
             let profile: ProfileDTO = try await api.get("/api/my/profile")
@@ -310,9 +310,9 @@ final class MyRequestsViewModel: ObservableObject {
             }
             state = .loaded
         } catch let e as APIError {
-            state = .failed(e.userMessage)
+            if !RefreshFailurePolicy.keepContent(hasContent: myEmployeeId != nil, message: e.userMessage) { state = .failed(e.userMessage) }
         } catch {
-            state = .failed(APIError.unknown.userMessage)
+            if !RefreshFailurePolicy.keepContent(hasContent: myEmployeeId != nil, message: APIError.unknown.userMessage) { state = .failed(APIError.unknown.userMessage) }
         }
     }
 

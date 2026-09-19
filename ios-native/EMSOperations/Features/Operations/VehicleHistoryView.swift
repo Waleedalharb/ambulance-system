@@ -161,14 +161,14 @@ final class VehicleHistoryViewModel: ObservableObject {
     private let api = APIClient.shared
 
     func load(vehicleId: String, showLoading: Bool = false) async {
-        if showLoading { state = .loading }
+        if showLoading || data == nil { state = .loading }
         do {
             data = try await api.get("/api/vehicles/\(vehicleId)/history")
             state = .loaded
         } catch let e as APIError {
-            state = .failed(e.userMessage)
+            if !RefreshFailurePolicy.keepContent(hasContent: data != nil, message: e.userMessage) { state = .failed(e.userMessage) }
         } catch {
-            state = .failed(APIError.unknown.userMessage)
+            if !RefreshFailurePolicy.keepContent(hasContent: data != nil, message: APIError.unknown.userMessage) { state = .failed(APIError.unknown.userMessage) }
         }
     }
 }

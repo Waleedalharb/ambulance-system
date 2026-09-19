@@ -238,7 +238,7 @@ private struct AnnouncementAddSheet: View {
 // MARK: - ViewModel
 @MainActor
 final class RequestsAdminViewModel: ObservableObject {
-    enum LoadState { case loading, loaded, failed(String) }
+    enum LoadState: Equatable { case loading, loaded, failed(String) }
 
     @Published var state: LoadState = .loading
     @Published var leaveRequests: [LeaveRequestDTO] = []
@@ -251,7 +251,7 @@ final class RequestsAdminViewModel: ObservableObject {
     private let api = APIClient.shared
 
     func load() async {
-        state = .loading
+        if state != .loaded { state = .loading }
         do {
             // المعلَّقة أولًا — الأولوية التشغيلية لما ينتظر قرار الإدارة.
             async let pendingLeave: LeaveRequestsResponseDTO = api.get(
@@ -270,9 +270,9 @@ final class RequestsAdminViewModel: ObservableObject {
             announcements = (try await annReq).data ?? []
             state = .loaded
         } catch let e as APIError {
-            state = .failed(e.userMessage)
+            if !RefreshFailurePolicy.keepContent(hasContent: state == .loaded, message: e.userMessage) { state = .failed(e.userMessage) }
         } catch {
-            state = .failed(APIError.unknown.userMessage)
+            if !RefreshFailurePolicy.keepContent(hasContent: state == .loaded, message: APIError.unknown.userMessage) { state = .failed(APIError.unknown.userMessage) }
         }
     }
 

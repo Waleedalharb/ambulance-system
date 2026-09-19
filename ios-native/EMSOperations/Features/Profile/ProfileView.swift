@@ -25,7 +25,8 @@ struct ProfileView: View {
                     EMSErrorView(message: message) { Task { await vm.load() } }
                 case .loaded:
                     if let p = vm.profile { employeeCard(p) }
-                    requestsCard
+                    else if vm.portalUnavailable { accountIdentityCard }
+                    if !vm.portalUnavailable { requestsCard }
                     if session.permissions.canAccessAdmin { adminCard }
                     securityCard
                     logoutCard
@@ -85,6 +86,42 @@ struct ProfileView: View {
                 if let update = p.lastRosterUpdate {
                     EMSInfoRow(label: "آخر تحديث للجدول", value: update)
                 }
+            }
+        }
+    }
+
+    // MARK: - بطاقة هوية الحساب (بلا بوابة موظف — توجيه المالك 2026-09-19 بند 1/9)
+    // «عدم امتلاك ops.my_portal لا يمنع دخول التطبيق» — حسابي تبقى صفحة
+    // عاملة لكل موظفي القطاع: هوية من الجلسة (بلا طلب شبكة) + الأمان + الخروج.
+
+    private var accountIdentityCard: some View {
+        EMSCard {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 12) {
+                    ZStack {
+                        Circle().fill(EMSTheme.Colors.teal.opacity(0.18))
+                        Image(systemName: "person.badge.shield.checkmark.fill")
+                            .foregroundStyle(EMSTheme.Colors.teal)
+                    }
+                    .frame(width: 52, height: 52)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(session.currentUser?.name ?? "—")
+                            .font(.headline.weight(.bold))
+                            .foregroundStyle(.white)
+                        Text(session.permissions.roleLabel ?? session.currentUser?.role ?? "—")
+                            .font(.caption)
+                            .foregroundStyle(EMSTheme.Colors.textSecondary)
+                    }
+                    Spacer()
+                }
+                Divider().overlay(EMSTheme.Colors.divider)
+                if let username = session.currentUser?.username {
+                    EMSInfoRow(label: "اسم المستخدم", value: username)
+                }
+                Text("هذا الحساب غير مرتبط ببوابة الموظف — تُعرض لك الوحدات التشغيلية حسب صلاحياتك.")
+                    .font(.caption)
+                    .foregroundStyle(EMSTheme.Colors.textMuted)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
@@ -236,18 +273,28 @@ final class ProfileViewModel: ObservableObject {
 
     @Published var state: LoadState = .loading
     @Published var profile: ProfileDTO?
+    /// الحساب غير مرتبط ببوابة الموظف (403/NO_EMPLOYEE) — ليس خطأ (بند 1/9).
+    @Published var portalUnavailable = false
 
     private let api = APIClient.shared
 
     func load() async {
-        state = .loading
+        if profile == nil && !portalUnavailable { state = .loading }
         do {
             profile = try await api.get("/api/my/profile")
+            portalUnavailable = false
             state = .loaded
         } catch let e as APIError {
-            state = .failed(e.userMessage)
+            if e == .forbidden || e == .noEmployee {
+                portalUnavailable = true
+                state = .loaded
+            } else if !RefreshFailurePolicy.keepContent(hasContent: profile != nil || portalUnavailable, message: e.userMessage) {
+                state = .failed(e.userMessage)
+            }
         } catch {
-            state = .failed(APIError.unknown.userMessage)
+            if !RefreshFailurePolicy.keepContent(hasContent: profile != nil || portalUnavailable, message: APIError.unknown.userMessage) {
+                state = .failed(APIError.unknown.userMessage)
+            }
         }
     }
 }

@@ -124,15 +124,15 @@ final class ShiftMatesViewModel: ObservableObject {
     @Published var mates: ShiftMatesDTO?
 
     func load() async {
-        state = .loading
+        if mates == nil { state = .loading }
         do {
             let dto: ShiftMatesDTO = try await APIClient.shared.get("/api/my/shift-mates")
             mates = Self.deduped(dto)
             state = .loaded
         } catch let e as APIError {
-            state = .failed(e.userMessage)
+            if !RefreshFailurePolicy.keepContent(hasContent: mates != nil, message: e.userMessage) { state = .failed(e.userMessage) }
         } catch {
-            state = .failed(APIError.unknown.userMessage)
+            if !RefreshFailurePolicy.keepContent(hasContent: mates != nil, message: APIError.unknown.userMessage) { state = .failed(APIError.unknown.userMessage) }
         }
     }
 

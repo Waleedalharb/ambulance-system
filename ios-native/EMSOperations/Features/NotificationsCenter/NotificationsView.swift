@@ -95,16 +95,16 @@ final class NotificationsViewModel: ObservableObject {
     private let api = APIClient.shared
 
     func load(session: SessionStore) async {
-        state = .loading
+        if items.isEmpty { state = .loading }
         do {
             let res: PortalNotificationsDTO = try await api.get("/api/my/notifications")
             items = res.notifications
             session.unreadNotifications = res.unreadCount ?? 0
             state = .loaded
         } catch let e as APIError {
-            state = .failed(e.userMessage)
+            if !RefreshFailurePolicy.keepContent(hasContent: !items.isEmpty, message: e.userMessage) { state = .failed(e.userMessage) }
         } catch {
-            state = .failed(APIError.unknown.userMessage)
+            if !RefreshFailurePolicy.keepContent(hasContent: !items.isEmpty, message: APIError.unknown.userMessage) { state = .failed(APIError.unknown.userMessage) }
         }
     }
 

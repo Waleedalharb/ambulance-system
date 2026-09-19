@@ -13,6 +13,7 @@
 		5E4000000000000000000004 /* AppLogger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000004 /* AppLogger.swift */; };
 		5E4000000000000000000005 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000005 /* APIClient.swift */; };
 		5E4000000000000000000006 /* APIError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000006 /* APIError.swift */; };
+		5E40000000000000000000F3 /* RefreshNoticeCenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000F3 /* RefreshNoticeCenter.swift */; };
 		5E4000000000000000000007 /* AuthDTO.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000007 /* AuthDTO.swift */; };
 		5E4000000000000000000008 /* PortalDTO.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000008 /* PortalDTO.swift */; };
 		5E4000000000000000000009 /* KeychainService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000009 /* KeychainService.swift */; };
@@ -244,6 +245,7 @@
 		5E30000000000000000000F0 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		5E30000000000000000000F1 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		5E30000000000000000000F2 /* EMSOperations.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = EMSOperations.entitlements; sourceTree = "<group>"; };
+		5E30000000000000000000F3 /* RefreshNoticeCenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RefreshNoticeCenter.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -318,6 +320,7 @@
 				5E2000000000000000000054 /* DeepLinks */,
 				5E2000000000000000000055 /* Storage */,
 				5E2000000000000000000056 /* Network */,
+				5E2000000000000000000060 /* UI */,
 			);
 			path = Core;
 			sourceTree = "<group>";
@@ -368,6 +371,14 @@
 				5E3000000000000000000023 /* NetworkMonitor.swift */,
 			);
 			path = Network;
+			sourceTree = "<group>";
+		};
+		5E2000000000000000000060 /* UI */ = {
+			isa = PBXGroup;
+			children = (
+				5E30000000000000000000F3 /* RefreshNoticeCenter.swift */,
+			);
+			path = UI;
 			sourceTree = "<group>";
 		};
 		5E2000000000000000000013 /* Networking */ = {
@@ -866,6 +877,7 @@
 				5E4000000000000000000004 /* AppLogger.swift in Sources */,
 				5E4000000000000000000005 /* APIClient.swift in Sources */,
 				5E4000000000000000000006 /* APIError.swift in Sources */,
+				5E40000000000000000000F3 /* RefreshNoticeCenter.swift in Sources */,
 				5E4000000000000000000007 /* AuthDTO.swift in Sources */,
 				5E4000000000000000000008 /* PortalDTO.swift in Sources */,
 				5E4000000000000000000009 /* KeychainService.swift in Sources */,

@@ -134,7 +134,7 @@ final class CompletionViewModel: ObservableObject {
     private let api = APIClient.shared
 
     func load() async {
-        state = .loading
+        if check == nil { state = .loading }
         submitError = nil
         do {
             let dto: CheckSessionDTO = try await api.get("/api/my/check-session")
@@ -152,9 +152,9 @@ final class CompletionViewModel: ObservableObject {
                 state = .session
             }
         } catch let e as APIError {
-            state = .failed(e.userMessage)
+            if !RefreshFailurePolicy.keepContent(hasContent: check != nil, message: e.userMessage) { state = .failed(e.userMessage) }
         } catch {
-            state = .failed(APIError.unknown.userMessage)
+            if !RefreshFailurePolicy.keepContent(hasContent: check != nil, message: APIError.unknown.userMessage) { state = .failed(APIError.unknown.userMessage) }
         }
     }
 

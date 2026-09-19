@@ -105,15 +105,15 @@ final class ScheduleChangesViewModel: ObservableObject {
     @Published var changes: [ScheduleChangesDTO.Change] = []
 
     func load() async {
-        state = .loading
+        if changes.isEmpty { state = .loading }
         do {
             let res: ScheduleChangesDTO = try await APIClient.shared.get("/api/my/schedule-changes")
             changes = res.changes
             state = .loaded
         } catch let e as APIError {
-            state = .failed(e.userMessage)
+            if !RefreshFailurePolicy.keepContent(hasContent: !changes.isEmpty, message: e.userMessage) { state = .failed(e.userMessage) }
         } catch {
-            state = .failed(APIError.unknown.userMessage)
+            if !RefreshFailurePolicy.keepContent(hasContent: !changes.isEmpty, message: APIError.unknown.userMessage) { state = .failed(APIError.unknown.userMessage) }
         }
     }
 }

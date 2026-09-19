@@ -258,7 +258,7 @@ struct FilesOpsView: View {
 // MARK: - ViewModel
 @MainActor
 final class FilesOpsViewModel: ObservableObject {
-    enum LoadState { case loading, loaded, failed(String) }
+    enum LoadState: Equatable { case loading, loaded, failed(String) }
 
     @Published var state: LoadState = .loading
     @Published var files: [OpsFileDTO] = []
@@ -271,7 +271,7 @@ final class FilesOpsViewModel: ObservableObject {
     private let api = APIClient.shared
 
     func load() async {
-        state = .loading
+        if state != .loaded { state = .loading }
         do {
             async let filesReq: OpsFilesResponseDTO = api.get("/api/ops-files")
             async let docsReq: OpsDocsResponseDTO = api.get("/api/docs")
@@ -279,9 +279,9 @@ final class FilesOpsViewModel: ObservableObject {
             docs = (try? await docsReq)?.docs ?? []
             state = .loaded
         } catch let e as APIError {
-            state = .failed(e.userMessage)
+            if !RefreshFailurePolicy.keepContent(hasContent: state == .loaded, message: e.userMessage) { state = .failed(e.userMessage) }
         } catch {
-            state = .failed(APIError.unknown.userMessage)
+            if !RefreshFailurePolicy.keepContent(hasContent: state == .loaded, message: APIError.unknown.userMessage) { state = .failed(APIError.unknown.userMessage) }
         }
     }
 

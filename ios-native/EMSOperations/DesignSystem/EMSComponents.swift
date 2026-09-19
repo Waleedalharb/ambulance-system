@@ -195,11 +195,22 @@ struct EMSBackground: View {
 }
 
 /// معدِّل موحد لصفحات المحتوى (خلفية + حاشية + عنوان شريط)
+/// + شريط التنبيه العابر لفشل التحديث (توجيه المالك 2026-09-19 بند 7) —
+/// يظهر فوق أي صفحة تستخدم emsPage بلا أي تعديل في الشاشات.
 struct EMSPageModifier: ViewModifier {
     let title: String
+    @ObservedObject private var notice = RefreshNoticeCenter.shared
     func body(content: Content) -> some View {
         content
             .background(EMSBackground())
+            .overlay(alignment: .top) {
+                if let message = notice.message {
+                    RefreshNoticeBanner(message: message) { notice.dismiss() }
+                        .padding(.top, 6)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                }
+            }
+            .animation(.easeInOut(duration: 0.25), value: notice.message)
             .navigationTitle(title)
             .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbarBackground(EMSTheme.Colors.navy, for: .navigationBar)

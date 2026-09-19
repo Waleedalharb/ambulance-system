@@ -336,7 +336,7 @@ final class DecisionCenterViewModel: ObservableObject {
     }
 
     func load() async {
-        state = .loading
+        if state != .loaded { state = .loading }
         do {
             async let assessmentReq: SmartAssessmentDTO = api.get("/api/smart-operator/assessment")
             async let shiftReq: CurrentShiftDTO = api.get("/api/current-shift")
@@ -347,9 +347,9 @@ final class DecisionCenterViewModel: ObservableObject {
             // الذاكرة إثراء اختياري — فشلها لا يسقط التقييم (نفس روح الخادم)
             await loadMemory()
         } catch let e as APIError {
-            state = .failed(e.userMessage)
+            if !RefreshFailurePolicy.keepContent(hasContent: state == .loaded, message: e.userMessage) { state = .failed(e.userMessage) }
         } catch {
-            state = .failed(APIError.unknown.userMessage)
+            if !RefreshFailurePolicy.keepContent(hasContent: state == .loaded, message: APIError.unknown.userMessage) { state = .failed(APIError.unknown.userMessage) }
         }
     }
 

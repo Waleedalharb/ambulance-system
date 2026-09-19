@@ -155,7 +155,7 @@ struct SignoutsOpsView: View {
 // MARK: - ViewModel
 @MainActor
 final class SignoutsOpsViewModel: ObservableObject {
-    enum LoadState { case loading, loaded, failed(String) }
+    enum LoadState: Equatable { case loading, loaded, failed(String) }
 
     @Published var state: LoadState = .loading
     @Published var teamNames: [String] = []
@@ -177,7 +177,7 @@ final class SignoutsOpsViewModel: ObservableObject {
     }
 
     func load() async {
-        state = .loading
+        if state != .loaded { state = .loading }
         do {
             async let teamsReq: OpsTeamsDTO = api.get("/api/teams")
             async let signoutsReq: SignoutListResponseDTO = api.get("/api/signouts")
@@ -186,9 +186,9 @@ final class SignoutsOpsViewModel: ObservableObject {
             signouts = (try await signoutsReq).signouts ?? []
             state = .loaded
         } catch let e as APIError {
-            state = .failed(e.userMessage)
+            if !RefreshFailurePolicy.keepContent(hasContent: state == .loaded, message: e.userMessage) { state = .failed(e.userMessage) }
         } catch {
-            state = .failed(APIError.unknown.userMessage)
+            if !RefreshFailurePolicy.keepContent(hasContent: state == .loaded, message: APIError.unknown.userMessage) { state = .failed(APIError.unknown.userMessage) }
         }
     }
 

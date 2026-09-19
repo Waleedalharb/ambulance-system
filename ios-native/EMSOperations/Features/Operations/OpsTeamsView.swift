@@ -90,14 +90,14 @@ final class OpsTeamsViewModel: ObservableObject {
     }
 
     func load() async {
-        state = .loading
+        if data == nil { state = .loading }
         do {
             data = try await api.get("/api/teams")
             state = .loaded
         } catch let e as APIError {
-            state = .failed(e.userMessage)
+            if !RefreshFailurePolicy.keepContent(hasContent: data != nil, message: e.userMessage) { state = .failed(e.userMessage) }
         } catch {
-            state = .failed(APIError.unknown.userMessage)
+            if !RefreshFailurePolicy.keepContent(hasContent: data != nil, message: APIError.unknown.userMessage) { state = .failed(APIError.unknown.userMessage) }
         }
     }
 }

@@ -96,7 +96,7 @@ final class ScheduleOpsViewModel: ObservableObject {
             rosterState = .loaded
             return
         }
-        if !silent { rosterState = .loading }
+        if !silent && roster.isEmpty { rosterState = .loading }
         do {
             let q = ["month": String(selectedMonthNumber), "year": String(selectedYear)]
             async let rosterCall: RosterMonthDTO = api.get("/api/shift-roster", query: q)
@@ -106,9 +106,9 @@ final class ScheduleOpsViewModel: ObservableObject {
             stats = s
             rosterState = .loaded
         } catch let err as APIError {
-            rosterState = .failed(err.userMessage)
+            if !RefreshFailurePolicy.keepContent(hasContent: !roster.isEmpty, message: err.userMessage) { rosterState = .failed(err.userMessage) }
         } catch {
-            rosterState = .failed(APIError.unknown.userMessage)
+            if !RefreshFailurePolicy.keepContent(hasContent: !roster.isEmpty, message: APIError.unknown.userMessage) { rosterState = .failed(APIError.unknown.userMessage) }
         }
     }
 

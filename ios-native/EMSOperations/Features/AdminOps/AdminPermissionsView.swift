@@ -191,7 +191,7 @@ private struct AdminUserPermissionsDetailView: View {
 // MARK: - ViewModels
 @MainActor
 final class AdminPermissionsViewModel: ObservableObject {
-    enum LoadState { case loading, loaded, failed(String) }
+    enum LoadState: Equatable { case loading, loaded, failed(String) }
 
     @Published var state: LoadState = .loading
     @Published var users: [PermUserRowDTO] = []
@@ -200,7 +200,7 @@ final class AdminPermissionsViewModel: ObservableObject {
     private let api = APIClient.shared
 
     func load() async {
-        state = .loading
+        if state != .loaded { state = .loading }
         do {
             async let usersReq: PermUsersResponseDTO = api.get("/api/permissions/users")
             async let catReq: PermissionsCatalogDTO = api.get("/api/permissions/catalog")
@@ -208,16 +208,16 @@ final class AdminPermissionsViewModel: ObservableObject {
             catalog = (try await catReq).permissions ?? [:]
             state = .loaded
         } catch let e as APIError {
-            state = .failed(e.userMessage)
+            if !RefreshFailurePolicy.keepContent(hasContent: state == .loaded, message: e.userMessage) { state = .failed(e.userMessage) }
         } catch {
-            state = .failed(APIError.unknown.userMessage)
+            if !RefreshFailurePolicy.keepContent(hasContent: state == .loaded, message: APIError.unknown.userMessage) { state = .failed(APIError.unknown.userMessage) }
         }
     }
 }
 
 @MainActor
 final class AdminUserPermissionsViewModel: ObservableObject {
-    enum LoadState { case loading, loaded, failed(String) }
+    enum LoadState: Equatable { case loading, loaded, failed(String) }
     enum PermAction { case grant, revoke, clear
         var path: String {
             switch self {
@@ -246,7 +246,7 @@ final class AdminUserPermissionsViewModel: ObservableObject {
     }
 
     func load(userId: String) async {
-        state = .loading
+        if detail == nil { state = .loading }
         do {
             async let dReq: PermUserDetailDTO = api.get("/api/permissions/user/\(userId)")
             async let catReq: PermissionsCatalogDTO = api.get("/api/permissions/catalog")
@@ -254,9 +254,9 @@ final class AdminUserPermissionsViewModel: ObservableObject {
             catalog = (try await catReq).permissions ?? [:]
             state = .loaded
         } catch let e as APIError {
-            state = .failed(e.userMessage)
+            if !RefreshFailurePolicy.keepContent(hasContent: detail != nil, message: e.userMessage) { state = .failed(e.userMessage) }
         } catch {
-            state = .failed(APIError.unknown.userMessage)
+            if !RefreshFailurePolicy.keepContent(hasContent: detail != nil, message: APIError.unknown.userMessage) { state = .failed(APIError.unknown.userMessage) }
         }
     }
 

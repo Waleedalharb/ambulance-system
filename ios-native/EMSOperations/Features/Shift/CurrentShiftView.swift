@@ -125,7 +125,7 @@ final class CurrentShiftViewModel: ObservableObject {
     private let api = APIClient.shared
 
     func load() async {
-        state = .loading
+        if mates == nil { state = .loading }
         do {
             async let m: ShiftMatesDTO = api.get("/api/my/shift-mates")
             async let p: ProfileDTO = api.get("/api/my/profile")
@@ -134,9 +134,9 @@ final class CurrentShiftViewModel: ObservableObject {
             self.profile = profile
             state = .loaded
         } catch let e as APIError {
-            state = .failed(e.userMessage)
+            if !RefreshFailurePolicy.keepContent(hasContent: mates != nil, message: e.userMessage) { state = .failed(e.userMessage) }
         } catch {
-            state = .failed(APIError.unknown.userMessage)
+            if !RefreshFailurePolicy.keepContent(hasContent: mates != nil, message: APIError.unknown.userMessage) { state = .failed(APIError.unknown.userMessage) }
         }
     }
 }

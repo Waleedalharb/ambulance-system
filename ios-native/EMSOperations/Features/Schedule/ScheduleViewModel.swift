@@ -26,16 +26,16 @@ final class ScheduleViewModel: ObservableObject {
     }
 
     func load() async {
-        state = .loading
+        if schedule == nil { state = .loading }
         do {
             schedule = try await api.get("/api/my/schedule", query: [
                 "month": String(month), "year": String(year)
             ])
             state = .loaded
         } catch let e as APIError {
-            state = .failed(e.userMessage)
+            if !RefreshFailurePolicy.keepContent(hasContent: schedule != nil, message: e.userMessage) { state = .failed(e.userMessage) }
         } catch {
-            state = .failed(APIError.unknown.userMessage)
+            if !RefreshFailurePolicy.keepContent(hasContent: schedule != nil, message: APIError.unknown.userMessage) { state = .failed(APIError.unknown.userMessage) }
         }
     }
 
