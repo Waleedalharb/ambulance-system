@@ -71,6 +71,99 @@ actor APIClient {
         try await send(.delete, path, query: [:], body: nil as String?, authorized: true, retried: false)
     }
 
+    // MARK: - رفع multipart (ملفات تشغيلية §22 · مرفقات الدردشة §19)
+
+    /// ملف واحد ضمن طلب multipart/form-data.
+    struct UploadFile {
+        let data: Data
+        let filename: String
+        let mimeType: String
+    }
+
+    /// POST multipart/form-data بنفس قواعد send (Bearer، مهلة، تحديث واحد
+    /// عند 401، فك أخطاء {error}). fileField هو اسم الحقل الذي يتوقعه multer
+    /// ("files" للتشغيلية، "file" للدردشة)؛ fields حقول نصية إضافية.
+    func upload<T: Decodable>(_ path: String, fileField: String, files: [UploadFile],
+                              fields: [String: String] = [:]) async throws -> T {
+        try await sendUpload(path, fileField: fileField, files: files, fields: fields, retried: false)
+    }
+
+    private func sendUpload<T: Decodable>(_ path: String, fileField: String, files: [UploadFile],
+                                          fields: [String: String], retried: Bool) async throws -> T {
+        guard let url = URLComponents(url: AppEnvironment.current.baseURL.appending(path: path), resolvingAgainstBaseURL: false)?.url else {
+            throw APIError.unknown
+        }
+        let boundary = "EMSBoundary-\(UUID().uuidString)"
+        var body = Data()
+        for (name, value) in fields {
+            body.append(Data("--\(boundary)\r\n".utf8))
+            body.append(Data("Content-Disposition: form-data; name=\"\(name)\"\r\n\r\n".utf8))
+            body.append(Data("\(value)\r\n".utf8))
+        }
+        for file in files {
+            // الأسماء العربية تُرسل بصيغة RFC 5987 (filename*) مع بديل ASCII —
+            // busboy يفك filename* فيحفظ originalname سليمًا.
+            let asciiFallback = file.filename.unicodeScalars
+                .map { $0.isASCII && $0 != "\"" ? String($0) : "_" }.joined()
+            let encoded = file.filename.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? asciiFallback
+            body.append(Data("--\(boundary)\r\n".utf8))
+            body.append(Data("Content-Disposition: form-data; name=\"\(fileField)\"; filename=\"\(asciiFallback)\"; filename*=UTF-8''\(encoded)\r\n".utf8))
+            body.append(Data("Content-Type: \(file.mimeType)\r\n\r\n".utf8))
+            body.append(file.data)
+            body.append(Data("\r\n".utf8))
+        }
+        body.append(Data("--\(boundary)--\r\n".utf8))
+
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        req.setValue("application/json", forHTTPHeaderField: "Accept")
+        if let token = tokenProvider?() {
+            req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        req.httpBody = body
+
+        let (data, response): (Data, URLResponse)
+        do {
+            (data, response) = try await session.data(for: req)
+        } catch let e as URLError {
+            switch e.code {
+            case .notConnectedToInternet, .networkConnectionLost, .dataNotAllowed: throw APIError.offline
+            case .timedOut: throw APIError.timeout
+            default: throw APIError.offline
+            }
+        }
+        guard let http = response as? HTTPURLResponse else { throw APIError.unknown }
+        #if DEBUG
+        AppLogger.network.info("POST \(path, privacy: .public) → HTTP \(http.statusCode) (multipart \(files.count) file(s))")
+        #endif
+        switch http.statusCode {
+        case 200...299:
+            do {
+                return try JSONDecoder().decode(T.self, from: data)
+            } catch {
+                AppLogger.network.error("decoding failed for \(path, privacy: .public) (multipart)")
+                throw APIError.decoding
+            }
+        case 401:
+            if !retried, let refresh = refreshHandler, let newToken = await refresh() {
+                _ = newToken
+                return try await sendUpload(path, fileField: fileField, files: files, fields: fields, retried: true)
+            }
+            throw APIError.unauthenticated
+        case 403:
+            throw APIError.forbidden
+        case 404:
+            throw APIError.notFound
+        case 400:
+            let msg = (try? JSONDecoder().decode([String: String].self, from: data))?["error"] ?? ""
+            throw APIError.badRequest(msg)
+        default:
+            let msg = (try? JSONDecoder().decode([String: String].self, from: data))?["error"] ?? "HTTP \(http.statusCode)"
+            throw APIError.server(msg)
+        }
+    }
+
     // MARK: - JSON خام (قوائم حرة الحقول: ملاحظات/غيابات المناوبة)
     // الاستبدال الجماعي لهذه القوائم يقتضي حفظ الحقول غير المعروفة حرفيًا —
     // فكّ DTO انتقائي ثم إعادة ترميز كان سيُسقط حقولًا يملكها الويب.

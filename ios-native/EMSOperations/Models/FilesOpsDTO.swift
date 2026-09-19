@@ -84,3 +84,20 @@ struct OpsDocsResponseDTO: Decodable {
     let success: Bool?
     let docs: [OpsDocDTO]?
 }
+
+// MARK: - POST /api/upload-operational → {success, count, files[]} (server.js:9712)
+/// multipart: حقل الملفات "files" (حتى 10) + حقول uploader/category/note.
+struct OpsUploadResponseDTO: Decodable {
+    let success: Bool?
+    let count: Int?
+}
+
+// MARK: - POST /api/chat/upload → {success, fileUrl, filename, storedName, size} (server.js:14642)
+/// multipart: حقل ملف واحد "file". المسار المعاد يُرسل لاحقًا في file_url للرسالة.
+struct ChatUploadResponseDTO: Decodable {
+    let success: Bool?
+    let fileUrl: String?
+    let filename: String?
+    let storedName: String?
+    let size: Int?
+}

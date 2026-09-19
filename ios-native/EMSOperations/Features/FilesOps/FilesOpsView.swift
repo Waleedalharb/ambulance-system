@@ -3,18 +3,36 @@
 //  EMSOperations
 //
 //  الملفات التشغيلية والمستندات (§22): قائمة الملفات التشغيلية
-//  (GET /api/ops-files) + تنزيل (GET /api/download-operational/:id عبر
-//  ورقة مشاركة النظام) + حذف (DELETE /api/ops-files/:id — ops.files) +
-//  المستندات العامة (GET /api/docs + تنزيل/حذف — ops.files).
-//  الرفع multipart مؤجل موثقًا — لا يدعمه APIClient حاليًا.
+//  (GET /api/ops-files) + رفع multipart (POST /api/upload-operational —
+//  ops.files، حتى 10 ملفات، الأنواع المسموحة سيرفريًا) + تنزيل
+//  (GET /api/download-operational/:id عبر ورقة مشاركة النظام) + حذف
+//  (DELETE /api/ops-files/:id — ops.files) + المستندات العامة
+//  (GET /api/docs + تنزيل/حذف — ops.files).
 //
 
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct FilesOpsView: View {
     @StateObject private var vm = FilesOpsViewModel()
     @EnvironmentObject private var session: SessionStore
     @State private var shareItems: [Any] = []
+    @State private var showUploadSheet = false
+    @State private var showFilePicker = false
+    @State private var pickedFiles: [URL] = []
+    @State private var uploadCategory = ""
+    @State private var uploadNote = ""
+
+    /// الأنواع المسموحة — نفس قائمة multer سيرفريًا (opsUpload.fileFilter).
+    private static let allowedTypes: [UTType] = [
+        .pdf, .jpeg, .png, .gif, .webP,
+        UTType("org.openxmlformats.wordprocessingml.document"),
+        UTType("com.microsoft.word.doc"),
+        UTType("org.openxmlformats.spreadsheetml.sheet"),
+        UTType("com.microsoft.excel.xls"),
+        UTType("org.openxmlformats.presentationml.presentation"),
+        UTType("com.microsoft.powerpoint.ppt")
+    ].compactMap { $0 }
 
     var body: some View {
         ScrollView {
@@ -41,16 +59,91 @@ struct FilesOpsView: View {
         )) {
             ActivityShareSheet(items: shareItems)
         }
+        .sheet(isPresented: $showUploadSheet) {
+            uploadSheet
+        }
+        .fileImporter(isPresented: $showFilePicker, allowedContentTypes: Self.allowedTypes,
+                      allowsMultipleSelection: true) { result in
+            if case .success(let urls) = result { pickedFiles = urls }
+        }
+    }
+
+    // MARK: - ورقة الرفع (ops.files)
+
+    private var uploadSheet: some View {
+        NavigationStack {
+            Form {
+                Section("الملفات") {
+                    Button {
+                        showFilePicker = true
+                    } label: {
+                        Label(pickedFiles.isEmpty ? "اختيار ملفات (حتى 10)" : "\(pickedFiles.count) ملف(ات) مختارة",
+                              systemImage: "doc.badge.plus")
+                    }
+                    ForEach(pickedFiles, id: \.self) { url in
+                        Text(url.lastPathComponent)
+                            .font(.caption)
+                            .foregroundStyle(EMSTheme.Colors.textSecondary)
+                            .lineLimit(1)
+                    }
+                }
+                Section("التصنيف والملاحظة") {
+                    TextField("التصنيف (افتراضي: عام)", text: $uploadCategory)
+                    TextField("ملاحظة (اختياري)", text: $uploadNote)
+                }
+                if let msg = vm.infoMessage {
+                    Section {
+                        Text(msg)
+                            .font(.caption)
+                            .foregroundStyle(EMSTheme.Colors.textSecondary)
+                    }
+                }
+            }
+            .navigationTitle("رفع ملفات تشغيلية")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("إلغاء") { showUploadSheet = false }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button {
+                        let files = pickedFiles
+                        let category = uploadCategory
+                        let note = uploadNote
+                        Task {
+                            if await vm.upload(files: files, category: category, note: note) {
+                                pickedFiles = []
+                                uploadCategory = ""
+                                uploadNote = ""
+                                showUploadSheet = false
+                            }
+                        }
+                    } label: {
+                        if vm.isUploading { ProgressView() } else { Text("رفع") }
+                    }
+                    .disabled(pickedFiles.isEmpty || pickedFiles.count > 10 || vm.isUploading)
+                }
+            }
+        }
     }
 
     // MARK: - الملفات التشغيلية
     private var opsFilesSection: some View {
         VStack(spacing: EMSTheme.spacing) {
             EMSectionHeader(title: "الملفات التشغيلية", systemImage: "folder.fill")
-            Text("الرفع من الويب حاليًا — التنزيل والحذف متاحان هنا حسب الصلاحية.")
-                .font(.caption2)
-                .foregroundStyle(EMSTheme.Colors.textMuted)
+            if session.permissions.canOpsFiles {
+                Button { showUploadSheet = true } label: {
+                    Label("رفع ملفات", systemImage: "square.and.arrow.up")
+                        .font(.subheadline.weight(.semibold))
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(EMSTheme.Colors.teal)
                 .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                Text("الرفع يتطلب صلاحية الملفات — التنزيل متاح للجميع.")
+                    .font(.caption2)
+                    .foregroundStyle(EMSTheme.Colors.textMuted)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
             if vm.files.isEmpty {
                 EMSEmptyView(icon: "folder", title: "لا توجد ملفات تشغيلية")
             } else {
@@ -172,6 +265,8 @@ final class FilesOpsViewModel: ObservableObject {
     @Published var docs: [OpsDocDTO] = []
     @Published var downloadingId: String? = nil
     @Published var deletingId: String? = nil
+    @Published var isUploading = false
+    @Published var infoMessage: String? = nil
 
     private let api = APIClient.shared
 
@@ -232,6 +327,45 @@ final class FilesOpsViewModel: ObservableObject {
             state = .failed(e.userMessage)
         } catch {
             state = .failed(APIError.unknown.userMessage)
+        }
+    }
+
+    /// رفع ملفات تشغيلية (ops.files) — POST /api/upload-operational multipart.
+    /// يعيد true عند النجاح ليُغلق السheet. القراءة الأمنية security-scoped.
+    func upload(files urls: [URL], category: String, note: String) async -> Bool {
+        guard !urls.isEmpty, urls.count <= 10, !isUploading else { return false }
+        isUploading = true
+        infoMessage = nil
+        defer { isUploading = false }
+        var payloads: [APIClient.UploadFile] = []
+        for url in urls {
+            let scoped = url.startAccessingSecurityScopedResource()
+            defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+            do {
+                let data = try Data(contentsOf: url)
+                let ext = url.pathExtension.lowercased()
+                let mime = UTType(filenameExtension: ext)?.preferredMIMEType ?? "application/octet-stream"
+                payloads.append(APIClient.UploadFile(data: data, filename: url.lastPathComponent, mimeType: mime))
+            } catch {
+                infoMessage = "تعذر قراءة الملف: \(url.lastPathComponent)"
+                return false
+            }
+        }
+        var fields: [String: String] = [:]
+        if !category.trimmingCharacters(in: .whitespaces).isEmpty { fields["category"] = category }
+        if !note.trimmingCharacters(in: .whitespaces).isEmpty { fields["note"] = note }
+        do {
+            let res: OpsUploadResponseDTO = try await api.upload("/api/upload-operational",
+                fileField: "files", files: payloads, fields: fields)
+            infoMessage = "تم رفع \(res.count ?? payloads.count) ملف(ات)"
+            await load()
+            return true
+        } catch let e as APIError {
+            infoMessage = e.userMessage
+            return false
+        } catch {
+            infoMessage = APIError.unknown.userMessage
+            return false
         }
     }
 }
