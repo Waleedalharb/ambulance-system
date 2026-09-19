@@ -110,7 +110,7 @@
 | **Operational Actions** | استيراد رسمي، توليد ذكي، تحقق تعارضات (`validate`)، تصدير PDF، تراجع/إعادة |
 | **Permissions** | `schedule.view` (قراءة+validate) · `schedule.edit_cell` · `schedule.employees` · `schedule.import` · `schedule.bulk_update` · `schedule.swap` · `schedule.sync` · `schedule.export` · `schedule.clear` — كلها منح فردية حصرًا؛ التوليد/التحديث `authorize(['admin','director'])` |
 | **Native Screen** | `ScheduleView` (جدول الموظف الشهري — قراءة) + مجال الجداول الإداري `Features/ScheduleOps/` (`ScheduleHubView` خمسة أوجه عرض · `ScheduleCellSheet` تحرير · `ScheduleHistoryView` تدقيق · `ScheduleAdvancedView` عمليات متقدمة) — التصميم: `docs/native-schedule-parity.md` |
-| **Native Status** | ✅ عرض شهر/يوم/فريق/موظف/مركز ✅ تعديل خلية (PUT /cell) ✅ إضافة/حذف سجل (validate → تأكيد) ✅ تبديل (swap) ✅ سجل تدقيق قبل/بعد ✅ تصدير PDF (تنزيل ثنائي + مشاركة) ✅ تصدير JSON (مشاركة) ✅ مسودات/تراجع/إعادة (إعادة تطبيق عبر bulk-update بعد تأكيد) ✅ توليد ذكي (admin/director) ✅ مسح بالمدى/كامل (تأكيد مزدوج) — ⛔ استيراد Excel (`import`/`official-import`/`schedule/files`) يبقى على الويب: فجوة موثقة تحتاج endpoint فكّ سيرفي · ⛔ الجدول الشهري الرسمي (`monthly-table`) والمزامنة (`schedule.sync`) و`shift-schedule/update` لم تُنقل بعد · التحديث الحي يعتمد pull-to-refresh (لا SSE في Native) |
+| **Native Status** | ✅ عرض شهر/يوم/فريق/موظف/مركز ✅ تعديل خلية (PUT /cell) ✅ إضافة/حذف سجل (validate → تأكيد) ✅ تبديل (swap) ✅ سجل تدقيق قبل/بعد ✅ تصدير PDF (تنزيل ثنائي + مشاركة) ✅ تصدير JSON (مشاركة) ✅ مسودات/تراجع/إعادة (إعادة تطبيق عبر bulk-update بعد تأكيد) ✅ توليد ذكي (admin/director) ✅ مسح بالمدى/كامل (تأكيد مزدوج) — ⛔ استيراد Excel (`import`/`official-import`/`schedule/files`): **قرار مالك (2026-09-19) — Web-only نهائيًا حاليًا؛ لا يُبنى Import في iOS ولا يُطلب endpoint جديد له** · ⛔ الجدول الشهري الرسمي (`monthly-table`) والمزامنة (`schedule.sync`) و`shift-schedule/update` لم تُنقل بعد · التحديث الحي يعتمد pull-to-refresh (لا SSE في Native) |
 
 ## 7. التكميل (completion / staffing)
 
@@ -435,7 +435,7 @@
 - كتابات JSON الكاملة القديمة (خطر استبدال الكل): `POST /api/timeline`، `POST /api/hospitals`،
   `POST /api/save-vacations`، `POST /api/announcements` (الجماعية) — لا تُبنى أصلًا دون قرار مالك.
 - الرفع multipart: theme/هوية فقط — §22 و§19 أُغلقتا (APIClient صار يدعم multipart/form-data بأسماء RFC 5987).
-- استيراد Excel للجداول (§6): يحتاج endpoint فكّ سيرفي.
+- استيراد Excel للجداول (§6): **قرار مالك (2026-09-19) — Web-only**؛ iOS يعرض ويعدّل ويشغّل الجداول ويقرأ نتائج الاستيراد، والـImport نفسه من الويب فقط بلا endpoint جديد.
 - شاشات تحليلية ثقيلة تحتاج قرار تصميم: لوحات دورة المناوبة (§8)، تحليلات `/api/analytics/*` (§21)،
   محادثة AI وإدارة المعرفة (§18).
 - SSE/التحديث اللحظي: التطبيق يعتمد pull-to-refresh بوعي (§4/§5/§19).
@@ -471,3 +471,10 @@
 ### تدقيق عقود API الآلي
 
 `scripts/api-contract-audit.js`: يستخرج 241 استدعاء API من التطبيق ويطابقها مع 414 مسارًا في server.js — **صفر فجوات حقيقية** (حالتان إيجابيتان كاذبتان من مسارات ديناميكية مؤلَّفة، ومسارا Push الموجودان في origin/main).
+
+### قرارات نطاق معتمدة من المالك (2026-09-19)
+
+- **الجداول في iOS:** عرض + تعديل خلايا + تعيين/نقل/تبديل وبقية عمليات الجدول حسب الصلاحيات + قراءة نتائج الاستيراد بعد تنفيذه من الويب.
+- **Excel/استيراد ملفات الجداول:** منصة الويب فقط — لا يُبنى Import في التطبيق ولا يُطلب Backend endpoint جديد له.
+- **الملفات (§22):** للمستندات والإعلانات والمرفقات التشغيلية فقط — ليست قناة Import للجداول.
+- **الدردشة (§19):** مجمّدة (Deferred/Frozen) — لا تطوير إضافي عليها حاليًا (المرفقات المبنية في `e844bfc` تبقى كما هي بلا توسعة).
