@@ -295,7 +295,8 @@ final class MyRequestsViewModel: ObservableObject {
 
             // العزل من المصدر: الموظف الميداني لا يجلب إجازات العمليات إطلاقًا
             if canViewVacations {
-                vacations = (try? await api.get("/api/vacations")) ?? []
+                let vac: [VacationEntryDTO]? = try? await api.get("/api/vacations")
+                vacations = vac ?? []
             } else {
                 vacations = []
             }
