@@ -29,7 +29,7 @@ while ((m = routeRe.exec(serverSrc))) {
 
 // 2) مسارات التطبيق: api.get/post/put/delete + getRaw/postRaw/putRaw + download
 const swiftFiles = walk(IOS_ROOT);
-const callRe = /api\.(get|post|put|delete|getRaw|postRaw|putRaw|download)\(\s*"([^"]+)"/g;
+const callRe = /api\.(get|post|put|delete|getRaw|postRaw|putRaw|download|upload)\(\s*"([^"]+)"/g;
 const appCalls = [];
 for (const f of swiftFiles) {
   const src = fs.readFileSync(f, 'utf8');
@@ -37,7 +37,7 @@ for (const f of swiftFiles) {
   while ((mm = callRe.exec(src))) {
     const rawPath = mm[2].replace(/\\\([^)]*\)/g, ':_'); // \(id) → :_
     appCalls.push({
-      method: mm[1].replace('getRaw', 'get').replace('postRaw', 'post').replace('putRaw', 'put').replace('download', 'get').toUpperCase(),
+      method: mm[1].replace('getRaw', 'get').replace('postRaw', 'post').replace('putRaw', 'put').replace('download', 'get').replace('upload', 'post').toUpperCase(),
       path: rawPath,
       file: path.relative(IOS_ROOT, f),
       line: src.slice(0, mm.index).split('\n').length

@@ -195,6 +195,19 @@ struct ChatPrivateCreateRequestDTO: Encodable {
 struct ChatMessageRequestDTO: Encodable {
     let content: String
     let type: String?
+    /// مسار المرفق المعاد من POST /api/chat/upload (type="file")
+    let fileUrl: String?
+
+    enum CodingKeys: String, CodingKey {
+        case content, type
+        case fileUrl = "file_url"
+    }
+
+    init(content: String, type: String? = nil, fileUrl: String? = nil) {
+        self.content = content
+        self.type = type
+        self.fileUrl = fileUrl
+    }
 }
 
 struct ChatParticipantRequestDTO: Encodable {

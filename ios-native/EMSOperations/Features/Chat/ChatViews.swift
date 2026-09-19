@@ -5,11 +5,12 @@
 //  مجال الدردشة (§19): محادثات جماعية/خاصة، رسائل، مشاركون، متصلون.
 //  نظام داخلي عام — كل المسارات authenticate فقط (server.js:14240+).
 //  إدارة المشاركين والأرشفة لمسؤول المجموعة (is_admin) كما يفرضه الخادم.
-//  مؤجل موثق: رفع المرفقات (POST /api/chat/upload multipart) — يتطلب
-//  دعم multipart في APIClient وتحققًا على الجهاز قبل التفعيل.
+//  المرفقات: رفع multipart (POST /api/chat/upload) ثم رسالة type=file
+//  بمسار file_url المعاد — نفس عقد الويب حرفيًا.
 //
 
 import SwiftUI
+import UniformTypeIdentifiers
 
 // MARK: - قائمة المحادثات
 
@@ -320,6 +321,7 @@ struct ChatConversationView: View {
     @StateObject private var vm: ChatConversationViewModel
     @State private var draft = ""
     @State private var showParticipants = false
+    @State private var showAttachPicker = false
 
     init(conversation: ChatConversationDTO) {
         _vm = StateObject(wrappedValue: ChatConversationViewModel(conversation: conversation))
@@ -364,6 +366,13 @@ struct ChatConversationView: View {
             }
 
             HStack(spacing: 8) {
+                Button {
+                    showAttachPicker = true
+                } label: {
+                    Image(systemName: "paperclip")
+                        .foregroundStyle(EMSTheme.Colors.teal)
+                }
+                .disabled(vm.isMutating)
                 TextField("اكتب رسالة…", text: $draft, axis: .vertical)
                     .textFieldStyle(.roundedBorder)
                     .lineLimit(1...4)
@@ -396,6 +405,14 @@ struct ChatConversationView: View {
         }
         .sheet(isPresented: $showParticipants) {
             ChatParticipantsSheet(vm: vm)
+        }
+        // مرفقات الدردشة — الخادم يقبل كل الأنواع (uploadChat بلا فلتر)
+        .fileImporter(isPresented: $showAttachPicker,
+                      allowedContentTypes: [.image, .pdf, .text, .audio, .data],
+                      allowsMultipleSelection: false) { result in
+            if case .success(let urls) = result, let url = urls.first {
+                Task { _ = await vm.attachAndSend(url: url) }
+            }
         }
     }
 
@@ -570,6 +587,37 @@ final class ChatConversationViewModel: ObservableObject {
             return nil
         } catch {
             infoMessage = APIError.unknown.userMessage
+            return nil
+        }
+    }
+
+    /// مرفق: رفع الملف (POST /api/chat/upload) ثم رسالة type=file بمساره —
+    /// نفس تسلسل الويب. القراءة security-scoped.
+    func attachAndSend(url: URL) async -> String? {
+        guard let cid = conversation.id, !isMutating else { return nil }
+        isMutating = true
+        defer { isMutating = false }
+        let scoped = url.startAccessingSecurityScopedResource()
+        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+        do {
+            let data = try Data(contentsOf: url)
+            let ext = url.pathExtension.lowercased()
+            let mime = UTType(filenameExtension: ext)?.preferredMIMEType ?? "application/octet-stream"
+            let up: ChatUploadResponseDTO = try await api.upload("/api/chat/upload",
+                fileField: "file", files: [APIClient.UploadFile(data: data, filename: url.lastPathComponent, mimeType: mime)])
+            guard let fileUrl = up.fileUrl else {
+                infoMessage = APIError.decoding.userMessage
+                return nil
+            }
+            let _: ChatMessageResponseDTO = try await api.post("/api/chat/conversations/\(cid)/messages",
+                body: ChatMessageRequestDTO(content: "", type: "file", fileUrl: fileUrl))
+            await load()
+            return "تم"
+        } catch let e as APIError {
+            infoMessage = e.userMessage
+            return nil
+        } catch {
+            infoMessage = "تعذر قراءة الملف"
             return nil
         }
     }
