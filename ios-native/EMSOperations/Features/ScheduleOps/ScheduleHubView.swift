@@ -173,7 +173,7 @@ struct ScheduleHubView: View {
         case .team:
             ScheduleTeamView(vm: vm, centerMode: false, allowsEmptyTap: allowsEmptyTap) { cellContext = $0 }
         case .employee:
-            ScheduleEmployeeView(vm: vm)
+            ScheduleEmployeeView(vm: vm) { cellContext = $0 }
         case .center:
             ScheduleTeamView(vm: vm, centerMode: true, allowsEmptyTap: allowsEmptyTap) { cellContext = $0 }
         }
