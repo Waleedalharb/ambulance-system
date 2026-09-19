@@ -28,6 +28,7 @@ struct ScheduleView: View {
                     if let s = vm.schedule {
                         coverageLine(s)
                         calendarGrid(s)
+                        monthlyRosterList(s)
                         NavigationLink {
                             ScheduleChangesView()
                         } label: {
@@ -183,6 +184,86 @@ struct ScheduleView: View {
         .background(isToday ? EMSTheme.Colors.teal : (info?.shiftCode != nil ? Color.white.opacity(0.07) : Color.clear))
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         .accessibilityLabel("\(dateStr) \(info?.shiftName ?? "")")
+    }
+
+    // MARK: - قائمة المناوبات الشهرية (صفّية: اليوم · التاريخ · المناوبة · الفريق · المركز)
+    // مواصفة المالك 2026-09-20 بند 2: جدول الموظف يعرض مناوباته الرسمية من
+    // shift_roster بصيغة مقروءة — لا يعتمد على الشبكة وحدها.
+    private func monthlyRosterList(_ s: ScheduleDTO) -> some View {
+        let days = s.days
+            .filter { $0.shiftCode != nil }
+            .sorted { ($0.date ?? "") < ($1.date ?? "") }
+        let fmt = DateFormatter()
+        fmt.dateFormat = "yyyy-MM-dd"
+        fmt.timeZone = TimeZone(identifier: "Asia/Riyadh") ?? .current
+        let todayStr = fmt.string(from: Date())
+
+        return EMSCard {
+            VStack(alignment: .leading, spacing: 0) {
+                EMSectionHeader(title: "مناوباتي هذا الشهر", systemImage: "list.bullet.rectangle")
+                    .padding(.bottom, 8)
+                if days.isEmpty {
+                    Text("لا توجد مناوبات مسجلة لهذا الشهر.")
+                        .font(.caption)
+                        .foregroundStyle(EMSTheme.Colors.textMuted)
+                } else {
+                    ForEach(days, id: \.date) { d in
+                        let isToday = d.date == todayStr
+                        HStack(spacing: 8) {
+                            Text(weekdayName(d.date))
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(isToday ? EMSTheme.Colors.teal : EMSTheme.Colors.textSecondary)
+                                .frame(width: 44, alignment: .leading)
+                            Text(dayNumber(d.date))
+                                .font(.caption.monospacedDigit())
+                                .foregroundStyle(isToday ? EMSTheme.Colors.teal : EMSTheme.Colors.textPrimary)
+                                .frame(width: 24, alignment: .leading)
+                                .environment(\.layoutDirection, .leftToRight)
+                            Text(d.shiftName ?? d.shiftCode ?? "—")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(EMSTheme.Colors.textPrimary)
+                                .lineLimit(1)
+                            Spacer(minLength: 4)
+                            let place = [d.teamName, d.center].compactMap { $0 }.filter { !$0.isEmpty }
+                                .reduce(into: [String]()) { acc, v in if !acc.contains(v) { acc.append(v) } }
+                                .joined(separator: " · ")
+                            if !place.isEmpty {
+                                Text(place)
+                                    .font(.caption2)
+                                    .foregroundStyle(EMSTheme.Colors.textMuted)
+                                    .lineLimit(1)
+                            }
+                        }
+                        .padding(.vertical, 7)
+                        .padding(.horizontal, 6)
+                        .background(isToday ? EMSTheme.Colors.teal.opacity(0.12) : Color.clear)
+                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        if d.date != days.last?.date {
+                            Divider().background(Color.white.opacity(0.06))
+                        }
+                    }
+                }
+            }
+        }
+        .accessibilityLabel("قائمة مناوبات الموظف للشهر")
+    }
+
+    private func weekdayName(_ dateStr: String?) -> String {
+        guard let dateStr else { return "—" }
+        let fmt = DateFormatter()
+        fmt.dateFormat = "yyyy-MM-dd"
+        fmt.timeZone = TimeZone(identifier: "Asia/Riyadh") ?? .current
+        guard let date = fmt.date(from: dateStr) else { return "—" }
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = fmt.timeZone
+        let names = ["أحد", "اثنين", "ثلاثاء", "أربعاء", "خميس", "جمعة", "سبت"]
+        return names[max(0, min(6, cal.component(.weekday, from: date) - 1))]
+    }
+
+    private func dayNumber(_ dateStr: String?) -> String {
+        guard let dateStr, dateStr.count >= 10 else { return "—" }
+        let day = String(dateStr.suffix(2))
+        return String(Int(day) ?? 0)
     }
 
     /// خلايا الشهر: فراغات المحاذاة (الأحد أولًا) ثم الأيام.
