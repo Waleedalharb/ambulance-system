@@ -14,6 +14,7 @@ enum APIError: Error, Equatable {
     case notFound
     case badRequest(String)       // 400 برسالة الخادم
     case server(String)           // 5xx
+    case serverMessage(String)    // خطأ برسالة الخادم نفسها (مثل 404 «لا بيانات جدول»)
     case offline                  // انقطاع شبكة
     case timeout
     case decoding                 // شكل رد غير متوقع
@@ -28,6 +29,7 @@ enum APIError: Error, Equatable {
         case .notFound: return "العنصر غير موجود."
         case .badRequest(let m): return m.isEmpty ? "بيانات غير مكتملة." : m
         case .server: return "خطأ في الخادم — حاول لاحقًا."
+        case .serverMessage(let m): return m
         case .offline: return "تعذر الاتصال بالخادم — تحقق من اتصال الإنترنت وحاول مرة أخرى."
         case .timeout: return "استغرق الطلب وقتًا طويلًا — حاول مرة أخرى."
         case .decoding: return "رد غير متوقع من الخادم."

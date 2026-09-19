@@ -281,6 +281,9 @@ actor APIClient {
         switch http.statusCode {
         case 200...299:
             let filename = Self.contentDispositionFilename(http.value(forHTTPHeaderField: "Content-Disposition"))
+            #if DEBUG
+            AppLogger.network.info("download OK \(path, privacy: .public) — CT=\(http.value(forHTTPHeaderField: "Content-Type") ?? "؟", privacy: .public) file=\(filename ?? "؟", privacy: .public)")
+            #endif
             return DownloadedFile(data: data, filename: filename, mimeType: http.value(forHTTPHeaderField: "Content-Type"))
         case 401:
             if !retried, let refresh = refreshHandler, let newToken = await refresh() {
@@ -291,6 +294,10 @@ actor APIClient {
         case 403:
             throw APIError.forbidden
         case 404:
+            // أظهر رسالة الخادم نفسها عند وجودها («لا توجد بيانات جدول لهذا المركز»)
+            if let msg = (try? JSONDecoder().decode([String: String].self, from: data))?["error"], !msg.isEmpty {
+                throw APIError.serverMessage(msg)
+            }
             throw APIError.notFound
         default:
             let msg = (try? JSONDecoder().decode([String: String].self, from: data))?["error"] ?? "HTTP \(http.statusCode)"

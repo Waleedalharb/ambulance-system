@@ -37,6 +37,7 @@ struct ScheduleAdvancedView: View {
     // JSON
     @State private var jsonRows = 0
     @State private var jsonFileURL: URL?
+    @State private var jsonStage: String?
     // مسودات
     @State private var drafts: [RosterDraftsDTO.Draft] = []
     @State private var draftsLoaded = false
@@ -171,6 +172,14 @@ struct ScheduleAdvancedView: View {
             do {
                 let file = try await vm.downloadPdf(center: pdfMode == .center ? pdfCenter : nil,
                                                     group: pdfMode == .group ? pdfGroup : nil)
+                // تحقق صادق: الخادم يجب أن يعيد PDF ثنائيًا فعليًا (%PDF magic)
+                guard file.data.count > 5,
+                      file.data.prefix(5).elementsEqual([0x25, 0x50, 0x44, 0x46, 0x2D]) else {
+                    #if DEBUG
+                    AppLogger.network.error("schedule pdf: payload is not a PDF — \(file.data.count) bytes, CT=\(file.mimeType ?? "؟", privacy: .public)")
+                    #endif
+                    throw APIError.serverMessage("استجابة الخادم ليست ملف PDF صالحًا (\(file.mimeType ?? "نوع غير معروف")).")
+                }
                 let url = FileManager.default.temporaryDirectory
                     .appendingPathComponent(file.filename ?? "schedule-\(vm.selectedMonth).pdf")
                 try file.data.write(to: url, options: .atomic)
@@ -193,6 +202,11 @@ struct ScheduleAdvancedView: View {
                 EMSectionHeader(title: "تصدير JSON — \(vm.selectedMonthLabel)", systemImage: "curlybraces")
                 EMSPrimaryButton(title: "جلب البيانات", isLoading: working) {
                     runJsonExport()
+                }
+                if let jsonStage, working {
+                    Text(jsonStage)
+                        .font(.caption2)
+                        .foregroundStyle(EMSTheme.Colors.textMuted)
                 }
                 if jsonRows > 0 {
                     EMSInfoRow(label: "عدد الصفوف", value: String(jsonRows))
@@ -217,15 +231,25 @@ struct ScheduleAdvancedView: View {
         errorMessage = nil
         infoMessage = nil
         working = true
+        jsonStage = "جاري الجلب من الخادم…"
         Task {
             do {
                 let res = try await vm.exportJson()
                 let rows = res.data ?? []
+                #if DEBUG
+                AppLogger.network.info("roster export: \(rows.count) rows received")
+                #endif
+                jsonStage = "جاري تجهيز الملف…"
+                let month = vm.selectedMonth
+                // الترميز والكتابة خارج MainActor — لا تجميد للواجهة مهما كبرت البيانات
+                let url = try await Task.detached(priority: .userInitiated) {
+                    let payload = try JSONEncoder().encode(rows)
+                    let fileURL = FileManager.default.temporaryDirectory
+                        .appendingPathComponent("shift-roster-\(month).json")
+                    try payload.write(to: fileURL, options: .atomic)
+                    return fileURL
+                }.value
                 jsonRows = rows.count
-                let payload = try JSONEncoder().encode(rows)
-                let url = FileManager.default.temporaryDirectory
-                    .appendingPathComponent("shift-roster-\(vm.selectedMonth).json")
-                try payload.write(to: url, options: .atomic)
                 jsonFileURL = url
                 infoMessage = "تم جلب \(rows.count) سجلًا من الخادم."
             } catch let e as APIError {
@@ -233,6 +257,7 @@ struct ScheduleAdvancedView: View {
             } catch {
                 errorMessage = APIError.unknown.userMessage
             }
+            jsonStage = nil
             working = false
         }
     }
