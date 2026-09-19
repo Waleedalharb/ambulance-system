@@ -24,19 +24,19 @@ struct MyRequestsView: View {
                     EMSSkeletonCard()
                     EMSSkeletonCard()
                 case .failed(let message):
-                    EMSErrorView(message: message) { Task { await vm.load() } }
+                    EMSErrorView(message: message) { Task { await vm.load(isAdminDirector: session.permissions.isAdminOrDirector) } }
                 case .loaded:
                     announcementsSection
                     leaveSection
                     shiftChangeSection
-                    vacationsSection
+                    if vm.canViewVacations { vacationsSection }
                 }
             }
             .padding(EMSTheme.pagePadding)
         }
         .emsPage("طلباتي والإعلانات")
-        .task { await vm.load() }
-        .refreshable { await vm.load() }
+        .task { await vm.load(isAdminDirector: session.permissions.isAdminOrDirector) }
+        .refreshable { await vm.load(isAdminDirector: session.permissions.isAdminOrDirector) }
         .alert("تم", isPresented: $vm.showSuccess) {
             Button("حسنًا", role: .cancel) {}
         } message: {
@@ -100,14 +100,14 @@ struct MyRequestsView: View {
                     Text("الاعتماد والحد الأقصى للإجازات المتزامنة يُحسمان على الخادم — يظهر رفض الخادم بلفظه.")
                         .font(.caption2)
                         .foregroundStyle(EMSTheme.Colors.textMuted)
-                    TextField("نوع الإجازة (مثال: سنوية)", text: $vm.leaveType)
-                        .textFieldStyle(.roundedBorder)
-                    HStack(spacing: 8) {
-                        TextField("من (yyyy-MM-dd)", text: $vm.leaveStart)
-                            .textFieldStyle(.roundedBorder)
-                        TextField("إلى (yyyy-MM-dd)", text: $vm.leaveEnd)
-                            .textFieldStyle(.roundedBorder)
+                    Picker("نوع الإجازة", selection: $vm.leaveType) {
+                        ForEach(MyRequestsViewModel.leaveTypes, id: \.self) { Text($0).tag($0) }
                     }
+                    .pickerStyle(.segmented)
+                    DatePicker("من", selection: $vm.leaveStartDate, displayedComponents: .date)
+                        .foregroundStyle(.white)
+                    DatePicker("إلى", selection: $vm.leaveEndDate, in: vm.leaveStartDate..., displayedComponents: .date)
+                        .foregroundStyle(.white)
                     TextField("السبب (اختياري)", text: $vm.leaveReason)
                         .textFieldStyle(.roundedBorder)
                     EMSPrimaryButton(
@@ -228,16 +228,36 @@ final class MyRequestsViewModel: ObservableObject {
     @Published var announcements: [AnnouncementDTO] = []
     @Published var myLeaveRequests: [LeaveRequestDTO] = []
     @Published var vacations: [VacationEntryDTO] = []
+    /// إجازات التحكم والتنسيق تخص طاقم العمليات — لا تُجلب أصلًا للموظف الميداني
+    /// (عزل المصدر: الويب يعرضها في لوحة العمليات فقط، وبوابة الموظف لا تعرضها).
+    @Published var canViewVacations = false
+
+    /// من تُعرض لهم إجازات التحكم والتنسيق: طاقم العمليات نفسه + القيادة الميدانية.
+    private static let vacationsViewerTitles: Set<String> = [
+        "تحكم عملياتي", "تنسيق الاستجابة", "كبير مسعفين", "مساعد كبير المسعفين"
+    ]
 
     // نماذج الإدخال
-    @Published var leaveType = ""
-    @Published var leaveStart = ""
-    @Published var leaveEnd = ""
+    /// الأنواع المقبولة سيرفريًا حصرًا — CHECK constraint في leave_requests
+    /// (type IN ('إجازة','مرضية','استثنائية')) — نص حر = رفض 500.
+    static let leaveTypes = ["إجازة", "مرضية", "استثنائية"]
+    @Published var leaveType = "إجازة"
+    @Published var leaveStartDate = Date()
+    @Published var leaveEndDate = Date()
     @Published var leaveReason = ""
     @Published var scDate = ""
     @Published var scOldCode = ""
     @Published var scProposedCode = ""
     @Published var scReason = ""
+
+    /// صيغة التاريخ للعقد السيرفري (yyyy-MM-dd ميلادية أرقام لاتينية — POSIX إجباري).
+    private static let isoDay: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.calendar = Calendar(identifier: .gregorian)
+        f.dateFormat = "yyyy-MM-dd"
+        return f
+    }()
 
     @Published var submittingLeave = false
     @Published var submittingShiftChange = false
@@ -247,29 +267,38 @@ final class MyRequestsViewModel: ObservableObject {
 
     private let api = APIClient.shared
     private var myEmployeeId: Int?
+    private var isAdminDirector = false
 
     var canSubmitLeave: Bool {
-        !leaveType.trimmingCharacters(in: .whitespaces).isEmpty
-            && !leaveStart.trimmingCharacters(in: .whitespaces).isEmpty
-            && !leaveEnd.trimmingCharacters(in: .whitespaces).isEmpty
+        Self.leaveTypes.contains(leaveType)
+            && Calendar.current.compare(leaveEndDate, to: leaveStartDate, toGranularity: .day) != .orderedAscending
     }
     var canSubmitShiftChange: Bool {
         !scDate.trimmingCharacters(in: .whitespaces).isEmpty
             && !scProposedCode.trimmingCharacters(in: .whitespaces).isEmpty
     }
 
-    func load() async {
+    func load(isAdminDirector: Bool = false) async {
+        // يُحفظ لإعادات التحميل الداخلية بعد الإرسال/الإلغاء
+        if isAdminDirector { self.isAdminDirector = true }
         state = .loading
         do {
             // معرف الموظف من ملفي — المصدر الوحيد لربط الطلبات بصاحبها.
             let profile: ProfileDTO = try await api.get("/api/my/profile")
             myEmployeeId = profile.employee.id
+            canViewVacations = self.isAdminDirector
+                || Self.vacationsViewerTitles.contains(profile.employee.jobTitle ?? "")
 
             async let annReq: AnnouncementsResponseDTO = api.get("/api/announcements")
-            async let vacReq: [VacationEntryDTO] = api.get("/api/vacations")
             let ann = try await annReq
             announcements = ann.data ?? []
-            vacations = (try? await vacReq) ?? []
+
+            // العزل من المصدر: الموظف الميداني لا يجلب إجازات العمليات إطلاقًا
+            if canViewVacations {
+                vacations = (try? await api.get("/api/vacations")) ?? []
+            } else {
+                vacations = []
+            }
 
             if let empId = myEmployeeId {
                 let lr: LeaveRequestsResponseDTO = try await api.get(
@@ -296,13 +325,13 @@ final class MyRequestsViewModel: ObservableObject {
         do {
             let body = LeaveRequestBody(
                 employee_id: empId,
-                start_date: leaveStart.trimmingCharacters(in: .whitespaces),
-                end_date: leaveEnd.trimmingCharacters(in: .whitespaces),
-                type: leaveType.trimmingCharacters(in: .whitespaces),
+                start_date: Self.isoDay.string(from: leaveStartDate),
+                end_date: Self.isoDay.string(from: leaveEndDate),
+                type: leaveType,
                 reason: leaveReason.trimmingCharacters(in: .whitespaces).isEmpty ? nil : leaveReason)
             let res: BasicSuccessDTO = try await api.post("/api/leave-requests", body: body)
             if res.success == false { throw APIError.server("فشل تقديم الطلب") }
-            leaveType = ""; leaveStart = ""; leaveEnd = ""; leaveReason = ""
+            leaveType = "إجازة"; leaveStartDate = Date(); leaveEndDate = Date(); leaveReason = ""
             successMessage = "تم إرسال طلب الإجازة — بانتظار اعتماد الإدارة"
             showSuccess = true
             await load()
