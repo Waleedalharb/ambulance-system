@@ -311,6 +311,7 @@ struct AdminSymbolsView: View {
                         VStack(alignment: .leading, spacing: 10) {
                             EMSectionHeader(title: "إضافة رمز", systemImage: "plus.square")
                             TextField("الكود", text: $sCode).textFieldStyle(.roundedBorder)
+                                .emsNumericInput()
                             TextField("النوع (مثل: day_code / employee_symbol)", text: $sType)
                                 .textFieldStyle(.roundedBorder)
                             TextField("الاسم (اختياري)", text: $sName).textFieldStyle(.roundedBorder)

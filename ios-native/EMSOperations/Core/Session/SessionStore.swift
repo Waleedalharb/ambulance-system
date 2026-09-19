@@ -77,12 +77,15 @@ final class SessionStore: ObservableObject {
     }
 
     func logout() async {
-        await auth.logout()
+        // محلي أولًا (توجيه المالك 2026-09-20 بند 5): الخروج يستجيب فورًا
+        // حتى لو الخادم غير متاح — النداءات السيرفرية best-effort بـtry?
+        // داخل AuthService ولا تمنع التصفير المحلي.
         PushService.shared.invalidateRegistrationCache()
         permissions.reset()
         SafeCache.clear()
         unreadNotifications = 0
         state = .unauthenticated
+        await auth.logout()
     }
 
     /// جلسة ميتة اكتشفها APIClient (401 بعد فشل التحديث) — تصفير محلي بلا نداء

@@ -318,7 +318,7 @@ struct FormsOpsView: View {
             // الخطوة 1: البحث والتحقق (إلزامي — قاعدة الويب)
             HStack(spacing: 8) {
                 formField("رقم بلاغ CAD", text: $lookupNumber)
-                    .keyboardType(.numberPad)
+                    .keyboardType(.numberPad).emsNumericInput()
                 Button {
                     lookupError = nil
                     lookupLoading = true
@@ -417,7 +417,7 @@ struct FormsOpsView: View {
             formField("المركز", text: $incCenter)
             formField("اسم المريض", text: $incPatient)
             formField("العمر", text: $incAge)
-                .keyboardType(.numberPad)
+                .keyboardType(.numberPad).emsNumericInput()
             pickerMenu("الجنس", options: Self.genders, selection: $incGender)
             formField("الوصف", text: $incDescription)
             formField("الإجراءات", text: $incActions)
@@ -454,8 +454,8 @@ struct FormsOpsView: View {
                 .keyboardType(.numbersAndPunctuation)
             formField("الموقع", text: $escLocation)
             HStack(spacing: 8) {
-                formField("الإصابات", text: $escInjuries).keyboardType(.numberPad)
-                formField("الوفيات", text: $escDeaths).keyboardType(.numberPad)
+                formField("الإصابات", text: $escInjuries).keyboardType(.numberPad).emsNumericInput()
+                formField("الوفيات", text: $escDeaths).keyboardType(.numberPad).emsNumericInput()
             }
             chipsRow(Self.agencies, selected: $escAgencies)
             formField("التفاصيل", text: $escDetails)
@@ -488,7 +488,7 @@ struct FormsOpsView: View {
                 .keyboardType(.numbersAndPunctuation)
             formField("الموقع", text: $ecLocation)
             HStack(spacing: 8) {
-                formField("العمر", text: $ecAge).keyboardType(.numberPad)
+                formField("العمر", text: $ecAge).keyboardType(.numberPad).emsNumericInput()
                 pickerMenu("الجنس", options: Self.genders, selection: $ecGender)
             }
             formField("المستشفى", text: $ecHospital)
@@ -534,8 +534,8 @@ struct FormsOpsView: View {
             formField("التاريخ * (yyyy-MM-dd)", text: $drDate)
                 .keyboardType(.numbersAndPunctuation)
             HStack(spacing: 8) {
-                formField("فرق الاستجابة", text: $drTeams).keyboardType(.numberPad)
-                formField("الإسعاف الجوي", text: $drAir).keyboardType(.numberPad)
+                formField("فرق الاستجابة", text: $drTeams).keyboardType(.numberPad).emsNumericInput()
+                formField("الإسعاف الجوي", text: $drAir).keyboardType(.numberPad).emsNumericInput()
             }
             formField("بلاغات الحدود", text: $drBorder)
             chipsRow(Self.dailyPaths, selected: $drPaths)
@@ -568,12 +568,12 @@ struct FormsOpsView: View {
     private var seniorSheet: some View {
         formShell("مناوبة كبار المسعفين") {
             HStack(spacing: 8) {
-                formField("سيارات عاملة", text: $srWorking).keyboardType(.numberPad)
-                formField("متعطلة", text: $srBroken).keyboardType(.numberPad)
+                formField("سيارات عاملة", text: $srWorking).keyboardType(.numberPad).emsNumericInput()
+                formField("متعطلة", text: $srBroken).keyboardType(.numberPad).emsNumericInput()
             }
             HStack(spacing: 8) {
-                formField("احتياط", text: $srReserve).keyboardType(.numberPad)
-                formField("فرق أوفرلاب", text: $srOverlap).keyboardType(.numberPad)
+                formField("احتياط", text: $srReserve).keyboardType(.numberPad).emsNumericInput()
+                formField("فرق أوفرلاب", text: $srOverlap).keyboardType(.numberPad).emsNumericInput()
             }
             chipsRow(Self.seniorAreas, selected: $srAreas)
             formField("ملاحظات", text: $srNotes)

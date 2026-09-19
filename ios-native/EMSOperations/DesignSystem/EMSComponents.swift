@@ -220,4 +220,12 @@ struct EMSPageModifier: ViewModifier {
 
 extension View {
     func emsPage(_ title: String) -> some View { modifier(EMSPageModifier(title: title)) }
+
+    /// الحقول الرقمية/الأكواد/التواريخ/الجوال (توجيه المالك 2026-09-20 — بند 2):
+    /// سلوك LTR مستقر داخل واجهة RTL — لا تختفي الأرقام ولا ينقلب تموضع
+    /// المؤشر، مع بقاء التصميم العربي حولها كما هو.
+    func emsNumericInput() -> some View {
+        environment(\.layoutDirection, .leftToRight)
+            .multilineTextAlignment(.leading)
+    }
 }

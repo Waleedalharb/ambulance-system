@@ -142,6 +142,7 @@ struct AdminRefsView: View {
                             TextField("النوع (اختياري)", text: $tType).textFieldStyle(.roundedBorder)
                             TextField("ترتيب العرض (رقم)", text: $tSort)
                                 .textFieldStyle(.roundedBorder).keyboardType(.numberPad)
+                                .emsNumericInput()
                             EMSPrimaryButton(title: editingTeam == nil ? "إضافة" : "حفظ", isLoading: working,
                                              isDisabled: tName.trimmingCharacters(in: .whitespaces).isEmpty
                                                 || tCenter.trimmingCharacters(in: .whitespaces).isEmpty) {
@@ -241,10 +242,13 @@ struct AdminRefsView: View {
                             EMSectionHeader(title: editingCode == nil ? "إضافة رمز" : "تعديل رمز",
                                              systemImage: "tag.fill")
                             TextField("الرمز (مثل: M1)", text: $cCode).textFieldStyle(.roundedBorder)
+                                .emsNumericInput()
                             TextField("الاسم", text: $cName).textFieldStyle(.roundedBorder)
                             HStack(spacing: 8) {
                                 TextField("البداية HH:MM", text: $cStart).textFieldStyle(.roundedBorder)
+                                    .emsNumericInput()
                                 TextField("النهاية HH:MM", text: $cEnd).textFieldStyle(.roundedBorder)
+                                    .emsNumericInput()
                             }
                             TextField("الحالة", text: $cStatus).textFieldStyle(.roundedBorder)
                             EMSPrimaryButton(title: editingCode == nil ? "إضافة" : "حفظ", isLoading: working,

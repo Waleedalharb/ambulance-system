@@ -62,6 +62,7 @@ struct ForgotPasswordView: View {
                         .foregroundStyle(EMSTheme.Colors.textMuted)
                     TextField("اسم المستخدم / الرقم الوظيفي", text: $vm.identifier)
                         .keyboardType(.numberPad)
+                        .emsNumericInput()
                         .foregroundStyle(.white)
                 }
                 EMSPrimaryButton(
@@ -86,6 +87,7 @@ struct ForgotPasswordView: View {
                         .foregroundStyle(EMSTheme.Colors.textMuted)
                     TextField("الرمز المرسل إلى جوالك", text: $vm.code)
                         .keyboardType(.numberPad)
+                        .emsNumericInput()
                         .foregroundStyle(.white)
                 }
                 EMSPrimaryButton(

@@ -181,10 +181,12 @@ struct AdminEmployeesView: View {
                             if isNew {
                                 TextField("الكود الوظيفي", text: $fCode)
                                     .textFieldStyle(.roundedBorder)
+                                    .emsNumericInput()
                             }
                             TextField("الاسم", text: $fName).textFieldStyle(.roundedBorder)
                             TextField("المسمى الوظيفي", text: $fTitle).textFieldStyle(.roundedBorder)
                             TextField("الرمز", text: $fSymbol).textFieldStyle(.roundedBorder)
+                                .emsNumericInput()
                             EMSPrimaryButton(title: isNew ? "إضافة" : "حفظ", isLoading: working,
                                              isDisabled: fName.trimmingCharacters(in: .whitespaces).isEmpty
                                                 || (isNew && fCode.trimmingCharacters(in: .whitespaces).isEmpty)) {
@@ -271,6 +273,7 @@ struct AdminEmployeesView: View {
                             TextField("رقم الجوال (أرقام فقط 9-15)", text: $fPhone)
                                 .textFieldStyle(.roundedBorder)
                                 .keyboardType(.phonePad)
+                                .emsNumericInput()
                             EMSPrimaryButton(title: "حفظ الجوال", isLoading: working) {
                                 execute {
                                     try await vm.updatePhone(code: emp.employeeCode ?? "", phone: fPhone)
@@ -287,6 +290,7 @@ struct AdminEmployeesView: View {
                             EMSectionHeader(title: "نمط المناوبة", systemImage: "repeat")
                             TextField("كود النمط (فارغ = فك الربط)", text: $fPattern)
                                 .textFieldStyle(.roundedBorder)
+                                .emsNumericInput()
                             EMSPrimaryButton(title: "حفظ النمط", isLoading: working) {
                                 execute {
                                     try await vm.setPattern(code: emp.employeeCode ?? "",
@@ -305,6 +309,7 @@ struct AdminEmployeesView: View {
                             TextField("معرّف الفرقة المستهدفة (رقم)", text: $fTransferTeamId)
                                 .textFieldStyle(.roundedBorder)
                                 .keyboardType(.numberPad)
+                                .emsNumericInput()
                             Picker("النطاق", selection: $fTransferScope) {
                                 Text("يوم واحد").tag("day")
                                 Text("من تاريخ فصاعدًا").tag("from-date")
@@ -312,6 +317,7 @@ struct AdminEmployeesView: View {
                             .pickerStyle(.segmented)
                             TextField("التاريخ (YYYY-MM-DD)", text: $fTransferDate)
                                 .textFieldStyle(.roundedBorder)
+                                .emsNumericInput()
                             EMSPrimaryButton(title: "تنفيذ النقل", isLoading: working,
                                              isDisabled: Int(fTransferTeamId) == nil || fTransferDate.count != 10) {
                                 execute {

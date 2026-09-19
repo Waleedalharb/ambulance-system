@@ -721,7 +721,9 @@ struct CycleCreateSheet: View {
                 }
                 Section("الفترة (اختياري — YYYY-MM-DD)") {
                     TextField("من", text: $start)
+                        .emsNumericInput()
                     TextField("إلى", text: $end)
+                        .emsNumericInput()
                 }
                 if let error = errorMessage {
                     Section { Text(error).font(.caption).foregroundStyle(EMSTheme.Colors.danger) }

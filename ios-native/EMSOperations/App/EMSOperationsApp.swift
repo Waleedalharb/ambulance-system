@@ -23,6 +23,10 @@ struct EMSOperationsApp: App {
                 .environmentObject(session)
                 .environmentObject(deepLinks)
                 .environmentObject(network)
+                // هوية داكنة إلزامية (توجيه المالك 2026-09-20 بند 1): بلا هذا
+                // السطر تتبع الحقول الافتراضية/الكيبورد/التنبيهات وضع الجهاز —
+                // وعلى الوضع الفاتح يصير النص داكنًا على خلفيتنا الداكنة.
+                .preferredColorScheme(.dark)
                 .task { await session.restore() }
                 .onAppear { PushService.shared.attach(deepLinks: deepLinks, session: session) }
                 // تحديث ذكي عند العودة للمقدمة (قسم 37): صلاحيات فقط —

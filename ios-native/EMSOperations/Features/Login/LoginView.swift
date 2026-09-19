@@ -67,6 +67,7 @@ struct LoginView: View {
                         TextField("", text: $vm.username, prompt: Text("اسم المستخدم / الرقم الوظيفي").foregroundColor(EMSTheme.Colors.textMuted))
                             .textContentType(.username)
                             .keyboardType(.numberPad)
+                            .emsNumericInput()
                             .focused($focus, equals: .username)
                             .foregroundColor(.white)
                             .tint(EMSTheme.Colors.teal)

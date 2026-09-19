@@ -163,11 +163,14 @@ struct MyRequestsView: View {
                         .foregroundStyle(EMSTheme.Colors.textMuted)
                     TextField("تاريخ المناوبة (yyyy-MM-dd)", text: $vm.scDate)
                         .textFieldStyle(.roundedBorder)
+                        .emsNumericInput()
                     HStack(spacing: 8) {
                         TextField("الرمز الحالي", text: $vm.scOldCode)
                             .textFieldStyle(.roundedBorder)
+                            .emsNumericInput()
                         TextField("الرمز المقترح", text: $vm.scProposedCode)
                             .textFieldStyle(.roundedBorder)
+                            .emsNumericInput()
                     }
                     TextField("السبب (اختياري)", text: $vm.scReason)
                         .textFieldStyle(.roundedBorder)

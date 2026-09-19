@@ -77,6 +77,7 @@ struct AdminNotificationsView: View {
                 TextField("معرّف المستلم (رقم الموظف)", text: $sRecipient)
                     .textFieldStyle(.roundedBorder)
                     .keyboardType(.numberPad)
+                    .emsNumericInput()
                 Picker("النوع", selection: $sType) {
                     // القيم الثلاث المسموحة في CHECK — db.js:890
                     Text("تغيير مناوبة").tag("shift_change")

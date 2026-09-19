@@ -98,9 +98,11 @@ struct ArchiveOpsView: View {
                     TextField("من تاريخ (YYYY-MM-DD)", text: $vm.dateFrom)
                         .textFieldStyle(.roundedBorder)
                         .font(.caption)
+                        .emsNumericInput()
                     TextField("إلى تاريخ", text: $vm.dateTo)
                         .textFieldStyle(.roundedBorder)
                         .font(.caption)
+                        .emsNumericInput()
                 }
                 HStack(spacing: 8) {
                     TextField("نوع المناوبة (اختياري)", text: $vm.shiftType)

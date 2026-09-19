@@ -259,6 +259,7 @@ struct ShiftLifecycleView: View {
                                              systemImage: "pencil.circle")
                             TextField("نوع المناوبة", text: $eType).textFieldStyle(.roundedBorder)
                             TextField("التاريخ (YYYY-MM-DD)", text: $eDate).textFieldStyle(.roundedBorder)
+                                .emsNumericInput()
                             EMSPrimaryButton(title: "حفظ التعديل", isLoading: working,
                                              isDisabled: eType.trimmingCharacters(in: .whitespaces).isEmpty
                                                 && eDate.trimmingCharacters(in: .whitespaces).isEmpty) {

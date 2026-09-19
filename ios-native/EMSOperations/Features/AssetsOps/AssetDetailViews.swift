@@ -494,6 +494,7 @@ struct InventoryItemSheet: View {
                 }
                 Section("اختياري") {
                     TextField("السيريال المرئي", text: $serialSeen)
+                        .emsNumericInput()
                     TextField("ملاحظة الموقع", text: $locationNote)
                 }
                 if let error = errorMessage {
@@ -548,6 +549,7 @@ struct DiscoveredAssetSheet: View {
                 Section("تفاصيل") {
                     TextField("الاسم الأصلي (اختياري)", text: $originalName)
                     TextField("السيريال (اختياري)", text: $serial)
+                        .emsNumericInput()
                     TextField("ملاحظة الموقع (اختياري)", text: $locationNote)
                 }
                 Section("ملاحظة (اختياري)") {

@@ -133,6 +133,7 @@ struct AdminUsersView: View {
                                 .foregroundStyle(EMSTheme.Colors.textMuted)
                             TextField("الكود الوظيفي (= اسم المستخدم)", text: $cCode)
                                 .textFieldStyle(.roundedBorder)
+                                .emsNumericInput()
                             TextField("الاسم", text: $cName)
                                 .textFieldStyle(.roundedBorder)
                             Picker("الدور", selection: $cRole) {

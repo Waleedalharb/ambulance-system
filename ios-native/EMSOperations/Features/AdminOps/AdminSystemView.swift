@@ -75,6 +75,7 @@ struct AdminSystemView: View {
                         TextField("قيمة جديدة (1–744)", text: $hoursText)
                             .textFieldStyle(.roundedBorder)
                             .keyboardType(.numberPad)
+                            .emsNumericInput()
                         Button {
                             working = true
                             infoMessage = nil
