@@ -67,11 +67,12 @@ struct LoginView: View {
                         TextField("", text: $vm.username, prompt: Text("اسم المستخدم / الرقم الوظيفي").foregroundColor(EMSTheme.Colors.textMuted))
                             .textContentType(.username)
                             .keyboardType(.numberPad)
-                            .emsNumericInput()
+                            // تجربة محصورة (اعتماد المالك 2026-09-20): لا فرض محاذاة ولا
+                            // اتجاه — حقل RTL طبيعي؛ الأرقام تُقرأ LTR داخليًا بلا تعارض
+                            // UIKit أثناء التحرير. لا تعميم قبل نجاح اختبار A/B/C/D.
                             .focused($focus, equals: .username)
                             .foregroundColor(.white)
                             .tint(EMSTheme.Colors.teal)
-                            .multilineTextAlignment(.leading)
                             .autocorrectionDisabled()
                             .textInputAutocapitalization(.never)
                             .padding(.horizontal, 10)
