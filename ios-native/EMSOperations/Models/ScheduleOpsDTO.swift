@@ -416,3 +416,9 @@ struct RosterGenericResponseDTO: Decodable {
     let message: String?
     let deleted: Int?              // POST clear — عدد السجلات المحذوفة
 }
+
+// MARK: - GET /api/check-monthly-table → {exists} (server.js:9589)
+/// فحص وجود الجدول الشهري الرسمي (Excel مرفوع من الويب — قراءة Native فقط).
+struct MonthlyTableCheckDTO: Decodable {
+    let exists: Bool?
+}

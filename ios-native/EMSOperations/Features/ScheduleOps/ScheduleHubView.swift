@@ -14,6 +14,9 @@ struct ScheduleHubView: View {
     @StateObject private var vm = ScheduleOpsViewModel()
     @State private var mode: HubMode = .month
     @State private var cellContext: ScheduleCellContext?
+    @State private var officialExists = false
+    @State private var downloadingOfficial = false
+    @State private var shareItems: [Any] = []
 
     enum HubMode: String, CaseIterable, Identifiable {
         case month, day, team, employee, center
@@ -58,11 +61,20 @@ struct ScheduleHubView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .emsPage("الجداول")
-        .task { await vm.load() }
+        .task {
+            await vm.load()
+            await checkOfficialTable()
+        }
         .sheet(item: $cellContext) { ctx in
             ScheduleCellSheet(context: ctx)
                 .environmentObject(vm)
                 .environmentObject(session)
+        }
+        .sheet(isPresented: .init(
+            get: { !shareItems.isEmpty },
+            set: { if !$0 { shareItems = [] } }
+        )) {
+            ActivityShareSheet(items: shareItems)
         }
     }
 
@@ -170,6 +182,17 @@ struct ScheduleHubView: View {
     // MARK: - روابط السجل والعمليات المتقدمة
     private var linksSection: some View {
         VStack(spacing: EMSTheme.spacing) {
+            if officialExists {
+                Button {
+                    Task { await downloadOfficialTable() }
+                } label: {
+                    linkCard(title: "الجدول الشهري الرسمي",
+                             subtitle: downloadingOfficial ? "جارٍ التنزيل…" : "ملف Excel المعتمد — يُستورد من الويب ويُقرأ هنا",
+                             icon: "tablecells.badge.ellipsis", tint: EMSTheme.Colors.emerald)
+                }
+                .buttonStyle(.plain)
+                .disabled(downloadingOfficial)
+            }
             NavigationLink {
                 ScheduleHistoryView()
                     .environmentObject(vm)
@@ -209,6 +232,25 @@ struct ScheduleHubView: View {
                     .font(.caption)
                     .foregroundStyle(EMSTheme.Colors.textMuted)
             }
+        }
+    }
+
+    // MARK: - الجدول الشهري الرسمي (قراءة فقط — الاستيراد Web-only بقرار المالك)
+
+    private func checkOfficialTable() async {
+        let res: MonthlyTableCheckDTO? = try? await APIClient.shared.get("/api/check-monthly-table")
+        officialExists = res?.exists == true
+    }
+
+    private func downloadOfficialTable() async {
+        guard !downloadingOfficial else { return }
+        downloadingOfficial = true
+        defer { downloadingOfficial = false }
+        if let file = try? await APIClient.shared.download("/api/get-monthly-table") {
+            let url = FileManager.default.temporaryDirectory
+                .appendingPathComponent(file.filename ?? "monthly-table.xlsx")
+            try? file.data.write(to: url, options: .atomic)
+            shareItems = [url]
         }
     }
 }
