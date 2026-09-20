@@ -677,7 +677,8 @@ final class CompletionViewModel: ObservableObject {
         let qty = qtys[key]?.trimmingCharacters(in: .whitespacesAndNewlines)
         let body = CheckItemRequest(
             itemKey: key, statusDetail: status,
-            note: (note?.isEmpty == false) ? note : nil,
+            // «سليم» لا يحمل ملاحظة — مطابقة سلوك الويب (my-ems.js) ومسح أثر ملاحظة سابقة
+            note: (status != "complete" && note?.isEmpty == false) ? note : nil,
             qtyAvailable: (status == "shortage" && qty?.isEmpty == false) ? qty : nil)
         do {
             let res: CheckWriteResponse = try await api.post("/api/my/check-session/items", body: body)
