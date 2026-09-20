@@ -195,6 +195,9 @@ struct CompletionOpsView: View {
                                 .font(.caption)
                                 .foregroundStyle(EMSTheme.Colors.textSecondary)
                             Spacer()
+                            if let phone = a.phone, !phone.isEmpty {
+                                EMSContactButtons(phone: phone)
+                            }
                             Text(a.type == "late" ? "تأخر" : "غياب")
                                 .font(.caption2)
                                 .foregroundStyle(EMSTheme.Colors.danger)
@@ -217,6 +220,9 @@ struct CompletionOpsView: View {
                     .foregroundStyle(EMSTheme.Colors.textMuted)
             }
             Spacer()
+            if let phone = member.phone, !phone.isEmpty {
+                EMSContactButtons(phone: phone)
+            }
             if canWrite { memberMenu(member, team: team) }
         }
     }

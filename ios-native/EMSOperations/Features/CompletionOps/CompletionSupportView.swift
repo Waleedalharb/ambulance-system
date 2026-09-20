@@ -86,8 +86,17 @@ struct CompletionSupportView: View {
                                         .compactMap { $0 }.joined(separator: " · "))
                                     .font(.caption)
                                     .foregroundStyle(EMSTheme.Colors.textMuted)
+                                if let phone = s.phone, !phone.isEmpty {
+                                    Text(phone)
+                                        .font(.caption2)
+                                        .foregroundStyle(EMSTheme.Colors.textSecondary)
+                                        .environment(\.layoutDirection, .leftToRight)
+                                }
                             }
                             Spacer()
+                            if let phone = s.phone, !phone.isEmpty {
+                                EMSContactButtons(phone: phone)
+                            }
                             if canWrite {
                                 Button {
                                     assignTarget = s
@@ -211,8 +220,17 @@ struct CompletionSupportView: View {
                             Text([c.employeeCode, c.jobTitle, c.dayCode].compactMap { $0 }.joined(separator: " · "))
                                 .font(.caption2)
                                 .foregroundStyle(EMSTheme.Colors.textMuted)
+                            if let phone = c.phone, !phone.isEmpty {
+                                Text(phone)
+                                    .font(.caption2)
+                                    .foregroundStyle(EMSTheme.Colors.textSecondary)
+                                    .environment(\.layoutDirection, .leftToRight)
+                            }
                         }
                         Spacer()
+                        if let phone = c.phone, !phone.isEmpty {
+                            EMSContactButtons(phone: phone)
+                        }
                         Button("تطوع") {
                             confirm = ConfirmRequest(title: "تسجيل تطوع",
                                                      message: "إضافة \(c.name ?? "—") إلى حوض الدعم كمتطوع؟") {

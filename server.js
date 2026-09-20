@@ -7416,6 +7416,17 @@ async function resolveEventsShiftId(req) {
     return { shiftId: active ? active.id : null };
 }
 
+// بوابة كشف الجوالات في قراءات التكميل (اعتماد المالك 2026-09-20): الجوال لا
+// يُرسل إلا لحامل عضوية صريحة staff.phone_view أو admin.users_manage — نفس
+// صيغة مسار shift-mates حرفيًا (نمط employeeColumnsFor). بلا المنحة يُرجَع
+// phone=null مع بقاء المفتاح (ثبات الشكل مع الويب وiOS).
+async function _canViewPhones(req) {
+    try {
+        const eff = await getPermissionService().getEffective(req.user.id, req.user.role);
+        return holdsExplicitPerm(eff, 'admin.users_manage') || holdsExplicitPerm(eff, 'staff.phone_view');
+    } catch (_) { return false; }
+}
+
 app.get('/api/staffing/state', authenticate, async (req, res) => {
     try {
         if (!opsEngine || !staffingEventsService) return res.status(503).json({ error: 'Engine unavailable' });
@@ -7436,7 +7447,7 @@ app.get('/api/staffing/state', authenticate, async (req, res) => {
             if (resolved.error) return res.status(400).json({ error: resolved.error });
             shiftId = resolved.shiftId;
         }
-        const state = await staffingEventsService.getState(shiftId);
+        const state = await staffingEventsService.getState(shiftId, { canPhone: await _canViewPhones(req) });
         res.json({ success: true, ...state });
     } catch (error) {
         console.error('[API] Error staffing state:', error);
@@ -7476,7 +7487,7 @@ app.get('/api/staffing/available-support', authenticate, async (req, res) => {
         if (!opsEngine || !staffingEventsService) return res.status(503).json({ error: 'Engine unavailable' });
         const resolved = await resolveEventsShiftId(req);
         if (resolved.error) return res.status(400).json({ error: resolved.error });
-        const avail = await staffingEventsService.getAvailableSupport(resolved.shiftId);
+        const avail = await staffingEventsService.getAvailableSupport(resolved.shiftId, { canPhone: await _canViewPhones(req) });
         res.json({ success: true, ...avail });
     } catch (error) {
         console.error('[API] Error available support:', error);
@@ -7533,7 +7544,7 @@ app.get('/api/staffing/volunteer-candidates', authenticate, async (req, res) => 
         if (!opsEngine || !staffingEventsService) return res.status(503).json({ error: 'Engine unavailable' });
         const resolved = await resolveEventsShiftId(req);
         if (resolved.error) return res.status(400).json({ error: resolved.error });
-        const result = await staffingEventsService.getVolunteerCandidates(resolved.shiftId, req.query.q);
+        const result = await staffingEventsService.getVolunteerCandidates(resolved.shiftId, req.query.q, { canPhone: await _canViewPhones(req) });
         res.json({ success: true, ...result });
     } catch (error) {
         if (error && error.statusCode) return res.status(error.statusCode).json({ error: error.message });

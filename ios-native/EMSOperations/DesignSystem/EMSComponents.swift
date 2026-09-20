@@ -285,3 +285,38 @@ struct EMSNumericField: UIViewRepresentable {
         func textFieldDidEndEditing(_ textField: UITextField) { isFocused.wrappedValue = false }
     }
 }
+
+// MARK: - أزرار التواصل المشتركة (اعتماد المالك 2026-09-20)
+/// اتصال/رسالة لأي شخص يصل رقمه من الخادم. بوابة staff.phone_view مطبقة
+/// خادميًا في كل المسارات (زملائي/التكميل/الحوض/المرشحون): الخادم لا يرسل
+/// phone إلا للمخوَّل، فالعميل يعرض الأزرار عند وجود الرقم فقط ولا يتجاوز
+/// ذلك أبدًا. 📞 اتصال iPhone · 💬 تطبيق الرسائل (قرار المالك — لا Chat).
+struct EMSContactButtons: View {
+    let phone: String
+
+    var body: some View {
+        let digits = phone.filter(\.isNumber)
+        HStack(spacing: 12) {
+            if let tel = URL(string: "tel://\(digits)"), !digits.isEmpty {
+                Link(destination: tel) {
+                    Image(systemName: "phone.fill")
+                        .foregroundStyle(EMSTheme.Colors.emerald)
+                        .frame(width: 34, height: 34)
+                        .background(EMSTheme.Colors.emerald.opacity(0.14))
+                        .clipShape(Circle())
+                }
+                .accessibilityLabel("اتصال")
+            }
+            if let sms = URL(string: "sms:\(digits)"), !digits.isEmpty {
+                Link(destination: sms) {
+                    Image(systemName: "message.fill")
+                        .foregroundStyle(EMSTheme.Colors.teal)
+                        .frame(width: 34, height: 34)
+                        .background(EMSTheme.Colors.teal.opacity(0.14))
+                        .clipShape(Circle())
+                }
+                .accessibilityLabel("رسالة")
+            }
+        }
+    }
+}

@@ -76,7 +76,7 @@ struct ShiftMatesView: View {
                         }
                         Spacer()
                         if let phone = person.phone, !phone.isEmpty {
-                            contactButtons(phone: phone)
+                            EMSContactButtons(phone: phone)
                         }
                     }
                     if person.id != people.last?.id {
@@ -87,33 +87,8 @@ struct ShiftMatesView: View {
         }
     }
 
-    /// اتصال/رسالة — فقط عند وصول الرقم من الخادم (staff.phone_view مطبقة خادميًا).
-    /// 📞 اتصال → اتصال iPhone · 💬 رسالة → تطبيق الرسائل (قرار المالك — لا Chat).
-    private func contactButtons(phone: String) -> some View {
-        let digits = phone.filter(\.isNumber)
-        return HStack(spacing: 12) {
-            if let tel = URL(string: "tel://\(digits)"), !digits.isEmpty {
-                Link(destination: tel) {
-                    Image(systemName: "phone.fill")
-                        .foregroundStyle(EMSTheme.Colors.emerald)
-                        .frame(width: 34, height: 34)
-                        .background(EMSTheme.Colors.emerald.opacity(0.14))
-                        .clipShape(Circle())
-                }
-                .accessibilityLabel("اتصال")
-            }
-            if let sms = URL(string: "sms:\(digits)"), !digits.isEmpty {
-                Link(destination: sms) {
-                    Image(systemName: "message.fill")
-                        .foregroundStyle(EMSTheme.Colors.teal)
-                        .frame(width: 34, height: 34)
-                        .background(EMSTheme.Colors.teal.opacity(0.14))
-                        .clipShape(Circle())
-                }
-                .accessibilityLabel("رسالة")
-            }
-        }
-    }
+    /// اتصال/رسالة — المكوّن المشترك EMSContactButtons (DesignSystem/EMSComponents) —
+    /// فقط عند وصول الرقم من الخادم (staff.phone_view مطبقة خادميًا).
 }
 
 @MainActor

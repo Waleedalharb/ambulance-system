@@ -20,6 +20,7 @@ struct SupportPoolDTO: Decodable {
         let name: String?
         let employeeCode: String?
         let jobTitle: String?
+        let phone: String?            // بوابة staff.phone_view خادميًا — null لغير المخوَّل
         let team: String?
         let shiftCode: String?
         let sourceUnit: String?
@@ -28,7 +29,7 @@ struct SupportPoolDTO: Decodable {
 
         enum CodingKeys: String, CodingKey {
             case name, team, kind, volunteer
-            case employeeCode, jobTitle, shiftCode, sourceUnit
+            case employeeCode, jobTitle, shiftCode, sourceUnit, phone
         }
     }
     let success: Bool?
@@ -43,6 +44,7 @@ struct VolunteerCandidatesDTO: Decodable {
         let name: String?
         let employeeCode: String?
         let jobTitle: String?
+        let phone: String?            // بوابة staff.phone_view خادميًا — null لغير المخوَّل
         let dayCode: String?
     }
     let success: Bool?
