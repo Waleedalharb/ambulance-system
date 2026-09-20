@@ -78,23 +78,185 @@ final class EMSOperationsTests: XCTestCase {
         XCTAssertNil(dto.session)
     }
 
-    func testCheckSessionWithItems() throws {
-        let json = #"{"team": {"id": 1, "name": "جنوب 1"}, "session": {"id": 9, "status": "open", "items": [{"item_key": "oxygen", "label": "الأكسجين"}]}}"#.data(using: .utf8)!
+    /// العقد الفعلي v4.2: items مسطحة camelCase في المستوى الأعلى، groups مُجمّعة،
+    /// session صف DB خام snake_case، وconfirmations/vehicleFields snake_case.
+    func testCheckSessionFullDecode() throws {
+        let json = #"{
+            "today": "2026-09-20",
+            "session": {"id": 9, "status": "open", "schema_version": 2, "completed_at": null},
+            "team": {"teamId": 1, "teamName": "جنوب 1", "center": "الخرج"},
+            "vehicleType": "إسعاف", "serviceLevel": "ALS", "serviceLevelConfirmed": true, "isAls": true,
+            "members": [{"id": 5, "name": "سالم", "employee_code": "8323"}],
+            "me": {"id": 5, "name": "سالم", "code": "8323"},
+            "items": [{"itemKey": "med:oxygen_bag:o2_set", "domain": "medical", "label": "أسطوانة الأكسجين",
+                       "groupKey": "oxygen_bag", "qtyRequired": "1 each", "result": "issue",
+                       "statusDetail": "shortage", "qtyAvailable": "0", "note": "ناقصة",
+                       "noChange": false, "checkedByName": "سالم", "reflected": true}],
+            "groups": [{"key": "oxygen_bag", "label": "حقيبة الأكسجين", "domain": "medical",
+                        "items": [{"itemKey": "med:oxygen_bag:o2_set", "statusDetail": "shortage"}]},
+                       {"key": "assets", "label": "الأصول المسجلة على الفرقة", "domain": "medical",
+                        "isAssets": true, "items": []}],
+            "confirmations": [{"employee_id": 5, "employee_name": "سالم", "kind": "checkin",
+                               "confirmed_at": "2026-09-20T04:00:00Z"}],
+            "openIssues": [{"domain": "medical", "itemKey": "med:emt_bag:aed", "label": "AED",
+                            "note": "تالف", "byName": "أحمد", "at": "2026-09-19T06:00:00Z"}],
+            "readiness": "yellow", "readinessReason": "أسطوانة الأكسجين", "checkMode": "partial",
+            "vehicleFields": {"odometer": 45200, "fuel_level": "75", "cleanliness": "clean",
+                              "master_key": 1, "fuel_card": 0},
+            "itemStatuses": ["complete", "shortage", "damaged", "unavailable", "follow_up"],
+            "noChange": {"eligible": false, "reasons": ["open_issues"],
+                         "lastCheck": {"at": "2026-09-19T05:00:00Z", "vehicleName": "إسعاف 3"}},
+            "noChangeMaxAgeHours": 24
+        }"#.data(using: .utf8)!
         let dto = try JSONDecoder().decode(CheckSessionDTO.self, from: json)
         XCTAssertNil(dto.state)
-        XCTAssertEqual(dto.session?.items?.first?.itemKey, "oxygen")
-        XCTAssertEqual(dto.session?.items?.first?.label, "الأكسجين")
+        XCTAssertEqual(dto.session?.id, 9)
+        XCTAssertEqual(dto.session?.schemaVersion, 2)
+        XCTAssertEqual(dto.team?.teamName, "جنوب 1")
+        XCTAssertEqual(dto.members?.first?.employeeCode, "8323")
+        XCTAssertEqual(dto.items?.first?.itemKey, "med:oxygen_bag:o2_set")
+        XCTAssertEqual(dto.items?.first?.statusDetail, "shortage")
+        XCTAssertEqual(dto.items?.first?.qtyRequired, "1 each")
+        XCTAssertEqual(dto.groups?.count, 2)
+        XCTAssertEqual(dto.groups?.last?.isAssets, true)
+        XCTAssertEqual(dto.confirmations?.first?.kind, "checkin")
+        XCTAssertEqual(dto.confirmations?.first?.employeeName, "سالم")
+        XCTAssertEqual(dto.openIssues?.first?.byName, "أحمد")
+        XCTAssertEqual(dto.readiness, "yellow")
+        XCTAssertEqual(dto.checkMode, "partial")
+        XCTAssertEqual(dto.vehicleFields?.odometer, 45200)
+        XCTAssertEqual(dto.vehicleFields?.fuelLevel, "75")
+        XCTAssertEqual(dto.vehicleFields?.masterKey, 1)
+        XCTAssertEqual(dto.vehicleFields?.fuelCard, 0)
+        XCTAssertEqual(dto.itemStatuses?.count, 5)
+        XCTAssertEqual(dto.noChange?.eligible, false)
+        XCTAssertEqual(dto.noChange?.reasons, ["open_issues"])
+        XCTAssertEqual(dto.noChange?.lastCheck?.vehicleName, "إسعاف 3")
     }
 
-    // MARK: - CheckItemRequest: ترميز snake_case
+    // MARK: - طلبات الكتابة: ترميز snake_case
 
+    /// status_detail يحدد result سيرفريًا — لا نرسل result إطلاقًا.
     func testCheckItemRequestEncodesSnakeCase() throws {
-        let body = CheckItemRequest(itemKey: "oxygen", result: "ok", note: nil)
+        let body = CheckItemRequest(itemKey: "med:oxygen_bag:o2_set", statusDetail: "shortage",
+                                    note: "ناقصة", qtyAvailable: "0")
         let data = try JSONEncoder().encode(body)
         let obj = try JSONSerialization.jsonObject(with: data) as? [String: Any]
-        XCTAssertEqual(obj?["item_key"] as? String, "oxygen")
-        XCTAssertEqual(obj?["result"] as? String, "ok")
+        XCTAssertEqual(obj?["item_key"] as? String, "med:oxygen_bag:o2_set")
+        XCTAssertEqual(obj?["status_detail"] as? String, "shortage")
+        XCTAssertEqual(obj?["note"] as? String, "ناقصة")
+        XCTAssertEqual(obj?["qty_available"] as? String, "0")
+        XCTAssertNil(obj?["result"])
+        XCTAssertNil(obj?["itemKey"])
+    }
+
+    func testCheckItemRequestOmitsNilOptionals() throws {
+        let body = CheckItemRequest(itemKey: "mech:brakes", statusDetail: "complete",
+                                    note: nil, qtyAvailable: nil)
+        let obj = try JSONSerialization.jsonObject(with: JSONEncoder().encode(body)) as? [String: Any]
+        XCTAssertEqual(obj?["status_detail"] as? String, "complete")
         XCTAssertNil(obj?["note"])
+        XCTAssertNil(obj?["qty_available"])
+    }
+
+    func testCheckVehicleFieldsRequestEncodesSnakeCase() throws {
+        let body = CheckVehicleFieldsRequest(odometer: 45200, fuelLevel: "under25",
+                                             cleanliness: nil, masterKey: 1, fuelCard: nil)
+        let obj = try JSONSerialization.jsonObject(with: JSONEncoder().encode(body)) as? [String: Any]
+        XCTAssertEqual(obj?["odometer"] as? Int, 45200)
+        XCTAssertEqual(obj?["fuel_level"] as? String, "under25")
+        XCTAssertEqual(obj?["master_key"] as? Int, 1)
+        XCTAssertNil(obj?["cleanliness"])
+        XCTAssertNil(obj?["fuel_card"])
+        XCTAssertNil(obj?["fuelLevel"])
+    }
+
+    func testCheckConfirmRequestEncodesKind() throws {
+        let obj = try JSONSerialization.jsonObject(
+            with: JSONEncoder().encode(CheckConfirmRequest(kind: "checkout"))) as? [String: Any]
+        XCTAssertEqual(obj?["kind"] as? String, "checkout")
+    }
+
+    // MARK: - ردود الكتابة
+
+    func testCheckWriteResponseDecodesReadinessObject() throws {
+        let json = #"{"success": true, "sessionId": 9, "itemKey": "mech:brakes", "result": "issue",
+                      "reflected": true, "warning": null,
+                      "readiness": {"readiness": "red", "reason": "الفرامل"}}"#.data(using: .utf8)!
+        let res = try JSONDecoder().decode(CheckWriteResponse.self, from: json)
+        XCTAssertEqual(res.success, true)
+        XCTAssertEqual(res.readiness?.readiness, "red")
+        XCTAssertEqual(res.readiness?.reason, "الفرامل")
+    }
+
+    /// الجلسات القديمة (schema_version<2) تعيد readiness=null.
+    func testCheckWriteResponseDecodesNullReadiness() throws {
+        let json = #"{"success": true, "sessionId": 3, "readiness": null}"#.data(using: .utf8)!
+        let res = try JSONDecoder().decode(CheckWriteResponse.self, from: json)
+        XCTAssertNil(res.readiness)
+    }
+
+    func testCheckConfirmResponseDecodes() throws {
+        let json = #"{"success": true, "sessionId": 9, "kind": "checkout",
+                      "already": false, "completed": true}"#.data(using: .utf8)!
+        let res = try JSONDecoder().decode(CheckConfirmResponse.self, from: json)
+        XCTAssertEqual(res.kind, "checkout")
+        XCTAssertEqual(res.completed, true)
+    }
+
+    // MARK: - PendingCheckStore: منع التكرار والثبات
+
+    private func tempStore() -> PendingCheckStore {
+        PendingCheckStore(fileURL: FileManager.default.temporaryDirectory
+            .appendingPathComponent("pending-test-\(UUID().uuidString).json"))
+    }
+
+    /// ضغطة أحدث على نفس البند تستبدل المعلقة — لا تكرار أبدًا.
+    func testPendingStoreItemDedupeBySessionAndItemKey() {
+        let store = tempStore()
+        store.enqueue(PendingCheckOp(sessionId: 9, kind: .item, itemKey: "mech:brakes", statusDetail: "damaged"))
+        store.enqueue(PendingCheckOp(sessionId: 9, kind: .item, itemKey: "mech:brakes", statusDetail: "complete"))
+        XCTAssertEqual(store.ops.count, 1)
+        XCTAssertEqual(store.ops.first?.statusDetail, "complete")
+    }
+
+    func testPendingStoreDistinctItemsCoexist() {
+        let store = tempStore()
+        store.enqueue(PendingCheckOp(sessionId: 9, kind: .item, itemKey: "mech:brakes", statusDetail: "complete"))
+        store.enqueue(PendingCheckOp(sessionId: 9, kind: .item, itemKey: "mech:tires", statusDetail: "shortage"))
+        XCTAssertEqual(store.ops.count, 2)
+    }
+
+    /// حقول المركبة عملية واحدة لكل جلسة (آخر قيمة تربح) — مستقلة عن مفاتيح البنود.
+    func testPendingStoreVehicleFieldsDedupePerSession() {
+        let store = tempStore()
+        let f1 = CheckVehicleFieldsRequest(odometer: 100, fuelLevel: nil, cleanliness: nil, masterKey: nil, fuelCard: nil)
+        let f2 = CheckVehicleFieldsRequest(odometer: 200, fuelLevel: "75", cleanliness: nil, masterKey: nil, fuelCard: nil)
+        store.enqueue(PendingCheckOp(sessionId: 9, kind: .vehicleFields, vehicleFields: f1))
+        store.enqueue(PendingCheckOp(sessionId: 9, kind: .item, itemKey: "mech:ac", statusDetail: "complete"))
+        store.enqueue(PendingCheckOp(sessionId: 9, kind: .vehicleFields, vehicleFields: f2))
+        XCTAssertEqual(store.ops.count, 2)
+        XCTAssertEqual(store.opsFor(sessionId: 9).first { $0.kind == .vehicleFields }?.vehicleFields?.odometer, 200)
+    }
+
+    /// جلستان مختلفتان لا تتداخلان.
+    func testPendingStoreSessionsIsolated() {
+        let store = tempStore()
+        store.enqueue(PendingCheckOp(sessionId: 9, kind: .item, itemKey: "mech:brakes", statusDetail: "complete"))
+        store.enqueue(PendingCheckOp(sessionId: 10, kind: .item, itemKey: "mech:brakes", statusDetail: "damaged"))
+        XCTAssertEqual(store.ops.count, 2)
+        XCTAssertEqual(store.opsFor(sessionId: 10).count, 1)
+    }
+
+    func testPendingStorePersistsAcrossInstances() {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("pending-test-\(UUID().uuidString).json")
+        let store = PendingCheckStore(fileURL: url)
+        store.enqueue(PendingCheckOp(sessionId: 9, kind: .item, itemKey: "mech:radio", statusDetail: "complete"))
+        let reloaded = PendingCheckStore(fileURL: url)
+        XCTAssertEqual(reloaded.opsFor(sessionId: 9).count, 1)
+        XCTAssertEqual(reloaded.opsFor(sessionId: 9).first?.itemKey, "mech:radio")
+        try? FileManager.default.removeItem(at: url)
     }
 
     // MARK: - DeepLinkRouter

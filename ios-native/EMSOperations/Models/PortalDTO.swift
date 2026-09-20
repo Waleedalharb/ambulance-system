@@ -252,53 +252,212 @@ struct TeamIncidentsDTO: Decodable {
     let note: String?
 }
 
-// MARK: - /api/my/check-session (D10 — الحالات الأساسية، التفاصيل تُثبت على الجهاز)
+// MARK: - /api/my/check-session (العقد الفعلي v4.2 — shift-check-service.js getSession)
+// الاستجابة camelCase في المستوى الأعلى، باستثناء: session (صف DB خام snake_case)
+// وconfirmations وvehicleFields (snake_case). الطلبات كلها snake_case.
+// الجاهزية والحرجية تُعرض كما يرسلها السيرفر حرفيًا — لا حساب في العميل (SSOT).
 struct CheckSessionDTO: Decodable {
-    struct TeamView: Decodable {
+    /// الحالات الصادقة بلا جلسة: no_assignment | not_field_team — nil عند وجود جلسة.
+    let state: String?
+    let today: String?
+
+    /// صف shift_check_sessions الخام — مفاتيحه snake_case.
+    struct SessionInfo: Decodable {
         let id: Int?
-        let name: String?
+        let status: String?       // open | completed
+        let schemaVersion: Int?
+        let completedAt: String?
+
+        enum CodingKeys: String, CodingKey {
+            case id, status
+            case schemaVersion = "schema_version"
+            case completedAt = "completed_at"
+        }
+    }
+    let session: SessionInfo?
+    let vehicle: VehicleDTO.Vehicle?
+    let vehicleType: String?
+    let serviceLevel: String?
+    let serviceLevelConfirmed: Bool?
+    let isAls: Bool?
+
+    struct TeamView: Decodable {
+        let teamId: Int?
+        let teamName: String?
         let center: String?
     }
-    let state: String?            // no_assignment | not_field_team | nil عند وجود جلسة
-    let today: String?
     let team: TeamView?
-    // عند وجود جلسة نشطة يعيد الخادم session/vehicle — نفكها بمرونة
-    let session: Session?
-    let vehicle: VehicleDTO.Vehicle?
 
-    struct Session: Decodable {
+    struct Member: Decodable, Identifiable {
         let id: Int?
-        let status: String?
-        let items: [Item]?
+        let name: String?
+        let employeeCode: String?
+
+        enum CodingKeys: String, CodingKey {
+            case id, name
+            case employeeCode = "employee_code"
+        }
     }
+    let members: [Member]?
+
+    struct MeView: Decodable {
+        let id: Int?
+        let name: String?
+        let code: String?
+    }
+    let me: MeView?
+
     struct Item: Decodable, Identifiable {
         var id: String { itemKey ?? UUID().uuidString }
         let itemKey: String?
+        let domain: String?       // mechanical | medical
         let label: String?
-        let result: String?
+        let groupKey: String?
+        let qtyRequired: String?
+        let result: String?       // ok | issue | nil
+        let statusDetail: String? // complete|shortage|damaged|unavailable|follow_up
+        let qtyAvailable: String?
         let note: String?
+        let noChange: Bool?
+        let refCheckedAt: String?
+        let checkedByName: String?
+        let checkedAt: String?
+        let reflected: Bool?
+    }
+    let items: [Item]?
+
+    struct Group: Decodable, Identifiable {
+        var id: String { key ?? UUID().uuidString }
+        let key: String?
+        let label: String?
+        let domain: String?
+        let isAssets: Bool?
+        let items: [Item]?
+    }
+    let groups: [Group]?
+
+    /// snake_case وسط رد camelCase — مفاتيح صريحة إلزامية.
+    struct Confirmation: Decodable, Identifiable {
+        var id: String { "\(employeeId ?? 0)-\(kind ?? "")" }
+        let employeeId: Int?
+        let employeeName: String?
+        let kind: String?         // ack | checkin | checkout
+        let confirmedAt: String?
 
         enum CodingKeys: String, CodingKey {
-            case label, result, note
-            case itemKey = "item_key"
+            case kind
+            case employeeId = "employee_id"
+            case employeeName = "employee_name"
+            case confirmedAt = "confirmed_at"
         }
+    }
+    let confirmations: [Confirmation]?
+
+    struct OpenIssue: Decodable, Identifiable {
+        var id: String { "\(domain ?? "")-\(itemKey ?? "")" }
+        let domain: String?
+        let itemKey: String?
+        let label: String?
+        let note: String?
+        let byName: String?
+        let at: String?
+    }
+    let openIssues: [OpenIssue]?
+
+    let readiness: String?        // green | yellow | red | nil (لم يُستكمل)
+    let readinessReason: String?
+    let readinessAt: String?
+    let checkMode: String?        // full | partial | no_change
+
+    /// snake_case كما في قاعدة البيانات.
+    struct VehicleFields: Decodable {
+        let odometer: Int?
+        let fuelLevel: String?
+        let cleanliness: String?
+        let masterKey: Int?
+        let fuelCard: Int?
+
+        enum CodingKeys: String, CodingKey {
+            case odometer, cleanliness
+            case fuelLevel = "fuel_level"
+            case masterKey = "master_key"
+            case fuelCard = "fuel_card"
+        }
+    }
+    let vehicleFields: VehicleFields?
+    let itemStatuses: [String]?
+
+    struct NoChangeInfo: Decodable {
+        struct LastCheck: Decodable {
+            let at: String?
+            let vehicleName: String?
+        }
+        let eligible: Bool?
+        let reasons: [String]?
+        let lastCheck: LastCheck?
+    }
+    let noChange: NoChangeInfo?
+    let noChangeMaxAgeHours: Int?
+}
+
+/// POST /api/my/check-session/items — status_detail يحدد result سيرفريًا
+/// (complete → ok؛ غيرها → issue)، فلا نرسل result إطلاقًا.
+struct CheckItemRequest: Encodable {
+    let itemKey: String
+    let statusDetail: String
+    let note: String?
+    let qtyAvailable: String?
+
+    enum CodingKeys: String, CodingKey {
+        case note
+        case itemKey = "item_key"
+        case statusDetail = "status_detail"
+        case qtyAvailable = "qty_available"
     }
 }
 
-struct CheckItemRequest: Encodable {
-    let itemKey: String
-    let result: String
-    let note: String?
+/// POST /api/my/check-session/vehicle-fields — whitelist سيرفري صارم.
+/// Codable (وليس Encodable فقط) لأن PendingCheckStore يخزنها للإرسال لاحقًا.
+struct CheckVehicleFieldsRequest: Codable {
+    let odometer: Int?
+    let fuelLevel: String?
+    let cleanliness: String?
+    let masterKey: Int?
+    let fuelCard: Int?
 
     enum CodingKeys: String, CodingKey {
-        case result, note
-        case itemKey = "item_key"
+        case odometer, cleanliness
+        case fuelLevel = "fuel_level"
+        case masterKey = "master_key"
+        case fuelCard = "fuel_card"
     }
+}
+
+/// POST /api/my/check-session/confirm — kind: ack | checkin | checkout
+struct CheckConfirmRequest: Encodable {
+    let kind: String
+}
+
+/// رد الكتابة الموحد: items / vehicle-fields / no-change.
+/// readiness كائن {readiness, reason} يعيده _recomputeReadiness (أو null للجلسات القديمة).
+struct CheckWriteResponse: Decodable {
+    struct Readiness: Decodable {
+        let readiness: String?
+        let reason: String?
+    }
+    let success: Bool?
+    let sessionId: Int?
+    let readiness: Readiness?
+    let warning: String?
+    let reflected: Bool?
 }
 
 struct CheckConfirmResponse: Decodable {
     let success: Bool?
-    let status: String?
+    let sessionId: Int?
+    let kind: String?
+    let already: Bool?
+    let completed: Bool?
 }
 
 // MARK: - /api/my/assignments (فك مرن — الحقول الأساسية مضمونة، الباقي اختياري)
