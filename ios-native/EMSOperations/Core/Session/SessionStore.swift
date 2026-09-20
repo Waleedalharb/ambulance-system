@@ -8,6 +8,7 @@
 
 import Foundation
 import SwiftUI
+import Combine
 
 @MainActor
 final class SessionStore: ObservableObject {
@@ -24,6 +25,7 @@ final class SessionStore: ObservableObject {
 
     /// صلاحيات المستخدم الفعلية — تُبنى عليها الواجهة (v2 قسم 6).
     let permissions = PermissionStore()
+    private var cancellables = Set<AnyCancellable>()
 
     private let auth = AuthService.shared
 
@@ -33,6 +35,14 @@ final class SessionStore: ObservableObject {
         APIClient.shared.refreshHandler = { await AuthService.shared.refreshAccessToken() }
         // موت الجلسة أثناء التصفح (401 بعد فشل التحديث) → تصفير محلي فوري
         APIClient.shared.authFailureHandler = { [weak self] in await self?.sessionExpired() }
+        // جسر إعادة الرسم (خلل 2026-09-20): PermissionStore مخزن متداخل — تغيّر
+        // payload فيه لا يُعلم SessionStore، فبقي MainTabView على اللقطة السابقة
+        // لتحميل الصلاحيات: تبويب «العمليات» يغيب رغم canAccessOperations=true
+        // بينما تظهر بطاقة النبض (HomeView تُعاد بفضل ViewModel خاص بها).
+        // الشرط نفسه كان صحيحًا دائمًا — الناقص هو إشعار الواجهة بوصول الصلاحيات.
+        permissions.objectWillChange
+            .sink { [weak self] _ in self?.objectWillChange.send() }
+            .store(in: &cancellables)
     }
 
     var isAuthenticated: Bool {

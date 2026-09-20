@@ -49,6 +49,22 @@ struct HomeView: View {
             .padding(EMSTheme.pagePadding)
         }
         .refreshable { await vm.load(session: session, force: true) }
+        // تسجيل الوجهات في جذر الشاشة — لا داخل quickActionsGrid (خلل 2026-09-20):
+        // بطاقة «نبض العمليات» تظهر أيضًا للحسابات بلا بوابة موظف (الشبكة مخفية
+        // حينها) وكانت وجهتها غير مسجلة فلا تفتح شيئًا عند الضغط.
+        .navigationDestination(for: Destination.self) { dest in
+            switch dest {
+            case .shift: CurrentShiftView()
+            case .mates: ShiftMatesView()
+            case .completion: CompletionView()
+            case .incidents: ReportsView()
+            case .vehicle: VehicleView()
+            case .inventory: InventoryView()
+            case .changes: ScheduleChangesView()
+            case .assignments: AssignmentsView()
+            case .operations: OperationsHomeView()
+            }
+        }
         .emsPage("EMS OPERATIONS")
         .task { await vm.load(session: session) }
     }
@@ -282,19 +298,6 @@ struct HomeView: View {
                     }
                     .buttonStyle(.plain)
                 }
-            }
-        }
-        .navigationDestination(for: Destination.self) { dest in
-            switch dest {
-            case .shift: CurrentShiftView()
-            case .mates: ShiftMatesView()
-            case .completion: CompletionView()
-            case .incidents: ReportsView()
-            case .vehicle: VehicleView()
-            case .inventory: InventoryView()
-            case .changes: ScheduleChangesView()
-            case .assignments: AssignmentsView()
-            case .operations: OperationsHomeView()
             }
         }
     }
