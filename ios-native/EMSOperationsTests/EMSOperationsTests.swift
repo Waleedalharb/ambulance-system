@@ -81,7 +81,8 @@ final class EMSOperationsTests: XCTestCase {
     /// العقد الفعلي v4.2: items مسطحة camelCase في المستوى الأعلى، groups مُجمّعة،
     /// session صف DB خام snake_case، وconfirmations/vehicleFields snake_case.
     func testCheckSessionFullDecode() throws {
-        let json = #"{
+        let json = #"""
+            {
             "today": "2026-09-20",
             "session": {"id": 9, "status": "open", "schema_version": 2, "completed_at": null},
             "team": {"teamId": 1, "teamName": "جنوب 1", "center": "الخرج"},
@@ -107,7 +108,8 @@ final class EMSOperationsTests: XCTestCase {
             "noChange": {"eligible": false, "reasons": ["open_issues"],
                          "lastCheck": {"at": "2026-09-19T05:00:00Z", "vehicleName": "إسعاف 3"}},
             "noChangeMaxAgeHours": 24
-        }"#.data(using: .utf8)!
+            }
+            """#.data(using: .utf8)!
         let dto = try JSONDecoder().decode(CheckSessionDTO.self, from: json)
         XCTAssertNil(dto.state)
         XCTAssertEqual(dto.session?.id, 9)
@@ -180,9 +182,7 @@ final class EMSOperationsTests: XCTestCase {
     // MARK: - ردود الكتابة
 
     func testCheckWriteResponseDecodesReadinessObject() throws {
-        let json = #"{"success": true, "sessionId": 9, "itemKey": "mech:brakes", "result": "issue",
-                      "reflected": true, "warning": null,
-                      "readiness": {"readiness": "red", "reason": "الفرامل"}}"#.data(using: .utf8)!
+        let json = #"{"success": true, "sessionId": 9, "itemKey": "mech:brakes", "result": "issue", "reflected": true, "warning": null, "readiness": {"readiness": "red", "reason": "الفرامل"}}"#.data(using: .utf8)!
         let res = try JSONDecoder().decode(CheckWriteResponse.self, from: json)
         XCTAssertEqual(res.success, true)
         XCTAssertEqual(res.readiness?.readiness, "red")
@@ -197,8 +197,7 @@ final class EMSOperationsTests: XCTestCase {
     }
 
     func testCheckConfirmResponseDecodes() throws {
-        let json = #"{"success": true, "sessionId": 9, "kind": "checkout",
-                      "already": false, "completed": true}"#.data(using: .utf8)!
+        let json = #"{"success": true, "sessionId": 9, "kind": "checkout", "already": false, "completed": true}"#.data(using: .utf8)!
         let res = try JSONDecoder().decode(CheckConfirmResponse.self, from: json)
         XCTAssertEqual(res.kind, "checkout")
         XCTAssertEqual(res.completed, true)
@@ -448,7 +447,7 @@ final class EMSOperationsTests: XCTestCase {
     }
 
     func testShiftCodesDTODisplayLabel() throws {
-        let json = #"{"success": true, "codes": [{"id": 1, "code": "M1", "name": "صباحية", "time_start": "07:00", "time_end": "19:00", "color": "#22c55e", "status": "active"}, {"id": 2, "code": "N1", "name": null, "status": "active"}]}"#.data(using: .utf8)!
+        let json = ##"{"success": true, "codes": [{"id": 1, "code": "M1", "name": "صباحية", "time_start": "07:00", "time_end": "19:00", "color": "#22c55e", "status": "active"}, {"id": 2, "code": "N1", "name": null, "status": "active"}]}"##.data(using: .utf8)!
         let dto = try JSONDecoder().decode(ShiftCodesDTO.self, from: json)
         XCTAssertEqual(dto.codes?.count, 2)
         let m1 = try XCTUnwrap(dto.codes?.first)
@@ -512,8 +511,8 @@ final class EMSOperationsTests: XCTestCase {
             XCTAssertTrue(check([], true), "النجمة تمنح \(key)")
         }
         // مفتاح مشابه لا يفتح آخر — لا مطابقة جزئية
-        XCTAssertFalse(PermissionMapper.canEditScheduleCell(["schedule.edit"], false))
-        XCTAssertFalse(PermissionMapper.canViewSchedules(["schedule.view_all"], false))
+        XCTAssertFalse(PermissionMapper.canEditScheduleCell(["schedule.edit"], star: false))
+        XCTAssertFalse(PermissionMapper.canViewSchedules(["schedule.view_all"], star: false))
     }
 
     @MainActor
@@ -575,12 +574,12 @@ final class EMSOperationsTests: XCTestCase {
     }
 
     func testCompletionPermissionKeys() {
-        XCTAssertTrue(PermissionMapper.canCompleteOps(["ops.completion"], false))
-        XCTAssertFalse(PermissionMapper.canCompleteOps(["ops.execute"], false))
-        XCTAssertTrue(PermissionMapper.canCompleteOps([], true))
-        XCTAssertTrue(PermissionMapper.canVolunteers(["ops.volunteers"], false))
-        XCTAssertFalse(PermissionMapper.canVolunteers(["ops.completion"], false))
-        XCTAssertTrue(PermissionMapper.canVolunteers([], true))
+        XCTAssertTrue(PermissionMapper.canCompleteOps(["ops.completion"], star: false))
+        XCTAssertFalse(PermissionMapper.canCompleteOps(["ops.execute"], star: false))
+        XCTAssertTrue(PermissionMapper.canCompleteOps([], star: true))
+        XCTAssertTrue(PermissionMapper.canVolunteers(["ops.volunteers"], star: false))
+        XCTAssertFalse(PermissionMapper.canVolunteers(["ops.completion"], star: false))
+        XCTAssertTrue(PermissionMapper.canVolunteers([], star: true))
     }
 
     // MARK: - مجال التمركز والذروة (PositioningOps)
@@ -610,10 +609,10 @@ final class EMSOperationsTests: XCTestCase {
     }
 
     func testDeployPermissionKey() {
-        XCTAssertTrue(PermissionMapper.canDeployOps(["ops.deployments"], false))
-        XCTAssertFalse(PermissionMapper.canDeployOps(["ops.execute"], false))
-        XCTAssertFalse(PermissionMapper.canDeployOps([], false))
-        XCTAssertTrue(PermissionMapper.canDeployOps([], true))
+        XCTAssertTrue(PermissionMapper.canDeployOps(["ops.deployments"], star: false))
+        XCTAssertFalse(PermissionMapper.canDeployOps(["ops.execute"], star: false))
+        XCTAssertFalse(PermissionMapper.canDeployOps([], star: false))
+        XCTAssertTrue(PermissionMapper.canDeployOps([], star: true))
     }
 
     // MARK: - مجال البلاغات والتوزيع (DispatchOps)
@@ -658,15 +657,15 @@ final class EMSOperationsTests: XCTestCase {
     }
 
     func testDispatchPermissionKeys() {
-        XCTAssertTrue(PermissionMapper.canDispatch(["ops.dispatch"], false))
-        XCTAssertFalse(PermissionMapper.canDispatch(["ops.reports"], false))
-        XCTAssertTrue(PermissionMapper.canDispatch([], true))
-        XCTAssertTrue(PermissionMapper.canRevertReports(["ops.report_revert"], false))
-        XCTAssertFalse(PermissionMapper.canRevertReports(["ops.dispatch"], false))
-        XCTAssertTrue(PermissionMapper.canReportDetail(["ops.report_detail"], false))
-        XCTAssertFalse(PermissionMapper.canReportDetail(["ops.dispatch"], false))
+        XCTAssertTrue(PermissionMapper.canDispatch(["ops.dispatch"], star: false))
+        XCTAssertFalse(PermissionMapper.canDispatch(["ops.reports"], star: false))
+        XCTAssertTrue(PermissionMapper.canDispatch([], star: true))
+        XCTAssertTrue(PermissionMapper.canRevertReports(["ops.report_revert"], star: false))
+        XCTAssertFalse(PermissionMapper.canRevertReports(["ops.dispatch"], star: false))
+        XCTAssertTrue(PermissionMapper.canReportDetail(["ops.report_detail"], star: false))
+        XCTAssertFalse(PermissionMapper.canReportDetail(["ops.dispatch"], star: false))
         // ops.report_revert يفتح وحدة العمليات مثل باقي مفاتيح ops.*
-        XCTAssertTrue(PermissionMapper.canAccessOperations(["ops.report_revert"], false))
+        XCTAssertTrue(PermissionMapper.canAccessOperations(["ops.report_revert"], star: false))
     }
 
     // MARK: - مجال المركبات (VehiclesOps)
@@ -712,9 +711,9 @@ final class EMSOperationsTests: XCTestCase {
     }
 
     func testVehicleOpsPermissionKey() {
-        XCTAssertTrue(PermissionMapper.canVehicleOps(["ops.vehicles"], false))
-        XCTAssertFalse(PermissionMapper.canVehicleOps(["ops.dispatch"], false))
-        XCTAssertTrue(PermissionMapper.canVehicleOps([], true))
+        XCTAssertTrue(PermissionMapper.canVehicleOps(["ops.vehicles"], star: false))
+        XCTAssertFalse(PermissionMapper.canVehicleOps(["ops.dispatch"], star: false))
+        XCTAssertTrue(PermissionMapper.canVehicleOps([], star: true))
     }
 
     // MARK: - مجال النماذج التشغيلية (FormsOps)
@@ -754,9 +753,9 @@ final class EMSOperationsTests: XCTestCase {
     }
 
     func testFormsPermissionKey() {
-        XCTAssertTrue(PermissionMapper.canForms(["ops.forms"], false))
-        XCTAssertFalse(PermissionMapper.canForms(["ops.dispatch"], false))
-        XCTAssertTrue(PermissionMapper.canForms([], true))
+        XCTAssertTrue(PermissionMapper.canForms(["ops.forms"], star: false))
+        XCTAssertFalse(PermissionMapper.canForms(["ops.dispatch"], star: false))
+        XCTAssertTrue(PermissionMapper.canForms([], star: true))
     }
 
     // MARK: - مجال سير العمل (WorkflowOps)
@@ -784,13 +783,13 @@ final class EMSOperationsTests: XCTestCase {
     }
 
     func testWorkflowPermissionKeys() {
-        XCTAssertTrue(PermissionMapper.canViewWorkflow(["workflow.view"], false))
-        XCTAssertFalse(PermissionMapper.canViewWorkflow(["workflow.manage"], false))
-        XCTAssertTrue(PermissionMapper.canManageWorkflow(["workflow.manage"], false))
-        XCTAssertTrue(PermissionMapper.canApproveWorkflow(["workflow.approve"], false))
-        XCTAssertFalse(PermissionMapper.canApproveWorkflow(["workflow.manage"], false))
+        XCTAssertTrue(PermissionMapper.canViewWorkflow(["workflow.view"], star: false))
+        XCTAssertFalse(PermissionMapper.canViewWorkflow(["workflow.manage"], star: false))
+        XCTAssertTrue(PermissionMapper.canManageWorkflow(["workflow.manage"], star: false))
+        XCTAssertTrue(PermissionMapper.canApproveWorkflow(["workflow.approve"], star: false))
+        XCTAssertFalse(PermissionMapper.canApproveWorkflow(["workflow.manage"], star: false))
         // workflow.view يفتح وحدة العمليات (سير العمل داخل غرفة العمليات)
-        XCTAssertTrue(PermissionMapper.canAccessOperations(["workflow.view"], false))
+        XCTAssertTrue(PermissionMapper.canAccessOperations(["workflow.view"], star: false))
     }
 
     // MARK: - مجال الأرشيف (ArchiveOps)
@@ -821,10 +820,11 @@ final class EMSOperationsTests: XCTestCase {
         let json = #"{"success": true, "shiftId": 41, "passed": false, "timestamp": "2026-09-18T00:00:00Z", "checks": {"hashMatch": {"passed": true}, "dataLinkage": {"passed": false, "issues": ["2 سجل تكميل غير مرتبط"]}, "fileIntegrity": {"passed": true, "checked": 5}, "dataCompleteness": {"passed": true}, "noDuplicates": {"passed": true, "duplicateCount": 0}}}"#.data(using: .utf8)!
         let dto = try JSONDecoder().decode(VerifyArchiveResponseDTO.self, from: json)
         XCTAssertEqual(dto.passed, false)
-        XCTAssertEqual(dto.checks?.count, 5)
-        XCTAssertEqual(dto.checks?["dataLinkage"]??.issues?.first, "2 سجل تكميل غير مرتبط")
-        XCTAssertEqual(dto.checks?["fileIntegrity"]??.checked, 5)
-        XCTAssertEqual(dto.checks?["hashMatch"]??.passed, true)
+        let checks = try XCTUnwrap(dto.checks)
+        XCTAssertEqual(checks.count, 5)
+        XCTAssertEqual(checks["dataLinkage"]?.issues?.first, "2 سجل تكميل غير مرتبط")
+        XCTAssertEqual(checks["fileIntegrity"]?.checked, 5)
+        XCTAssertEqual(checks["hashMatch"]?.passed, true)
     }
 
     func testArchiveLogEntryToleratesMissingDetails() throws {
@@ -960,7 +960,7 @@ final class EMSOperationsTests: XCTestCase {
         XCTAssertEqual(teams.teams?.first?.center, "مركز الشفا")
         XCTAssertEqual(teams.teams?.first?.active, true)
 
-        let codesJson = #"{"success": true, "codes": [{"id": 2, "code": "M1", "name": "صباحية", "time_start": "07:00", "time_end": "19:00", "color": "#2563EB", "status": "دوام"}]}"#.data(using: .utf8)!
+        let codesJson = ##"{"success": true, "codes": [{"id": 2, "code": "M1", "name": "صباحية", "time_start": "07:00", "time_end": "19:00", "color": "#2563EB", "status": "دوام"}]}"##.data(using: .utf8)!
         let codes = try JSONDecoder().decode(ShiftCodesResponseDTO.self, from: codesJson)
         XCTAssertEqual(codes.codes?.first?.timeStart, "07:00")
         XCTAssertEqual(codes.codes?.first?.status, "دوام")
@@ -998,11 +998,11 @@ final class EMSOperationsTests: XCTestCase {
     }
 
     func testAdminPermissionKeys() {
-        XCTAssertTrue(PermissionMapper.canManageUsers(["admin.users_manage"], false))
-        XCTAssertFalse(PermissionMapper.canManageUsers(["ops.dispatch"], false))
-        XCTAssertTrue(PermissionMapper.canManageSymbols(["symbols.manage"], false))
-        XCTAssertFalse(PermissionMapper.canManageSymbols(["admin.users_manage"], false))
-        XCTAssertTrue(PermissionMapper.canManageUsers([], true))
+        XCTAssertTrue(PermissionMapper.canManageUsers(["admin.users_manage"], star: false))
+        XCTAssertFalse(PermissionMapper.canManageUsers(["ops.dispatch"], star: false))
+        XCTAssertTrue(PermissionMapper.canManageSymbols(["symbols.manage"], star: false))
+        XCTAssertFalse(PermissionMapper.canManageSymbols(["admin.users_manage"], star: false))
+        XCTAssertTrue(PermissionMapper.canManageUsers([], star: true))
     }
 
     func testAdminRolesLabels() {
@@ -1091,13 +1091,13 @@ final class EMSOperationsTests: XCTestCase {
     }
 
     func testShiftLifecyclePermissionKeys() {
-        XCTAssertTrue(PermissionMapper.canShiftLifecycle(["shift.lifecycle"], false))
-        XCTAssertFalse(PermissionMapper.canShiftLifecycle(["shift.approve"], false))
-        XCTAssertTrue(PermissionMapper.canShiftApprove(["shift.approve"], false))
-        XCTAssertFalse(PermissionMapper.canShiftApprove(["shift.lifecycle"], false))
+        XCTAssertTrue(PermissionMapper.canShiftLifecycle(["shift.lifecycle"], star: false))
+        XCTAssertFalse(PermissionMapper.canShiftLifecycle(["shift.approve"], star: false))
+        XCTAssertTrue(PermissionMapper.canShiftApprove(["shift.approve"], star: false))
+        XCTAssertFalse(PermissionMapper.canShiftApprove(["shift.lifecycle"], star: false))
         // مفاتيح دورة المناوبة تفتح وحدة العمليات
-        XCTAssertTrue(PermissionMapper.canAccessOperations(["shift.lifecycle"], false))
-        XCTAssertTrue(PermissionMapper.canAccessOperations(["shift.approve"], false))
+        XCTAssertTrue(PermissionMapper.canAccessOperations(["shift.lifecycle"], star: false))
+        XCTAssertTrue(PermissionMapper.canAccessOperations(["shift.approve"], star: false))
     }
 
     // MARK: - مجال خطوط الأحداث (§14)
@@ -1202,15 +1202,15 @@ final class EMSOperationsTests: XCTestCase {
     }
 
     func testAssetsPermissionKeys() {
-        XCTAssertTrue(PermissionMapper.canAssetsView(["assets.view"], false))
-        XCTAssertFalse(PermissionMapper.canAssetsView(["assets.manage"], false))
-        XCTAssertTrue(PermissionMapper.canAssetsManage(["assets.manage"], false))
+        XCTAssertTrue(PermissionMapper.canAssetsView(["assets.view"], star: false))
+        XCTAssertFalse(PermissionMapper.canAssetsView(["assets.manage"], star: false))
+        XCTAssertTrue(PermissionMapper.canAssetsManage(["assets.manage"], star: false))
         // INV_EXEC: الجرد متاح لحامل assets.inventory أو assets.manage
-        XCTAssertTrue(PermissionMapper.canAssetsInventory(["assets.inventory"], false))
-        XCTAssertTrue(PermissionMapper.canAssetsInventory(["assets.manage"], false))
-        XCTAssertFalse(PermissionMapper.canAssetsInventory(["assets.view"], false))
+        XCTAssertTrue(PermissionMapper.canAssetsInventory(["assets.inventory"], star: false))
+        XCTAssertTrue(PermissionMapper.canAssetsInventory(["assets.manage"], star: false))
+        XCTAssertFalse(PermissionMapper.canAssetsInventory(["assets.view"], star: false))
         // مفاتيح العهد تفتح وحدة العمليات
-        XCTAssertTrue(PermissionMapper.canAccessOperations(["assets.view"], false))
+        XCTAssertTrue(PermissionMapper.canAccessOperations(["assets.view"], star: false))
     }
 
     // MARK: - مجال المستشفيات (§17)
@@ -1248,8 +1248,8 @@ final class EMSOperationsTests: XCTestCase {
 
     func testOpsAlertsPermissionKey() {
         // إقرار تنبيهات المراقبة مقيد بـ ops.alerts — server.js:5603
-        XCTAssertTrue(PermissionMapper.canOpsAlerts(["ops.alerts"], false))
-        XCTAssertFalse(PermissionMapper.canOpsAlerts(["ops.dispatch"], false))
+        XCTAssertTrue(PermissionMapper.canOpsAlerts(["ops.alerts"], star: false))
+        XCTAssertFalse(PermissionMapper.canOpsAlerts(["ops.dispatch"], star: false))
     }
 
     // MARK: - مجال الدردشة (§19)
@@ -1319,7 +1319,7 @@ final class EMSOperationsTests: XCTestCase {
 
     func testCrewActivityDecodesStandings() throws {
         // crew-activity-service.js getActivity — server.js:5003
-        let json = #"{"success": true, "scope": "south", "period": "week", "period_range": {"from": "2026-09-14", "to": "2026-09-18", "shifts_count": 8}, "label": "الأكثر نشاطًا", "generated_at": "2026-09-18T10:00:00.000Z", "standings": [{"rank": 1, "team": "فريق 1", "center": "مركز الشفا", "reports_count": 12, "members": 4, "members_incomplete": 0, "shift_minutes": 2880, "active_minutes": 900}], "meta": {"teams_ranked": 10, "teams_active_without_reports": 2, "note": "الترتيب نشاط فقط (عدد البلاغات المباشرة) — ليس تقييم أداء"}}"#.data(using: .utf8)!
+        let json = #"{"success": true, "scope": "south", "period": "week", "period_range": {"from": "2026-09-14", "to": "2026-09-18", "shifts_count": 8}, "label": "الأكثر نشاطًا", "generated_at": "2026-09-18T10:00:00.000Z", "standings": [{"rank": 1, "team": "فريق 1", "center": "مركز الشفا", "reports_count": 12, "members": ["أحمد", "سارة"], "members_incomplete": false, "shift_minutes": 2880, "active_minutes": 900}], "meta": {"teams_ranked": 10, "teams_active_without_reports": 2, "note": "الترتيب نشاط فقط (عدد البلاغات المباشرة) — ليس تقييم أداء"}}"#.data(using: .utf8)!
         let dto = try JSONDecoder().decode(CrewActivityDTO.self, from: json)
         let first = try XCTUnwrap(dto.standings?.first)
         XCTAssertEqual(first.rank, 1)

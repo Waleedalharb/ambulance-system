@@ -418,7 +418,8 @@ struct CheckItemRequest: Encodable {
 
 /// POST /api/my/check-session/vehicle-fields — whitelist سيرفري صارم.
 /// Codable (وليس Encodable فقط) لأن PendingCheckStore يخزنها للإرسال لاحقًا.
-struct CheckVehicleFieldsRequest: Codable {
+/// Equatable لأن PendingCheckOp (الحاوي لها) معلن Equatable — لا أثر على عقد الشبكة.
+struct CheckVehicleFieldsRequest: Codable, Equatable {
     let odometer: Int?
     let fuelLevel: String?
     let cleanliness: String?
