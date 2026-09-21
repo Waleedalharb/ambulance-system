@@ -396,13 +396,17 @@ final class EMSOperationsTests: XCTestCase {
         XCTAssertEqual(item.type, "event")
     }
 
-    func testCenterGeoDTODecodesCoordinates() throws {
-        let json = #"{"success": true, "data": {"مركز النرجس": {"center": [24.8132, 46.6931], "radius": 3000}}}"#.data(using: .utf8)!
-        let dto = try JSONDecoder().decode(CenterGeoDTO.self, from: json)
+    func testOpsCentersDTODecodesContract() throws {
+        // عقد GET /api/ops/centers (server.js:1511): success/version/data/integrity
+        let json = #"{"success": true, "version": 1, "data": {"مركز النرجس": {"center": [24.8132, 46.6931], "radius": 3000, "address": "النرجس، الرياض"}}, "integrity": {"complete": true, "missing": [], "loadError": null}}"#.data(using: .utf8)!
+        let dto = try JSONDecoder().decode(OpsCentersDTO.self, from: json)
+        XCTAssertEqual(dto.version, 1)
         let center = try XCTUnwrap(dto.data?["مركز النرجس"])
         XCTAssertEqual(center.center?.count, 2)
         XCTAssertEqual(center.center?.first, 24.8132)
         XCTAssertEqual(center.radius, 3000)
+        XCTAssertEqual(center.address, "النرجس، الرياض")
+        XCTAssertEqual(dto.integrity?.complete, true)
     }
 
     func testSmartAssessmentDTODecodesEngineOutput() throws {
@@ -1511,5 +1515,125 @@ final class EMSOperationsTests: XCTestCase {
         let obj = try JSONSerialization.jsonObject(with: data) as? [String: Any]
         XCTAssertEqual(obj?["currentPassword"] as? String, "old")
         XCTAssertEqual(obj?["newPassword"] as? String, "new")
+    }
+
+    // MARK: - خريطة العمليات (OpsMap): إزاحة حلقية + ألوان الفرق + فلترة البلاغات
+    // الدوال النقية في OpsMapView.swift — مطابقة حرفية لـ smart-map.js
+    // (teamPosition/teamSev/cSev/renderIncidents). لا شبكة ولا MapKit هنا.
+
+    func testOpsMapRingOffsetSingleTeamKeepsCenter() {
+        // فرقة وحيدة ← بلا إزاحة: إحداثيات المركز نفسها (teamPosition:297)
+        let off = opsMapRingOffset(index: 0, count: 1)
+        XCTAssertEqual(off.dLat, 0, accuracy: 1e-12)
+        XCTAssertEqual(off.dLng, 0, accuracy: 1e-12)
+    }
+
+    func testOpsMapRingOffsetDistributesEvenlyAndDeterministically() {
+        // angle = 2π·index/count ثم 0.0011·(cos, sin) — نصف قطر ثابت وتوزيع حتمي
+        let r = 0.0011
+        for i in 0..<4 {
+            let off = opsMapRingOffset(index: i, count: 4)
+            XCTAssertEqual((off.dLat * off.dLat + off.dLng * off.dLng).squareRoot(), r, accuracy: 1e-9)
+            let expected = (2 * Double.pi * Double(i)) / 4
+            XCTAssertEqual(off.dLat, r * cos(expected), accuracy: 1e-9)
+            XCTAssertEqual(off.dLng, r * sin(expected), accuracy: 1e-9)
+        }
+        // الحتمية: نفس المدخل ← نفس الإزاحة دائمًا (لا تبدّل أماكن بين التحديثات)
+        let a = opsMapRingOffset(index: 2, count: 5)
+        let b = opsMapRingOffset(index: 2, count: 5)
+        XCTAssertEqual(a.dLat, b.dLat, accuracy: 0)
+        XCTAssertEqual(a.dLng, b.dLng, accuracy: 0)
+    }
+
+    func testOpsMapTeamSeverityMatchesWeb() {
+        // teamSev (smart-map.js:257): missing/offline/vehicleOk===false ← red · pending ← yellow · غيرها ← green
+        XCTAssertEqual(opsMapTeamSeverity(status: "missing", vehicleOk: true), .red)
+        XCTAssertEqual(opsMapTeamSeverity(status: "offline", vehicleOk: nil), .red)
+        XCTAssertEqual(opsMapTeamSeverity(status: "ready", vehicleOk: false), .red)
+        XCTAssertEqual(opsMapTeamSeverity(status: "pending", vehicleOk: true), .yellow)
+        XCTAssertEqual(opsMapTeamSeverity(status: "ready", vehicleOk: true), .green)
+        // vehicleOk الغائب (nil) ليس red — الويب يختبر === false فقط
+        XCTAssertEqual(opsMapTeamSeverity(status: nil, vehicleOk: nil), .green)
+    }
+
+    func testOpsMapCenterSeverityWorstOfTeams() {
+        // cSev (smart-map.js:516-521): أسوأ حالة بين فرق المركز · بلا فرق ← none
+        XCTAssertEqual(opsMapCenterSeverity([]), .none)
+        XCTAssertEqual(opsMapCenterSeverity([.green, .green]), .green)
+        XCTAssertEqual(opsMapCenterSeverity([.green, .yellow]), .yellow)
+        XCTAssertEqual(opsMapCenterSeverity([.yellow, .red]), .red)
+        XCTAssertEqual(opsMapCenterSeverity([.red, .green]), .red)
+    }
+
+    func testOpsMapVisibleIncidentsActiveWithCoordsOnly() throws {
+        // فلتر الويب (renderIncidents:587-593): active فقط + lat/lng فعليان
+        let json = #"{"success": true, "total": 4, "incidents": [{"number": "100", "status": "active", "lat": 24.71, "lng": 46.68, "severity": "red"}, {"number": "101", "status": "closed", "lat": 24.72, "lng": 46.69}, {"number": "102", "status": "active"}, {"number": "103", "status": "active", "lat": 24.73, "lng": 46.70}]}"#.data(using: .utf8)!
+        let dto = try JSONDecoder().decode(CadSummaryDTO.self, from: json)
+        let visible = opsMapVisibleIncidents(dto.incidents)
+        XCTAssertEqual(visible.map { $0.number }, ["100", "103"])
+        // severity سيرفري مباشرة · الغياب yellow (smart-map.js:616)
+        XCTAssertEqual(opsMapIncidentSeverity(visible.first?.severity), .red)
+        XCTAssertEqual(opsMapIncidentSeverity(visible.last?.severity), .yellow)
+        XCTAssertEqual(opsMapIncidentSeverity(nil), .yellow)
+        XCTAssertEqual(opsMapIncidentSeverity("green"), .green)
+    }
+
+    // MARK: - P2: نقل الخريطة إلى /api/ops/centers (SSOT) + تنبيه الخيار A
+
+    @MainActor
+    func testOpsCentersIntegrityDecodesMissingCenters() throws {
+        // مرجع غير مكتمل: complete=false + missing يسمّي المركز وفرقه
+        let json = #"{"success": true, "version": 1, "data": {"المنصورة": {"center": [24.614143, 46.751110], "radius": 4000, "address": "المنصورة، الرياض"}}, "integrity": {"complete": false, "missing": [{"center": "الحائر", "teams": ["جنوب 8", "جنوب 9"]}], "loadError": null}}"#.data(using: .utf8)!
+        let dto = try JSONDecoder().decode(OpsCentersDTO.self, from: json)
+        let missing = try XCTUnwrap(dto.integrity?.missing)
+        XCTAssertEqual(dto.integrity?.complete, false)
+        XCTAssertEqual(missing.first?.center, "الحائر")
+        XCTAssertEqual(missing.first?.teams, ["جنوب 8", "جنوب 9"])
+        // الخيار A: التنبيه يسمّي المراكز الناقصة فقط عند عدم الاكتمال
+        XCTAssertEqual(OpsMapViewModel.missingCenterNames(dto.integrity), ["الحائر"])
+        XCTAssertEqual(OpsMapViewModel.missingCenterNames(nil), [])
+        let completeJson = #"{"success": true, "version": 1, "data": {}, "integrity": {"complete": true, "missing": [], "loadError": null}}"#.data(using: .utf8)!
+        let completeDto = try JSONDecoder().decode(OpsCentersDTO.self, from: completeJson)
+        XCTAssertEqual(OpsMapViewModel.missingCenterNames(completeDto.integrity), [])
+    }
+
+    @MainActor
+    func testOpsMapBuildPinsSkipsNonGeographicCenter() throws {
+        // «العمليات» مركز غير جغرافي معلن في SSOT — لا يصل في data إطلاقًا،
+        // ففرقه لا تُرسم (لا إحداثيات مختلقة) بينما فرق المراكز المعروفة تُرسم
+        let centersJson = #"{"success": true, "version": 1, "data": {"المنصورة": {"center": [24.614143, 46.751110], "radius": 4000}}, "integrity": {"complete": true, "missing": [], "loadError": null}}"#.data(using: .utf8)!
+        let centers = try JSONDecoder().decode(OpsCentersDTO.self, from: centersJson)
+        let staffingJson = #"{"success": true, "teams": {"جنوب 1": {"status": "ready", "vehicleOk": true, "center": "المنصورة"}, "العمليات 1": {"status": "ready", "vehicleOk": true, "center": "العمليات"}, "جنوب 13": {"status": "pending", "vehicleOk": true, "center": "الفرق الإضافية"}}}"#.data(using: .utf8)!
+        let staffing = try JSONDecoder().decode(StaffingStateDTO.self, from: staffingJson)
+        let pins = OpsMapViewModel.buildPins(centers: centers, staffing: staffing, reports: nil)
+        let names = pins.map(\.name)
+        XCTAssertTrue(names.contains("جنوب 1"))
+        XCTAssertTrue(names.contains("المنصورة"))
+        XCTAssertFalse(names.contains("العمليات 1"))
+        XCTAssertFalse(names.contains("جنوب 13"))
+        XCTAssertFalse(names.contains("العمليات"))
+        XCTAssertFalse(names.contains("الفرق الإضافية"))
+        // فرقة المركز الوحيدة بلا إزاحة — إحداثيات المركز نفسها حرفيًا
+        let team = try XCTUnwrap(pins.first { $0.name == "جنوب 1" })
+        XCTAssertEqual(team.coordinate.latitude, 24.614143, accuracy: 1e-9)
+        XCTAssertEqual(team.coordinate.longitude, 46.751110, accuracy: 1e-9)
+    }
+
+    @MainActor
+    func testOpsMapBuildPinsHandlesIncompleteReference() throws {
+        // محاكاة integrity.complete=false: مركز ناقص من data — فرقه تُستبعد
+        // بلا crash وبلا إحداثيات مختلقة، والمراكز المتوفرة تُرسم طبيعيًا
+        let centersJson = #"{"success": true, "version": 1, "data": {"المنصورة": {"center": [24.614143, 46.751110], "radius": 4000}}, "integrity": {"complete": false, "missing": [{"center": "الحائر", "teams": ["جنوب 8"]}], "loadError": null}}"#.data(using: .utf8)!
+        let centers = try JSONDecoder().decode(OpsCentersDTO.self, from: centersJson)
+        let staffingJson = #"{"success": true, "teams": {"جنوب 1": {"status": "ready", "vehicleOk": true, "center": "المنصورة"}, "جنوب 8": {"status": "ready", "vehicleOk": true, "center": "الحائر"}}}"#.data(using: .utf8)!
+        let staffing = try JSONDecoder().decode(StaffingStateDTO.self, from: staffingJson)
+        let pins = OpsMapViewModel.buildPins(centers: centers, staffing: staffing, reports: nil)
+        let names = pins.map(\.name)
+        XCTAssertTrue(names.contains("المنصورة"))
+        XCTAssertTrue(names.contains("جنوب 1"))
+        XCTAssertFalse(names.contains("الحائر"))
+        XCTAssertFalse(names.contains("جنوب 8"))
+        // والتنبيه يكشف النقص بدل إخفائه
+        XCTAssertEqual(OpsMapViewModel.missingCenterNames(centers.integrity), ["الحائر"])
     }
 }

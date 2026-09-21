@@ -1,7 +1,9 @@
 /* ============================================================
    الخريطة التشغيلية الذكية — SmartMap (إعادة البناء المعتمدة)
-   قراءة فقط: كل البيانات من /api/cad-reports و /api/staffing/state
-   ومن الجداول الثابتة operationalCenters / teamCenterMap في app.js.
+   قراءة فقط: كل البيانات من /api/cad-reports و /api/staffing/state،
+   والمراكز/ربط الفرق من مرجع runtime في app.js (P3 — اعتماد المالك
+   2026-09-21): operationalCenters/teamCenterMap يُبنيان من
+   GET /api/ops/centers (SSOT) — لا جداول ثابتة هنا ولا في app.js.
    لا منطق تشغيلي هنا، لا اشتقاق، لا إحداثيات مختلقة، لا مصادر جديدة.
    التمييز البصري القاطع: 🚑 فرقة · 🏥 مركز · 📍 بلاغ.
    ============================================================ */
@@ -449,7 +451,10 @@
                 var total = 0, ready = 0;
                 for (var u in state.teams) {
                     if (!state.teams.hasOwnProperty(u)) continue;
-                    if (!teamCenterMap[u]) continue; // الفرق التشغيلية الميدانية فقط
+                    // الفرق الميدانية ذات مركز جغرافي مصرّح فقط — الربط من
+                    // teamCenterMap (teamCenters سيرفري) والحسم الجغرافي من المرجع
+                    var _kc = teamCenterMap[u];
+                    if (!_kc || !operationalCenters[_kc]) continue;
                     total++;
                     if (state.teams[u].status === 'ready') ready++;
                 }
@@ -465,6 +470,41 @@
         }
         var pkEl = document.getElementById('smapKpiPeak');
         if (pkEl) pkEl.textContent = ms.peakHour ? (ms.peakHour.hour + ':00') : '—';
+    }
+
+    // ---------- مرجع المراكز (P3): حالة SSOT + الراية غير الحاجبة ----------
+    function centersRefReadyNow() {
+        // app.js تُحمَّل قبل smart-map.js في index.html — غيابها = فشل صريح لا افتراض
+        return (typeof centersRefState !== 'undefined') && centersRefState === 'ready';
+    }
+    function renderRefBanner() {
+        var el = document.getElementById('smapRefBanner');
+        if (!el) return;
+        var st = (typeof centersRefState !== 'undefined') ? centersRefState : 'failed';
+        if (st === 'loading') {
+            el.style.display = '';
+            el.className = 'smap-refbanner is-loading';
+            el.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> جارٍ تحميل مرجع المراكز من المصدر الموحد…';
+            return;
+        }
+        if (st === 'failed') {
+            el.style.display = '';
+            el.className = 'smap-refbanner is-failed';
+            el.innerHTML = '<i class="fas fa-triangle-exclamation"></i> تعذر تحميل مرجع المراكز — طبقتا المراكز والفرق متوقفتان حتى يعود. '
+                + '<button type="button" class="smap-refbanner-btn" onclick="loadCentersReference()"><i class="fas fa-rotate"></i> إعادة المحاولة</button>';
+            return;
+        }
+        // الخيار A (كما في iOS): مرجع غير مكتمل ← تنبيه يسمّي الناقص ولا يحجب الخريطة
+        var integ = (typeof centersRefIntegrity !== 'undefined') ? centersRefIntegrity : null;
+        if (integ && integ.complete === false) {
+            var names = (integ.missing || []).map(function (m) { return m && m.center; }).filter(Boolean).join('، ');
+            el.style.display = '';
+            el.className = 'smap-refbanner is-incomplete';
+            el.innerHTML = '<i class="fas fa-triangle-exclamation"></i> مرجع المراكز غير مكتمل' + (names ? ': ' + esc(names) : '') + ' — تُعرض البيانات المتاحة فقط.';
+            return;
+        }
+        el.style.display = 'none';
+        el.innerHTML = '';
     }
 
     // ---------- الفرق والمراكز ----------
@@ -498,7 +538,16 @@
     function renderTeams(teams) {
         state.teams = teams || null;
         renderKpis();
+        renderRefBanner();
         if (!init()) return;
+        if (!centersRefReadyNow()) {
+            // مرجع المراكز غير جاهز (loading/failed) — إخلاء صادق لطبقتي
+            // المراكز/الفرق: لا undefined ولا [0,0] ولا خريطة ناقصة بلا توضيح
+            markerIndex.centers = syncMarkers(layers.centers, markerIndex.centers, {}, function () { return null; });
+            markerIndex.teams = syncMarkers(layers.teams, markerIndex.teams, {}, function () { return null; });
+            lastRender.teamsFp = '';
+            refit(); return;
+        }
         if (!state.teams) {
             // لا بيانات — إخلاء فعلي للعلامات مرة واحدة (تفاضليًا أيضًا)
             markerIndex.centers = syncMarkers(layers.centers, markerIndex.centers, {}, function () { return null; });
@@ -1181,6 +1230,7 @@
         focusOn: focusOn,
         clearFocus: clearFocus,
         closeCard: closeCard,
+        refreshCentersRef: function () { renderRefBanner(); renderTeams(state.teams); },
         dismissAlerts: function () { alertBarClosed = true; renderAlerts(); }
     };
 })();

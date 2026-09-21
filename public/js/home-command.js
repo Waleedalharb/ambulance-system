@@ -136,7 +136,10 @@
             return;
         }
         function centerOf(unit) {
-            return (typeof teamCenterMap !== 'undefined' && teamCenterMap && teamCenterMap[unit]) || '';
+            // P3 (اعتماد المالك 2026-09-21): مركز الفرقة من مرآة staffing السيرفرية
+            // (teams.center في DB) — لا جدول ثابت. الغياب = نص فارغ كما كان.
+            var t = (typeof workforceStateTeams !== 'undefined' && workforceStateTeams) ? workforceStateTeams[unit] : null;
+            return (t && t.center) || '';
         }
         function item(entry, clsName, badge, detail) {
             var c = centerOf(entry.name);

@@ -184,14 +184,28 @@ struct TimelineDTO: Decodable {
     private enum CodingKeys: String, CodingKey { case success, data }
 }
 
-// MARK: - /api/center-geo — إحداثيات المراكز للخريطة
-struct CenterGeoDTO: Decodable {
+// MARK: - /api/ops/centers — إحداثيات المراكز من المصدر الوحيد (SSOT)
+// عقد server.js:1511 ← CentersGeoService: المراكز الجغرافية المعتمدة فقط في data،
+// وسلامة المرجع في integrity (المراكز الناقصة من teams.center تظهر في missing).
+struct OpsCentersDTO: Decodable {
     struct Center: Decodable {
         let center: [Double]?       // [lat, lng]
         let radius: Double?
+        let address: String?
+    }
+    struct Integrity: Decodable {
+        struct Missing: Decodable {
+            let center: String?
+            let teams: [String]?
+        }
+        let complete: Bool?
+        let missing: [Missing]?
+        let loadError: String?
     }
     let success: Bool?
+    let version: Int?
     let data: [String: Center]?
+    let integrity: Integrity?
 }
 
 // MARK: - /api/current-shift — سياق المناوبة الحالية
