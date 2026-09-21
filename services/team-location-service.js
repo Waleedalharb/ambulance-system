@@ -9,7 +9,10 @@
  *    (معتمد 2026-09-21): جدولة + أحداث staffing المناوبة النشطة — الغياب/الخروج
  *    المفتوح يحجب، والإسناد/التفعيل ينقل الفرقة للبديل. team_id من العميل مرفوض (400).
  *  - الإرسال للفرق الميدانية فقط (FIELD_TEAM_TYPES: جنوب/دعم/سريع) — لا مواقع لإداريين.
- *  - قاعدة العضوين: الأحدث recorded_at يفوز، وعند التعادل الأدق (accuracy الأقل).
+ *  - قاعدة العضوين: الأحدث recorded_at يفوز، وعند التعادل الأدق (accuracy الأقل)
+ *    — تُفرَض ذرّيًا داخل القاعدة بـUPSERT واحد بشرط WHERE (اعتماد المالك
+ *    2026-09-22): لا SELECT-then-write، فلا يمكن للأقدم أن يكتب فوق الأحدث
+ *    مهما تداخلت الطلبات المتزامنة.
  *  - received_at سيرفري حتمًا. الحالة مشتقة عند القراءة — لا تُخزَّن:
  *      fresh ≤ 120s · stale ≤ 15min · unavailable > 15min أو accuracy > 500m
  *    (عتبات معتمدة من المالك — ثوابت أدناه فقط، لا نسخة ثانية).
@@ -94,25 +97,14 @@ class TeamLocationService {
         }
         const team = { id: eff.teamId, name: eff.teamName };
 
-        // قاعدة العضوين: الأحدث recorded_at يفوز، وعند التعادل الأدق (accuracy الأقل).
-        // تحديث أقدم من المخزن لا يُطبَّق ولا يفشل الطلب — applied:false بصدق.
-        const existing = await this.db.get(
-            'SELECT recorded_at, accuracy FROM team_live_locations WHERE team_id = ?', [team.id]);
-        if (existing) {
-            const existingMs = Date.parse(existing.recorded_at);
-            if (Number.isFinite(existingMs) &&
-                (existingMs > recordedMs ||
-                    (existingMs === recordedMs && (existing.accuracy == null || existing.accuracy <= (accuracy == null ? Infinity : accuracy))))) {
-                return {
-                    success: true, applied: false, reason: 'older_than_current',
-                    teamId: team.id, teamName: team.name, source: eff.source,
-                    status: TeamLocationService.deriveStatus(existingMs, existing.accuracy, nowMs)
-                };
-            }
-        }
-
+        // قاعدة العضوين تُفرَض ذرّيًا داخل القاعدة نفسها (اعتماد المالك 2026-09-22):
+        // لا SELECT ثم قرار ثم كتابة — عبارة UPSERT واحدة بشرط WHERE يجعل قاعدة
+        // البيانات نفسها ترفض كتابة الأقدم فوق الأحدث مهما تداخلت الطلبات.
+        // الأحدث recorded_at يفوز دائمًا، وعند التعادل الأدق (accuracy الأقل؛
+        // NULL في المقارنة يخسر — مطابق لدلالة القاعدة الأصلية).
         const nowIso = new Date(nowMs).toISOString();
-        await this.db.run(
+        const recordedIso = new Date(recordedMs).toISOString();
+        const wr = await this.db.run(
             `INSERT INTO team_live_locations
                 (team_id, latitude, longitude, accuracy, recorded_at, received_at, source_employee_id, updated_at)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -120,9 +112,26 @@ class TeamLocationService {
                 latitude = excluded.latitude, longitude = excluded.longitude,
                 accuracy = excluded.accuracy, recorded_at = excluded.recorded_at,
                 received_at = excluded.received_at,
-                source_employee_id = excluded.source_employee_id, updated_at = excluded.updated_at`,
+                source_employee_id = excluded.source_employee_id, updated_at = excluded.updated_at
+             WHERE excluded.recorded_at > team_live_locations.recorded_at
+                OR (excluded.recorded_at = team_live_locations.recorded_at
+                    AND excluded.accuracy < team_live_locations.accuracy)`,
             [team.id, latitude, longitude, accuracy == null ? null : accuracy,
-             new Date(recordedMs).toISOString(), nowIso, eff.employeeId, nowIso]);
+             recordedIso, nowIso, eff.employeeId, nowIso]);
+
+        if (wr && wr.changes === 0) {
+            // الصف موجود وشرط الأحدث/الأدق رفض الكتابة ذرّيًا — الموقع الحالي بقي.
+            // تحديث أقدم من المخزن لا يُطبَّق ولا يفشل الطلب — applied:false بصدق.
+            // القراءة هنا للتقرير فقط (reason/status) — لا أثر لها على الفائز.
+            const current = await this.db.get(
+                'SELECT recorded_at, accuracy FROM team_live_locations WHERE team_id = ?', [team.id]);
+            const currentMs = current ? Date.parse(current.recorded_at) : NaN;
+            return {
+                success: true, applied: false, reason: 'older_than_current',
+                teamId: team.id, teamName: team.name, source: eff.source,
+                status: TeamLocationService.deriveStatus(currentMs, current ? current.accuracy : null, nowMs)
+            };
+        }
 
         return {
             success: true, applied: true,

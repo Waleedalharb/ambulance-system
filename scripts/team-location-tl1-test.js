@@ -6,7 +6,9 @@
  * يغطي قرارات المالك المعتمدة:
  *  - السيرفر يحسم الفرقة من تكليف اليوم؛ team_id من العميل ← 400 صريح.
  *  - الإرسال للفرق الميدانية فقط (جنوب/دعم/سريع) ← غير ذلك 422 NO_FIELD_ASSIGNMENT.
- *  - صف واحد لكل فرقة: الأحدث recorded_at يفوز، التعادل للأدق — applied:false بصدق.
+ *  - صف واحد لكل فرقة: الأحدث recorded_at يفوز، التعادل للأدق — applied:false بصدق،
+ *    والفوز يُفرَض ذرّيًا داخل القاعدة (UPSERT بشرط WHERE — اعتماد المالك
+ *    2026-09-22) ويُختبر بطلبات متزامنة فعلية: 20 جولة متعاكسة + Promise.all.
  *  - الحالة مشتقة عند القراءة: fresh ≤120s · stale ≤15min · unavailable (>15min
  *    أو accuracy>500m) تُعاد بالحالة وageSeconds (الخيار A المعتمد 2026-09-21 —
  *    آخر موقع معروف، ليس موقعًا حيًا ولا يدخل أقرب-فرقة/ETA مستقبلًا).
@@ -248,6 +250,50 @@ async function apiPost(p, tok, payload) {
             'status=' + centers.status);
         const checkSession = await apiGet('/api/my/check-session', tok1);
         check('22) انحدار: /api/my/check-session يعمل لعضو الفرقة', checkSession.status === 200, 'status=' + checkSession.status);
+
+        // ═══ التزامن الفعلي (اعتماد المالك 2026-09-22): الأحدث recorded_at يفوز دائمًا ═══
+        // UPSERT ذرّي بشرط WHERE داخل القاعدة — لا SELECT-then-write. recordedAt
+        // هنا في المستقبل القريب عمدًا (ضمن سماح 300 ثانية) لضمان أنها أحدث من
+        // كل ما سبق في الاختبار فتكون الجولات صراعًا حقيقيًا بين طلبَي الجولة فقط.
+        const baseMs = Date.now() + 60 * 1000;
+        // 23) خط أساس تسلسلي بالترتيب المعاكس: الأقدم يكتب أولًا ثم الأحدث
+        const seqOld = await apiPost('/api/my/team-location', tok1, { latitude: 24.10, longitude: 46.10, accuracy: 10, recordedAt: iso(baseMs + 1000) });
+        const seqNew = await apiPost('/api/my/team-location', tok2, { latitude: 24.20, longitude: 46.20, accuracy: 10, recordedAt: iso(baseMs + 2000) });
+        const rowSeq = dbw.prepare('SELECT latitude, recorded_at FROM team_live_locations WHERE team_id = ?').get(T1.id);
+        check('23) خط أساس تسلسلي (أقدم ثم أحدث): كلاهما applied والصف النهائي للأحدث',
+            seqOld.status === 200 && seqOld.body.applied === true &&
+            seqNew.status === 200 && seqNew.body.applied === true &&
+            rowSeq && Math.abs(rowSeq.latitude - 24.20) < 0.0001 && rowSeq.recorded_at === iso(baseMs + 2000),
+            JSON.stringify({ seqOld: seqOld.body, seqNew: seqNew.body, rowSeq }));
+
+        // 24) طلبان متزامنان متداخلان (Promise.all): A أحدث + B أقدم — الفائز دائمًا A
+        const [cB, cA] = await Promise.all([
+            apiPost('/api/my/team-location', tok1, { latitude: 24.31, longitude: 46.31, accuracy: 10, recordedAt: iso(baseMs + 3000) }), // B أقدم
+            apiPost('/api/my/team-location', tok2, { latitude: 24.32, longitude: 46.32, accuracy: 10, recordedAt: iso(baseMs + 4000) })  // A أحدث
+        ]);
+        const rowConc = dbw.prepare('SELECT latitude, recorded_at FROM team_live_locations WHERE team_id = ?').get(T1.id);
+        check('24) طلبان متزامنان (A أحدث + B أقدم متداخلان): A يفوز دائمًا — النهائي هو الأحدث',
+            cA.status === 200 && cA.body.applied === true &&
+            rowConc && Math.abs(rowConc.latitude - 24.32) < 0.0001 && rowConc.recorded_at === iso(baseMs + 4000),
+            JSON.stringify({ cA: cA.body, cB: cB.body, rowConc }));
+
+        // 25) 20 جولة تزامن بترتيب إطلاق متعاكس بالتناوب — الفائز دائمًا الأحدث وصف واحد فقط
+        let roundsOk = true, roundsDetail = '';
+        for (let r = 0; r < 20; r++) {
+            const tNew = iso(baseMs + 10000 + r * 2000);
+            const tOld = iso(baseMs + 10000 + r * 2000 - 1000);
+            const newerLat = 24.40 + r * 0.001;
+            const reqNew = () => apiPost('/api/my/team-location', r % 2 ? tok1 : tok2, { latitude: newerLat, longitude: 46.40, accuracy: 10, recordedAt: tNew });
+            const reqOld = () => apiPost('/api/my/team-location', r % 2 ? tok2 : tok1, { latitude: 24.90, longitude: 46.90, accuracy: 10, recordedAt: tOld });
+            const res = r % 2 ? await Promise.all([reqOld(), reqNew()]) : await Promise.all([reqNew(), reqOld()]);
+            const row = dbw.prepare('SELECT recorded_at, latitude FROM team_live_locations WHERE team_id = ?').get(T1.id);
+            if (res.some(x => x.status !== 200) || !row || row.recorded_at !== tNew || Math.abs(row.latitude - newerLat) > 0.00001) {
+                roundsOk = false; roundsDetail = 'round ' + r + ' → ' + JSON.stringify({ row, statuses: res.map(x => x.status) }); break;
+            }
+        }
+        const countAfter = dbw.prepare('SELECT COUNT(*) c FROM team_live_locations WHERE team_id = ?').get(T1.id);
+        check('25) 20 جولة تزامن بترتيب متعاكس: الفائز دائمًا الأحدث recorded_at وصف واحد فقط للفرقة',
+            roundsOk && countAfter.c === 1, roundsDetail || ('count=' + countAfter.c));
 
         dbw.close();
     } catch (e) {
