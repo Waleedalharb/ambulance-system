@@ -31,9 +31,10 @@
  *   1) IS_PULL_REQUEST === 'true'        — لا يعمل خارج PR Preview إطلاقًا.
  *   2) RENDER_DISK_PATH مضبوط            — نفس حسم STORAGE_PATH في server.js:545.
  *   3) PREVIEW_ADMIN_PASSWORD / PREVIEW_DIRECTOR_PASSWORD من env — لا قيم مضمّنة.
- *   4) القاعدة بكر: users/employees/reports/shifts/shift_roster/
- *      incident_registry/shift_team_status كلها صفر، ولا أحداث staffing مسبقة
- *      (أحداث V-A للمركبات فقط هي المسموح بقاؤها).
+ *   4) القاعدة بكر: employees/reports/shifts/shift_roster/incident_registry/
+ *      shift_team_status كلها صفر، ولا أحداث staffing مسبقة، ولا مستخدمون
+ *      خارج حسابات bootstrap الافتتاحية (user_id يبدأ emp- وcreated_at NULL)
+ *      — أحداث V-A للمركبات فقط هي المسموح بقاؤها.
  *   5) teams.center ⊆ مراكز SSOT (config/operational-centers.json) — فشل = إيقاف.
  *
  * لا يقرأ ولا يكتب خارج قاعدة STORAGE_PATH المحلية. لا PII ولا بيانات إنتاج.
@@ -91,8 +92,21 @@ const scalar = (sql) => db.prepare(sql).get().c;
 const fail = (msg) => { console.error('⛔ مرفوض: ' + msg); db.close(); process.exit(1); };
 
 // ─── الحارس 4: القاعدة بكر (one-shot / fail-closed) ───
+// users: يُسمح فقط بحسابات bootstrap الافتتاحية — عند أول إقلاع ينشئ التطبيق
+// 19 حسابًا من قائمة ثابتة (server.js:660-700) ثم يزامنها إلى SQLite بلا
+// created_at (server.js:14926-14939). تمييزها البنيوي الدقيق:
+// user_id يبدأ بـ emp-  و  created_at IS NULL. أي حساب آخر = قاعدة غير بكر.
+// لا تُحذف ولا تُعدَّل ولا تُستخدم كحسابات اختبار — وحسابا المراجعة
+// (preview_admin/preview_director) لهما user_id بصيغة preview-* وcreated_at
+// مضبوط، فيكشفهما هذا الحارس عند أي تشغيل ثانٍ (fail-closed محفوظ).
+const bootstrapUsers = scalar(`SELECT COUNT(*) AS c FROM users WHERE user_id LIKE 'emp-%' AND created_at IS NULL`);
+const nonBootstrapUsers = scalar(`SELECT COUNT(*) AS c FROM users WHERE user_id NOT LIKE 'emp-%' OR created_at IS NOT NULL`);
+const nameClash = scalar(`SELECT COUNT(*) AS c FROM users WHERE username IN ('preview_admin', 'preview_director')`);
+if (nameClash > 0) fail('يوجد حساب باسم preview_admin/preview_director مسبقًا — لا دمج ولا استبدال.');
+console.log(`ℹ️ حسابات bootstrap الافتتاحية المسموح بقاؤها: ${bootstrapUsers} (لا تُمس).`);
+
 const pristineChecks = {
-    users: scalar('SELECT COUNT(*) AS c FROM users'),
+    users_non_bootstrap: nonBootstrapUsers,
     employees: scalar('SELECT COUNT(*) AS c FROM employees'),
     reports: scalar('SELECT COUNT(*) AS c FROM reports'),
     shifts: scalar('SELECT COUNT(*) AS c FROM shifts'),
