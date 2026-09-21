@@ -4506,6 +4506,24 @@ async function migrateAssetRegistry() {
   await ensureColumn('inventory_items', 'serial_seen', 'TEXT');
   await ensureColumn('inventory_items', 'location_note', 'TEXT');
   await ensureColumn('inventory_items', 'discovered', 'INTEGER DEFAULT 0');
+
+  // ═══ الموقع التشغيلي الحي للفرق — Team Live Location (TL1 معتمد 2026-09-21) ═══
+  // آخر حالة معروفة فقط: صف واحد لكل فرقة (UPSERT) — استحالة ظهور الفرقة مرتين
+  // بنيويًا. لا سجل تاريخي في هذه المرحلة. الحالة fresh/stale/unavailable مشتقة
+  // عند القراءة من recorded_at ولا تُخزَّن. received_at سيرفري حتمًا (لا يُؤخذ من
+  // الجهاز) — الفرق بينه وبين recorded_at يقيس تأخر الإرسال صراحة.
+  // speed/heading مستبعدان بقرار المالك — تُضافان بترحيل مستقل عند الحاجة.
+  await exec(`CREATE TABLE IF NOT EXISTS team_live_locations (
+    team_id            INTEGER PRIMARY KEY REFERENCES teams(id),
+    latitude           REAL NOT NULL,
+    longitude          REAL NOT NULL,
+    accuracy           REAL,
+    recorded_at        TEXT NOT NULL,
+    received_at        TEXT NOT NULL,
+    source_employee_id INTEGER NOT NULL REFERENCES employees(id),
+    updated_at         TEXT NOT NULL
+  )`);
+
   logger.info('asset registry tables ready (8 tables, additive)');
 }
 

@@ -1403,6 +1403,33 @@ function getShiftCheckService() {
     }
     return shiftCheckService;
 }
+
+// ── TL1 (اعتماد المالك 2026-09-21): الموقع التشغيلي الحي للفرق ──
+// خدمة الموقع فقط: GPS ← SSOT ← API. لا خريطة ولا ETA ولا أقرب فرقة الآن.
+// السيرفر يحسم الفرقة من **التكليف التشغيلي الفعلي** (operational-assignment-service:
+// جدولة + أحداث staffing للمناوبة النشطة) — الغائب/الخارج يحجب، والبديل المُسند
+// يرسل على فرقة إسناده. team_id من العميل مرفوض.
+let operationalAssignmentService = null;
+function getOperationalAssignmentService() {
+    if (!operationalAssignmentService && db) {
+        const OperationalAssignmentService = require('./services/operational-assignment-service');
+        operationalAssignmentService = new OperationalAssignmentService({
+            db,
+            portal: getMyPortalService(),
+            getStaffingEventsService: () => staffingEventsService,
+            getActiveShift: async () => (opsEngine && opsEngine.shifts) ? opsEngine.shifts.getActiveShift() : null
+        });
+    }
+    return operationalAssignmentService;
+}
+let teamLocationService = null;
+function getTeamLocationService() {
+    if (!teamLocationService && db) {
+        const TeamLocationService = require('./services/team-location-service');
+        teamLocationService = new TeamLocationService({ db, portal: getMyPortalService(), assignment: getOperationalAssignmentService() });
+    }
+    return teamLocationService;
+}
 function myCheckError(res, error, fallback) {
     const status = error.statusCode || 500;
     if (status >= 500) console.error('[shift-check]', error);
@@ -1464,6 +1491,30 @@ app.get('/api/ops/readiness/teams', authenticate, OPS_READINESS_VIEW, async (req
     try {
         res.json(await getShiftCheckService().getTeamsReadinessBoard());
     } catch (error) { myCheckError(res, error, 'فشل في جلب لوحة استعداد الفرق'); }
+});
+
+// ── TL1 (اعتماد المالك 2026-09-21): الموقع التشغيلي الحي للفرق ──
+// الإرسال إجراء موظف بوابة (/api/my) محروس بـ ops.my_portal، والسيرفر يحسم
+// الفرقة من تكليف اليوم — team_id من العميل مرفوض داخل الخدمة (400 صريح).
+app.post('/api/my/team-location', authenticate, authorizePerm('ops.my_portal'), validateBody({
+    latitude: { required: true, type: 'number', min: -90, max: 90 },
+    longitude: { required: true, type: 'number', min: -180, max: 180 },
+    accuracy: { required: false, type: 'number', min: 0 },
+    recordedAt: { required: true, type: 'string', minLength: 10, maxLength: 40 }
+}), async (req, res) => {
+    try {
+        const out = await getTeamLocationService().submit(req.user, req.body);
+        res.json(out);
+    } catch (error) { myCheckError(res, error, 'فشل في حفظ موقع الفرقة'); }
+});
+
+// القراءة لغرفة العمليات (/api/ops) محروسة بمفتاح مستقل منحًا فرديًا —
+// مواقع الفرق أشد حساسية من الجوالات (سابقة staff.phone_view المعتمدة).
+app.get('/api/ops/team-locations', authenticate, authorizePerm('ops.team_locations.view'), async (req, res) => {
+    try {
+        const out = await getTeamLocationService().list();
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في جلب مواقع الفرق'); }
 });
 
 app.post('/api/my/check-session/confirm', authenticate, authorizePerm('ops.my_portal'), async (req, res) => {
