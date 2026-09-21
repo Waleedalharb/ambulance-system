@@ -1397,18 +1397,39 @@ table.data-table tr:hover td {
 <script>AuthCore.requireAuth('/');</script>
 <script>
 // ========== البيانات ==========
-var centersData = {
-    "المنصورة":   ["جنوب 1", "سريع 3"],
-    "الخالدية":   ["جنوب 2"],
-    "منفوحة":     ["جنوب 3"],
-    "الدار البيضاء": ["جنوب 4", "جنوب 5", "سريع 2"],
-    "الإسكان":    ["جنوب 6"],
-    "الحائر":     ["جنوب 7"],
-    "الشفاء":     ["جنوب 8", "سريع 1"],
-    "عكاظ":       ["جنوب 9"],
-    "ديراب":      ["جنوب 10"],
-    "الفرق الإضافية": ["جنوب 11", "جنوب 12", "جنوب 13", "جنوب 14", "جنوب 15", "جنوب 16", "جنوب 17", "جنوب 18", "جنوب 19"]
-};
+// P3 (اعتماد المالك 2026-09-21): لا جدول centersData ثابت — ربط الفرقة بالمركز
+// يُجلب من GET /api/ops/centers (teamCenters ← teams.center في DB، SSOT الربط).
+// الحالات صريحة: loading → ready | failed — لا قائمة وهمية ولا سقوط صامت.
+var centersData = null;
+var centersDataState = 'loading'; // loading | ready | failed
+
+async function loadCentersData() {
+    centersDataState = 'loading';
+    try {
+        var token = AuthCore.getToken();
+        var res = await fetch('/api/ops/centers', { headers: { 'Authorization': 'Bearer ' + token } });
+        var payload = await res.json();
+        if (!payload || payload.success !== true || !payload.teamCenters) throw new Error('bad payload');
+        var grouped = {};
+        var tc = payload.teamCenters;
+        for (var team in tc) {
+            if (!tc.hasOwnProperty(team)) continue;
+            var c = tc[team];
+            if (!grouped[c]) grouped[c] = [];
+            grouped[c].push(team);
+        }
+        // ترتيب طبيعي ثابت (جنوب 1..10 ثم سريع…) للمراكز والفرق
+        var sorted = {};
+        Object.keys(grouped).sort(function (a, b) { return a.localeCompare(b, 'ar', { numeric: true }); }).forEach(function (c) {
+            sorted[c] = grouped[c].sort(function (a, b) { return a.localeCompare(b, 'ar', { numeric: true }); });
+        });
+        centersData = sorted;
+        centersDataState = 'ready';
+    } catch (e) {
+        centersData = null;
+        centersDataState = 'failed';
+    }
+}
 
 var reportTypes = ["حادث مروري", "حالة مرضية", "حريق", "إصابة", "حالة ولادة", "سقوط", "اختناق", "آخر"];
 
@@ -1430,6 +1451,7 @@ var typeBadgeMap = {
 
 // ========== عند التحميل ==========
 document.addEventListener("DOMContentLoaded", async function() {
+    await loadCentersData(); // P3: مرجع الربط أولًا — renderCenters/populateAdvCenters تحرسان حالته
     await loadData();
     renderCenters();
     renderTypeSelectors();
@@ -1648,6 +1670,15 @@ function updateDarkModeBtn(isDark) {
 // ========== عرض المراكز ==========
 function renderCenters() {
     var container = document.getElementById("centersGrid");
+    // P3: حالات مرجع الربط صريحة — لا شبكة فارغة بلا توضيح
+    if (centersDataState !== 'ready' || !centersData) {
+        if (centersDataState === 'loading') {
+            container.innerHTML = '<div class="hc-empty" style="padding:20px; text-align:center; color:var(--ex-text-3,#94a3b8);"><i class="fas fa-circle-notch fa-spin"></i> جارٍ تحميل مرجع المراكز من المصدر الموحد…</div>';
+        } else {
+            container.innerHTML = '<div class="hc-empty" style="padding:20px; text-align:center; color:var(--ex-text-3,#94a3b8);"><i class="fas fa-triangle-exclamation"></i> تعذر تحميل مرجع المراكز. <button type="button" onclick="loadCentersData().then(renderCenters)" style="border:1px solid currentColor; background:none; color:inherit; border-radius:6px; padding:2px 10px; cursor:pointer; font-size:0.8rem;">إعادة المحاولة</button></div>';
+        }
+        return;
+    }
     var html = "";
     var centerNames = Object.keys(centersData);
 
@@ -1774,6 +1805,11 @@ function closeAdvancedModal() {
 
 function populateAdvCenters() {
     var select = document.getElementById("advCenter");
+    // P3: المرجع غير الجاهز = خيار حالة صادق فقط — لا قائمة وهمية
+    if (centersDataState !== 'ready' || !centersData) {
+        select.innerHTML = '<option value="">' + (centersDataState === 'loading' ? 'جارٍ تحميل المراكز…' : 'تعذر تحميل المراكز') + '</option>';
+        return;
+    }
     var centerNames = Object.keys(centersData);
     for (var i = 0; i < centerNames.length; i++) {
         var opt = document.createElement("option");
@@ -1788,7 +1824,7 @@ function updateAdvUnits() {
     var unitSelect = document.getElementById("advUnit");
     unitSelect.innerHTML = '<option value="">اختر الفرقة</option>';
 
-    if (center && centersData[center]) {
+    if (center && centersData && centersData[center]) {
         var units = centersData[center];
         for (var i = 0; i < units.length; i++) {
             var opt = document.createElement("option");

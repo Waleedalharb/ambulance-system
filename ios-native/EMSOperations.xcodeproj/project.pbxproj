@@ -1,0 +1,1242 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		5E4000000000000000000001 /* EMSOperationsApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000001 /* EMSOperationsApp.swift */; };
+		5E4000000000000000000002 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000002 /* RootView.swift */; };
+		5E4000000000000000000003 /* AppEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000003 /* AppEnvironment.swift */; };
+		5E4000000000000000000004 /* AppLogger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000004 /* AppLogger.swift */; };
+		5E4000000000000000000005 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000005 /* APIClient.swift */; };
+		5E4000000000000000000006 /* APIError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000006 /* APIError.swift */; };
+		5E40000000000000000000F3 /* RefreshNoticeCenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000F3 /* RefreshNoticeCenter.swift */; };
+		5E4000000000000000000007 /* AuthDTO.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000007 /* AuthDTO.swift */; };
+		5E4000000000000000000008 /* PortalDTO.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000008 /* PortalDTO.swift */; };
+		5E4000000000000000000009 /* KeychainService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000009 /* KeychainService.swift */; };
+		5E400000000000000000000A /* BiometricGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000000A /* BiometricGate.swift */; };
+		5E400000000000000000000B /* AuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000000B /* AuthService.swift */; };
+		5E400000000000000000000C /* SessionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000000C /* SessionStore.swift */; };
+		5E400000000000000000000D /* PushService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000000D /* PushService.swift */; };
+		5E400000000000000000000E /* DeepLinkRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000000E /* DeepLinkRouter.swift */; };
+		5E400000000000000000000F /* EMSTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000000F /* EMSTheme.swift */; };
+		5E4000000000000000000010 /* EMSComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000010 /* EMSComponents.swift */; };
+		5E4000000000000000000011 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000011 /* LoginView.swift */; };
+		5E4000000000000000000012 /* LoginViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000012 /* LoginViewModel.swift */; };
+		5E4000000000000000000013 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000013 /* HomeView.swift */; };
+		5E4000000000000000000014 /* HomeViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000014 /* HomeViewModel.swift */; };
+		5E4000000000000000000015 /* AssignmentsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000015 /* AssignmentsView.swift */; };
+		5E4000000000000000000016 /* CurrentShiftView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000016 /* CurrentShiftView.swift */; };
+		5E4000000000000000000017 /* ShiftMatesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000017 /* ShiftMatesView.swift */; };
+		5E4000000000000000000018 /* ScheduleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000018 /* ScheduleView.swift */; };
+		5E4000000000000000000019 /* ScheduleViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000019 /* ScheduleViewModel.swift */; };
+		5E400000000000000000001A /* ScheduleChangesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000001A /* ScheduleChangesView.swift */; };
+		5E400000000000000000001B /* NotificationsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000001B /* NotificationsView.swift */; };
+		5E400000000000000000001C /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000001C /* ProfileView.swift */; };
+		5E400000000000000000001D /* CompletionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000001D /* CompletionView.swift */; };
+		5E400000000000000000001E /* VehicleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000001E /* VehicleView.swift */; };
+		5E400000000000000000001F /* InventoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000001F /* InventoryView.swift */; };
+		5E4000000000000000000020 /* ReportsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000020 /* ReportsView.swift */; };
+		5E4000000000000000000021 /* PermissionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000021 /* PermissionStore.swift */; };
+		5E4000000000000000000022 /* SafeCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000022 /* SafeCache.swift */; };
+		5E4000000000000000000023 /* NetworkMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000023 /* NetworkMonitor.swift */; };
+		5E4000000000000000000024 /* OperationsHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000024 /* OperationsHomeView.swift */; };
+		5E4000000000000000000025 /* OpsDTO.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000025 /* OpsDTO.swift */; };
+		5E4000000000000000000026 /* OpsTeamsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000026 /* OpsTeamsView.swift */; };
+		5E4000000000000000000027 /* OpsReadinessView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000027 /* OpsReadinessView.swift */; };
+		5E4000000000000000000028 /* OpsVehiclesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000028 /* OpsVehiclesView.swift */; };
+		5E4000000000000000000029 /* OpsEventsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000029 /* OpsEventsView.swift */; };
+		5E400000000000000000002A /* OpsMapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000002A /* OpsMapView.swift */; };
+		5E400000000000000000002B /* DecisionCenterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000002B /* DecisionCenterView.swift */; };
+		5E400000000000000000002C /* ScheduleOpsDTO.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000002C /* ScheduleOpsDTO.swift */; };
+		5E400000000000000000002D /* ScheduleOpsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000002D /* ScheduleOpsViewModel.swift */; };
+		5E400000000000000000002E /* ScheduleRosterGrid.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000002E /* ScheduleRosterGrid.swift */; };
+		5E400000000000000000002F /* ScheduleHubView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000002F /* ScheduleHubView.swift */; };
+		5E4000000000000000000030 /* ScheduleMonthView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000030 /* ScheduleMonthView.swift */; };
+		5E4000000000000000000031 /* ScheduleDayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000031 /* ScheduleDayView.swift */; };
+		5E4000000000000000000032 /* ScheduleTeamView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000032 /* ScheduleTeamView.swift */; };
+		5E4000000000000000000033 /* ScheduleEmployeeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000033 /* ScheduleEmployeeView.swift */; };
+		5E4000000000000000000034 /* ScheduleCellSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000034 /* ScheduleCellSheet.swift */; };
+		5E4000000000000000000035 /* ScheduleHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000035 /* ScheduleHistoryView.swift */; };
+		5E4000000000000000000036 /* ScheduleAdvancedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000036 /* ScheduleAdvancedView.swift */; };
+		5E4000000000000000000037 /* CompletionOpsDTO.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000037 /* CompletionOpsDTO.swift */; };
+		5E4000000000000000000038 /* CompletionOpsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000038 /* CompletionOpsViewModel.swift */; };
+		5E4000000000000000000039 /* CompletionOpsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000039 /* CompletionOpsView.swift */; };
+		5E400000000000000000003A /* CompletionSupportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000003A /* CompletionSupportView.swift */; };
+		5E400000000000000000003B /* CompletionRecordsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000003B /* CompletionRecordsView.swift */; };
+		5E400000000000000000003C /* PositioningOpsDTO.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000003C /* PositioningOpsDTO.swift */; };
+		5E400000000000000000003D /* PositioningOpsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000003D /* PositioningOpsViewModel.swift */; };
+		5E400000000000000000003E /* PositioningOpsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000003E /* PositioningOpsView.swift */; };
+		5E400000000000000000003F /* DispatchOpsDTO.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000003F /* DispatchOpsDTO.swift */; };
+		5E4000000000000000000040 /* DispatchOpsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000040 /* DispatchOpsViewModel.swift */; };
+		5E4000000000000000000041 /* DispatchOpsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000041 /* DispatchOpsView.swift */; };
+		5E4000000000000000000042 /* VehiclesOpsDTO.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000042 /* VehiclesOpsDTO.swift */; };
+		5E4000000000000000000043 /* VehicleHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000043 /* VehicleHistoryView.swift */; };
+		5E4000000000000000000044 /* VehicleRegistryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000044 /* VehicleRegistryView.swift */; };
+		5E4000000000000000000045 /* FormsOpsDTO.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000045 /* FormsOpsDTO.swift */; };
+		5E4000000000000000000046 /* FormsOpsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000046 /* FormsOpsViewModel.swift */; };
+		5E4000000000000000000047 /* FormsOpsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000047 /* FormsOpsView.swift */; };
+		5E4000000000000000000048 /* WorkflowOpsDTO.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000048 /* WorkflowOpsDTO.swift */; };
+		5E4000000000000000000049 /* WorkflowOpsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000049 /* WorkflowOpsViewModel.swift */; };
+		5E400000000000000000004A /* WorkflowOpsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000004A /* WorkflowOpsView.swift */; };
+		5E400000000000000000004B /* ArchiveOpsDTO.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000004B /* ArchiveOpsDTO.swift */; };
+		5E400000000000000000004E /* SmartOpsDTO.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000004E /* SmartOpsDTO.swift */; };
+		5E400000000000000000004F /* AdminOpsDTO.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000004F /* AdminOpsDTO.swift */; };
+		5E4000000000000000000050 /* AdminHubView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000050 /* AdminHubView.swift */; };
+		5E4000000000000000000051 /* AdminUsersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000051 /* AdminUsersView.swift */; };
+		5E4000000000000000000052 /* AdminEmployeesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000052 /* AdminEmployeesView.swift */; };
+		5E4000000000000000000053 /* AdminRefsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000053 /* AdminRefsView.swift */; };
+		5E4000000000000000000054 /* AdminSymbolsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000054 /* AdminSymbolsView.swift */; };
+		5E4000000000000000000055 /* AdminSystemView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000055 /* AdminSystemView.swift */; };
+		5E4000000000000000000056 /* AdminNotificationsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000056 /* AdminNotificationsView.swift */; };
+		5E4000000000000000000057 /* ShiftLifecycleDTO.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000057 /* ShiftLifecycleDTO.swift */; };
+		5E4000000000000000000058 /* ShiftLifecycleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000058 /* ShiftLifecycleView.swift */; };
+		5E4000000000000000000059 /* TimelineOpsDTO.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000059 /* TimelineOpsDTO.swift */; };
+		5E400000000000000000005A /* OpsTimelinesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000005A /* OpsTimelinesView.swift */; };
+		5E400000000000000000005B /* AssetsDTO.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000005B /* AssetsDTO.swift */; };
+		5E400000000000000000005C /* AssetsHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000005C /* AssetsHomeView.swift */; };
+		5E400000000000000000005D /* AssetDetailViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000005D /* AssetDetailViews.swift */; };
+		5E400000000000000000005E /* HospitalsDTO.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000005E /* HospitalsDTO.swift */; };
+		5E400000000000000000005F /* HospitalsOpsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000005F /* HospitalsOpsView.swift */; };
+		5E4000000000000000000060 /* ChatDTO.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000060 /* ChatDTO.swift */; };
+		5E4000000000000000000061 /* ChatViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000061 /* ChatViews.swift */; };
+		5E4000000000000000000062 /* IndicatorsDTO.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000062 /* IndicatorsDTO.swift */; };
+		5E4000000000000000000063 /* IndicatorsOpsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000063 /* IndicatorsOpsView.swift */; };
+		5E4000000000000000000064 /* RequestsDTO.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000064 /* RequestsDTO.swift */; };
+		5E4000000000000000000065 /* MyRequestsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000065 /* MyRequestsView.swift */; };
+		5E4000000000000000000066 /* RequestsAdminView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000066 /* RequestsAdminView.swift */; };
+		5E4000000000000000000067 /* SignoutsOpsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000067 /* SignoutsOpsView.swift */; };
+		5E4000000000000000000068 /* FilesOpsDTO.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000068 /* FilesOpsDTO.swift */; };
+		5E4000000000000000000069 /* FilesOpsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000069 /* FilesOpsView.swift */; };
+		5E400000000000000000006A /* PermissionsAdminDTO.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000006A /* PermissionsAdminDTO.swift */; };
+		5E400000000000000000006B /* ForgotPasswordView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000006B /* ForgotPasswordView.swift */; };
+		5E400000000000000000006C /* AdminPermissionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000006C /* AdminPermissionsView.swift */; };
+		5E400000000000000000004C /* ArchiveOpsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000004C /* ArchiveOpsViewModel.swift */; };
+		5E400000000000000000004D /* ArchiveOpsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000004D /* ArchiveOpsView.swift */; };
+		5E40000000000000000000E1 /* EMSOperationsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000E1 /* EMSOperationsTests.swift */; };
+		5E40000000000000000000F0 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000F0 /* Assets.xcassets */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		5E8000000000000000000002 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 5E0000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 5E1000000000000000000001;
+			remoteInfo = EMSOperations;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		5E3000000000000000000001 /* EMSOperationsApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EMSOperationsApp.swift; sourceTree = "<group>"; };
+		5E3000000000000000000002 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
+		5E3000000000000000000003 /* AppEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppEnvironment.swift; sourceTree = "<group>"; };
+		5E3000000000000000000004 /* AppLogger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLogger.swift; sourceTree = "<group>"; };
+		5E3000000000000000000005 /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
+		5E3000000000000000000006 /* APIError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIError.swift; sourceTree = "<group>"; };
+		5E3000000000000000000007 /* AuthDTO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthDTO.swift; sourceTree = "<group>"; };
+		5E3000000000000000000008 /* PortalDTO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PortalDTO.swift; sourceTree = "<group>"; };
+		5E3000000000000000000009 /* KeychainService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainService.swift; sourceTree = "<group>"; };
+		5E300000000000000000000A /* BiometricGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BiometricGate.swift; sourceTree = "<group>"; };
+		5E300000000000000000000B /* AuthService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthService.swift; sourceTree = "<group>"; };
+		5E300000000000000000000C /* SessionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionStore.swift; sourceTree = "<group>"; };
+		5E300000000000000000000D /* PushService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PushService.swift; sourceTree = "<group>"; };
+		5E300000000000000000000E /* DeepLinkRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeepLinkRouter.swift; sourceTree = "<group>"; };
+		5E300000000000000000000F /* EMSTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EMSTheme.swift; sourceTree = "<group>"; };
+		5E3000000000000000000010 /* EMSComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EMSComponents.swift; sourceTree = "<group>"; };
+		5E3000000000000000000011 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
+		5E3000000000000000000012 /* LoginViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginViewModel.swift; sourceTree = "<group>"; };
+		5E3000000000000000000013 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
+		5E3000000000000000000014 /* HomeViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeViewModel.swift; sourceTree = "<group>"; };
+		5E3000000000000000000015 /* AssignmentsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssignmentsView.swift; sourceTree = "<group>"; };
+		5E3000000000000000000016 /* CurrentShiftView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CurrentShiftView.swift; sourceTree = "<group>"; };
+		5E3000000000000000000017 /* ShiftMatesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShiftMatesView.swift; sourceTree = "<group>"; };
+		5E3000000000000000000018 /* ScheduleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduleView.swift; sourceTree = "<group>"; };
+		5E3000000000000000000019 /* ScheduleViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduleViewModel.swift; sourceTree = "<group>"; };
+		5E300000000000000000001A /* ScheduleChangesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduleChangesView.swift; sourceTree = "<group>"; };
+		5E300000000000000000001B /* NotificationsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationsView.swift; sourceTree = "<group>"; };
+		5E300000000000000000001C /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
+		5E300000000000000000001D /* CompletionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompletionView.swift; sourceTree = "<group>"; };
+		5E300000000000000000001E /* VehicleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VehicleView.swift; sourceTree = "<group>"; };
+		5E300000000000000000001F /* InventoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InventoryView.swift; sourceTree = "<group>"; };
+		5E3000000000000000000020 /* ReportsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportsView.swift; sourceTree = "<group>"; };
+		5E3000000000000000000021 /* PermissionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionStore.swift; sourceTree = "<group>"; };
+		5E3000000000000000000022 /* SafeCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SafeCache.swift; sourceTree = "<group>"; };
+		5E3000000000000000000023 /* NetworkMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkMonitor.swift; sourceTree = "<group>"; };
+		5E3000000000000000000024 /* OperationsHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OperationsHomeView.swift; sourceTree = "<group>"; };
+		5E3000000000000000000025 /* OpsDTO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpsDTO.swift; sourceTree = "<group>"; };
+		5E3000000000000000000026 /* OpsTeamsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpsTeamsView.swift; sourceTree = "<group>"; };
+		5E3000000000000000000027 /* OpsReadinessView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpsReadinessView.swift; sourceTree = "<group>"; };
+		5E3000000000000000000028 /* OpsVehiclesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpsVehiclesView.swift; sourceTree = "<group>"; };
+		5E3000000000000000000029 /* OpsEventsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpsEventsView.swift; sourceTree = "<group>"; };
+		5E300000000000000000002A /* OpsMapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpsMapView.swift; sourceTree = "<group>"; };
+		5E300000000000000000002B /* DecisionCenterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionCenterView.swift; sourceTree = "<group>"; };
+		5E300000000000000000002C /* ScheduleOpsDTO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduleOpsDTO.swift; sourceTree = "<group>"; };
+		5E300000000000000000002D /* ScheduleOpsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduleOpsViewModel.swift; sourceTree = "<group>"; };
+		5E300000000000000000002E /* ScheduleRosterGrid.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduleRosterGrid.swift; sourceTree = "<group>"; };
+		5E300000000000000000002F /* ScheduleHubView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduleHubView.swift; sourceTree = "<group>"; };
+		5E3000000000000000000030 /* ScheduleMonthView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduleMonthView.swift; sourceTree = "<group>"; };
+		5E3000000000000000000031 /* ScheduleDayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduleDayView.swift; sourceTree = "<group>"; };
+		5E3000000000000000000032 /* ScheduleTeamView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduleTeamView.swift; sourceTree = "<group>"; };
+		5E3000000000000000000033 /* ScheduleEmployeeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduleEmployeeView.swift; sourceTree = "<group>"; };
+		5E3000000000000000000034 /* ScheduleCellSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduleCellSheet.swift; sourceTree = "<group>"; };
+		5E3000000000000000000035 /* ScheduleHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduleHistoryView.swift; sourceTree = "<group>"; };
+		5E3000000000000000000036 /* ScheduleAdvancedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduleAdvancedView.swift; sourceTree = "<group>"; };
+		5E3000000000000000000037 /* CompletionOpsDTO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompletionOpsDTO.swift; sourceTree = "<group>"; };
+		5E3000000000000000000038 /* CompletionOpsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompletionOpsViewModel.swift; sourceTree = "<group>"; };
+		5E3000000000000000000039 /* CompletionOpsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompletionOpsView.swift; sourceTree = "<group>"; };
+		5E300000000000000000003A /* CompletionSupportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompletionSupportView.swift; sourceTree = "<group>"; };
+		5E300000000000000000003B /* CompletionRecordsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompletionRecordsView.swift; sourceTree = "<group>"; };
+		5E300000000000000000003C /* PositioningOpsDTO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PositioningOpsDTO.swift; sourceTree = "<group>"; };
+		5E300000000000000000003D /* PositioningOpsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PositioningOpsViewModel.swift; sourceTree = "<group>"; };
+		5E300000000000000000003E /* PositioningOpsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PositioningOpsView.swift; sourceTree = "<group>"; };
+		5E300000000000000000003F /* DispatchOpsDTO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DispatchOpsDTO.swift; sourceTree = "<group>"; };
+		5E3000000000000000000040 /* DispatchOpsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DispatchOpsViewModel.swift; sourceTree = "<group>"; };
+		5E3000000000000000000041 /* DispatchOpsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DispatchOpsView.swift; sourceTree = "<group>"; };
+		5E3000000000000000000042 /* VehiclesOpsDTO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VehiclesOpsDTO.swift; sourceTree = "<group>"; };
+		5E3000000000000000000043 /* VehicleHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VehicleHistoryView.swift; sourceTree = "<group>"; };
+		5E3000000000000000000044 /* VehicleRegistryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VehicleRegistryView.swift; sourceTree = "<group>"; };
+		5E3000000000000000000045 /* FormsOpsDTO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FormsOpsDTO.swift; sourceTree = "<group>"; };
+		5E3000000000000000000046 /* FormsOpsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FormsOpsViewModel.swift; sourceTree = "<group>"; };
+		5E3000000000000000000047 /* FormsOpsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FormsOpsView.swift; sourceTree = "<group>"; };
+		5E3000000000000000000048 /* WorkflowOpsDTO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkflowOpsDTO.swift; sourceTree = "<group>"; };
+		5E3000000000000000000049 /* WorkflowOpsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkflowOpsViewModel.swift; sourceTree = "<group>"; };
+		5E300000000000000000004A /* WorkflowOpsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkflowOpsView.swift; sourceTree = "<group>"; };
+		5E300000000000000000004B /* ArchiveOpsDTO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveOpsDTO.swift; sourceTree = "<group>"; };
+		5E300000000000000000004E /* SmartOpsDTO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartOpsDTO.swift; sourceTree = "<group>"; };
+		5E300000000000000000004F /* AdminOpsDTO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminOpsDTO.swift; sourceTree = "<group>"; };
+		5E3000000000000000000050 /* AdminHubView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminHubView.swift; sourceTree = "<group>"; };
+		5E3000000000000000000051 /* AdminUsersView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminUsersView.swift; sourceTree = "<group>"; };
+		5E3000000000000000000052 /* AdminEmployeesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminEmployeesView.swift; sourceTree = "<group>"; };
+		5E3000000000000000000053 /* AdminRefsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminRefsView.swift; sourceTree = "<group>"; };
+		5E3000000000000000000054 /* AdminSymbolsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminSymbolsView.swift; sourceTree = "<group>"; };
+		5E3000000000000000000055 /* AdminSystemView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminSystemView.swift; sourceTree = "<group>"; };
+		5E3000000000000000000056 /* AdminNotificationsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminNotificationsView.swift; sourceTree = "<group>"; };
+		5E3000000000000000000057 /* ShiftLifecycleDTO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShiftLifecycleDTO.swift; sourceTree = "<group>"; };
+		5E3000000000000000000058 /* ShiftLifecycleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShiftLifecycleView.swift; sourceTree = "<group>"; };
+		5E3000000000000000000059 /* TimelineOpsDTO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimelineOpsDTO.swift; sourceTree = "<group>"; };
+		5E300000000000000000005A /* OpsTimelinesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpsTimelinesView.swift; sourceTree = "<group>"; };
+		5E300000000000000000005B /* AssetsDTO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssetsDTO.swift; sourceTree = "<group>"; };
+		5E300000000000000000005C /* AssetsHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssetsHomeView.swift; sourceTree = "<group>"; };
+		5E300000000000000000005D /* AssetDetailViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssetDetailViews.swift; sourceTree = "<group>"; };
+		5E300000000000000000005E /* HospitalsDTO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HospitalsDTO.swift; sourceTree = "<group>"; };
+		5E300000000000000000005F /* HospitalsOpsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HospitalsOpsView.swift; sourceTree = "<group>"; };
+		5E3000000000000000000060 /* ChatDTO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatDTO.swift; sourceTree = "<group>"; };
+		5E3000000000000000000061 /* ChatViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatViews.swift; sourceTree = "<group>"; };
+		5E3000000000000000000062 /* IndicatorsDTO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IndicatorsDTO.swift; sourceTree = "<group>"; };
+		5E3000000000000000000063 /* IndicatorsOpsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IndicatorsOpsView.swift; sourceTree = "<group>"; };
+		5E3000000000000000000064 /* RequestsDTO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RequestsDTO.swift; sourceTree = "<group>"; };
+		5E3000000000000000000065 /* MyRequestsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MyRequestsView.swift; sourceTree = "<group>"; };
+		5E3000000000000000000066 /* RequestsAdminView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RequestsAdminView.swift; sourceTree = "<group>"; };
+		5E3000000000000000000067 /* SignoutsOpsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignoutsOpsView.swift; sourceTree = "<group>"; };
+		5E3000000000000000000068 /* FilesOpsDTO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilesOpsDTO.swift; sourceTree = "<group>"; };
+		5E3000000000000000000069 /* FilesOpsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilesOpsView.swift; sourceTree = "<group>"; };
+		5E300000000000000000006A /* PermissionsAdminDTO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionsAdminDTO.swift; sourceTree = "<group>"; };
+		5E300000000000000000006B /* ForgotPasswordView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ForgotPasswordView.swift; sourceTree = "<group>"; };
+		5E300000000000000000006C /* AdminPermissionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminPermissionsView.swift; sourceTree = "<group>"; };
+		5E300000000000000000004C /* ArchiveOpsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveOpsViewModel.swift; sourceTree = "<group>"; };
+		5E300000000000000000004D /* ArchiveOpsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveOpsView.swift; sourceTree = "<group>"; };
+		5E30000000000000000000D0 /* EMSOperations.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = EMSOperations.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		5E30000000000000000000D1 /* EMSOperationsTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = EMSOperationsTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		5E30000000000000000000E1 /* EMSOperationsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EMSOperationsTests.swift; sourceTree = "<group>"; };
+		5E30000000000000000000F0 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		5E30000000000000000000F1 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		5E30000000000000000000F2 /* EMSOperations.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = EMSOperations.entitlements; sourceTree = "<group>"; };
+		5E30000000000000000000F3 /* RefreshNoticeCenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RefreshNoticeCenter.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		5E5000000000000000000002 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5E5000000000000000000012 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		5E2000000000000000000001 = {
+			isa = PBXGroup;
+			children = (
+				5E2000000000000000000010 /* EMSOperations */,
+				5E2000000000000000000040 /* EMSOperationsTests */,
+				5E2000000000000000000002 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		5E2000000000000000000002 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				5E30000000000000000000D0 /* EMSOperations.app */,
+				5E30000000000000000000D1 /* EMSOperationsTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		5E2000000000000000000010 /* EMSOperations */ = {
+			isa = PBXGroup;
+			children = (
+				5E2000000000000000000011 /* App */,
+				5E2000000000000000000012 /* Core */,
+				5E2000000000000000000014 /* Models */,
+				5E2000000000000000000018 /* DesignSystem */,
+				5E2000000000000000000019 /* Features */,
+				5E2000000000000000000032 /* Resources */,
+			);
+			path = EMSOperations;
+			sourceTree = "<group>";
+		};
+		5E2000000000000000000011 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				5E3000000000000000000001 /* EMSOperationsApp.swift */,
+				5E3000000000000000000002 /* RootView.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		5E2000000000000000000012 /* Core */ = {
+			isa = PBXGroup;
+			children = (
+				5E3000000000000000000003 /* AppEnvironment.swift */,
+				5E2000000000000000000051 /* Logging */,
+				5E2000000000000000000013 /* Networking */,
+				5E2000000000000000000016 /* Authentication */,
+				5E2000000000000000000052 /* Session */,
+				5E2000000000000000000015 /* Security */,
+				5E2000000000000000000053 /* Permissions */,
+				5E2000000000000000000017 /* Notifications */,
+				5E2000000000000000000054 /* DeepLinks */,
+				5E2000000000000000000055 /* Storage */,
+				5E2000000000000000000056 /* Network */,
+				5E2000000000000000000060 /* UI */,
+			);
+			path = Core;
+			sourceTree = "<group>";
+		};
+		5E2000000000000000000051 /* Logging */ = {
+			isa = PBXGroup;
+			children = (
+				5E3000000000000000000004 /* AppLogger.swift */,
+			);
+			path = Logging;
+			sourceTree = "<group>";
+		};
+		5E2000000000000000000052 /* Session */ = {
+			isa = PBXGroup;
+			children = (
+				5E300000000000000000000C /* SessionStore.swift */,
+			);
+			path = Session;
+			sourceTree = "<group>";
+		};
+		5E2000000000000000000053 /* Permissions */ = {
+			isa = PBXGroup;
+			children = (
+				5E3000000000000000000021 /* PermissionStore.swift */,
+			);
+			path = Permissions;
+			sourceTree = "<group>";
+		};
+		5E2000000000000000000054 /* DeepLinks */ = {
+			isa = PBXGroup;
+			children = (
+				5E300000000000000000000E /* DeepLinkRouter.swift */,
+			);
+			path = DeepLinks;
+			sourceTree = "<group>";
+		};
+		5E2000000000000000000055 /* Storage */ = {
+			isa = PBXGroup;
+			children = (
+				5E3000000000000000000022 /* SafeCache.swift */,
+			);
+			path = Storage;
+			sourceTree = "<group>";
+		};
+		5E2000000000000000000056 /* Network */ = {
+			isa = PBXGroup;
+			children = (
+				5E3000000000000000000023 /* NetworkMonitor.swift */,
+			);
+			path = Network;
+			sourceTree = "<group>";
+		};
+		5E2000000000000000000060 /* UI */ = {
+			isa = PBXGroup;
+			children = (
+				5E30000000000000000000F3 /* RefreshNoticeCenter.swift */,
+			);
+			path = UI;
+			sourceTree = "<group>";
+		};
+		5E2000000000000000000013 /* Networking */ = {
+			isa = PBXGroup;
+			children = (
+				5E3000000000000000000005 /* APIClient.swift */,
+				5E3000000000000000000006 /* APIError.swift */,
+			);
+			path = Networking;
+			sourceTree = "<group>";
+		};
+		5E2000000000000000000014 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				5E3000000000000000000007 /* AuthDTO.swift */,
+				5E3000000000000000000008 /* PortalDTO.swift */,
+				5E3000000000000000000025 /* OpsDTO.swift */,
+				5E300000000000000000002C /* ScheduleOpsDTO.swift */,
+				5E3000000000000000000037 /* CompletionOpsDTO.swift */,
+				5E300000000000000000003C /* PositioningOpsDTO.swift */,
+				5E300000000000000000003F /* DispatchOpsDTO.swift */,
+				5E3000000000000000000042 /* VehiclesOpsDTO.swift */,
+				5E3000000000000000000045 /* FormsOpsDTO.swift */,
+				5E3000000000000000000048 /* WorkflowOpsDTO.swift */,
+				5E300000000000000000004B /* ArchiveOpsDTO.swift */,
+				5E300000000000000000004E /* SmartOpsDTO.swift */,
+				5E300000000000000000004F /* AdminOpsDTO.swift */,
+				5E3000000000000000000057 /* ShiftLifecycleDTO.swift */,
+				5E3000000000000000000059 /* TimelineOpsDTO.swift */,
+				5E300000000000000000005B /* AssetsDTO.swift */,
+				5E300000000000000000005E /* HospitalsDTO.swift */,
+				5E3000000000000000000060 /* ChatDTO.swift */,
+				5E3000000000000000000062 /* IndicatorsDTO.swift */,
+				5E3000000000000000000064 /* RequestsDTO.swift */,
+				5E3000000000000000000068 /* FilesOpsDTO.swift */,
+				5E300000000000000000006A /* PermissionsAdminDTO.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		5E2000000000000000000015 /* Security */ = {
+			isa = PBXGroup;
+			children = (
+				5E3000000000000000000009 /* KeychainService.swift */,
+				5E300000000000000000000A /* BiometricGate.swift */,
+			);
+			path = Security;
+			sourceTree = "<group>";
+		};
+		5E2000000000000000000016 /* Authentication */ = {
+			isa = PBXGroup;
+			children = (
+				5E300000000000000000000B /* AuthService.swift */,
+			);
+			path = Authentication;
+			sourceTree = "<group>";
+		};
+		5E2000000000000000000017 /* Notifications */ = {
+			isa = PBXGroup;
+			children = (
+				5E300000000000000000000D /* PushService.swift */,
+			);
+			path = Notifications;
+			sourceTree = "<group>";
+		};
+		5E2000000000000000000018 /* DesignSystem */ = {
+			isa = PBXGroup;
+			children = (
+				5E300000000000000000000F /* EMSTheme.swift */,
+				5E3000000000000000000010 /* EMSComponents.swift */,
+			);
+			path = DesignSystem;
+			sourceTree = "<group>";
+		};
+		5E2000000000000000000019 /* Features */ = {
+			isa = PBXGroup;
+			children = (
+				5E2000000000000000000020 /* Login */,
+				5E2000000000000000000021 /* Home */,
+				5E2000000000000000000022 /* Shift */,
+				5E2000000000000000000023 /* ShiftMates */,
+				5E2000000000000000000024 /* Schedule */,
+				5E2000000000000000000025 /* ScheduleChanges */,
+				5E2000000000000000000026 /* NotificationsCenter */,
+				5E2000000000000000000027 /* Profile */,
+				5E2000000000000000000028 /* Completion */,
+				5E2000000000000000000029 /* Vehicle */,
+				5E2000000000000000000030 /* Inventory */,
+				5E2000000000000000000031 /* Reports */,
+				5E2000000000000000000057 /* Operations */,
+				5E2000000000000000000058 /* ScheduleOps */,
+				5E2000000000000000000059 /* CompletionOps */,
+				5E200000000000000000005A /* PositioningOps */,
+				5E200000000000000000005B /* DispatchOps */,
+				5E200000000000000000005C /* FormsOps */,
+				5E200000000000000000005D /* WorkflowOps */,
+				5E200000000000000000005E /* ArchiveOps */,
+				5E200000000000000000005F /* AdminOps */,
+				5E2000000000000000000060 /* ShiftLifecycle */,
+				5E2000000000000000000061 /* AssetsOps */,
+				5E2000000000000000000062 /* HospitalsOps */,
+				5E2000000000000000000063 /* Chat */,
+				5E2000000000000000000064 /* IndicatorsOps */,
+				5E2000000000000000000065 /* Requests */,
+				5E2000000000000000000066 /* FilesOps */,
+			);
+			path = Features;
+			sourceTree = "<group>";
+		};
+		5E2000000000000000000059 /* CompletionOps */ = {
+			isa = PBXGroup;
+			children = (
+				5E3000000000000000000038 /* CompletionOpsViewModel.swift */,
+				5E3000000000000000000039 /* CompletionOpsView.swift */,
+				5E300000000000000000003A /* CompletionSupportView.swift */,
+				5E300000000000000000003B /* CompletionRecordsView.swift */,
+			);
+			path = CompletionOps;
+			sourceTree = "<group>";
+		};
+		5E200000000000000000005A /* PositioningOps */ = {
+			isa = PBXGroup;
+			children = (
+				5E300000000000000000003D /* PositioningOpsViewModel.swift */,
+				5E300000000000000000003E /* PositioningOpsView.swift */,
+			);
+			path = PositioningOps;
+			sourceTree = "<group>";
+		};
+		5E200000000000000000005B /* DispatchOps */ = {
+			isa = PBXGroup;
+			children = (
+				5E3000000000000000000040 /* DispatchOpsViewModel.swift */,
+				5E3000000000000000000041 /* DispatchOpsView.swift */,
+			);
+			path = DispatchOps;
+			sourceTree = "<group>";
+		};
+		5E200000000000000000005C /* FormsOps */ = {
+			isa = PBXGroup;
+			children = (
+				5E3000000000000000000046 /* FormsOpsViewModel.swift */,
+				5E3000000000000000000047 /* FormsOpsView.swift */,
+			);
+			path = FormsOps;
+			sourceTree = "<group>";
+		};
+		5E200000000000000000005D /* WorkflowOps */ = {
+			isa = PBXGroup;
+			children = (
+				5E3000000000000000000049 /* WorkflowOpsViewModel.swift */,
+				5E300000000000000000004A /* WorkflowOpsView.swift */,
+			);
+			path = WorkflowOps;
+			sourceTree = "<group>";
+		};
+		5E200000000000000000005E /* ArchiveOps */ = {
+			isa = PBXGroup;
+			children = (
+				5E300000000000000000004C /* ArchiveOpsViewModel.swift */,
+				5E300000000000000000004D /* ArchiveOpsView.swift */,
+			);
+			path = ArchiveOps;
+			sourceTree = "<group>";
+		};
+		5E2000000000000000000060 /* ShiftLifecycle */ = {
+			isa = PBXGroup;
+			children = (
+				5E3000000000000000000058 /* ShiftLifecycleView.swift */,
+			);
+			path = ShiftLifecycle;
+			sourceTree = "<group>";
+		};
+		5E2000000000000000000061 /* AssetsOps */ = {
+			isa = PBXGroup;
+			children = (
+				5E300000000000000000005C /* AssetsHomeView.swift */,
+				5E300000000000000000005D /* AssetDetailViews.swift */,
+			);
+			path = AssetsOps;
+			sourceTree = "<group>";
+		};
+		5E2000000000000000000062 /* HospitalsOps */ = {
+			isa = PBXGroup;
+			children = (
+				5E300000000000000000005F /* HospitalsOpsView.swift */,
+			);
+			path = HospitalsOps;
+			sourceTree = "<group>";
+		};
+		5E2000000000000000000063 /* Chat */ = {
+			isa = PBXGroup;
+			children = (
+				5E3000000000000000000061 /* ChatViews.swift */,
+			);
+			path = Chat;
+			sourceTree = "<group>";
+		};
+		5E2000000000000000000064 /* IndicatorsOps */ = {
+			isa = PBXGroup;
+			children = (
+				5E3000000000000000000063 /* IndicatorsOpsView.swift */,
+			);
+			path = IndicatorsOps;
+			sourceTree = "<group>";
+		};
+		5E2000000000000000000065 /* Requests */ = {
+			isa = PBXGroup;
+			children = (
+				5E3000000000000000000065 /* MyRequestsView.swift */,
+				5E3000000000000000000066 /* RequestsAdminView.swift */,
+			);
+			path = Requests;
+			sourceTree = "<group>";
+		};
+		5E2000000000000000000066 /* FilesOps */ = {
+			isa = PBXGroup;
+			children = (
+				5E3000000000000000000069 /* FilesOpsView.swift */,
+			);
+			path = FilesOps;
+			sourceTree = "<group>";
+		};
+		5E200000000000000000005F /* AdminOps */ = {
+			isa = PBXGroup;
+			children = (
+				5E3000000000000000000050 /* AdminHubView.swift */,
+				5E3000000000000000000051 /* AdminUsersView.swift */,
+				5E3000000000000000000052 /* AdminEmployeesView.swift */,
+				5E3000000000000000000053 /* AdminRefsView.swift */,
+				5E3000000000000000000054 /* AdminSymbolsView.swift */,
+				5E3000000000000000000055 /* AdminSystemView.swift */,
+				5E3000000000000000000056 /* AdminNotificationsView.swift */,
+				5E300000000000000000006C /* AdminPermissionsView.swift */,
+			);
+			path = AdminOps;
+			sourceTree = "<group>";
+		};
+		5E2000000000000000000058 /* ScheduleOps */ = {
+			isa = PBXGroup;
+			children = (
+				5E300000000000000000002D /* ScheduleOpsViewModel.swift */,
+				5E300000000000000000002E /* ScheduleRosterGrid.swift */,
+				5E300000000000000000002F /* ScheduleHubView.swift */,
+				5E3000000000000000000030 /* ScheduleMonthView.swift */,
+				5E3000000000000000000031 /* ScheduleDayView.swift */,
+				5E3000000000000000000032 /* ScheduleTeamView.swift */,
+				5E3000000000000000000033 /* ScheduleEmployeeView.swift */,
+				5E3000000000000000000034 /* ScheduleCellSheet.swift */,
+				5E3000000000000000000035 /* ScheduleHistoryView.swift */,
+				5E3000000000000000000036 /* ScheduleAdvancedView.swift */,
+			);
+			path = ScheduleOps;
+			sourceTree = "<group>";
+		};
+		5E2000000000000000000057 /* Operations */ = {
+			isa = PBXGroup;
+			children = (
+				5E3000000000000000000024 /* OperationsHomeView.swift */,
+				5E3000000000000000000026 /* OpsTeamsView.swift */,
+				5E3000000000000000000027 /* OpsReadinessView.swift */,
+				5E3000000000000000000028 /* OpsVehiclesView.swift */,
+				5E3000000000000000000029 /* OpsEventsView.swift */,
+				5E300000000000000000002A /* OpsMapView.swift */,
+				5E300000000000000000002B /* DecisionCenterView.swift */,
+				5E3000000000000000000043 /* VehicleHistoryView.swift */,
+				5E3000000000000000000044 /* VehicleRegistryView.swift */,
+				5E300000000000000000005A /* OpsTimelinesView.swift */,
+				5E3000000000000000000067 /* SignoutsOpsView.swift */,
+			);
+			path = Operations;
+			sourceTree = "<group>";
+		};
+		5E2000000000000000000020 /* Login */ = {
+			isa = PBXGroup;
+			children = (
+				5E3000000000000000000011 /* LoginView.swift */,
+				5E3000000000000000000012 /* LoginViewModel.swift */,
+				5E300000000000000000006B /* ForgotPasswordView.swift */,
+			);
+			path = Login;
+			sourceTree = "<group>";
+		};
+		5E2000000000000000000021 /* Home */ = {
+			isa = PBXGroup;
+			children = (
+				5E3000000000000000000013 /* HomeView.swift */,
+				5E3000000000000000000014 /* HomeViewModel.swift */,
+				5E3000000000000000000015 /* AssignmentsView.swift */,
+			);
+			path = Home;
+			sourceTree = "<group>";
+		};
+		5E2000000000000000000022 /* Shift */ = {
+			isa = PBXGroup;
+			children = (
+				5E3000000000000000000016 /* CurrentShiftView.swift */,
+			);
+			path = Shift;
+			sourceTree = "<group>";
+		};
+		5E2000000000000000000023 /* ShiftMates */ = {
+			isa = PBXGroup;
+			children = (
+				5E3000000000000000000017 /* ShiftMatesView.swift */,
+			);
+			path = ShiftMates;
+			sourceTree = "<group>";
+		};
+		5E2000000000000000000024 /* Schedule */ = {
+			isa = PBXGroup;
+			children = (
+				5E3000000000000000000018 /* ScheduleView.swift */,
+				5E3000000000000000000019 /* ScheduleViewModel.swift */,
+			);
+			path = Schedule;
+			sourceTree = "<group>";
+		};
+		5E2000000000000000000025 /* ScheduleChanges */ = {
+			isa = PBXGroup;
+			children = (
+				5E300000000000000000001A /* ScheduleChangesView.swift */,
+			);
+			path = ScheduleChanges;
+			sourceTree = "<group>";
+		};
+		5E2000000000000000000026 /* NotificationsCenter */ = {
+			isa = PBXGroup;
+			children = (
+				5E300000000000000000001B /* NotificationsView.swift */,
+			);
+			path = NotificationsCenter;
+			sourceTree = "<group>";
+		};
+		5E2000000000000000000027 /* Profile */ = {
+			isa = PBXGroup;
+			children = (
+				5E300000000000000000001C /* ProfileView.swift */,
+			);
+			path = Profile;
+			sourceTree = "<group>";
+		};
+		5E2000000000000000000028 /* Completion */ = {
+			isa = PBXGroup;
+			children = (
+				5E300000000000000000001D /* CompletionView.swift */,
+			);
+			path = Completion;
+			sourceTree = "<group>";
+		};
+		5E2000000000000000000029 /* Vehicle */ = {
+			isa = PBXGroup;
+			children = (
+				5E300000000000000000001E /* VehicleView.swift */,
+			);
+			path = Vehicle;
+			sourceTree = "<group>";
+		};
+		5E2000000000000000000030 /* Inventory */ = {
+			isa = PBXGroup;
+			children = (
+				5E300000000000000000001F /* InventoryView.swift */,
+			);
+			path = Inventory;
+			sourceTree = "<group>";
+		};
+		5E2000000000000000000031 /* Reports */ = {
+			isa = PBXGroup;
+			children = (
+				5E3000000000000000000020 /* ReportsView.swift */,
+			);
+			path = Reports;
+			sourceTree = "<group>";
+		};
+		5E2000000000000000000032 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				5E30000000000000000000F0 /* Assets.xcassets */,
+				5E30000000000000000000F1 /* Info.plist */,
+				5E30000000000000000000F2 /* EMSOperations.entitlements */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		5E2000000000000000000040 /* EMSOperationsTests */ = {
+			isa = PBXGroup;
+			children = (
+				5E30000000000000000000E1 /* EMSOperationsTests.swift */,
+			);
+			path = EMSOperationsTests;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		5E1000000000000000000001 /* EMSOperations */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 5E7000000000000000000002 /* Build configuration list for PBXNativeTarget "EMSOperations" */;
+			buildPhases = (
+				5E5000000000000000000001 /* Sources */,
+				5E5000000000000000000002 /* Frameworks */,
+				5E5000000000000000000003 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = EMSOperations;
+			productName = EMSOperations;
+			productReference = 5E30000000000000000000D0 /* EMSOperations.app */;
+			productType = "com.apple.product-type.application";
+		};
+		5E1000000000000000000002 /* EMSOperationsTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 5E7000000000000000000003 /* Build configuration list for PBXNativeTarget "EMSOperationsTests" */;
+			buildPhases = (
+				5E5000000000000000000011 /* Sources */,
+				5E5000000000000000000012 /* Frameworks */,
+				5E5000000000000000000013 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				5E8000000000000000000001 /* PBXTargetDependency */,
+			);
+			name = EMSOperationsTests;
+			productName = EMSOperationsTests;
+			productReference = 5E30000000000000000000D1 /* EMSOperationsTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		5E0000000000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1500;
+				LastUpgradeCheck = 1500;
+				TargetAttributes = {
+					5E1000000000000000000001 = {
+						CreatedOnToolsVersion = 15.0;
+					};
+					5E1000000000000000000002 = {
+						CreatedOnToolsVersion = 15.0;
+						TestTargetID = 5E1000000000000000000001;
+					};
+				};
+			};
+			buildConfigurationList = 5E7000000000000000000001 /* Build configuration list for PBXProject "EMSOperations" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+				ar,
+			);
+			mainGroup = 5E2000000000000000000001;
+			productRefGroup = 5E2000000000000000000002 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				5E1000000000000000000001 /* EMSOperations */,
+				5E1000000000000000000002 /* EMSOperationsTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		5E5000000000000000000003 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5E40000000000000000000F0 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5E5000000000000000000013 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		5E5000000000000000000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5E4000000000000000000001 /* EMSOperationsApp.swift in Sources */,
+				5E4000000000000000000002 /* RootView.swift in Sources */,
+				5E4000000000000000000003 /* AppEnvironment.swift in Sources */,
+				5E4000000000000000000004 /* AppLogger.swift in Sources */,
+				5E4000000000000000000005 /* APIClient.swift in Sources */,
+				5E4000000000000000000006 /* APIError.swift in Sources */,
+				5E40000000000000000000F3 /* RefreshNoticeCenter.swift in Sources */,
+				5E4000000000000000000007 /* AuthDTO.swift in Sources */,
+				5E4000000000000000000008 /* PortalDTO.swift in Sources */,
+				5E4000000000000000000009 /* KeychainService.swift in Sources */,
+				5E400000000000000000000A /* BiometricGate.swift in Sources */,
+				5E400000000000000000000B /* AuthService.swift in Sources */,
+				5E400000000000000000000C /* SessionStore.swift in Sources */,
+				5E400000000000000000000D /* PushService.swift in Sources */,
+				5E400000000000000000000E /* DeepLinkRouter.swift in Sources */,
+				5E400000000000000000000F /* EMSTheme.swift in Sources */,
+				5E4000000000000000000010 /* EMSComponents.swift in Sources */,
+				5E4000000000000000000011 /* LoginView.swift in Sources */,
+				5E4000000000000000000012 /* LoginViewModel.swift in Sources */,
+				5E4000000000000000000013 /* HomeView.swift in Sources */,
+				5E4000000000000000000014 /* HomeViewModel.swift in Sources */,
+				5E4000000000000000000015 /* AssignmentsView.swift in Sources */,
+				5E4000000000000000000016 /* CurrentShiftView.swift in Sources */,
+				5E4000000000000000000017 /* ShiftMatesView.swift in Sources */,
+				5E4000000000000000000018 /* ScheduleView.swift in Sources */,
+				5E4000000000000000000019 /* ScheduleViewModel.swift in Sources */,
+				5E400000000000000000001A /* ScheduleChangesView.swift in Sources */,
+				5E400000000000000000001B /* NotificationsView.swift in Sources */,
+				5E400000000000000000001C /* ProfileView.swift in Sources */,
+				5E400000000000000000001D /* CompletionView.swift in Sources */,
+				5E400000000000000000001E /* VehicleView.swift in Sources */,
+				5E400000000000000000001F /* InventoryView.swift in Sources */,
+				5E4000000000000000000020 /* ReportsView.swift in Sources */,
+				5E4000000000000000000021 /* PermissionStore.swift in Sources */,
+				5E4000000000000000000022 /* SafeCache.swift in Sources */,
+				5E4000000000000000000023 /* NetworkMonitor.swift in Sources */,
+				5E4000000000000000000024 /* OperationsHomeView.swift in Sources */,
+				5E4000000000000000000025 /* OpsDTO.swift in Sources */,
+				5E4000000000000000000026 /* OpsTeamsView.swift in Sources */,
+				5E4000000000000000000027 /* OpsReadinessView.swift in Sources */,
+				5E4000000000000000000028 /* OpsVehiclesView.swift in Sources */,
+				5E4000000000000000000029 /* OpsEventsView.swift in Sources */,
+				5E400000000000000000002A /* OpsMapView.swift in Sources */,
+				5E400000000000000000002B /* DecisionCenterView.swift in Sources */,
+				5E400000000000000000002C /* ScheduleOpsDTO.swift in Sources */,
+				5E400000000000000000002D /* ScheduleOpsViewModel.swift in Sources */,
+				5E400000000000000000002E /* ScheduleRosterGrid.swift in Sources */,
+				5E400000000000000000002F /* ScheduleHubView.swift in Sources */,
+				5E4000000000000000000030 /* ScheduleMonthView.swift in Sources */,
+				5E4000000000000000000031 /* ScheduleDayView.swift in Sources */,
+				5E4000000000000000000032 /* ScheduleTeamView.swift in Sources */,
+				5E4000000000000000000033 /* ScheduleEmployeeView.swift in Sources */,
+				5E4000000000000000000034 /* ScheduleCellSheet.swift in Sources */,
+				5E4000000000000000000035 /* ScheduleHistoryView.swift in Sources */,
+				5E4000000000000000000036 /* ScheduleAdvancedView.swift in Sources */,
+				5E4000000000000000000037 /* CompletionOpsDTO.swift in Sources */,
+				5E4000000000000000000038 /* CompletionOpsViewModel.swift in Sources */,
+				5E4000000000000000000039 /* CompletionOpsView.swift in Sources */,
+				5E400000000000000000003A /* CompletionSupportView.swift in Sources */,
+				5E400000000000000000003B /* CompletionRecordsView.swift in Sources */,
+				5E400000000000000000003C /* PositioningOpsDTO.swift in Sources */,
+				5E400000000000000000003D /* PositioningOpsViewModel.swift in Sources */,
+				5E400000000000000000003E /* PositioningOpsView.swift in Sources */,
+				5E400000000000000000003F /* DispatchOpsDTO.swift in Sources */,
+				5E4000000000000000000040 /* DispatchOpsViewModel.swift in Sources */,
+				5E4000000000000000000041 /* DispatchOpsView.swift in Sources */,
+				5E4000000000000000000042 /* VehiclesOpsDTO.swift in Sources */,
+				5E4000000000000000000043 /* VehicleHistoryView.swift in Sources */,
+				5E4000000000000000000044 /* VehicleRegistryView.swift in Sources */,
+				5E4000000000000000000045 /* FormsOpsDTO.swift in Sources */,
+				5E4000000000000000000046 /* FormsOpsViewModel.swift in Sources */,
+				5E4000000000000000000047 /* FormsOpsView.swift in Sources */,
+				5E4000000000000000000048 /* WorkflowOpsDTO.swift in Sources */,
+				5E4000000000000000000049 /* WorkflowOpsViewModel.swift in Sources */,
+				5E400000000000000000004A /* WorkflowOpsView.swift in Sources */,
+				5E400000000000000000004B /* ArchiveOpsDTO.swift in Sources */,
+				5E400000000000000000004E /* SmartOpsDTO.swift in Sources */,
+				5E400000000000000000004F /* AdminOpsDTO.swift in Sources */,
+				5E4000000000000000000050 /* AdminHubView.swift in Sources */,
+				5E4000000000000000000051 /* AdminUsersView.swift in Sources */,
+				5E4000000000000000000052 /* AdminEmployeesView.swift in Sources */,
+				5E4000000000000000000053 /* AdminRefsView.swift in Sources */,
+				5E4000000000000000000054 /* AdminSymbolsView.swift in Sources */,
+				5E4000000000000000000055 /* AdminSystemView.swift in Sources */,
+				5E4000000000000000000056 /* AdminNotificationsView.swift in Sources */,
+				5E4000000000000000000057 /* ShiftLifecycleDTO.swift in Sources */,
+				5E4000000000000000000058 /* ShiftLifecycleView.swift in Sources */,
+				5E4000000000000000000059 /* TimelineOpsDTO.swift in Sources */,
+				5E400000000000000000005A /* OpsTimelinesView.swift in Sources */,
+				5E400000000000000000005B /* AssetsDTO.swift in Sources */,
+				5E400000000000000000005C /* AssetsHomeView.swift in Sources */,
+				5E400000000000000000005D /* AssetDetailViews.swift in Sources */,
+				5E400000000000000000005E /* HospitalsDTO.swift in Sources */,
+				5E400000000000000000005F /* HospitalsOpsView.swift in Sources */,
+				5E4000000000000000000060 /* ChatDTO.swift in Sources */,
+				5E4000000000000000000061 /* ChatViews.swift in Sources */,
+				5E4000000000000000000062 /* IndicatorsDTO.swift in Sources */,
+				5E4000000000000000000063 /* IndicatorsOpsView.swift in Sources */,
+				5E4000000000000000000064 /* RequestsDTO.swift in Sources */,
+				5E4000000000000000000065 /* MyRequestsView.swift in Sources */,
+				5E4000000000000000000066 /* RequestsAdminView.swift in Sources */,
+				5E4000000000000000000067 /* SignoutsOpsView.swift in Sources */,
+				5E4000000000000000000068 /* FilesOpsDTO.swift in Sources */,
+				5E4000000000000000000069 /* FilesOpsView.swift in Sources */,
+				5E400000000000000000006A /* PermissionsAdminDTO.swift in Sources */,
+				5E400000000000000000006B /* ForgotPasswordView.swift in Sources */,
+				5E400000000000000000006C /* AdminPermissionsView.swift in Sources */,
+				5E400000000000000000004C /* ArchiveOpsViewModel.swift in Sources */,
+				5E400000000000000000004D /* ArchiveOpsView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5E5000000000000000000011 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5E40000000000000000000E1 /* EMSOperationsTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		5E8000000000000000000001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 5E1000000000000000000001 /* EMSOperations */;
+			targetProxy = 5E8000000000000000000002 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		5E6000000000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		5E6000000000000000000002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		5E6000000000000000000011 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = "";
+				CODE_SIGN_ENTITLEMENTS = EMSOperations/Resources/EMSOperations.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = EMSOperations/Resources/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = online.emsoperations.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		5E6000000000000000000012 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = "";
+				CODE_SIGN_ENTITLEMENTS = EMSOperations/Resources/EMSOperations.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = EMSOperations/Resources/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = online.emsoperations.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+		5E6000000000000000000021 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = online.emsoperations.app.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/EMSOperations.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/EMSOperations";
+			};
+			name = Debug;
+		};
+		5E6000000000000000000022 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = online.emsoperations.app.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/EMSOperations.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/EMSOperations";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		5E7000000000000000000001 /* Build configuration list for PBXProject "EMSOperations" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5E6000000000000000000001 /* Debug */,
+				5E6000000000000000000002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		5E7000000000000000000002 /* Build configuration list for PBXNativeTarget "EMSOperations" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5E6000000000000000000011 /* Debug */,
+				5E6000000000000000000012 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		5E7000000000000000000003 /* Build configuration list for PBXNativeTarget "EMSOperationsTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5E6000000000000000000021 /* Debug */,
+				5E6000000000000000000022 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 5E0000000000000000000001 /* Project object */;
+}

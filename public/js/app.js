@@ -199,6 +199,9 @@ document.addEventListener('DOMContentLoaded', function() {
     if (typeof AuthManager !== 'undefined') {
         AuthManager.init();
     }
+    // P3: جلب مرجع المراكز من SSOT مرة واحدة عند الإقلاع (بلا حجب —
+    // الميزات تحرس نفسها بـ centersRefReady وتصرح بحالتها بصدق)
+    loadCentersReference();
     var loginScreen = document.getElementById('loginScreen');
     var loginBtn = document.getElementById('loginBtn');
     var loginUsername = document.getElementById('loginUsername');
@@ -2699,48 +2702,71 @@ var unitLocationAddresses = {
 };
 
 // ============================================================
-// الإحداثيات التشغيلية الفعلية لمراكز قطاع جنوب الرياض — مصدر التموضع
-// الوحيد (بلا أي منطق تشغيلي). كل فرقة ترث موقع مركزها التشغيلي عبر
-// teamCenterMap؛ لا إحداثيات مستقلة للفرق، ولا إحداثيات تجريبية.
+// مرجع المراكز التشغيلية (P3 — اعتماد المالك 2026-09-21): لا جداول ثابتة.
+// operationalCenters / teamCenterMap / unitLocations تُبنى في runtime حصريًا من
+// GET /api/ops/centers: الإحداثيات من data (SSOT سيرفي) وربط الفريق بالمركز من
+// teamCenters (teams.center في DB — نص فقط، بلا إحداثيات).
+// الحالات صريحة: loading → ready | failed · ممنوع undefined / [0,0] / إحداثيات وهمية.
 // ============================================================
-var operationalCenters = {
-    "المنصورة":      [24.614143, 46.75111],
-    "الخالدية":      [24.6199444071494, 46.7549224197865],
-    "منفوحه":        [24.6083812713623, 46.7229347229004],
-    "الدار البيضاء": [24.56692, 46.76842],
-    "الإسكان":       [24.560406, 46.84616],
-    "الشفا":         [24.5608158111572, 46.695240020752],
-    "عكاظ":          [24.5301020455377, 46.6545581817627],
-    "ديراب":         [24.44628, 46.617017],
-    "الحائر":        [24.418611, 46.842628]
-};
+var operationalCenters = {};      // تُملأ من المرجع فقط — {} أثناء التحميل/الفشل
+var teamCenterMap = {};           // تُملأ من teamCenters السيرفي — {} أثناء التحميل/الفشل
+var unitLocations = {};           // تُبنى بعد الجاهزية فقط (توافق المعاينة/أقرب فرقة)
+var centersRefState = 'loading';  // loading | ready | failed
+var centersRefIntegrity = null;   // { complete, missing:[{center,teams}] } — للتنبيه غير الحاجب
 
-// Mapping: رمز الفرقة ← مركزها التشغيلي الفعلي
-var teamCenterMap = {
-    "جنوب 1": "المنصورة",      "سريع 4": "المنصورة",
-    "جنوب 2": "الخالدية",      "سريع 3": "الخالدية",
-    "جنوب 3": "منفوحه",
-    "جنوب 4": "الدار البيضاء", "جنوب 5": "الدار البيضاء", "سريع 1": "الدار البيضاء",
-    "جنوب 6": "الإسكان",
-    "جنوب 7": "الحائر",
-    "جنوب 8": "الشفا",         "سريع 2": "الشفا",
-    "جنوب 9": "عكاظ",
-    "جنوب 10": "ديراب"
-};
+function centersRefReady() { return centersRefState === 'ready'; }
 
-// توافق للميزات القائمة (معاينة الموقع/أقرب فرقة): يُبنى من الجدولين
-// الفعليين أعلاه — حُذفت الإحداثيات التجريبية القديمة نهائيًا.
-var unitLocations = (function () {
-    var out = {};
-    for (var team in teamCenterMap) {
-        if (!teamCenterMap.hasOwnProperty(team)) continue;
-        var c = teamCenterMap[team];
-        if (!operationalCenters[c]) continue;
-        if (!out[c]) out[c] = {};
-        out[c][team] = operationalCenters[c];
+/// رسالة الحالة الصادقة لميزات المعاينة/أقرب فرقة عندما المرجع غير جاهز.
+function centersRefNotReadyNotice(featureName) {
+    if (centersRefState === 'loading') {
+        showNotification('جارٍ التحميل', 'مرجع المراكز لم يجهز بعد — أعد المحاولة خلال لحظات (' + featureName + ')', 'info', 3000);
+    } else {
+        showNotification('تعذر التحميل', 'مرجع المراكز غير متاح حاليًا — ' + featureName + ' متوقفة حتى يعود', 'warning', 4000);
     }
-    return out;
-})();
+}
+
+async function loadCentersReference() {
+    if (typeof AuthManager === 'undefined' || !AuthManager.isLoggedIn()) { centersRefState = 'failed'; return; }
+    centersRefState = 'loading';
+    try {
+        var res = await AuthManager.apiRequest('/api/ops/centers');
+        var payload = await res.json();
+        if (!payload || payload.success !== true) throw new Error('bad payload');
+        var centers = payload.data || {};
+        var tc = payload.teamCenters || {};
+        var oc = {}, ul = {};
+        for (var name in centers) {
+            if (!centers.hasOwnProperty(name)) continue;
+            var pair = centers[name] && centers[name].center;
+            // قبول صارم: [lat,lng] رقمان فقط — أي شكل آخر يُستبعد ولا يُصحّح تخمينيًا
+            if (Array.isArray(pair) && pair.length === 2 &&
+                typeof pair[0] === 'number' && typeof pair[1] === 'number' &&
+                Math.abs(pair[0]) <= 90 && Math.abs(pair[1]) <= 180) {
+                oc[name] = pair;
+            }
+        }
+        // unitLocations: فقط الفرق التي مركزها جغرافي مصرّح — غير الجغرافية
+        // («العمليات»/«الفرق الإضافية») لا تُعطى إحداثيات وهمية.
+        for (var team in tc) {
+            if (!tc.hasOwnProperty(team)) continue;
+            var c = tc[team];
+            if (!oc[c]) continue;
+            if (!ul[c]) ul[c] = {};
+            ul[c][team] = oc[c];
+        }
+        operationalCenters = oc;
+        teamCenterMap = tc; // الربط الكامل نصيًا — الحسم الجغرافي عبر operationalCenters
+        unitLocations = ul;
+        centersRefIntegrity = payload.integrity || null;
+        centersRefState = 'ready';
+    } catch (e) {
+        operationalCenters = {}; teamCenterMap = {}; unitLocations = {};
+        centersRefIntegrity = null;
+        centersRefState = 'failed';
+    }
+    // إشعار الخريطة بتغيّر جاهزية المرجع (راية الحالة + إعادة رسم تفاضلي)
+    if (window.SmartMap && typeof SmartMap.refreshCentersRef === 'function') SmartMap.refreshCentersRef();
+}
 
 var map = null;
 var mapMarkers = [];
@@ -2757,6 +2783,7 @@ function openMapPreview(unit, location) {
 }
 
 function initLeafletMap(focusUnit) {
+    if (!centersRefReady()) { centersRefNotReadyNotice('معاينة الموقع'); return; }
     var mapFrame = document.getElementById('mapFrame');
     var mapLeaflet = document.getElementById('mapLeaflet');
 
@@ -2813,6 +2840,7 @@ function closeMapPreview() {
 // ============================================
 
 function findNearestUnit() {
+    if (!centersRefReady()) { centersRefNotReadyNotice('أقرب فرقة'); return; }
     if (!navigator.geolocation) {
         showNotification('غير مدعوم', 'المتصفح لا يدعم تحديد الموقع', 'warning', 3000);
         return;
@@ -2910,6 +2938,7 @@ var coverageCircles = [];
 
 function drawCoverageCircles() {
     if (!map) return;
+    if (!centersRefReady()) { centersRefNotReadyNotice('مناطق التغطية'); return; }
 
     // إزالة الدوائر القديمة
     coverageCircles.forEach(function(c) { map.removeLayer(c); });
@@ -3025,29 +3054,8 @@ async function loadAllData() {
         } else if (Object.keys(centersData).length === 0) {
             centersData = result.centers || {};
         }
-        // Otherwise keep existing centersData (has team-to-center mapping)
-        
-        // Build default centersData if still empty (e.g. new shift, first load)
-        if (Object.keys(centersData).length === 0) {
-            centersData = {
-                "المنصورة": ["جنوب 1", "جنوب 11", "جنوب 12", "سريع 3"],
-                "الخالدية": ["جنوب 2"],
-                "منفوحة": ["جنوب 3"],
-                "الدار البيضاء": ["جنوب 4", "جنوب 5", "سريع 1"],
-                "الإسكان": ["جنوب 6"],
-                "الحائر": ["جنوب 7"],
-                "ديراب": ["جنوب 10"],
-                "عكاظ": ["جنوب 9"],
-                "الشفاء": ["جنوب 8", "سريع 2"],
-                "الفرق الإضافية": ["سريع 4", "جنوب 13", "جنوب 14", "جنوب 15", "جنوب 16", "جنوب 17", "جنوب 18", "جنوب 19"]
-            };
-        }
-        if (result.centers && Object.keys(result.centers).length > 0) {
-            centersData = result.centers;
-        } else if (Object.keys(centersData).length === 0) {
-            centersData = result.centers || {};
-        }
-        // Otherwise keep existing centersData (has team-to-center mapping)
+        // P3: لا fallback ثابت للربط — centers تأتي من DB عبر /api/data؛
+        // الفارغ يبقى فارغًا بصدق والمستهلكون يعرضون «0 مركز» بدل تخمين.
         if (!isViewingArchiveShift) {
             reports = result.data;
             updateTotal();
