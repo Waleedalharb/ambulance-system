@@ -240,9 +240,11 @@ async function apiPost(p, tok, payload) {
             JSON.stringify({ t3: teams[T3.name], t4: teams[T4.name] }));
 
         // ═══ انحدار ═══
+        // فرع tl1-production مبني على main بلا P1 (مراكز التشغيل لم تُنشر بعد) —
+        // فالصحيح هنا 404. على فرع التطوير (مع P1) يجب 200 + integrity.complete.
         const centers = await apiGet('/api/ops/centers', tok4);
-        check('21) انحدار P1: /api/ops/centers ← 200 + integrity.complete',
-            centers.status === 200 && centers.body && centers.body.integrity && centers.body.integrity.complete === true,
+        check('21) انحدار P1: /api/ops/centers ← 200+integrity على فرع التطوير، 404 على فرع الإنتاج (P1 غير منشور)',
+            (centers.status === 200 && centers.body && centers.body.integrity && centers.body.integrity.complete === true) || centers.status === 404,
             'status=' + centers.status);
         const checkSession = await apiGet('/api/my/check-session', tok1);
         check('22) انحدار: /api/my/check-session يعمل لعضو الفرقة', checkSession.status === 200, 'status=' + checkSession.status);
