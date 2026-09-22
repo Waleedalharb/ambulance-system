@@ -12665,6 +12665,19 @@ app.post('/api/shift-change-request', authenticate, async (req, res) => {
             type: 'shift_change_request',
             payload: { request_id: id, employee_id, status: 'pending' }
         });
+
+        // إشعار المسؤولين: Inbox + Push — نفس منطق طلبات الإجازة، وفشله لا يُفقد الطلب.
+        try {
+            if (db.Notifications) {
+                await notificationService.notifyOperational({
+                    eventKey: 'shift_change.submitted',
+                    title: 'طلب تغيير مناوبة جديد',
+                    message: (req.user.name || req.user.username) + ': تغيير مناوبة ' + shift_date + ' إلى ' + proposed_shift_code,
+                    push: true
+                });
+            }
+        } catch (nErr) { console.error('ShiftChange submit notify error:', nErr.message); }
+
         res.json({ success: true, id, message: 'تم إرسال طلب التغيير' });
     } catch (error) {
         console.error('ShiftChangeRequest error:', error);
@@ -12698,6 +12711,22 @@ app.post('/api/shift-change-request/:id/review', authenticate, authorize(['admin
         }
         await db.ShiftChangeRequests.updateStatus(req.params.id, status, req.user.username || req.user.name);
         const entry = await db.ShiftChangeRequests.getById(req.params.id);
+
+        // إشعار شخصي لصاحب الطلب بنتيجة المراجعة: Inbox + Push (سقوط آمن بلا حساب مربوط).
+        try {
+            if (db.Notifications && entry) {
+                const ownerUserId = await resolveEmployeeUserId(entry.employee_id);
+                if (ownerUserId) {
+                    const label = status === 'approved' ? 'تمت الموافقة على' : (status === 'denied' ? 'تم رفض' : 'تم إلغاء');
+                    await notificationService.notifyPersonal(ownerUserId, {
+                        title: label + ' طلب تغيير المناوبة',
+                        message: 'مناوبة ' + entry.shift_date + ': ' + label + ' طلب التغيير إلى ' + entry.proposed_shift_code,
+                        type: status === 'approved' ? 'success' : (status === 'denied' ? 'warning' : 'info')
+                    });
+                }
+            }
+        } catch (nErr) { console.error('ShiftChange review notify error:', nErr.message); }
+
         broadcast({
             type: 'shift_change_request',
             payload: { request_id: req.params.id, employee_id: entry ? entry.employee_id : null, status }
@@ -13597,6 +13626,19 @@ app.get('/api/staffing-levels', authenticate, async (req, res) => {
 // API: Leave Requests
 // ============================================
 
+// ربط employee_id ← حساب المستخدم لإشعاره شخصيًا: users.username =
+// employees.employee_code (قاعدة my-portal المثبتة). الحساب غير النشط أو
+// غير الموجود = بلا إشعار شخصي (سقوط آمن — الطلب نفسه لا يتأثر أبدًا).
+async function resolveEmployeeUserId(employeeId) {
+    try {
+        const emp = await db.get('SELECT employee_code FROM employees WHERE id = ?', [employeeId]);
+        if (!emp || !emp.employee_code) return null;
+        const users = JSON.parse(await fs.readFile(USERS_PATH, 'utf8'));
+        const u = users.find(x => x.username === emp.employee_code && x.isActive);
+        return u ? u.id.toString() : null;
+    } catch (_) { return null; }
+}
+
 app.get('/api/leave-requests', authenticate, async (req, res) => {
     try {
         const { status, employee_id } = req.query;
@@ -13657,7 +13699,22 @@ app.post('/api/leave-requests', authenticate, validateBody({
             message: 'تم تقديم طلب إجازة جديد',
             requestId: id
         });
-        
+
+        // إشعار المسؤولين: Inbox (صف لكل admin/director) + Push لأجهزتهم.
+        // فشل الإشعار أو Push لا يُفقد الطلب — لهذا هو داخل try منفصل ولا يرمي.
+        try {
+            if (db.Notifications) {
+                const createdReq = await db.LeaveRequests.getById(id); // يحمل employee_name من الـJOIN
+                const empName = (createdReq && createdReq.employee_name) || ('موظف #' + employee_id);
+                await notificationService.notifyOperational({
+                    eventKey: 'leave.submitted',
+                    title: 'طلب إجازة جديد',
+                    message: empName + ': ' + type + ' من ' + start_date + ' إلى ' + end_date,
+                    push: true
+                });
+            }
+        } catch (nErr) { console.error('Leave submit notify error:', nErr.message); }
+
         res.json({ success: true, id });
     } catch (error) {
         console.error('Leave request POST error:', error);
@@ -13735,7 +13792,23 @@ app.post('/api/leave-requests/:id/approve', authenticate, authorize(['admin', 'd
         }
         
         await db.LeaveRequests.updateStatus(req.params.id, status, req.user.id);
-        
+
+        // إشعار شخصي لصاحب الطلب: Inbox + Push (حسابه = users.username بـ employee_code).
+        // بلا حساب مربوط/نشط يُتخطى الإشعار بهدوء ولا يتعطل القرار.
+        try {
+            if (db.Notifications) {
+                const ownerUserId = await resolveEmployeeUserId(existing.employee_id);
+                if (ownerUserId) {
+                    const approved = status === 'approved';
+                    await notificationService.notifyPersonal(ownerUserId, {
+                        title: approved ? 'تمت الموافقة على طلب الإجازة' : 'تم رفض طلب الإجازة',
+                        message: existing.type + ' من ' + existing.start_date + ' إلى ' + existing.end_date,
+                        type: approved ? 'success' : 'warning'
+                    });
+                }
+            }
+        } catch (nErr) { console.error('Leave resolve notify error:', nErr.message); }
+
         broadcast({
             type: 'leave_request_resolved',
             message: `تم ${status === 'approved' ? 'قبول' : 'رفض'} طلب الإجازة`,
