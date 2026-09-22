@@ -65,7 +65,9 @@ const EVENT_TYPE_MAP = Object.freeze({
     'identity.updated':       'info',    // تحديث هوية القطاع — إشعار عام
     'ops_files.uploaded':     'info',    // ملفات تشغيلية جديدة — إشعار عام
     'user.login':             'info',    // «تم تسجيل دخول مستخدم جديد» — مثال المستخدم حرفيًا
-    'support.recorded':       'info'     // تسجيل دعم — إشعار عام
+    'support.recorded':       'info',    // تسجيل دعم — إشعار عام
+    'leave.submitted':        'warning', // طلب إجازة جديد ينتظر قرارًا — يؤثر في الجدول
+    'shift_change.submitted': 'warning'  // طلب تغيير مناوبة جديد ينتظر قرارًا — يؤثر في الجدول
 });
 
 // تصنيف حدث — سقوط آمن info بلا خطأ عند مفتاح غير معروف
@@ -101,12 +103,17 @@ function resolveDeps() {
 // إشعار تشغيلي: صف لكل admin/director نشط (fan-out — النمط القائم حرفيًا)
 // مع منع التكرار الموثق أعلاه (dedupeKey = مستخدم+عنوان+رسالة داخل النافذة).
 // يُستدعى تحت حارس dbAvailable() && db.Notifications في المواضع كما كان.
-async function notifyOperational({ eventKey, title, message }) {
+// push اختياري (افتراضيًا false): عند تفعيله تُرسل نسخة Push عبر البوابة
+// للمستخدمين الذين أُنشئ لهم صف فعلًا فقط — التكرار داخل النافذة (touch)
+// لا يُزعج الجهاز مرة ثانية. البوابة لا ترمي أبدًا (وضع معطَّل آمن بلا مفاتيح)،
+// وفشلها لا يمس الصفوف المنشأة ولا البث — الطلب لا يُفقد حتى لو فشل Push.
+async function notifyOperational({ eventKey, title, message, push }) {
     const d = resolveDeps();
     const type = classify(eventKey);
     const users = JSON.parse(await fs.readFile(d.usersPath, 'utf8'));
     const targets = users.filter(u => (u.role === 'admin' || u.role === 'director') && u.isActive);
     let created = 0, deduped = 0;
+    const createdUserIds = [];
     for (const t of targets) {
         const uid = t.id.toString();
         const existing = await d.db.Notifications.findRecentMatch(uid, title, message, DEDUPE_WINDOW_MINUTES);
@@ -117,9 +124,17 @@ async function notifyOperational({ eventKey, title, message }) {
         } else {
             await d.db.Notifications.create({ user_id: uid, title, message, type });
             created++;
+            createdUserIds.push(uid);
         }
     }
-    return { created, deduped, type };
+    let pushed = null;
+    if (push === true && createdUserIds.length && d.pushGateway && typeof d.pushGateway.sendToUsers === 'function') {
+        pushed = await d.pushGateway.sendToUsers(createdUserIds, {
+            title, body: message || '', badge: 'auto',
+            data: { kind: 'notification', event: eventKey }
+        });
+    }
+    return { created, deduped, type, pushed };
 }
 
 // إشعار شخصي: صف واحد لصاحبه + بث موجَّه للمستهدف فقط (D-21).
