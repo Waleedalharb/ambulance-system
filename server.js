@@ -1404,6 +1404,18 @@ function getShiftCheckService() {
     return shiftCheckService;
 }
 
+// ── P1 (اعتماد المالك 2026-09-21): المصدر الوحيد لإحداثيات المراكز التشغيلية ──
+// قراءة فقط من config/operational-centers.json — لا علاقة بـ centerGeoData القديم
+// (قطاعات فرق لـ /api/locate-report — يبقى دون مساس).
+let centersGeoService = null;
+function getCentersGeoService() {
+    if (!centersGeoService && db) {
+        const CentersGeoService = require('./services/centers-geo-service');
+        centersGeoService = new CentersGeoService({ db });
+    }
+    return centersGeoService;
+}
+
 // ── TL1 (اعتماد المالك 2026-09-21): الموقع التشغيلي الحي للفرق ──
 // خدمة الموقع فقط: GPS ← SSOT ← API. لا خريطة ولا ETA ولا أقرب فرقة الآن.
 // السيرفر يحسم الفرقة من **التكليف التشغيلي الفعلي** (operational-assignment-service:
@@ -1491,6 +1503,28 @@ app.get('/api/ops/readiness/teams', authenticate, OPS_READINESS_VIEW, async (req
     try {
         res.json(await getShiftCheckService().getTeamsReadinessBoard());
     } catch (error) { myCheckError(res, error, 'فشل في جلب لوحة استعداد الفرق'); }
+});
+
+// ── P1 (اعتماد المالك 2026-09-21): إحداثيات المراكز التشغيلية من المصدر الوحيد ──
+// قراءة فقط صِرفة. integrity يكشف أي مركز مستخدم في teams وغير موجود في المرجع —
+// خطأ بيانات نظام ظاهر، لا فشل صامت. لا علاقة بـ /api/center-geo القديم.
+// P3 (اعتماد المالك 2026-09-21): teamCenters — ربط الفريق بالمركز من teams.center
+// (نص فقط، بلا إحداثيات) ليكون SSOT الربط بدل الجداول الثابتة في الويب.
+app.get('/api/ops/centers', authenticate, async (req, res) => {
+    try {
+        const svc = getCentersGeoService();
+        if (!svc) return res.status(503).json({ error: 'Engine unavailable' });
+        const data = svc.getData();
+        const integrity = await svc.checkIntegrity();
+        const teamCenters = await svc.getTeamCenters();
+        if (!data) {
+            return res.json({ success: true, version: null, data: {}, teamCenters, integrity });
+        }
+        res.json({ success: true, version: data.version, data: data.centers, teamCenters, integrity });
+    } catch (error) {
+        console.error('[centers-geo] GET error:', error);
+        res.status(500).json({ error: 'فشل في جلب إحداثيات المراكز' });
+    }
 });
 
 // ── TL1 (اعتماد المالك 2026-09-21): الموقع التشغيلي الحي للفرق ──
@@ -14925,6 +14959,28 @@ server.listen(PORT, async () => {
     
     // Initialize DB after server starts
     await initDatabase();
+
+    // P1: فحص سلامة مرجع إحداثيات المراكز — صارم بلا فشل صامت (قرار المالك):
+    // مركز مستخدم في teams وغير موجود في المرجع = خطأ بيانات نظام يُسمَّى صراحة.
+    try {
+        const cgs = getCentersGeoService();
+        if (cgs) {
+            const integrity = await cgs.checkIntegrity();
+            if (!integrity.complete) {
+                if (integrity.loadError) {
+                    console.error('❌ [centers-geo] تعذّر تحميل config/operational-centers.json:', integrity.loadError);
+                }
+                for (const m of integrity.missing) {
+                    console.error(`❌ [centers-geo] مركز مفقود من المرجع: «${m.center}» — الفرق المتأثرة: ${m.teams.join('، ')}`);
+                }
+                console.error('❌ [centers-geo] المرجع غير مكتمل — راجع /api/ops/centers integrity قبل P2/P3');
+            } else {
+                console.log(`🗺️ مرجع إحداثيات المراكز: مكتمل (${Object.keys(cgs.getData().centers).length} مراكز معتمدة)`);
+            }
+        }
+    } catch (cgErr) {
+        console.error('❌ [centers-geo] فحص السلامة فشل:', cgErr.message);
+    }
 
     // إدارة رموز الجداول: بذر السجل المركزي من المحللات الفعلية (مرة واحدة فقط)
     try {
