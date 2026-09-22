@@ -29,6 +29,16 @@
     // تحديث SSE مطابق للبيانات = صفر إنشاء/إزالة/إعادة رسم، والمتغيّر وحده يُحدَّث
     var lastRender = { incidentsFp: null, teamsFp: null, heatFp: null, hotFp: null, streetsFp: null, dupFp: null };
 
+    // ── الموقع الحي للفرق (TL1 — اعتماد المالك 2026-09-22) ──
+    // مصدره GET /api/ops/team-locations (قراءة فقط). fresh يتغلب على تموضع
+    // المركز، stale يبقى على آخر موقع معروف مع شارة كهرمانية، unavailable
+    // يعود لتموضع المركز الحالي. عرض بحت — لا يغيّر أي منطق تشغيلي ولا
+    // الإحداثيات الثابتة للمراكز ولا مصدر تحديد الفرقة.
+    var liveTeams = {};
+    var livePollTimer = null;
+    var livePollDisabled = false;  // 401/403 = بلا جلسة/منحة — صمت تام وسلوك المركز يستمر
+    var LIVE_POLL_MS = 30000;      // كل 30 ثانية — أسرع من نافذة fresh (120 ث) بهامش مريح
+
     function esc(s) {
         return String(s == null ? '' : s)
             .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -285,7 +295,40 @@
     // لا علامة ولا كثافة ولا موقع ساخن ولا ارتباط بفرقة — يبقى تاريخيًا في الإحصائيات
     function isFinalInc(ic) { return (AR && AR.isFinal) ? AR.isFinal(ic && ic.status) : false; }
     // موقع عرض الفرقة = حلقة صغيرة حول مركزها (تموضع عرضي بحت — لا GPS للفرق)
+    // ما لم يوجد موقع حي (TL1): fresh/stale يتغلبان على التموضع الحلقي.
+    function livePosFor(unit) {
+        var t = liveTeams && liveTeams[unit];
+        if (!t) return null;
+        if (t.status !== 'fresh' && t.status !== 'stale') return null; // unavailable → تموضع المركز
+        if (typeof t.latitude !== 'number' || typeof t.longitude !== 'number') return null;
+        return { pos: [t.latitude, t.longitude], status: t.status, ageSeconds: t.ageSeconds };
+    }
+    function fetchLiveTeams() {
+        if (livePollDisabled) return;
+        var tok = (window.AuthCore && AuthCore.getToken) ? AuthCore.getToken()
+            : (localStorage.getItem('auth_access_token') || localStorage.getItem('authToken'));
+        if (!tok) return; // بلا جلسة — التموضع الحلقي يستمر بصمت
+        fetch('/api/ops/team-locations', { headers: { Authorization: 'Bearer ' + tok } })
+            .then(function (r) {
+                if (r.status === 401 || r.status === 403) { livePollDisabled = true; return null; } // بلا منحة ops.team_locations.view — لا إزعاج ولا إعادة
+                if (!r.ok) return null;
+                return r.json();
+            })
+            .then(function (d) {
+                if (!d || !d.teams) return;
+                liveTeams = d.teams;
+                if (state.teams) renderTeams(state.teams); // إعادة تقييم البصمات — تفاضلي (صفر رسم إن لم يتغير شيء)
+            })
+            .catch(function () { /* انقطاع شبكة — نحتفظ بآخر لقطة حتى التحديث القادم */ });
+    }
+    function startLivePolling() {
+        if (livePollTimer) return;
+        fetchLiveTeams();
+        livePollTimer = setInterval(fetchLiveTeams, LIVE_POLL_MS);
+    }
     function teamPosition(unit, centerName) {
+        var lv = livePosFor(unit);
+        if (lv) return lv.pos; // الموقع الحي يتغلب على تموضع المركز (fresh/stale فقط)
         var base = operationalCenters[centerName];
         if (!base) return null;
         var siblings = [];
@@ -360,6 +403,7 @@
         map.on('click', function () { clearFocus(); closeCard(); });
         wireOnce();
         startTicker(); // نبضة التنبيهات الحية (كل ثانية)
+        startLivePolling(); // المواقع الحية للفرق (TL1) — كل 30 ثانية، صامت بلا منحة
         // استقرار أولي: الحاوية داخل شبكة الصفحة قد يتأخر حجمها النهائي عن التهيئة
         [150, 600, 1500].forEach(function (ms) { setTimeout(onMapResize, ms); });
         return true;
@@ -529,7 +573,8 @@
             if (!cName2 || !operationalCenters[cName2]) continue; // قيادة/تحكم/احتياط — مغطاة في مركز القرار
             var pos = teamPosition(unit, cName2);
             if (!pos) continue;
-            tSigs[unit] = pos[0] + ',' + pos[1] + ',' + teamSev(state.teams[unit]);
+            var lv = livePosFor(unit); // في البصمة: انتقال fresh↔stale↔مركز يعيد رسم العلامة
+            tSigs[unit] = pos[0] + ',' + pos[1] + ',' + teamSev(state.teams[unit]) + ',' + (lv ? lv.status : 'ring');
             fpParts.push('t:' + unit + '=' + tSigs[unit]);
             bounds.push(pos);
         }
@@ -555,9 +600,12 @@
 
         // الفرق — 🚑 شريحة ملوّنة بالحالة + وسم الاسم (تفاضلي: المتغيّرة فقط)
         markerIndex.teams = syncMarkers(layers.teams, markerIndex.teams, tSigs, function (u) {
+            var lv2 = livePosFor(u);
+            var locDot = lv2 ? '<span class="smk-team-loc ' + (lv2.status === 'fresh' ? 'live' : 'stale') + '" title="'
+                + (lv2.status === 'fresh' ? 'موقع حي عبر GPS' : 'آخر موقع معروف — لم يتحدث منذ ' + Math.round((lv2.ageSeconds || 0) / 60) + ' د') + '"></span>' : '';
             var tIcon = L.divIcon({
                 className: 'smk-team sev-' + teamSev(state.teams[u]),
-                html: '<span class="smk-team-chip"><i class="fas fa-truck-medical"></i></span><span class="smk-team-name">' + esc(u) + '</span>',
+                html: '<span class="smk-team-chip">' + locDot + '<i class="fas fa-truck-medical"></i></span><span class="smk-team-name">' + esc(u) + '</span>',
                 iconSize: null, iconAnchor: [17, 17]
             });
             var mk = L.marker(teamPosition(u, teamCenter(u)), { icon: tIcon, zIndexOffset: 200 });
@@ -1181,6 +1229,12 @@
         focusOn: focusOn,
         clearFocus: clearFocus,
         closeCard: closeCard,
-        dismissAlerts: function () { alertBarClosed = true; renderAlerts(); }
+        dismissAlerts: function () { alertBarClosed = true; renderAlerts(); },
+        // خطاف اختبار داخلي (لا يستهلكه الإنتاج): فحص منطق ترجيح الموقع الحي
+        _test: {
+            setLive: function (t) { liveTeams = t || {}; },
+            pos: teamPosition,
+            live: livePosFor
+        }
     };
 })();
