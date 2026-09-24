@@ -705,6 +705,43 @@ async function unitStaticIsolation() {
             dbw.prepare('SELECT COUNT(*) c FROM community_competitions').get().c === cntBefore.competitions);
         const auditBack = await api('GET', '/api/community/moderation/audit', t3);
         check('V14) جدول التدقيق أُعيد وسليم بعد الاختبار', auditBack.status === 200, 'status=' + auditBack.status);
+
+        // (هـ) حالات ON CONFLICT في joinActivityWithCapacity — التحقق النهائي:
+        // joined يعيد الانضمام والنشاط ممتلئ / left يعيد والنشاط ممتلئ / left يعيد وبه سعة
+        console.log('\n── 15ب) حالات ON CONFLICT: joined/left × ممتلئ/به سعة ──');
+        const capAct = await api('POST', '/api/community/activities', t1, { typeId, title: 'نشاط حالات السعة', maxParticipants: 2 });
+        const capActId = capAct.body && capAct.body.id; // المنشئ شغل المقعد الأول (1/2)
+        await api('POST', '/api/community/activities/' + capActId + '/join', t2);  // t2 ينضم ← ممتلئ (2/2)
+        await api('POST', '/api/community/activities/' + capActId + '/leave', t2); // t2 يغادر ← left (1/2)
+        await api('POST', '/api/community/activities/' + capActId + '/join', t5);  // t5 ينضم ← ممتلئ مجددًا (2/2)
+        const capCount = () => dbw.prepare("SELECT COUNT(*) c FROM community_activity_participants WHERE activity_id = ? AND status = 'joined'").get(capActId).c;
+        const capRow = uid => dbw.prepare('SELECT status FROM community_activity_participants WHERE activity_id = ? AND user_id = ?').get(capActId, uid);
+
+        // 1) عضو حالته joined يعيد الانضمام والنشاط ممتلئ ← already بلا فشل زائف ولا زيادة
+        const reJoinJoined = await api('POST', '/api/community/activities/' + capActId + '/join', t1);
+        check('V15) joined يعيد الانضمام والنشاط ممتلئ ← 200 already:true (لا ACTIVITY_FULL زائف)',
+            capAct.status === 200 && reJoinJoined.status === 200 && reJoinJoined.body && reJoinJoined.body.already === true,
+            JSON.stringify(reJoinJoined.body));
+        check('V16) العدد لم يتغير ولم يُنشأ صف جديد (يبقى 2/2)', capCount() === 2, 'count=' + capCount());
+
+        // 2) عضو حالته left يعيد الانضمام والنشاط ممتلئ ← ACTIVITY_FULL ولا يتحول joined
+        const reJoinLeftFull = await api('POST', '/api/community/activities/' + capActId + '/join', t2);
+        check('V17) left يعيد الانضمام والنشاط ممتلئ ← 409 ACTIVITY_FULL',
+            reJoinLeftFull.status === 409 && reJoinLeftFull.body && reJoinLeftFull.body.code === 'ACTIVITY_FULL',
+            JSON.stringify(reJoinLeftFull.body));
+        check('V18) صف العضو المغادر يبقى left (لم يتحول joined رغم ON CONFLICT) والعدد 2/2',
+            capRow('emp-CM102') && capRow('emp-CM102').status === 'left' && capCount() === 2,
+            JSON.stringify(capRow('emp-CM102')) + ' count=' + capCount());
+
+        // 3) توفرت سعة فعلية ← إعادة انضمام العضو left تعيده joined
+        await api('POST', '/api/community/activities/' + capActId + '/leave', t5); // t5 يغادر (1/2)
+        const reJoinLeftOpen = await api('POST', '/api/community/activities/' + capActId + '/join', t2);
+        check('V19) left يعيد الانضمام وبه سعة ← 200 joined:true (مسار ON CONFLICT DO UPDATE)',
+            reJoinLeftOpen.status === 200 && reJoinLeftOpen.body && reJoinLeftOpen.body.joined === true && reJoinLeftOpen.body.already !== true,
+            JSON.stringify(reJoinLeftOpen.body));
+        check('V20) الصف عاد joined والعدد اكتمل 2/2',
+            capRow('emp-CM102') && capRow('emp-CM102').status === 'joined' && capCount() === 2,
+            JSON.stringify(capRow('emp-CM102')) + ' count=' + capCount());
     } catch (e) {
         failed++;
         failures.push('fatal: ' + e.message);
