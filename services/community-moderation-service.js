@@ -1,28 +1,32 @@
 // ============================================
-// CommunityModerationService — EMS Community C1 (اعتماد المالك الكتابي 2026-09-24)
+// CommunityModerationService — EMS Community Full Foundation (اعتماد المالك 2026-09-24)
 // ============================================
-// أساس الإشراف: Block / Report / Queue / Action / Audit.
+// الإشراف الكامل: Block / Report / Queue / Action / Audit — للمستخدمين والمحتوى.
 //
-// Block: من طرف واحد وأثره متبادل عمليًا — يمنع الرؤية والتفاعل والدعوات
-// والاقتراحات والإشعارات الاجتماعية بين الطرفين (تُفرض عند كل مسار تفاعل C2+
-// عبر isBlockedEitherWay). فوري، بلا إشعار للمحظور، ولا يفكّه إلا الحاظر.
+// Block: من طرف واحد وأثره متبادل عمليًا — يمنع الرؤية والتفاعل والانضمام
+// للأنشطة واستعراض الملفات بين الطرفين (تُفرض عبر isBlockedEitherWay و
+// getBlockCounterparts في كل مسار تفاعل). فوري، بلا إشعار للمحظور، ولا يفكّه
+// إلا الحاظر.
 //
 // Report Workflow: مستخدم → community_reports(pending) → قائمة المشرف →
-// إجراء → تدقيق. الإجراءات: none · warn · freeze · restrict · dismiss.
-// hide/remove محجوزان للمحتوى (C2) — مرفوضان في C1 بلا كيانات محتوى.
-// العتبة التلقائية (إخفاء عند تعدد البلاغات) تُفعَّل مع جداول المحتوى في C2 —
-// لا محتوى في C1. الحذف النهائي قرار مشرف بشري دائمًا ولا يكون تلقائيًا أبدًا.
+// إجراء → تدقيق. الأهداف: user · post · activity · majlis (مع التحقق من وجود
+// الهدف — لا بلاغات على أشباح). بلاغ pending واحد لكل (مبلِّغ، هدف) — منع
+// الإغراق. الإجراءات: none · warn · freeze · restrict · dismiss لكل الأهداف،
+// وhide/remove للمنشورات فقط. العتبة التلقائية: تعدد البلاغات على منشور ←
+// إخفاء مؤقت (hidden) بانتظار مشرف بشري — الحذف النهائي قرار بشري دائمًا
+// ولا يكون تلقائيًا أبدًا. إجراءات المستخدم (warn/freeze/restrict) تطال
+// المسؤول عن الهدف: المستخدم نفسه، مؤلف المنشور، أو منشئ النشاط.
 //
-// الذرّية: كل عملية كاتبة (block/unblock/report/handleReport/liftRestriction)
-// محمية بمعاملة قاعدة بيانات حقيقية (BEGIN/COMMIT/ROLLBACK — نمط
-// permission-service نفسه): فشل أي خطوة (التحديث/التقييد/التدقيق) يُرجع
-// العملية كاملة، فلا توجد حالة «report resolved بدون restriction أو بدون
-// audit». كل إجراء يُسجَّل: من اتخذه · متى · السبب · الهدف · الإجراء.
+// الذرّية: كل عملية كاتبة محمية بمعاملة حقيقية (BEGIN/COMMIT/ROLLBACK):
+// فشل أي خطوة (التحديث/التقييد/إخفاء المحتوى/التدقيق) يُرجع العملية كاملة،
+// فلا توجد حالة «report resolved بدون restriction أو بدون audit».
 // ============================================
 'use strict';
 
-const ACTIONS = Object.freeze(['none', 'warn', 'freeze', 'restrict', 'dismiss']);
+const ACTIONS = Object.freeze(['none', 'warn', 'freeze', 'restrict', 'dismiss', 'hide', 'remove']);
+const CONTENT_ACTIONS = Object.freeze(['hide', 'remove']); // لمنشورات المجالس فقط
 const TARGET_TYPES = Object.freeze(['user', 'post', 'activity', 'majlis']);
+const DEFAULT_AUTO_HIDE_THRESHOLD = 3;
 
 class CommunityModerationService {
     constructor({ db, identity }) {
@@ -95,28 +99,78 @@ class CommunityModerationService {
         return this.db.Community.isBlockedEitherWay(a, b);
     }
 
+    /** عتبة الإخفاء التلقائي للمنشورات — إدارية (اتجاه التشدد فقط: 2–20)، افتراضي 3. */
+    async _autoHideThreshold() {
+        const v = await this.db.Community.getSetting('auto_hide_threshold');
+        const n = parseInt(v, 10);
+        if (!Number.isInteger(n) || n < 2 || n > 20) return DEFAULT_AUTO_HIDE_THRESHOLD;
+        return n;
+    }
+
+    /** المستخدم المسؤول عن الهدف (تطاله warn/freeze/restrict) — null للمجالس. */
+    async _resolveTargetUser(report) {
+        if (report.target_type === 'user') return report.target_id;
+        if (report.target_type === 'post') {
+            const post = await this.db.Community.getPostById(report.target_id);
+            return post ? post.author_user_id : null;
+        }
+        if (report.target_type === 'activity') {
+            const a = await this.db.Community.getActivityById(report.target_id);
+            return a ? a.created_by : null;
+        }
+        return null; // majlis — كيان بلا مستخدم مسؤول مباشر
+    }
+
     // ── Report ──
     async report(actor, { targetType, targetId, reason }) {
         if (TARGET_TYPES.indexOf(targetType) === -1) {
             throw this._err(422, 'نوع هدف غير معروف', 'BAD_TARGET_TYPE');
         }
-        // C1: لا كيانات محتوى بعد — post/activity/majlis تُقبل مع C2/C3
-        if (targetType !== 'user') {
-            throw this._err(422, 'لا يوجد محتوى من هذا النوع في المرحلة الحالية', 'TARGET_NOT_AVAILABLE');
-        }
         const tid = String(targetId || '');
         if (!tid) throw this._err(400, 'targetId مطلوب', 'BAD_REQUEST');
-        if (String(actor.id) === tid) throw this._err(422, 'لا يمكن الإبلاغ عن نفسك', 'SELF_REPORT');
         const text = String(reason || '').trim();
         if (!text || text.length < 3) throw this._err(400, 'سبب الإبلاغ مطلوب', 'BAD_REQUEST');
         if (text.length > 500) throw this._err(400, 'سبب الإبلاغ طويل (الحد 500 حرف)', 'BAD_REQUEST');
-        const target = await this.identity.resolveByUserId(tid);
-        if (!target) throw this._err(404, 'المستخدم غير موجود', 'USER_NOT_FOUND');
+        // التحقق من وجود الهدف حسب نوعه — لا بلاغات على أشباح ولا user enumeration
+        if (targetType === 'user') {
+            if (String(actor.id) === tid) throw this._err(422, 'لا يمكن الإبلاغ عن نفسك', 'SELF_REPORT');
+            const target = await this.identity.resolveByUserId(tid);
+            if (!target) throw this._err(404, 'المستخدم غير موجود', 'USER_NOT_FOUND');
+        } else if (targetType === 'post') {
+            const post = await this.db.Community.getPostById(tid);
+            if (!post || post.status === 'removed') throw this._err(404, 'المنشور غير موجود', 'POST_NOT_FOUND');
+            if (String(post.author_user_id) === String(actor.id)) {
+                throw this._err(422, 'لا يمكن الإبلاغ عن محتواك', 'SELF_REPORT');
+            }
+        } else if (targetType === 'activity') {
+            const a = await this.db.Community.getActivityById(tid);
+            if (!a || a.status === 'disabled') throw this._err(404, 'النشاط غير موجود', 'ACTIVITY_NOT_FOUND');
+        } else if (targetType === 'majlis') {
+            const c = await this.db.Community.getCouncilById(tid);
+            if (!c) throw this._err(404, 'المجلس غير موجود', 'COUNCIL_NOT_FOUND');
+        }
+        // منع إغراق البلاغات: بلاغ pending واحد لكل (مبلِّغ، هدف)
+        const dup = await this.db.Community.getPendingReportByReporter(actor.id, targetType, tid);
+        if (dup) throw this._err(409, 'لديك بلاغ قائم على هذا الهدف بانتظار المعالجة', 'DUPLICATE_REPORT');
         return this._atomic(async () => {
             const id = await this.db.Community.createReport({
                 reporterUserId: actor.id, reporterName: actor.name,
                 targetType, targetId: tid, reason: text
             });
+            // العتبة التلقائية: تعدد البلاغات على منشور ← إخفاء مؤقت بانتظار قرار
+            // مشرف بشري (hidden وليس removed — الحذف لا يكون تلقائيًا أبدًا)
+            if (targetType === 'post') {
+                const threshold = await this._autoHideThreshold();
+                const pending = await this.db.Community.countPendingForTarget('post', tid);
+                if (pending >= threshold) {
+                    await this.db.Community.setPostStatus(tid, 'hidden', 'auto:' + threshold + '-reports');
+                    await this.db.Community.audit({
+                        actorId: null, actorName: 'system', action: 'post_auto_hide',
+                        targetType: 'post', targetId: tid,
+                        detail: 'إخفاء تلقائي مؤقت عند بلوغ ' + pending + ' بلاغًا — بانتظار قرار مشرف بشري'
+                    });
+                }
+            }
             await this.db.Community.audit({
                 actorId: actor.id, actorName: actor.name, action: 'report_create',
                 targetType, targetId: tid, detail: 'بلاغ جديد #' + id
@@ -130,8 +184,10 @@ class CommunityModerationService {
     }
 
     /**
-     * معالجة بلاغ — العملية كلها (resolve + restriction + audit) داخل معاملة
-     * واحدة: فشل أي خطوة يُرجعها جميعًا، فلا توجد حالة جزئية بلا تدقيق.
+     * معالجة بلاغ — العملية كلها (resolve + restriction/إخفاء المحتوى + audit)
+     * داخل معاملة واحدة: فشل أي خطوة يُرجعها جميعًا، فلا توجد حالة جزئية بلا تدقيق.
+     * hide/remove لمنشورات المجالس فقط؛ warn/freeze/restrict تطال المسؤول عن
+     * الهدف (المستخدم/المؤلف/المنشئ) — وترفض للمجالس (لا مستخدم مسؤول).
      */
     async handleReport(actor, reportId, { action, note }) {
         if (ACTIONS.indexOf(action) === -1) {
@@ -140,6 +196,14 @@ class CommunityModerationService {
         const report = await this.db.Community.getReportById(reportId);
         if (!report) throw this._err(404, 'البلاغ غير موجود', 'REPORT_NOT_FOUND');
         if (report.status !== 'pending') throw this._err(409, 'البلاغ عولج مسبقًا', 'ALREADY_HANDLED');
+        const isContentAction = CONTENT_ACTIONS.indexOf(action) !== -1;
+        if (isContentAction && report.target_type !== 'post') {
+            throw this._err(422, 'إجراءات hide/remove لمنشورات المجالس فقط', 'BAD_ACTION');
+        }
+        const targetUserId = await this._resolveTargetUser(report);
+        if (['warn', 'freeze', 'restrict'].indexOf(action) !== -1 && !targetUserId) {
+            throw this._err(422, 'لا يوجد مستخدم مسؤول عن هذا الهدف لإجراء ' + action, 'BAD_ACTION');
+        }
 
         return this._atomic(async () => {
             // حسم السباق داخل المعاملة: UPDATE الشرطي (WHERE status='pending') هو
@@ -157,12 +221,16 @@ class CommunityModerationService {
             }
             if (action === 'freeze' || action === 'restrict') {
                 await this.db.Community.addRestriction({
-                    userId: report.target_id,
+                    userId: targetUserId,
                     kind: action === 'freeze' ? 'participation_freeze' : 'participation_restrict',
                     scope: 'community',
                     reason: (note || '') || ('بلاغ #' + reportId),
                     createdBy: actor.name
                 });
+            }
+            if (isContentAction) {
+                await this.db.Community.setPostStatus(
+                    report.target_id, action === 'hide' ? 'hidden' : 'removed', actor.name);
             }
             await this.db.Community.audit({
                 actorId: actor.id, actorName: actor.name, action: 'report_handle',
@@ -191,5 +259,6 @@ class CommunityModerationService {
 }
 
 CommunityModerationService.ACTIONS = ACTIONS;
+CommunityModerationService.CONTENT_ACTIONS = CONTENT_ACTIONS;
 CommunityModerationService.TARGET_TYPES = TARGET_TYPES;
 module.exports = CommunityModerationService;

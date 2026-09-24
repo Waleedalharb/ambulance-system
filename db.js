@@ -2758,6 +2758,15 @@ const Community = {
   async getBlocksBy(userId) {
     return all('SELECT * FROM community_blocks WHERE blocker_user_id = ? ORDER BY created_at DESC', [String(userId)]);
   },
+  // كل الأطراف المقابلة في علاقة حظر معي (حظرتهم أو حظروني) — لاستبعادهم من القوائم
+  async getBlockCounterparts(userId) {
+    const rows = await all(
+      `SELECT blocked_user_id AS other FROM community_blocks WHERE blocker_user_id = ?
+       UNION
+       SELECT blocker_user_id AS other FROM community_blocks WHERE blocked_user_id = ?`,
+      [String(userId), String(userId)]);
+    return rows.map(r => r.other);
+  },
 
   // ── البلاغات ──
   async createReport({ reporterUserId, reporterName, targetType, targetId, reason }) {
@@ -2781,6 +2790,12 @@ const Community = {
       `SELECT COUNT(*) AS c FROM community_reports WHERE target_type = ? AND target_id = ? AND status = 'pending'`,
       [targetType, String(targetId)]);
     return r ? r.c : 0;
+  },
+  // منع إغراق البلاغات: بلاغ pending واحد لكل (مبلِّغ، هدف)
+  async getPendingReportByReporter(reporterUserId, targetType, targetId) {
+    return get(
+      `SELECT id FROM community_reports WHERE reporter_user_id = ? AND target_type = ? AND target_id = ? AND status = 'pending' LIMIT 1`,
+      [String(reporterUserId), targetType, String(targetId)]);
   },
   async resolveReport(id, { status, actionTaken, handledById, handledByName }) {
     return run(
@@ -2814,6 +2829,339 @@ const Community = {
   },
   async listAudit(limit = 50, offset = 0) {
     return all('SELECT * FROM community_audit_log ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?', [limit, offset]);
+  },
+
+  // ═══ Full Foundation (اعتماد المالك الكتابي 2026-09-24) ═══
+
+  // ── المجالس ──
+  async createCouncil({ slug, name, description, icon, membership, createdBy }) {
+    const r = await run(
+      `INSERT INTO community_councils (slug, name, description, icon, membership, created_by) VALUES (?, ?, ?, ?, ?, ?)`,
+      [slug, name, description || null, icon || null, membership || 'open', createdBy || null]);
+    return r.id;
+  },
+  async getCouncilById(id) {
+    return get('SELECT * FROM community_councils WHERE id = ?', [id]);
+  },
+  async getCouncilBySlug(slug) {
+    return get('SELECT * FROM community_councils WHERE slug = ?', [slug]);
+  },
+  async listCouncils(includeDisabled = false) {
+    if (includeDisabled) return all('SELECT * FROM community_councils ORDER BY name');
+    return all("SELECT * FROM community_councils WHERE status = 'active' ORDER BY name");
+  },
+  async updateCouncil(id, { name, description, icon, status, membership }) {
+    return run(
+      `UPDATE community_councils SET
+         name        = COALESCE(?, name),
+         description = COALESCE(?, description),
+         icon        = COALESCE(?, icon),
+         status      = COALESCE(?, status),
+         membership  = COALESCE(?, membership),
+         updated_at  = datetime('now')
+       WHERE id = ?`,
+      [name ?? null, description ?? null, icon ?? null, status ?? null, membership ?? null, id]);
+  },
+
+  // ── عضوية المجالس ──
+  async addCouncilMember(councilId, userId, role = 'member') {
+    return run(
+      `INSERT INTO community_council_members (council_id, user_id, role) VALUES (?, ?, ?)
+       ON CONFLICT(council_id, user_id) DO UPDATE SET role = excluded.role`,
+      [councilId, String(userId), role]);
+  },
+  async removeCouncilMember(councilId, userId) {
+    return run('DELETE FROM community_council_members WHERE council_id = ? AND user_id = ?', [councilId, String(userId)]);
+  },
+  async getCouncilMember(councilId, userId) {
+    return get('SELECT * FROM community_council_members WHERE council_id = ? AND user_id = ?', [councilId, String(userId)]);
+  },
+  async listCouncilMembers(councilId, limit = 100, offset = 0) {
+    return all('SELECT * FROM community_council_members WHERE council_id = ? ORDER BY joined_at LIMIT ? OFFSET ?', [councilId, limit, offset]);
+  },
+  async countCouncilMembers(councilId) {
+    const r = await get('SELECT COUNT(*) AS c FROM community_council_members WHERE council_id = ?', [councilId]);
+    return r ? r.c : 0;
+  },
+  async listMyCouncils(userId) {
+    return all(
+      `SELECT c.*, m.role AS my_role, m.joined_at AS my_joined_at
+       FROM community_council_members m JOIN community_councils c ON c.id = m.council_id
+       WHERE m.user_id = ? ORDER BY c.name`, [String(userId)]);
+  },
+  async setCouncilMemberRole(councilId, userId, role) {
+    return run('UPDATE community_council_members SET role = ? WHERE council_id = ? AND user_id = ?', [role, councilId, String(userId)]);
+  },
+
+  // ── المنشورات (بلا تعليقات) ──
+  async createPost({ councilId, authorUserId, authorName, content, status, flagReason }) {
+    const r = await run(
+      `INSERT INTO community_posts (council_id, author_user_id, author_name, content, status, flag_reason) VALUES (?, ?, ?, ?, ?, ?)`,
+      [councilId, String(authorUserId), authorName || null, content, status || 'active', flagReason || null]);
+    return r.id;
+  },
+  async getPostById(id) {
+    return get('SELECT * FROM community_posts WHERE id = ?', [id]);
+  },
+  // قائمة مجلس: active فقط + استبعاد المحظورين (متبادل الأثر) + Pagination إلزامي
+  async listCouncilPosts(councilId, { limit = 20, offset = 0, excludeUserIds = [] } = {}) {
+    let sql = `SELECT * FROM community_posts WHERE council_id = ? AND status = 'active'`;
+    const params = [councilId];
+    if (excludeUserIds.length) {
+      sql += ` AND author_user_id NOT IN (${excludeUserIds.map(() => '?').join(',')})`;
+      params.push(...excludeUserIds.map(String));
+    }
+    sql += ' ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?';
+    params.push(limit, offset);
+    return all(sql, params);
+  },
+  async countAuthorPosts(authorUserId) {
+    const r = await get("SELECT COUNT(*) AS c FROM community_posts WHERE author_user_id = ? AND status != 'removed'", [String(authorUserId)]);
+    return r ? r.c : 0;
+  },
+  // حالات الإشراف على المحتوى: flagged/hidden/removed/active(استعادة) — قرار بشري موثّق
+  async setPostStatus(id, status, moderatedBy) {
+    return run(
+      `UPDATE community_posts SET status = ?, moderated_by = ?, moderated_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`,
+      [status, moderatedBy || null, id]);
+  },
+  // حذف المؤلف لمنشوره — WHERE المزدوج يمنع IDOR بنيويًا (0 صف = ليس منشورك)
+  async deleteOwnPost(id, authorUserId) {
+    return run('DELETE FROM community_posts WHERE id = ? AND author_user_id = ?', [id, String(authorUserId)]);
+  },
+
+  // ── «من موجود؟» — Explicit Social Status فقط (لا GPS/لا استنتاج/لا last_seen) ──
+  async setPresence(userId, status, note) {
+    return run(
+      `INSERT INTO community_presence (user_id, status, note, updated_at) VALUES (?, ?, ?, datetime('now'))
+       ON CONFLICT(user_id) DO UPDATE SET status = excluded.status, note = excluded.note, updated_at = datetime('now')`,
+      [String(userId), status, note || null]);
+  },
+  async getPresence(userId) {
+    return get('SELECT * FROM community_presence WHERE user_id = ?', [String(userId)]);
+  },
+  // القائمة: نافذة صلاحية زمنية (الحالة القديمة لا تُعرض — ليست «موجودًا» افتراضيًا)
+  async listPresence({ excludeUserIds = [], limit = 50, offset = 0, maxAgeHours = 12 } = {}) {
+    let sql = `SELECT * FROM community_presence WHERE updated_at >= datetime('now', '-' || ? || ' hours')`;
+    const params = [maxAgeHours];
+    if (excludeUserIds.length) {
+      sql += ` AND user_id NOT IN (${excludeUserIds.map(() => '?').join(',')})`;
+      params.push(...excludeUserIds.map(String));
+    }
+    sql += ' ORDER BY updated_at DESC LIMIT ? OFFSET ?';
+    params.push(limit, offset);
+    return all(sql, params);
+  },
+
+  // ── أنواع الأنشطة ──
+  async listActivityTypes(enabledOnly = true) {
+    if (enabledOnly) return all('SELECT * FROM community_activity_types WHERE enabled = 1 ORDER BY name');
+    return all('SELECT * FROM community_activity_types ORDER BY name');
+  },
+  async getActivityTypeById(id) {
+    return get('SELECT * FROM community_activity_types WHERE id = ?', [id]);
+  },
+  async getActivityTypeByKey(key) {
+    return get('SELECT * FROM community_activity_types WHERE key = ?', [key]);
+  },
+  async createActivityType({ key, name, description, icon }) {
+    const r = await run('INSERT INTO community_activity_types (key, name, description, icon) VALUES (?, ?, ?, ?)',
+      [key, name, description || null, icon || null]);
+    return r.id;
+  },
+  async updateActivityType(id, { name, description, icon, enabled }) {
+    return run(
+      `UPDATE community_activity_types SET
+         name = COALESCE(?, name), description = COALESCE(?, description),
+         icon = COALESCE(?, icon), enabled = COALESCE(?, enabled)
+       WHERE id = ?`,
+      [name ?? null, description ?? null, icon ?? null, enabled == null ? null : (enabled ? 1 : 0), id]);
+  },
+
+  // ── الأنشطة / الفعاليات الواقعية ──
+  async createActivity({ typeId, councilId, title, description, locationText, startsAt, endsAt, maxParticipants, createdBy, createdByName }) {
+    const r = await run(
+      `INSERT INTO community_activities (type_id, council_id, title, description, location_text, starts_at, ends_at, max_participants, created_by, created_by_name)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [typeId, councilId ?? null, title, description || null, locationText || null, startsAt || null, endsAt || null,
+       maxParticipants ?? null, String(createdBy), createdByName || null]);
+    return r.id;
+  },
+  async getActivityById(id) {
+    return get(
+      `SELECT a.*, t.key AS type_key, t.name AS type_name, t.icon AS type_icon
+       FROM community_activities a JOIN community_activity_types t ON t.id = a.type_id WHERE a.id = ?`, [id]);
+  },
+  async listActivities({ status, councilId, limit = 20, offset = 0 } = {}) {
+    let sql = `SELECT a.*, t.key AS type_key, t.name AS type_name, t.icon AS type_icon,
+                 (SELECT COUNT(*) FROM community_activity_participants p WHERE p.activity_id = a.id AND p.status = 'joined') AS participants_count
+               FROM community_activities a JOIN community_activity_types t ON t.id = a.type_id WHERE 1=1`;
+    const params = [];
+    if (status) { sql += ' AND a.status = ?'; params.push(status); }
+    else { sql += " AND a.status != 'disabled'"; }
+    if (councilId) { sql += ' AND a.council_id = ?'; params.push(councilId); }
+    sql += ' ORDER BY a.starts_at IS NULL, a.starts_at, a.id DESC LIMIT ? OFFSET ?';
+    params.push(limit, offset);
+    return all(sql, params);
+  },
+  async updateActivity(id, { title, description, locationText, startsAt, endsAt, maxParticipants, status, councilId }) {
+    return run(
+      `UPDATE community_activities SET
+         title = COALESCE(?, title), description = COALESCE(?, description),
+         location_text = COALESCE(?, location_text), starts_at = COALESCE(?, starts_at),
+         ends_at = COALESCE(?, ends_at), max_participants = COALESCE(?, max_participants),
+         status = COALESCE(?, status), council_id = COALESCE(?, council_id),
+         updated_at = datetime('now')
+       WHERE id = ?`,
+      [title ?? null, description ?? null, locationText ?? null, startsAt ?? null, endsAt ?? null,
+       maxParticipants ?? null, status ?? null, councilId ?? null, id]);
+  },
+  async countActivityParticipants(activityId) {
+    const r = await get("SELECT COUNT(*) AS c FROM community_activity_participants WHERE activity_id = ? AND status = 'joined'", [activityId]);
+    return r ? r.c : 0;
+  },
+
+  // ── مشاركو الأنشطة ──
+  async joinActivity(activityId, userId) {
+    return run(
+      `INSERT INTO community_activity_participants (activity_id, user_id, status, joined_at) VALUES (?, ?, 'joined', datetime('now'))
+       ON CONFLICT(activity_id, user_id) DO UPDATE SET status = 'joined', joined_at = datetime('now')`,
+      [activityId, String(userId)]);
+  },
+  async leaveActivity(activityId, userId) {
+    return run(
+      `UPDATE community_activity_participants SET status = 'left' WHERE activity_id = ? AND user_id = ? AND status = 'joined'`,
+      [activityId, String(userId)]);
+  },
+  async getActivityParticipant(activityId, userId) {
+    return get('SELECT * FROM community_activity_participants WHERE activity_id = ? AND user_id = ?', [activityId, String(userId)]);
+  },
+  async listActivityParticipants(activityId, { status = 'joined', limit = 100, offset = 0 } = {}) {
+    return all('SELECT * FROM community_activity_participants WHERE activity_id = ? AND status = ? ORDER BY joined_at LIMIT ? OFFSET ?',
+      [activityId, status, limit, offset]);
+  },
+
+  // ── المناسبات ──
+  async createEvent({ title, icon, description, banner, startsAt, endsAt, linkedActivityId, createdBy }) {
+    const r = await run(
+      `INSERT INTO community_events (title, icon, description, banner, starts_at, ends_at, linked_activity_id, created_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [title, icon || null, description || null, banner || null, startsAt || null, endsAt || null, linkedActivityId ?? null, createdBy || null]);
+    return r.id;
+  },
+  async getEventById(id) {
+    return get('SELECT * FROM community_events WHERE id = ?', [id]);
+  },
+  async listEvents({ status, currentOnly = false, limit = 50, offset = 0 } = {}) {
+    let sql = 'SELECT * FROM community_events WHERE 1=1';
+    const params = [];
+    if (status) { sql += ' AND status = ?'; params.push(status); }
+    if (currentOnly) {
+      sql += ` AND status = 'active' AND (starts_at IS NULL OR starts_at <= datetime('now')) AND (ends_at IS NULL OR ends_at >= datetime('now'))`;
+    }
+    sql += ' ORDER BY starts_at IS NULL, starts_at DESC, id DESC LIMIT ? OFFSET ?';
+    params.push(limit, offset);
+    return all(sql, params);
+  },
+  async updateEvent(id, { title, icon, description, banner, startsAt, endsAt, status, linkedActivityId }) {
+    return run(
+      `UPDATE community_events SET
+         title = COALESCE(?, title), icon = COALESCE(?, icon), description = COALESCE(?, description),
+         banner = COALESCE(?, banner), starts_at = COALESCE(?, starts_at), ends_at = COALESCE(?, ends_at),
+         status = COALESCE(?, status), linked_activity_id = COALESCE(?, linked_activity_id),
+         updated_at = datetime('now')
+       WHERE id = ?`,
+      [title ?? null, icon ?? null, description ?? null, banner ?? null, startsAt ?? null, endsAt ?? null,
+       status ?? null, linkedActivityId ?? null, id]);
+  },
+
+  // ── الشارات والإنجازات ──
+  async listBadges(enabledOnly = true) {
+    if (enabledOnly) return all('SELECT * FROM community_badges WHERE enabled = 1 ORDER BY name');
+    return all('SELECT * FROM community_badges ORDER BY name');
+  },
+  async getBadgeById(id) {
+    return get('SELECT * FROM community_badges WHERE id = ?', [id]);
+  },
+  async createBadge({ key, name, description, icon }) {
+    const r = await run('INSERT INTO community_badges (key, name, description, icon) VALUES (?, ?, ?, ?)',
+      [key, name, description || null, icon || null]);
+    return r.id;
+  },
+  // INSERT OR IGNORE: منح مكرر بنفس السياق = idempotent بلا خطأ
+  async awardBadge({ userId, badgeId, context, awardedBy }) {
+    const r = await run(
+      `INSERT OR IGNORE INTO community_user_badges (user_id, badge_id, context, awarded_by) VALUES (?, ?, ?, ?)`,
+      [String(userId), badgeId, context || '', awardedBy || null]);
+    return r.id;
+  },
+  async revokeUserBadge(id) {
+    return run('DELETE FROM community_user_badges WHERE id = ?', [id]);
+  },
+  async getUserBadgeById(id) {
+    return get('SELECT * FROM community_user_badges WHERE id = ?', [id]);
+  },
+  async listUserBadges(userId) {
+    return all(
+      `SELECT ub.id, ub.user_id, ub.context, ub.awarded_by, ub.awarded_at, b.key, b.name, b.icon, b.description
+       FROM community_user_badges ub JOIN community_badges b ON b.id = ub.badge_id
+       WHERE ub.user_id = ? ORDER BY ub.awarded_at DESC`, [String(userId)]);
+  },
+
+  // ── المنافسات (لا مال/رهان/رسوم — معنوي فقط بحكم التصميم) ──
+  async createCompetition({ name, description, scope, activityId, rules, startsAt, endsAt, createdBy }) {
+    const r = await run(
+      `INSERT INTO community_competitions (name, description, scope, activity_id, rules, starts_at, ends_at, created_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [name, description || null, scope || 'teams', activityId ?? null, rules || null, startsAt || null, endsAt || null, createdBy || null]);
+    return r.id;
+  },
+  async getCompetitionById(id) {
+    return get('SELECT * FROM community_competitions WHERE id = ?', [id]);
+  },
+  async listCompetitions({ status, limit = 20, offset = 0 } = {}) {
+    let sql = 'SELECT * FROM community_competitions WHERE 1=1';
+    const params = [];
+    if (status) { sql += ' AND status = ?'; params.push(status); }
+    else { sql += " AND status != 'disabled'"; }
+    sql += ' ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?';
+    params.push(limit, offset);
+    return all(sql, params);
+  },
+  async updateCompetition(id, { name, description, scope, status, rules, startsAt, endsAt, activityId }) {
+    return run(
+      `UPDATE community_competitions SET
+         name = COALESCE(?, name), description = COALESCE(?, description), scope = COALESCE(?, scope),
+         status = COALESCE(?, status), rules = COALESCE(?, rules), starts_at = COALESCE(?, starts_at),
+         ends_at = COALESCE(?, ends_at), activity_id = COALESCE(?, activity_id),
+         updated_at = datetime('now')
+       WHERE id = ?`,
+      [name ?? null, description ?? null, scope ?? null, status ?? null, rules ?? null,
+       startsAt ?? null, endsAt ?? null, activityId ?? null, id]);
+  },
+  async addCompetitionParticipant({ competitionId, label, userId }) {
+    const r = await run(
+      `INSERT OR IGNORE INTO community_competition_participants (competition_id, participant_label, participant_user_id) VALUES (?, ?, ?)`,
+      [competitionId, label, userId != null ? String(userId) : null]);
+    return r.id;
+  },
+  async removeCompetitionParticipant(id) {
+    return run('DELETE FROM community_competition_participants WHERE id = ?', [id]);
+  },
+  async getCompetitionParticipant(id) {
+    return get('SELECT * FROM community_competition_participants WHERE id = ?', [id]);
+  },
+  async listCompetitionParticipants(competitionId) {
+    return all(
+      `SELECT * FROM community_competition_participants WHERE competition_id = ?
+       ORDER BY rank IS NULL, rank, score DESC, id`, [competitionId]);
+  },
+  async updateCompetitionParticipant(id, { score, rank, resultNote }) {
+    return run(
+      `UPDATE community_competition_participants SET
+         score = COALESCE(?, score), rank = COALESCE(?, rank), result_note = COALESCE(?, result_note)
+       WHERE id = ?`,
+      [score ?? null, rank ?? null, resultNote ?? null, id]);
   }
 };
 
@@ -4685,7 +5033,194 @@ async function migrateAssetRegistry() {
   )`);
   await exec(`CREATE INDEX IF NOT EXISTS idx_community_audit_created ON community_audit_log(created_at)`);
 
-  logger.info('community C1 foundation tables ready (5 tables, additive)');
+  // ═══ EMS Community — Full Foundation (اعتماد المالك الكتابي 2026-09-24) ═══
+  // استكمال المنظومة: مجالس/منشورات/حضور صريح/أنشطة/مناسبات/شارات/منافسات.
+  // نفس قيود C1: additive بالكامل، بادئة community_، لا FK لأي جدول تشغيلي،
+  // ولا أي عمود موقع/GPS في أي جدول — «مكان الفعالية» نص حر يكتبه المنظم فقط.
+
+  // المجالس: نظام Generic — تُضاف مجالس جديدة بلا تعديل بنيوي
+  await exec(`CREATE TABLE IF NOT EXISTS community_councils (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    slug        TEXT NOT NULL UNIQUE,
+    name        TEXT NOT NULL,
+    description TEXT,
+    icon        TEXT,
+    status      TEXT NOT NULL DEFAULT 'active',
+    membership  TEXT NOT NULL DEFAULT 'open',
+    created_by  TEXT,
+    created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+  )`);
+  await exec(`CREATE INDEX IF NOT EXISTS idx_community_councils_status ON community_councils(status)`);
+
+  // عضوية المجالس: دور member/moderator نطاقه المجلس فقط — لا علاقة له بأدوار المنصة
+  await exec(`CREATE TABLE IF NOT EXISTS community_council_members (
+    council_id INTEGER NOT NULL REFERENCES community_councils(id) ON DELETE CASCADE,
+    user_id    TEXT NOT NULL,
+    role       TEXT NOT NULL DEFAULT 'member',
+    joined_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY (council_id, user_id)
+  )`);
+  await exec(`CREATE INDEX IF NOT EXISTS idx_community_council_members_user ON community_council_members(user_id)`);
+
+  // المنشورات: بلا تعليقات (قرار v3). status: active | flagged (فلتر تلقائي)
+  // | hidden (عتبة بلاغات) | removed (قرار مشرف بشري — الحذف لا يكون تلقائيًا أبدًا)
+  await exec(`CREATE TABLE IF NOT EXISTS community_posts (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    council_id     INTEGER NOT NULL REFERENCES community_councils(id) ON DELETE CASCADE,
+    author_user_id TEXT NOT NULL,
+    author_name    TEXT,
+    content        TEXT NOT NULL,
+    status         TEXT NOT NULL DEFAULT 'active',
+    flag_reason    TEXT,
+    moderated_by   TEXT,
+    moderated_at   TEXT,
+    created_at     TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at     TEXT NOT NULL DEFAULT (datetime('now'))
+  )`);
+  await exec(`CREATE INDEX IF NOT EXISTS idx_community_posts_council ON community_posts(council_id, status, created_at)`);
+  await exec(`CREATE INDEX IF NOT EXISTS idx_community_posts_author ON community_posts(author_user_id)`);
+
+  // «من موجود؟»: Explicit Social Status فقط — يضبطه الموظف بيده. ممنوع معماريًا:
+  // لا GPS، لا team_live_locations، لا last_seen، لا استنتاج من نشاط التطبيق.
+  await exec(`CREATE TABLE IF NOT EXISTS community_presence (
+    user_id    TEXT PRIMARY KEY,
+    status     TEXT NOT NULL,
+    note       TEXT,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  )`);
+
+  // أنواع الأنشطة: Community → Activities → Activity Types (وليس Community → Baloot)
+  await exec(`CREATE TABLE IF NOT EXISTS community_activity_types (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    key         TEXT NOT NULL UNIQUE,
+    name        TEXT NOT NULL,
+    description TEXT,
+    icon        TEXT,
+    enabled     INTEGER NOT NULL DEFAULT 1,
+    created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+  )`);
+
+  // الأنشطة/الفعاليات الواقعية: موعد + مكان نصي من المنظم + مشاركون.
+  // location_text نص حر يكتبه المنظم — ليس تتبعًا وليس إحداثيات.
+  await exec(`CREATE TABLE IF NOT EXISTS community_activities (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    type_id          INTEGER NOT NULL REFERENCES community_activity_types(id),
+    council_id       INTEGER REFERENCES community_councils(id) ON DELETE SET NULL,
+    title            TEXT NOT NULL,
+    description      TEXT,
+    location_text    TEXT,
+    starts_at        TEXT,
+    ends_at          TEXT,
+    max_participants INTEGER,
+    status           TEXT NOT NULL DEFAULT 'open',
+    created_by       TEXT NOT NULL,
+    created_by_name  TEXT,
+    created_at       TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at       TEXT NOT NULL DEFAULT (datetime('now'))
+  )`);
+  await exec(`CREATE INDEX IF NOT EXISTS idx_community_activities_status ON community_activities(status, starts_at)`);
+  await exec(`CREATE INDEX IF NOT EXISTS idx_community_activities_council ON community_activities(council_id)`);
+
+  await exec(`CREATE TABLE IF NOT EXISTS community_activity_participants (
+    activity_id INTEGER NOT NULL REFERENCES community_activities(id) ON DELETE CASCADE,
+    user_id     TEXT NOT NULL,
+    status      TEXT NOT NULL DEFAULT 'joined',
+    joined_at   TEXT NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY (activity_id, user_id)
+  )`);
+
+  // المناسبات: Generic — تُدار من الإدارة بلا تعديل بنيوي (يوم وطني/رمضان/عيد/داخلية…)
+  await exec(`CREATE TABLE IF NOT EXISTS community_events (
+    id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+    title              TEXT NOT NULL,
+    icon               TEXT,
+    description        TEXT,
+    banner             TEXT,
+    starts_at          TEXT,
+    ends_at            TEXT,
+    status             TEXT NOT NULL DEFAULT 'active',
+    linked_activity_id INTEGER REFERENCES community_activities(id) ON DELETE SET NULL,
+    created_by         TEXT,
+    created_at         TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at         TEXT NOT NULL DEFAULT (datetime('now'))
+  )`);
+  await exec(`CREATE INDEX IF NOT EXISTS idx_community_events_status ON community_events(status, starts_at)`);
+
+  // الشارات والإنجازات: Framework عام غير مرتبط بالبلوت — التعريفات تُدار بلا كود
+  await exec(`CREATE TABLE IF NOT EXISTS community_badges (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    key         TEXT NOT NULL UNIQUE,
+    name        TEXT NOT NULL,
+    description TEXT,
+    icon        TEXT,
+    enabled     INTEGER NOT NULL DEFAULT 1,
+    created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+  )`);
+
+  // منح الشارات: يدوي (مشرف/إدارة) في هذه المرحلة — محرك المنح التلقائي مستقبلًا
+  await exec(`CREATE TABLE IF NOT EXISTS community_user_badges (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id    TEXT NOT NULL,
+    badge_id   INTEGER NOT NULL REFERENCES community_badges(id) ON DELETE CASCADE,
+    context    TEXT NOT NULL DEFAULT '',
+    awarded_by TEXT,
+    awarded_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE (user_id, badge_id, context)
+  )`);
+  await exec(`CREATE INDEX IF NOT EXISTS idx_community_user_badges_user ON community_user_badges(user_id)`);
+
+  // المنافسات: فرق/مراكز/أفراد + ترتيب ونتائج وجوائز معنوية فقط.
+  // لا يوجد أي عمود مال/رهان/رسوم دخول — الغياب هنا هو سياسة «لا Gambling» المعمارية.
+  // participant_label نص حر (اسم فريق/مركز) — لا FK لجداول teams/centers التشغيلية.
+  await exec(`CREATE TABLE IF NOT EXISTS community_competitions (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    name         TEXT NOT NULL,
+    description  TEXT,
+    scope        TEXT NOT NULL DEFAULT 'teams',
+    activity_id  INTEGER REFERENCES community_activities(id) ON DELETE SET NULL,
+    status       TEXT NOT NULL DEFAULT 'draft',
+    rules        TEXT,
+    starts_at    TEXT,
+    ends_at      TEXT,
+    created_by   TEXT,
+    created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at   TEXT NOT NULL DEFAULT (datetime('now'))
+  )`);
+  await exec(`CREATE INDEX IF NOT EXISTS idx_community_competitions_status ON community_competitions(status)`);
+
+  await exec(`CREATE TABLE IF NOT EXISTS community_competition_participants (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    competition_id      INTEGER NOT NULL REFERENCES community_competitions(id) ON DELETE CASCADE,
+    participant_label   TEXT NOT NULL,
+    participant_user_id TEXT,
+    score               INTEGER NOT NULL DEFAULT 0,
+    rank                INTEGER,
+    result_note         TEXT,
+    created_at          TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE (competition_id, participant_label)
+  )`);
+
+  // بذور أنواع الأنشطة (قابلة للإدارة لاحقًا — INSERT OR IGNORE لا يكرر)
+  await exec(`INSERT OR IGNORE INTO community_activity_types (key, name, icon, description) VALUES
+    ('baloot',    'بلوت',    '🃏', 'مجالس وبطولات البلوت — المحرك اللحظي مرحلة مستقلة لاحقة'),
+    ('coffee',    'قهوة',    '☕', 'تجمعات قهوة ومجالس ودّية'),
+    ('football',  'كرة قدم', '⚽', 'مباريات ودوريات كرة القدم'),
+    ('padel',     'بادل',    '🎾', 'مباريات البادل'),
+    ('dinner',    'عشاء',    '🍽️', 'ولائم وعشاء جماعي'),
+    ('gathering', 'تجمع',    '👥', 'تجمعات اجتماعية عامة'),
+    ('challenge', 'تحدٍ',    '🏆', 'تحديات ومسابقات بين الموظفين'),
+    ('event',     'فعالية',  '📅', 'فعاليات ومناسبات القطاع')`);
+
+  // بذور الشارات (Framework عام — لا ارتباط بالبلوت فقط)
+  await exec(`INSERT OR IGNORE INTO community_badges (key, name, icon, description) VALUES
+    ('council_maker',        'صانع المجالس',  '🏠', 'إنشاء وإحياء المجالس والتجمعات'),
+    ('team_spirit',          'روح الفريق',    '🤝', 'حضور اجتماعي مميز ودعم الزملاء'),
+    ('tournament_organizer', 'منظم البطولة',  '🎯', 'تنظيم بطولات وفعاليات ناجحة'),
+    ('baloot_pro',           'محترف البلوت',  '🃏', 'تميّز في مجالس وبطولات البلوت'),
+    ('challenge_champion',   'بطل التحديات',  '🏆', 'الفوز في التحديات والمنافسات')`);
+
+  logger.info('community full foundation tables ready (17 tables, additive)');
   logger.info('asset registry tables ready (8 tables, additive)');
 }
 

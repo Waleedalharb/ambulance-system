@@ -1477,6 +1477,99 @@ function getCommunityModerationService() {
     }
     return communityModerationService;
 }
+// ═══ EMS Community — Full Foundation (اعتماد المالك الكتابي 2026-09-24) ═══
+// مجالس/منشورات/حضور صريح/أنشطة/مناسبات/شارات/منافسات — نفس حدود العزل:
+// لا GPS، لا team_live_locations، لا realtime، ولا وصول لـemployees خارج Identity.
+let communityContentFilterService = null;
+function getCommunityContentFilterService() {
+    if (!communityContentFilterService && db) {
+        const CommunityContentFilterService = require('./services/community-content-filter-service');
+        communityContentFilterService = new CommunityContentFilterService({ db });
+    }
+    return communityContentFilterService;
+}
+let communityCouncilService = null;
+function getCommunityCouncilService() {
+    if (!communityCouncilService && db) {
+        const CommunityCouncilService = require('./services/community-council-service');
+        communityCouncilService = new CommunityCouncilService({
+            db, identity: getCommunityIdentityService(),
+            core: getCommunityService(), filter: getCommunityContentFilterService()
+        });
+    }
+    return communityCouncilService;
+}
+let communityPostService = null;
+function getCommunityPostService() {
+    if (!communityPostService && db) {
+        const CommunityPostService = require('./services/community-post-service');
+        communityPostService = new CommunityPostService({
+            db, identity: getCommunityIdentityService(),
+            core: getCommunityService(), filter: getCommunityContentFilterService()
+        });
+    }
+    return communityPostService;
+}
+let communityPresenceService = null;
+function getCommunityPresenceService() {
+    if (!communityPresenceService && db) {
+        const CommunityPresenceService = require('./services/community-presence-service');
+        communityPresenceService = new CommunityPresenceService({
+            db, identity: getCommunityIdentityService(),
+            core: getCommunityService(), filter: getCommunityContentFilterService()
+        });
+    }
+    return communityPresenceService;
+}
+let communityActivityService = null;
+function getCommunityActivityService() {
+    if (!communityActivityService && db) {
+        const CommunityActivityService = require('./services/community-activity-service');
+        communityActivityService = new CommunityActivityService({
+            db, identity: getCommunityIdentityService(),
+            core: getCommunityService(), filter: getCommunityContentFilterService(),
+            moderation: getCommunityModerationService()
+        });
+    }
+    return communityActivityService;
+}
+let communityEventService = null;
+function getCommunityEventService() {
+    if (!communityEventService && db) {
+        const CommunityEventService = require('./services/community-event-service');
+        communityEventService = new CommunityEventService({
+            db, identity: getCommunityIdentityService(), filter: getCommunityContentFilterService()
+        });
+    }
+    return communityEventService;
+}
+let communityBadgeService = null;
+function getCommunityBadgeService() {
+    if (!communityBadgeService && db) {
+        const CommunityBadgeService = require('./services/community-badge-service');
+        communityBadgeService = new CommunityBadgeService({
+            db, identity: getCommunityIdentityService(),
+            filter: getCommunityContentFilterService(), moderation: getCommunityModerationService()
+        });
+    }
+    return communityBadgeService;
+}
+let communityCompetitionService = null;
+function getCommunityCompetitionService() {
+    if (!communityCompetitionService && db) {
+        const CommunityCompetitionService = require('./services/community-competition-service');
+        communityCompetitionService = new CommunityCompetitionService({
+            db, identity: getCommunityIdentityService(),
+            core: getCommunityService(), filter: getCommunityContentFilterService()
+        });
+    }
+    return communityCompetitionService;
+}
+/** فحص صلاحية برمجي داخل مسارات المجتمع (للعرض الإداري الموسّع مثلًا). */
+async function communityHasPerm(user, key) {
+    try { return await getPermissionService().hasPermission(user.id, user.role, key); }
+    catch (_) { return false; }
+}
 // حارس توفر المنظومة (مستوى 1 + 5): إطفاء كامل أو دور معطّل ← 403 عام.
 // مسارات admin/settings مستثناة حتى يستطيع المدير إعادة التفعيل.
 async function authorizeCommunityAvailable(req, res, next) {
@@ -1708,6 +1801,478 @@ app.put('/api/community/admin/settings', authenticate, authorizePerm('community.
         const out = await svc.getSettings();
         res.json({ success: true, ...out });
     } catch (error) { myCheckError(res, error, 'فشل في تحديث إعدادات المجتمع'); }
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// EMS Community — Full Foundation (اعتماد المالك الكتابي 2026-09-24)
+// مجالس/منشورات/حضور صريح/أنشطة/مناسبات/شارات/منافسات — On-demand API فقط:
+// لا WebSocket ولا SSE ولا realtime. مسارات community.admin مستثناة من حارس
+// التوفر (إدارة المحتوى تبقى ممكنة أثناء الإطفاء) — بقية المسارات خلف الحارس.
+// ════════════════════════════════════════════════════════════════════════════
+
+// ── المجالس ──
+app.get('/api/community/councils', authenticate, authorizePerm('community.view'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const includeDisabled = req.query.all === '1' && await communityHasPerm(req.user, 'community.admin');
+        const out = await getCommunityCouncilService().list(req.user, { includeDisabled });
+        res.json({ success: true, councils: out });
+    } catch (error) { myCheckError(res, error, 'فشل في جلب المجالس'); }
+});
+
+app.post('/api/community/councils', authenticate, authorizePerm('community.admin'), validateBody({
+    slug: { required: true, type: 'string', minLength: 3, maxLength: 50 },
+    name: { required: true, type: 'string', minLength: 2, maxLength: 80 },
+    description: { required: false, type: 'string', maxLength: 500 },
+    icon: { required: false, type: 'string', maxLength: 16 },
+    membership: { required: false, type: 'string', maxLength: 10 }
+}), async (req, res) => {
+    try {
+        const out = await getCommunityCouncilService().create(req.user, req.body);
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في إنشاء المجلس'); }
+});
+
+app.get('/api/community/councils/:id', authenticate, authorizePerm('community.view'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const out = await getCommunityCouncilService().get(req.user, parseInt(req.params.id, 10));
+        res.json({ success: true, council: out });
+    } catch (error) { myCheckError(res, error, 'فشل في جلب المجلس'); }
+});
+
+app.put('/api/community/councils/:id', authenticate, authorizePerm('community.admin'), validateBody({
+    name: { required: false, type: 'string', minLength: 2, maxLength: 80 },
+    description: { required: false, type: 'string', maxLength: 500 },
+    icon: { required: false, type: 'string', maxLength: 16 },
+    membership: { required: false, type: 'string', maxLength: 10 },
+    status: { required: false, type: 'string', maxLength: 12 }
+}), async (req, res) => {
+    try {
+        const out = await getCommunityCouncilService().update(req.user, parseInt(req.params.id, 10), req.body);
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في تحديث المجلس'); }
+});
+
+app.post('/api/community/councils/:id/join', authenticate, authorizePerm('community.view'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const out = await getCommunityCouncilService().join(req.user, parseInt(req.params.id, 10));
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في الانضمام للمجلس'); }
+});
+
+app.post('/api/community/councils/:id/leave', authenticate, authorizePerm('community.view'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const out = await getCommunityCouncilService().leave(req.user, parseInt(req.params.id, 10));
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في مغادرة المجلس'); }
+});
+
+app.get('/api/community/councils/:id/members', authenticate, authorizePerm('community.view'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const limit = Math.min(parseInt(req.query.limit, 10) || 100, 200);
+        const offset = parseInt(req.query.offset, 10) || 0;
+        const out = await getCommunityCouncilService().members(req.user, parseInt(req.params.id, 10), { limit, offset });
+        res.json({ success: true, members: out });
+    } catch (error) { myCheckError(res, error, 'فشل في جلب أعضاء المجلس'); }
+});
+
+app.put('/api/community/councils/:id/members/:userId', authenticate, authorizePerm('community.moderate'), authorizeCommunityAvailable, validateBody({
+    role: { required: true, type: 'string', minLength: 4, maxLength: 10 }
+}), async (req, res) => {
+    try {
+        const out = await getCommunityCouncilService().setMember(req.user, parseInt(req.params.id, 10), req.params.userId, req.body.role);
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في تعديل عضوية المجلس'); }
+});
+
+app.delete('/api/community/councils/:id/members/:userId', authenticate, authorizePerm('community.moderate'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const out = await getCommunityCouncilService().removeMember(req.user, parseInt(req.params.id, 10), req.params.userId);
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في إزالة عضو المجلس'); }
+});
+
+// ── منشورات المجالس (بلا تعليقات — قرار معماري v3) ──
+app.get('/api/community/councils/:id/posts', authenticate, authorizePerm('community.view'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const limit = Math.min(parseInt(req.query.limit, 10) || 20, 50);
+        const offset = parseInt(req.query.offset, 10) || 0;
+        const out = await getCommunityPostService().list(req.user, parseInt(req.params.id, 10), { limit, offset });
+        res.json({ success: true, posts: out });
+    } catch (error) { myCheckError(res, error, 'فشل في جلب المنشورات'); }
+});
+
+app.post('/api/community/councils/:id/posts', authenticate, authorizePerm('community.post'), authorizeCommunityAvailable, validateBody({
+    content: { required: true, type: 'string', minLength: 1, maxLength: 2000 }
+}), async (req, res) => {
+    try {
+        const out = await getCommunityPostService().create(req.user, parseInt(req.params.id, 10), req.body);
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في نشر المنشور'); }
+});
+
+app.delete('/api/community/posts/:id', authenticate, authorizePerm('community.post'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const out = await getCommunityPostService().removeOwn(req.user, parseInt(req.params.id, 10));
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في حذف المنشور'); }
+});
+
+// ── «من موجود؟» — Explicit Social Status فقط (لا GPS/لا موقع/لا استنتاج) ──
+app.get('/api/community/presence', authenticate, authorizePerm('community.view'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const limit = Math.min(parseInt(req.query.limit, 10) || 50, 100);
+        const offset = parseInt(req.query.offset, 10) || 0;
+        const out = await getCommunityPresenceService().list(req.user, { limit, offset });
+        res.json({ success: true, presence: out });
+    } catch (error) { myCheckError(res, error, 'فشل في جلب «من موجود؟»'); }
+});
+
+app.get('/api/community/presence/me', authenticate, authorizePerm('community.view'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const out = await getCommunityPresenceService().mine(req.user);
+        res.json({ success: true, presence: out });
+    } catch (error) { myCheckError(res, error, 'فشل في جلب حالتك'); }
+});
+
+app.put('/api/community/presence', authenticate, authorizePerm('community.view'), authorizeCommunityAvailable, validateBody({
+    status: { required: true, type: 'string', minLength: 3, maxLength: 15 },
+    note: { required: false, type: 'string', maxLength: 120 }
+}), async (req, res) => {
+    try {
+        const out = await getCommunityPresenceService().setMine(req.user, req.body);
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في ضبط حالتك'); }
+});
+
+// ── أنواع الأنشطة ──
+app.get('/api/community/activity-types', authenticate, authorizePerm('community.view'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const out = await getCommunityActivityService().listTypes();
+        res.json({ success: true, types: out });
+    } catch (error) { myCheckError(res, error, 'فشل في جلب أنواع الأنشطة'); }
+});
+
+app.post('/api/community/admin/activity-types', authenticate, authorizePerm('community.admin'), validateBody({
+    key: { required: true, type: 'string', minLength: 3, maxLength: 40 },
+    name: { required: true, type: 'string', minLength: 2, maxLength: 60 },
+    description: { required: false, type: 'string', maxLength: 300 },
+    icon: { required: false, type: 'string', maxLength: 16 }
+}), async (req, res) => {
+    try {
+        const out = await getCommunityActivityService().createType(req.user, req.body);
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في إنشاء نوع النشاط'); }
+});
+
+app.put('/api/community/admin/activity-types/:id', authenticate, authorizePerm('community.admin'), validateBody({
+    name: { required: false, type: 'string', minLength: 2, maxLength: 60 },
+    description: { required: false, type: 'string', maxLength: 300 },
+    icon: { required: false, type: 'string', maxLength: 16 },
+    enabled: { required: false, type: 'boolean' }
+}), async (req, res) => {
+    try {
+        const out = await getCommunityActivityService().updateType(req.user, parseInt(req.params.id, 10), req.body);
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في تحديث نوع النشاط'); }
+});
+
+// ── الأنشطة / الفعاليات الواقعية ──
+app.get('/api/community/activities', authenticate, authorizePerm('community.view'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const limit = Math.min(parseInt(req.query.limit, 10) || 20, 50);
+        const offset = parseInt(req.query.offset, 10) || 0;
+        const councilId = req.query.councilId ? parseInt(req.query.councilId, 10) : undefined;
+        const out = await getCommunityActivityService().list(req.user, {
+            status: req.query.status || undefined, councilId, limit, offset
+        });
+        res.json({ success: true, activities: out });
+    } catch (error) { myCheckError(res, error, 'فشل في جلب الأنشطة'); }
+});
+
+app.post('/api/community/activities', authenticate, authorizePerm('community.create_activity'), authorizeCommunityAvailable, validateBody({
+    typeId: { required: true, type: 'number' },
+    councilId: { required: false, type: 'number' },
+    title: { required: true, type: 'string', minLength: 2, maxLength: 120 },
+    description: { required: false, type: 'string', maxLength: 1000 },
+    locationText: { required: false, type: 'string', maxLength: 200 },
+    startsAt: { required: false, type: 'string', maxLength: 40 },
+    endsAt: { required: false, type: 'string', maxLength: 40 },
+    maxParticipants: { required: false, type: 'number', min: 2, max: 500 }
+}), async (req, res) => {
+    try {
+        const out = await getCommunityActivityService().create(req.user, req.body);
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في إنشاء النشاط'); }
+});
+
+app.get('/api/community/activities/:id', authenticate, authorizePerm('community.view'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const out = await getCommunityActivityService().get(req.user, parseInt(req.params.id, 10));
+        res.json({ success: true, activity: out });
+    } catch (error) { myCheckError(res, error, 'فشل في جلب النشاط'); }
+});
+
+app.put('/api/community/activities/:id', authenticate, authorizePerm('community.create_activity'), authorizeCommunityAvailable, validateBody({
+    title: { required: false, type: 'string', minLength: 2, maxLength: 120 },
+    description: { required: false, type: 'string', maxLength: 1000 },
+    locationText: { required: false, type: 'string', maxLength: 200 },
+    startsAt: { required: false, type: 'string', maxLength: 40 },
+    endsAt: { required: false, type: 'string', maxLength: 40 },
+    maxParticipants: { required: false, type: 'number', min: 2, max: 500 },
+    status: { required: false, type: 'string', maxLength: 12 }
+}), async (req, res) => {
+    try {
+        const out = await getCommunityActivityService().updateOwn(req.user, parseInt(req.params.id, 10), req.body);
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في تحديث النشاط'); }
+});
+
+app.post('/api/community/activities/:id/join', authenticate, authorizePerm('community.join_activity'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const out = await getCommunityActivityService().join(req.user, parseInt(req.params.id, 10));
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في الانضمام للنشاط'); }
+});
+
+// الانسحاب انسحاب دائمًا — لا يتطلب إلا community.view (لا يُحبس أحد في نشاط)
+app.post('/api/community/activities/:id/leave', authenticate, authorizePerm('community.view'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const out = await getCommunityActivityService().leave(req.user, parseInt(req.params.id, 10));
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في مغادرة النشاط'); }
+});
+
+app.get('/api/community/activities/:id/participants', authenticate, authorizePerm('community.view'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const limit = Math.min(parseInt(req.query.limit, 10) || 100, 200);
+        const offset = parseInt(req.query.offset, 10) || 0;
+        const out = await getCommunityActivityService().participants(req.user, parseInt(req.params.id, 10), { limit, offset });
+        res.json({ success: true, participants: out });
+    } catch (error) { myCheckError(res, error, 'فشل في جلب المشاركين'); }
+});
+
+app.post('/api/community/moderation/activities/:id/status', authenticate, authorizePerm('community.moderate'), authorizeCommunityAvailable, validateBody({
+    status: { required: true, type: 'string', minLength: 5, maxLength: 12 },
+    note: { required: false, type: 'string', maxLength: 300 }
+}), async (req, res) => {
+    try {
+        const out = await getCommunityActivityService().moderateSetStatus(req.user, parseInt(req.params.id, 10), req.body.status, req.body.note);
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في الإشراف على النشاط'); }
+});
+
+// ── المناسبات ──
+app.get('/api/community/events', authenticate, authorizePerm('community.view'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const out = await getCommunityEventService().listCurrent();
+        res.json({ success: true, events: out });
+    } catch (error) { myCheckError(res, error, 'فشل في جلب المناسبات'); }
+});
+
+app.get('/api/community/admin/events', authenticate, authorizePerm('community.admin'), async (req, res) => {
+    try {
+        const out = await getCommunityEventService().listAll({});
+        res.json({ success: true, events: out });
+    } catch (error) { myCheckError(res, error, 'فشل في جلب المناسبات'); }
+});
+
+app.post('/api/community/admin/events', authenticate, authorizePerm('community.admin'), validateBody({
+    title: { required: true, type: 'string', minLength: 2, maxLength: 120 },
+    icon: { required: false, type: 'string', maxLength: 16 },
+    description: { required: false, type: 'string', maxLength: 1000 },
+    banner: { required: false, type: 'string', maxLength: 500 },
+    startsAt: { required: false, type: 'string', maxLength: 40 },
+    endsAt: { required: false, type: 'string', maxLength: 40 },
+    linkedActivityId: { required: false, type: 'number' }
+}), async (req, res) => {
+    try {
+        const out = await getCommunityEventService().create(req.user, req.body);
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في إنشاء المناسبة'); }
+});
+
+app.put('/api/community/admin/events/:id', authenticate, authorizePerm('community.admin'), validateBody({
+    title: { required: false, type: 'string', minLength: 2, maxLength: 120 },
+    icon: { required: false, type: 'string', maxLength: 16 },
+    description: { required: false, type: 'string', maxLength: 1000 },
+    banner: { required: false, type: 'string', maxLength: 500 },
+    startsAt: { required: false, type: 'string', maxLength: 40 },
+    endsAt: { required: false, type: 'string', maxLength: 40 },
+    status: { required: false, type: 'string', maxLength: 10 },
+    linkedActivityId: { required: false, type: 'number' }
+}), async (req, res) => {
+    try {
+        const out = await getCommunityEventService().update(req.user, parseInt(req.params.id, 10), req.body);
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في تحديث المناسبة'); }
+});
+
+// ── الشارات والإنجازات ──
+app.get('/api/community/badges', authenticate, authorizePerm('community.view'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const out = await getCommunityBadgeService().list();
+        res.json({ success: true, badges: out });
+    } catch (error) { myCheckError(res, error, 'فشل في جلب الشارات'); }
+});
+
+app.get('/api/community/users/:userId/badges', authenticate, authorizePerm('community.view'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const out = await getCommunityBadgeService().forUser(req.user, req.params.userId);
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في جلب شارات المستخدم'); }
+});
+
+app.post('/api/community/admin/badges', authenticate, authorizePerm('community.admin'), validateBody({
+    key: { required: true, type: 'string', minLength: 3, maxLength: 50 },
+    name: { required: true, type: 'string', minLength: 2, maxLength: 60 },
+    description: { required: false, type: 'string', maxLength: 300 },
+    icon: { required: false, type: 'string', maxLength: 16 }
+}), async (req, res) => {
+    try {
+        const out = await getCommunityBadgeService().create(req.user, req.body);
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في إنشاء الشارة'); }
+});
+
+app.post('/api/community/badges/:id/award', authenticate, authorizePerm('community.moderate'), authorizeCommunityAvailable, validateBody({
+    userId: { required: true, type: 'string', minLength: 1, maxLength: 64 },
+    context: { required: false, type: 'string', maxLength: 200 }
+}), async (req, res) => {
+    try {
+        const out = await getCommunityBadgeService().award(req.user, parseInt(req.params.id, 10), req.body);
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في منح الشارة'); }
+});
+
+app.post('/api/community/moderation/user-badges/:id/revoke', authenticate, authorizePerm('community.moderate'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const out = await getCommunityBadgeService().revoke(req.user, parseInt(req.params.id, 10));
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في سحب الشارة'); }
+});
+
+// ── المنافسات (معنوية فقط — لا مال/رهان/رسوم دخول بحكم التصميم) ──
+app.get('/api/community/competitions', authenticate, authorizePerm('community.view'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const limit = Math.min(parseInt(req.query.limit, 10) || 20, 50);
+        const offset = parseInt(req.query.offset, 10) || 0;
+        const out = await getCommunityCompetitionService().list(req.user, {
+            status: req.query.status || undefined, limit, offset
+        });
+        res.json({ success: true, competitions: out });
+    } catch (error) { myCheckError(res, error, 'فشل في جلب المنافسات'); }
+});
+
+app.get('/api/community/competitions/:id', authenticate, authorizePerm('community.view'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const out = await getCommunityCompetitionService().get(req.user, parseInt(req.params.id, 10));
+        res.json({ success: true, competition: out });
+    } catch (error) { myCheckError(res, error, 'فشل في جلب المنافسة'); }
+});
+
+app.post('/api/community/competitions/:id/join', authenticate, authorizePerm('community.tournament'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const out = await getCommunityCompetitionService().join(req.user, parseInt(req.params.id, 10));
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في الانضمام للمنافسة'); }
+});
+
+app.post('/api/community/admin/competitions', authenticate, authorizePerm('community.admin'), validateBody({
+    name: { required: true, type: 'string', minLength: 2, maxLength: 120 },
+    description: { required: false, type: 'string', maxLength: 1000 },
+    scope: { required: false, type: 'string', maxLength: 12 },
+    activityId: { required: false, type: 'number' },
+    rules: { required: false, type: 'string', maxLength: 2000 },
+    startsAt: { required: false, type: 'string', maxLength: 40 },
+    endsAt: { required: false, type: 'string', maxLength: 40 }
+}), async (req, res) => {
+    try {
+        const out = await getCommunityCompetitionService().create(req.user, req.body);
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في إنشاء المنافسة'); }
+});
+
+app.put('/api/community/admin/competitions/:id', authenticate, authorizePerm('community.admin'), validateBody({
+    name: { required: false, type: 'string', minLength: 2, maxLength: 120 },
+    description: { required: false, type: 'string', maxLength: 1000 },
+    scope: { required: false, type: 'string', maxLength: 12 },
+    status: { required: false, type: 'string', maxLength: 12 },
+    rules: { required: false, type: 'string', maxLength: 2000 },
+    startsAt: { required: false, type: 'string', maxLength: 40 },
+    endsAt: { required: false, type: 'string', maxLength: 40 },
+    activityId: { required: false, type: 'number' }
+}), async (req, res) => {
+    try {
+        const out = await getCommunityCompetitionService().update(req.user, parseInt(req.params.id, 10), req.body);
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في تحديث المنافسة'); }
+});
+
+app.post('/api/community/admin/competitions/:id/participants', authenticate, authorizePerm('community.admin'), validateBody({
+    label: { required: true, type: 'string', minLength: 2, maxLength: 80 },
+    userId: { required: false, type: 'string', minLength: 1, maxLength: 64 }
+}), async (req, res) => {
+    try {
+        const out = await getCommunityCompetitionService().addParticipant(req.user, parseInt(req.params.id, 10), req.body);
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في إضافة المشارك'); }
+});
+
+app.delete('/api/community/admin/competition-participants/:id', authenticate, authorizePerm('community.admin'), async (req, res) => {
+    try {
+        const out = await getCommunityCompetitionService().removeParticipant(req.user, parseInt(req.params.id, 10));
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في إزالة المشارك'); }
+});
+
+app.put('/api/community/admin/competition-participants/:id', authenticate, authorizePerm('community.admin'), validateBody({
+    score: { required: false, type: 'number', min: 0, max: 100000 },
+    rank: { required: false, type: 'number', min: 1, max: 1000 },
+    resultNote: { required: false, type: 'string', maxLength: 300 }
+}), async (req, res) => {
+    try {
+        const out = await getCommunityCompetitionService().updateResult(req.user, parseInt(req.params.id, 10), req.body);
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في تسجيل النتيجة'); }
+});
+
+// ── الإشراف على المحتوى الموقوف (flagged بالفلتر / hidden بعتبة البلاغات) ──
+app.get('/api/community/moderation/posts', authenticate, authorizePerm('community.moderate'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const limit = Math.min(parseInt(req.query.limit, 10) || 50, 200);
+        const offset = parseInt(req.query.offset, 10) || 0;
+        const out = await getCommunityPostService().listModeration(req.user, {
+            status: req.query.status, limit, offset
+        });
+        res.json({ success: true, posts: out });
+    } catch (error) { myCheckError(res, error, 'فشل في جلب المحتوى الموقوف'); }
+});
+
+app.post('/api/community/moderation/posts/:id/status', authenticate, authorizePerm('community.moderate'), authorizeCommunityAvailable, validateBody({
+    status: { required: true, type: 'string', minLength: 4, maxLength: 10 },
+    note: { required: false, type: 'string', maxLength: 300 }
+}), async (req, res) => {
+    try {
+        const out = await getCommunityPostService().moderateSetStatus(req.user, parseInt(req.params.id, 10), req.body.status, req.body.note);
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في الإشراف على المنشور'); }
+});
+
+// ── قائمة فلترة المحتوى الإدارية (توسيع فقط — المدمجة لا تُفرَّغ) ──
+app.get('/api/community/admin/content-filter', authenticate, authorizePerm('community.admin'), async (req, res) => {
+    try {
+        const out = await getCommunityContentFilterService().getCustomWords();
+        res.json({ success: true, words: out });
+    } catch (error) { myCheckError(res, error, 'فشل في جلب قائمة الفلترة'); }
+});
+
+app.put('/api/community/admin/content-filter', authenticate, authorizePerm('community.admin'), validateBody({
+    words: { required: true, type: 'array' }
+}), async (req, res) => {
+    try {
+        const out = await getCommunityContentFilterService().setCustomWords(req.body.words, req.user);
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في تحديث قائمة الفلترة'); }
 });
 
 app.post('/api/my/check-session/confirm', authenticate, authorizePerm('ops.my_portal'), async (req, res) => {

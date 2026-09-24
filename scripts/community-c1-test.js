@@ -272,8 +272,10 @@ async function unitFixes() {
         const selfRep = await api('POST', '/api/community/report', tok2, { targetType: 'user', targetId: 'emp-CM002', reason: 'تجربة' });
         check('B12) الإبلاغ عن النفس ← 422 SELF_REPORT', selfRep.status === 422 && selfRep.body && selfRep.body.code === 'SELF_REPORT');
         const badType = await api('POST', '/api/community/report', tok2, { targetType: 'post', targetId: '1', reason: 'تجربة محتوى' });
-        check('B13) بلاغ على محتوى (C2) ← 422 TARGET_NOT_AVAILABLE في C1',
-            badType.status === 422 && badType.body && badType.body.code === 'TARGET_NOT_AVAILABLE', 'status=' + badType.status);
+        // Full Foundation (اعتماد المالك 2026-09-24): بلاغات المحتوى أصبحت موجودة فعلًا —
+        // التوقع المحدّث: منشور غير موجود ← 404 POST_NOT_FOUND (لا TARGET_NOT_AVAILABLE من C1)
+        check('B13) بلاغ على منشور غير موجود ← 404 POST_NOT_FOUND (البلاغات على المحتوى مدعومة منذ Full Foundation)',
+            badType.status === 404 && badType.body && badType.body.code === 'POST_NOT_FOUND', 'status=' + badType.status);
         const ghost = await api('POST', '/api/community/report', tok2, { targetType: 'user', targetId: 'emp-GHOST', reason: 'تجربة' });
         check('B14) بلاغ على مستخدم غير موجود ← 404', ghost.status === 404, 'status=' + ghost.status);
         const rep = await api('POST', '/api/community/report', tok2, { targetType: 'user', targetId: 'emp-CM001', reason: 'سلوك غير لائق في المجلس' });
@@ -363,12 +365,25 @@ async function unitFixes() {
 
         // ═══ العزل البنيوي ═══
         const tbls = dbw.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'community_%' ORDER BY name").all().map(t => t.name);
-        check('B36) جداول community_* الخمسة أُنشئت additive',
-            JSON.stringify(tbls) === JSON.stringify(['community_audit_log', 'community_blocks', 'community_reports', 'community_restrictions', 'community_settings']), tbls.join(','));
+        // Full Foundation (اعتماد المالك 2026-09-24): الجداول أصبحت 17 — التوقع المحدّث:
+        // جداول C1 الخمسة موجودة ضمنها (subset) — التحقق الكامل من الـ17 في community-full-test
+        const C1_TABLES = ['community_audit_log', 'community_blocks', 'community_reports', 'community_restrictions', 'community_settings'];
+        check('B36) جداول C1 الخمسة موجودة ضمن جداول المجتمع (' + tbls.length + ' جدولًا بعد Full Foundation)',
+            C1_TABLES.every(t => tbls.indexOf(t) !== -1), tbls.join(','));
         const src2 = new Database(SRC_DB, { readonly: true });
-        const prodTbls = src2.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'community_%'").all();
+        // Full Foundation: قاعدة التطوير المحلية قد تحمل جداول community فارغة من
+        // خادم تطوير عامل بالكود الجديد (init additive طبيعي). الثابت الحقيقي
+        // للعزل: لا صفوف اختبار (emp-CM*) تسربت إلى المصدر إطلاقًا.
+        let leaked = 0;
+        for (const [t, c] of [['community_posts', 'author_user_id'], ['community_council_members', 'user_id'],
+            ['community_presence', 'user_id'], ['community_reports', 'reporter_user_id'], ['community_audit_log', 'actor_id']]) {
+            try {
+                const exists = src2.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name = ?").get(t);
+                if (exists) leaked += src2.prepare(`SELECT COUNT(*) c FROM ${t} WHERE CAST(${c} AS TEXT) LIKE 'emp-CM%'`).get().c;
+            } catch (_) { }
+        }
         src2.close();
-        check('B37) لا جداول community في قاعدة المصدر (العزل سليم)', prodTbls.length === 0);
+        check('B37) لا صفوف اختبار تسربت لقاعدة المصدر (العزل سليم)', leaked === 0, 'leaked=' + leaked);
     } catch (e) {
         failed++;
         failures.push('fatal: ' + e.message);
