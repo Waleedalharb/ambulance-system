@@ -2720,6 +2720,104 @@ const UserPermissions = {
 };
 
 // ============================================
+// CRUD: EMS COMMUNITY — C1 Foundation (معتمد 2026-09-24)
+// طبقة وصول جداول community_* فقط — لا تقرأ أي جدول تشغيلي.
+// ============================================
+const Community = {
+  // ── الإعدادات / مفاتيح التعطيل (اتجاه التقييد فقط) ──
+  async getSetting(key) {
+    const r = await get('SELECT value FROM community_settings WHERE key = ?', [key]);
+    return r ? r.value : null;
+  },
+  async setSetting(key, value, updatedBy) {
+    return run(
+      `INSERT INTO community_settings (key, value, updated_by) VALUES (?, ?, ?)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_by = excluded.updated_by, updated_at = datetime('now')`,
+      [key, String(value), updatedBy || null]);
+  },
+  async getAllSettings() {
+    return all('SELECT * FROM community_settings ORDER BY key');
+  },
+
+  // ── الحظر (من طرف واحد — الأثر متبادل عمليًا) ──
+  async addBlock(blockerId, blockedId) {
+    return run('INSERT OR IGNORE INTO community_blocks (blocker_user_id, blocked_user_id) VALUES (?, ?)',
+      [String(blockerId), String(blockedId)]);
+  },
+  async removeBlock(blockerId, blockedId) {
+    return run('DELETE FROM community_blocks WHERE blocker_user_id = ? AND blocked_user_id = ?',
+      [String(blockerId), String(blockedId)]);
+  },
+  async isBlockedEitherWay(a, b) {
+    const r = await get(
+      `SELECT 1 AS x FROM community_blocks
+       WHERE (blocker_user_id = ? AND blocked_user_id = ?) OR (blocker_user_id = ? AND blocked_user_id = ?) LIMIT 1`,
+      [String(a), String(b), String(b), String(a)]);
+    return !!r;
+  },
+  async getBlocksBy(userId) {
+    return all('SELECT * FROM community_blocks WHERE blocker_user_id = ? ORDER BY created_at DESC', [String(userId)]);
+  },
+
+  // ── البلاغات ──
+  async createReport({ reporterUserId, reporterName, targetType, targetId, reason }) {
+    const r = await run(
+      `INSERT INTO community_reports (reporter_user_id, reporter_name, target_type, target_id, reason)
+       VALUES (?, ?, ?, ?, ?)`,
+      [String(reporterUserId), reporterName || null, targetType, String(targetId), reason]);
+    return r.id;
+  },
+  async getReportById(id) {
+    return get('SELECT * FROM community_reports WHERE id = ?', [id]);
+  },
+  async listReports(status, limit = 50, offset = 0) {
+    if (status) {
+      return all('SELECT * FROM community_reports WHERE status = ? ORDER BY created_at DESC LIMIT ? OFFSET ?', [status, limit, offset]);
+    }
+    return all('SELECT * FROM community_reports ORDER BY created_at DESC LIMIT ? OFFSET ?', [limit, offset]);
+  },
+  async countPendingForTarget(targetType, targetId) {
+    const r = await get(
+      `SELECT COUNT(*) AS c FROM community_reports WHERE target_type = ? AND target_id = ? AND status = 'pending'`,
+      [targetType, String(targetId)]);
+    return r ? r.c : 0;
+  },
+  async resolveReport(id, { status, actionTaken, handledById, handledByName }) {
+    return run(
+      `UPDATE community_reports SET status = ?, action_taken = ?, handled_by_id = ?, handled_by_name = ?, handled_at = datetime('now')
+       WHERE id = ? AND status = 'pending'`,
+      [status, actionTaken || null, String(handledById), handledByName || null, id]);
+  },
+
+  // ── التقييدات (تجميد المشاركة) ──
+  async addRestriction({ userId, kind, scope, reason, createdBy }) {
+    const r = await run(
+      `INSERT INTO community_restrictions (user_id, kind, scope, reason, created_by) VALUES (?, ?, ?, ?, ?)`,
+      [String(userId), kind, scope || 'community', reason || null, createdBy || null]);
+    return r.id;
+  },
+  async liftRestriction(id, liftedBy) {
+    return run(
+      `UPDATE community_restrictions SET active = 0, lifted_by = ?, lifted_at = datetime('now') WHERE id = ? AND active = 1`,
+      [liftedBy || null, id]);
+  },
+  async getActiveRestrictions(userId) {
+    return all('SELECT * FROM community_restrictions WHERE user_id = ? AND active = 1 ORDER BY created_at DESC', [String(userId)]);
+  },
+
+  // ── سجل التدقيق ──
+  async audit({ actorId, actorName, action, targetType, targetId, detail }) {
+    return run(
+      `INSERT INTO community_audit_log (actor_id, actor_name, action, target_type, target_id, detail)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [actorId != null ? String(actorId) : null, actorName || null, action, targetType || null, targetId != null ? String(targetId) : null, detail || null]);
+  },
+  async listAudit(limit = 50, offset = 0) {
+    return all('SELECT * FROM community_audit_log ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?', [limit, offset]);
+  }
+};
+
+// ============================================
 // CRUD: SHIFT CODES
 // ============================================
 const ShiftCodes = {
@@ -4524,6 +4622,70 @@ async function migrateAssetRegistry() {
     updated_at         TEXT NOT NULL
   )`);
 
+  // ═══ EMS Community — C1 Foundation (اعتماد المالك الكتابي 2026-09-24) ═══
+  // جداول additive بالكامل وبادئة community_ — صفر تعديل على الجداول التشغيلية
+  // (لا أعمدة جديدة ولا فهارس ولا triggers عليها). لا FK لأي جدول تشغيلي:
+  // user_id مرجع منطقي (نمط user_permissions نفسه)، وبيانات عرض الموظف تُجلب
+  // حصريًا عبر community-identity-service (Projection محدد). لا تعليقات ولا
+  // رسائل خاصة ولا Social Graph ولا realtime — C1 أساس Moderation فقط.
+  await exec(`CREATE TABLE IF NOT EXISTS community_settings (
+    key         TEXT PRIMARY KEY,
+    value       TEXT NOT NULL,
+    updated_by  TEXT,
+    updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+  )`);
+  // الحظر: علاقة مستقلة بين مستخدمين — من طرف واحد وأثره متبادل عمليًا
+  await exec(`CREATE TABLE IF NOT EXISTS community_blocks (
+    blocker_user_id TEXT NOT NULL,
+    blocked_user_id TEXT NOT NULL,
+    created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY (blocker_user_id, blocked_user_id)
+  )`);
+  // البلاغات: pending → resolved | dismissed — الحذف قرار مشرف بشري فقط
+  await exec(`CREATE TABLE IF NOT EXISTS community_reports (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    reporter_user_id TEXT NOT NULL,
+    reporter_name   TEXT,
+    target_type     TEXT NOT NULL,
+    target_id       TEXT NOT NULL,
+    reason          TEXT NOT NULL,
+    status          TEXT NOT NULL DEFAULT 'pending',
+    action_taken    TEXT,
+    handled_by_id   TEXT,
+    handled_by_name TEXT,
+    handled_at      TEXT,
+    created_at      TEXT NOT NULL DEFAULT (datetime('now'))
+  )`);
+  await exec(`CREATE INDEX IF NOT EXISTS idx_community_reports_status ON community_reports(status, created_at)`);
+  await exec(`CREATE INDEX IF NOT EXISTS idx_community_reports_target ON community_reports(target_type, target_id, status)`);
+  // تقييدات المشاركة (تجميد مؤقت بقرار مشرف) — تُفحص في حارس مشاركة المجتمع
+  await exec(`CREATE TABLE IF NOT EXISTS community_restrictions (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id    TEXT NOT NULL,
+    kind       TEXT NOT NULL,
+    scope      TEXT NOT NULL DEFAULT 'community',
+    reason     TEXT,
+    active     INTEGER NOT NULL DEFAULT 1,
+    created_by TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    lifted_by  TEXT,
+    lifted_at  TEXT
+  )`);
+  await exec(`CREATE INDEX IF NOT EXISTS idx_community_restrictions_user ON community_restrictions(user_id, active)`);
+  // سجل تدقيق المجتمع: من اتخذ الإجراء · متى · السبب · الهدف · الإجراء
+  await exec(`CREATE TABLE IF NOT EXISTS community_audit_log (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    actor_id    TEXT,
+    actor_name  TEXT,
+    action      TEXT NOT NULL,
+    target_type TEXT,
+    target_id   TEXT,
+    detail      TEXT,
+    created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+  )`);
+  await exec(`CREATE INDEX IF NOT EXISTS idx_community_audit_created ON community_audit_log(created_at)`);
+
+  logger.info('community C1 foundation tables ready (5 tables, additive)');
   logger.info('asset registry tables ready (8 tables, additive)');
 }
 
@@ -4895,6 +5057,9 @@ module.exports = {
   NotificationLog,
   PushDevices,
   ShiftChangeRequests,
+
+  // EMS Community — C1 Foundation (معتمد 2026-09-24)
+  Community,
 
   // نظام العهد والأصول (المرحلة 2 — 2026-08-23)
   AssetTypes,

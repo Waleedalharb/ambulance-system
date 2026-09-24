@@ -1442,6 +1442,53 @@ function getTeamLocationService() {
     }
     return teamLocationService;
 }
+// ═══ EMS Community — C1 Foundation (اعتماد المالك الكتابي 2026-09-24) ═══
+// خدمات مستقلة بالكامل. نقطتا العزل الوحيدتان نحو التشغيل: Identity (Projection
+// محدد) وGate (قراءة resolveEffectiveAssignment كما هو — بلا أي تعديل عليه).
+let communityIdentityService = null;
+function getCommunityIdentityService() {
+    if (!communityIdentityService && db) {
+        const CommunityIdentityService = require('./services/community-identity-service');
+        communityIdentityService = new CommunityIdentityService({ db, usersPath: USERS_PATH });
+    }
+    return communityIdentityService;
+}
+let communityGateService = null;
+function getCommunityGateService() {
+    if (!communityGateService && db) {
+        const CommunityOperationalGateService = require('./services/community-operational-gate-service');
+        communityGateService = new CommunityOperationalGateService({ assignment: getOperationalAssignmentService() });
+    }
+    return communityGateService;
+}
+let communityService = null;
+function getCommunityService() {
+    if (!communityService && db) {
+        const CommunityService = require('./services/community-service');
+        communityService = new CommunityService({ db, gate: getCommunityGateService() });
+    }
+    return communityService;
+}
+let communityModerationService = null;
+function getCommunityModerationService() {
+    if (!communityModerationService && db) {
+        const CommunityModerationService = require('./services/community-moderation-service');
+        communityModerationService = new CommunityModerationService({ db, identity: getCommunityIdentityService() });
+    }
+    return communityModerationService;
+}
+// حارس توفر المنظومة (مستوى 1 + 5): إطفاء كامل أو دور معطّل ← 403 عام.
+// مسارات admin/settings مستثناة حتى يستطيع المدير إعادة التفعيل.
+async function authorizeCommunityAvailable(req, res, next) {
+    try {
+        const ok = await getCommunityService().isAvailableFor(req.user);
+        if (!ok) return res.status(403).json({ error: 'منظومة المجتمع غير متاحة حاليًا', code: 'COMMUNITY_DISABLED' });
+        next();
+    } catch (e) {
+        console.error('authorizeCommunityAvailable error:', e.message);
+        return res.status(500).json({ error: 'فشل فحص توفر المجتمع' });
+    }
+}
 function myCheckError(res, error, fallback) {
     const status = error.statusCode || 500;
     if (status >= 500) console.error('[shift-check]', error);
@@ -1549,6 +1596,118 @@ app.get('/api/ops/team-locations', authenticate, authorizePerm('ops.team_locatio
         const out = await getTeamLocationService().list();
         res.json({ success: true, ...out });
     } catch (error) { myCheckError(res, error, 'فشل في جلب مواقع الفرق'); }
+});
+
+// ═══ EMS Community — C1 Foundation (اعتماد المالك الكتابي 2026-09-24) ═══
+// أساس فقط: حالة/هوية/بوابة + Block/Report/Queue/Audit + مفاتيح التعطيل.
+// لا مجالس ولا منشورات ولا فعاليات ولا بطولات ولا realtime (C2+).
+// إجراءات السلامة (بلاغ/حظر) لا تمر بالبوابة التشغيلية — تبقى متاحة دائمًا.
+
+// حالة المجتمع للمستخدم الحالي: توفر + هوية العرض (Projection) + قرار البوابة + تقييدات
+app.get('/api/community/status', authenticate, authorizePerm('community.view'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const me = await getCommunityIdentityService().resolveByUser(req.user);
+        const gate = await getCommunityGateService().evaluate(req.user);
+        const restrictions = await db.Community.getActiveRestrictions(req.user.id);
+        res.json({
+            success: true, enabled: true, me,
+            gate, // { allowRead, allowParticipation, reason } — reason عام غير حساس
+            participationFrozen: restrictions.length > 0
+        });
+    } catch (error) { myCheckError(res, error, 'فشل في جلب حالة المجتمع'); }
+});
+
+// ── Block (سلامة — متاح دائمًا ولو في حالة تشغيلية) ──
+app.post('/api/community/block', authenticate, authorizePerm('community.view'), authorizeCommunityAvailable, validateBody({
+    userId: { required: true, type: 'string', minLength: 1, maxLength: 64 }
+}), async (req, res) => {
+    try {
+        const out = await getCommunityModerationService().block(req.user, req.body.userId);
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في حظر المستخدم'); }
+});
+
+app.post('/api/community/unblock', authenticate, authorizePerm('community.view'), authorizeCommunityAvailable, validateBody({
+    userId: { required: true, type: 'string', minLength: 1, maxLength: 64 }
+}), async (req, res) => {
+    try {
+        const out = await getCommunityModerationService().unblock(req.user, req.body.userId);
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في فك الحظر'); }
+});
+
+app.get('/api/community/blocks', authenticate, authorizePerm('community.view'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const out = await getCommunityModerationService().myBlocks(req.user);
+        res.json({ success: true, blocks: out });
+    } catch (error) { myCheckError(res, error, 'فشل في جلب قائمة الحظر'); }
+});
+
+// ── Report (سلامة — متاح دائمًا) ──
+app.post('/api/community/report', authenticate, authorizePerm('community.view'), authorizeCommunityAvailable, validateBody({
+    targetType: { required: true, type: 'string', minLength: 2, maxLength: 20 },
+    targetId: { required: true, type: 'string', minLength: 1, maxLength: 64 },
+    reason: { required: true, type: 'string', minLength: 3, maxLength: 500 }
+}), async (req, res) => {
+    try {
+        const out = await getCommunityModerationService().report(req.user, req.body);
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في إرسال البلاغ'); }
+});
+
+// ── الإشراف (community.moderate) ──
+app.get('/api/community/moderation/queue', authenticate, authorizePerm('community.moderate'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const out = await getCommunityModerationService().queue(req.query.status);
+        res.json({ success: true, reports: out });
+    } catch (error) { myCheckError(res, error, 'فشل في جلب قائمة البلاغات'); }
+});
+
+app.post('/api/community/moderation/reports/:id/action', authenticate, authorizePerm('community.moderate'), authorizeCommunityAvailable, validateBody({
+    action: { required: true, type: 'string', minLength: 2, maxLength: 20 },
+    note: { required: false, type: 'string', maxLength: 300 }
+}), async (req, res) => {
+    try {
+        const out = await getCommunityModerationService().handleReport(req.user, req.params.id, req.body);
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في معالجة البلاغ'); }
+});
+
+app.post('/api/community/moderation/restrictions/:id/lift', authenticate, authorizePerm('community.moderate'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const out = await getCommunityModerationService().liftRestriction(req.user, req.params.id);
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في فك التقييد'); }
+});
+
+app.get('/api/community/moderation/audit', authenticate, authorizePerm('community.moderate'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const limit = Math.min(parseInt(req.query.limit, 10) || 50, 200);
+        const offset = parseInt(req.query.offset, 10) || 0;
+        const out = await getCommunityModerationService().auditTrail(limit, offset);
+        res.json({ success: true, audit: out });
+    } catch (error) { myCheckError(res, error, 'فشل في جلب سجل التدقيق'); }
+});
+
+// ── الإدارة (community.admin) — مستثناة من حارس التوفر حتى يمكن إعادة التفعيل ──
+app.get('/api/community/admin/settings', authenticate, authorizePerm('community.admin'), async (req, res) => {
+    try {
+        const out = await getCommunityService().getSettings();
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في جلب إعدادات المجتمع'); }
+});
+
+app.put('/api/community/admin/settings', authenticate, authorizePerm('community.admin'), validateBody({
+    enabled: { required: false, type: 'boolean' },
+    disabledRoles: { required: false, type: 'array' }
+}), async (req, res) => {
+    try {
+        const svc = getCommunityService();
+        if (typeof req.body.enabled === 'boolean') await svc.setEnabled(req.body.enabled, req.user);
+        if (Array.isArray(req.body.disabledRoles)) await svc.setDisabledRoles(req.body.disabledRoles, req.user);
+        const out = await svc.getSettings();
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في تحديث إعدادات المجتمع'); }
 });
 
 app.post('/api/my/check-session/confirm', authenticate, authorizePerm('ops.my_portal'), async (req, res) => {
