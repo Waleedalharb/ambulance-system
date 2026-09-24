@@ -73,17 +73,20 @@ class CommunityCompetitionService {
             const a = await this.db.Community.getActivityById(activityId);
             if (!a) throw this._err(404, 'النشاط المرتبط غير موجود', 'ACTIVITY_NOT_FOUND');
         }
-        const id = await this.db.Community.createCompetition({
-            name: n, description: description ? String(description).slice(0, 1000) : null,
-            scope: scope || 'teams', activityId: activityId ?? null,
-            rules: rules ? String(rules).slice(0, 2000) : null,
-            startsAt: startsAt || null, endsAt: endsAt || null, createdBy: actor.name
+        // الإنشاء + التدقيق في معاملة واحدة
+        return this.db.Community.atomic(async () => {
+            const id = await this.db.Community.createCompetition({
+                name: n, description: description ? String(description).slice(0, 1000) : null,
+                scope: scope || 'teams', activityId: activityId ?? null,
+                rules: rules ? String(rules).slice(0, 2000) : null,
+                startsAt: startsAt || null, endsAt: endsAt || null, createdBy: actor.name
+            });
+            await this.db.Community.audit({
+                actorId: actor.id, actorName: actor.name, action: 'competition_create',
+                targetType: 'competition', targetId: id, detail: 'منافسة «' + n + '» (' + (scope || 'teams') + ')'
+            });
+            return { id };
         });
-        await this.db.Community.audit({
-            actorId: actor.id, actorName: actor.name, action: 'competition_create',
-            targetType: 'competition', targetId: id, detail: 'منافسة «' + n + '» (' + (scope || 'teams') + ')'
-        });
-        return { id };
     }
 
     /** تحديث منافسة (بما فيه الحالة) — community.admin عبر المسار. */
@@ -97,19 +100,22 @@ class CommunityCompetitionService {
             throw this._err(422, 'نطاق غير معروف (' + COMP_SCOPE.join('/') + ')', 'BAD_SCOPE');
         }
         await this._filterOrThrow([[name, 'الاسم'], [description, 'الوصف'], [rules, 'القواعد']]);
-        await this.db.Community.updateCompetition(id, {
-            name: name != null ? String(name).trim() : null,
-            description: description != null ? String(description).slice(0, 1000) : null,
-            scope: scope || null, status: status || null,
-            rules: rules != null ? String(rules).slice(0, 2000) : null,
-            startsAt: startsAt || null, endsAt: endsAt || null, activityId: activityId ?? null
+        // التحديث + التدقيق في معاملة واحدة
+        return this.db.Community.atomic(async () => {
+            await this.db.Community.updateCompetition(id, {
+                name: name != null ? String(name).trim() : null,
+                description: description != null ? String(description).slice(0, 1000) : null,
+                scope: scope || null, status: status || null,
+                rules: rules != null ? String(rules).slice(0, 2000) : null,
+                startsAt: startsAt || null, endsAt: endsAt || null, activityId: activityId ?? null
+            });
+            await this.db.Community.audit({
+                actorId: actor.id, actorName: actor.name, action: 'competition_update',
+                targetType: 'competition', targetId: id,
+                detail: 'تحديث منافسة «' + c.name + '»' + (status ? ' ← ' + status : '')
+            });
+            return { id, updated: true };
         });
-        await this.db.Community.audit({
-            actorId: actor.id, actorName: actor.name, action: 'competition_update',
-            targetType: 'competition', targetId: id,
-            detail: 'تحديث منافسة «' + c.name + '»' + (status ? ' ← ' + status : '')
-        });
-        return { id, updated: true };
     }
 
     /**
@@ -145,24 +151,30 @@ class CommunityCompetitionService {
             const target = await this.identity.resolveByUserId(userId);
             if (!target) throw this._err(404, 'المستخدم غير موجود', 'USER_NOT_FOUND');
         }
-        await this.db.Community.addCompetitionParticipant({ competitionId: c.id, label: l, userId: userId ?? null });
-        await this.db.Community.audit({
-            actorId: actor.id, actorName: actor.name, action: 'competition_participant_add',
-            targetType: 'competition', targetId: id, detail: 'إضافة «' + l + '» لمنافسة «' + c.name + '»'
+        // الإضافة + التدقيق في معاملة واحدة
+        return this.db.Community.atomic(async () => {
+            await this.db.Community.addCompetitionParticipant({ competitionId: c.id, label: l, userId: userId ?? null });
+            await this.db.Community.audit({
+                actorId: actor.id, actorName: actor.name, action: 'competition_participant_add',
+                targetType: 'competition', targetId: id, detail: 'إضافة «' + l + '» لمنافسة «' + c.name + '»'
+            });
+            return { added: true };
         });
-        return { added: true };
     }
 
     async removeParticipant(actor, participantId) {
         const p = await this.db.Community.getCompetitionParticipant(participantId);
         if (!p) throw this._err(404, 'المشارك غير موجود', 'PARTICIPANT_NOT_FOUND');
-        const r = await this.db.Community.removeCompetitionParticipant(participantId);
-        if (!r || r.changes !== 1) throw this._err(404, 'المشارك غير موجود', 'PARTICIPANT_NOT_FOUND');
-        await this.db.Community.audit({
-            actorId: actor.id, actorName: actor.name, action: 'competition_participant_remove',
-            targetType: 'competition', targetId: p.competition_id, detail: 'إزالة «' + p.participant_label + '»'
+        // الإزالة + التدقيق في معاملة واحدة
+        return this.db.Community.atomic(async () => {
+            const r = await this.db.Community.removeCompetitionParticipant(participantId);
+            if (!r || r.changes !== 1) throw this._err(404, 'المشارك غير موجود', 'PARTICIPANT_NOT_FOUND');
+            await this.db.Community.audit({
+                actorId: actor.id, actorName: actor.name, action: 'competition_participant_remove',
+                targetType: 'competition', targetId: p.competition_id, detail: 'إزالة «' + p.participant_label + '»'
+            });
+            return { removed: true };
         });
-        return { removed: true };
     }
 
     /** تسجيل نقاط/ترتيب/نتيجة — community.admin عبر المسار، ويُدقَّق دائمًا. */
@@ -180,17 +192,20 @@ class CommunityCompetitionService {
             rank = r2;
         }
         if (resultNote != null) await this._filterOrThrow([[resultNote, 'ملاحظة النتيجة']]);
-        await this.db.Community.updateCompetitionParticipant(participantId, {
-            score: score ?? null, rank: rank ?? null,
-            resultNote: resultNote != null ? String(resultNote).slice(0, 300) : null
+        // تسجيل النتيجة + التدقيق في معاملة واحدة
+        return this.db.Community.atomic(async () => {
+            await this.db.Community.updateCompetitionParticipant(participantId, {
+                score: score ?? null, rank: rank ?? null,
+                resultNote: resultNote != null ? String(resultNote).slice(0, 300) : null
+            });
+            await this.db.Community.audit({
+                actorId: actor.id, actorName: actor.name, action: 'competition_result',
+                targetType: 'competition', targetId: p.competition_id,
+                detail: 'نتيجة «' + p.participant_label + '»' +
+                    (score != null ? ' نقاط=' + score : '') + (rank != null ? ' ترتيب=' + rank : '')
+            });
+            return { updated: true };
         });
-        await this.db.Community.audit({
-            actorId: actor.id, actorName: actor.name, action: 'competition_result',
-            targetType: 'competition', targetId: p.competition_id,
-            detail: 'نتيجة «' + p.participant_label + '»' +
-                (score != null ? ' نقاط=' + score : '') + (rank != null ? ' ترتيب=' + rank : '')
-        });
-        return { updated: true };
     }
 }
 

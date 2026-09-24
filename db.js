@@ -2831,6 +2831,21 @@ const Community = {
     return all('SELECT * FROM community_audit_log ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?', [limit, offset]);
   },
 
+  // ── معاملة الكتابة الموحدة ──
+  // كل عملية تجمع DB mutation + Audit تُنفَّذ هنا: ينجح الاثنان معًا أو
+  // يُرجَعان معًا (ROLLBACK) — فلا توجد أبدًا حالة «تغيير محفوظ بلا تدقيق».
+  async atomic(fn) {
+    beginTransaction();
+    try {
+      const out = await fn();
+      commitTransaction();
+      return out;
+    } catch (e) {
+      try { rollbackTransaction(); } catch (_) { }
+      throw e;
+    }
+  },
+
   // ═══ Full Foundation (اعتماد المالك الكتابي 2026-09-24) ═══
 
   // ── المجالس ──
@@ -3027,6 +3042,25 @@ const Community = {
       `INSERT INTO community_activity_participants (activity_id, user_id, status, joined_at) VALUES (?, ?, 'joined', datetime('now'))
        ON CONFLICT(activity_id, user_id) DO UPDATE SET status = 'joined', joined_at = datetime('now')`,
       [activityId, String(userId)]);
+  },
+  // انضمام بسعة مضمونة ذرّيًا: فحص السعة والإدراج في عبارة SQL واحدة.
+  // SQLite ينفّذ العبارة كوحدة ذرّية ويُسلسل الكتّاب، فلا يمكن لطلبين
+  // متسابقين تجاوز max_participants مهما تداخلت الأحداث بين العبارات.
+  // changes=0 تعني أن السعة كانت مكتملة لحظة التنفيذ ← ACTIVITY_FULL.
+  // (إعادة انضمام عضو سابق تمر عبر ON CONFLICT وتحتسب ضمن السعة بصواب.)
+  async joinActivityWithCapacity(activityId, userId, maxParticipants) {
+    if (maxParticipants == null) {
+      return run(
+        `INSERT INTO community_activity_participants (activity_id, user_id, status, joined_at) VALUES (?, ?, 'joined', datetime('now'))
+         ON CONFLICT(activity_id, user_id) DO UPDATE SET status = 'joined', joined_at = datetime('now')`,
+        [activityId, String(userId)]);
+    }
+    return run(
+      `INSERT INTO community_activity_participants (activity_id, user_id, status, joined_at)
+       SELECT ?, ?, 'joined', datetime('now')
+       WHERE (SELECT COUNT(*) FROM community_activity_participants WHERE activity_id = ? AND status = 'joined') < ?
+       ON CONFLICT(activity_id, user_id) DO UPDATE SET status = 'joined', joined_at = datetime('now')`,
+      [activityId, String(userId), activityId, maxParticipants]);
   },
   async leaveActivity(activityId, userId) {
     return run(
@@ -5006,6 +5040,11 @@ async function migrateAssetRegistry() {
   )`);
   await exec(`CREATE INDEX IF NOT EXISTS idx_community_reports_status ON community_reports(status, created_at)`);
   await exec(`CREATE INDEX IF NOT EXISTS idx_community_reports_target ON community_reports(target_type, target_id, status)`);
+  // ضمان بنيوي ضد سباق البلاغات: بلاغ pending واحد لكل (مبلِّغ، نوع هدف، هدف).
+  // فحص القراءة في الخدمة مسار ودّي فقط — هذا الفهرس الجزئي هو الحارس النهائي
+  // داخل قاعدة البيانات، فلا يمكن لطلبين متسابقين إنشاء pending مزدوج أبدًا.
+  await exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_community_reports_pending_one
+    ON community_reports(reporter_user_id, target_type, target_id) WHERE status = 'pending'`);
   // تقييدات المشاركة (تجميد مؤقت بقرار مشرف) — تُفحص في حارس مشاركة المجتمع
   await exec(`CREATE TABLE IF NOT EXISTS community_restrictions (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,

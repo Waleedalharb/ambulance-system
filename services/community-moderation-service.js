@@ -153,10 +153,20 @@ class CommunityModerationService {
         const dup = await this.db.Community.getPendingReportByReporter(actor.id, targetType, tid);
         if (dup) throw this._err(409, 'لديك بلاغ قائم على هذا الهدف بانتظار المعالجة', 'DUPLICATE_REPORT');
         return this._atomic(async () => {
-            const id = await this.db.Community.createReport({
-                reporterUserId: actor.id, reporterName: actor.name,
-                targetType, targetId: tid, reason: text
-            });
+            let id;
+            try {
+                id = await this.db.Community.createReport({
+                    reporterUserId: actor.id, reporterName: actor.name,
+                    targetType, targetId: tid, reason: text
+                });
+            } catch (e) {
+                // الحارس البنيوي (فهرس idx_community_reports_pending_one) يحسم أي
+                // سباق تسلّل من فحص القراءة أعلاه ← نفس الرفض الودّي 409
+                if (e && /UNIQUE constraint failed/i.test(String(e.message || ''))) {
+                    throw this._err(409, 'لديك بلاغ قائم على هذا الهدف بانتظار المعالجة', 'DUPLICATE_REPORT');
+                }
+                throw e;
+            }
             // العتبة التلقائية: تعدد البلاغات على منشور ← إخفاء مؤقت بانتظار قرار
             // مشرف بشري (hidden وليس removed — الحذف لا يكون تلقائيًا أبدًا)
             if (targetType === 'post') {
@@ -244,7 +254,13 @@ class CommunityModerationService {
     /** رفع تقييد (فك تجميد) — قرار مشرف ويُدقَّق داخل نفس المعاملة. */
     async liftRestriction(actor, restrictionId) {
         return this._atomic(async () => {
-            await this.db.Community.liftRestriction(restrictionId, actor.name);
+            // لا نجاح بلا أثر: UPDATE الشرطي (WHERE active=1) هو نقطة القرار
+            // الوحيدة — 0 صفوف يعني تقييدًا غير موجود أو مرفوعًا مسبقًا (حتى
+            // تحت التزامن) ← 409 وROLLBACK، فلا تدقيق «فك» لشيء لم يُفكّ.
+            const r = await this.db.Community.liftRestriction(restrictionId, actor.name);
+            if (!r || r.changes !== 1) {
+                throw this._err(409, 'التقييد غير موجود أو مرفوع مسبقًا', 'RESTRICTION_NOT_ACTIVE');
+            }
             await this.db.Community.audit({
                 actorId: actor.id, actorName: actor.name, action: 'restriction_lift',
                 targetType: 'restriction', targetId: restrictionId, detail: 'فك تقييد مشاركة #' + restrictionId

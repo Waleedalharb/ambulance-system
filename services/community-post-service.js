@@ -52,22 +52,25 @@ class CommunityPostService {
         // مخالفة الفلتر ← flagged (قائمة الإشراف، لا تظهر للأعضاء) + تدقيق داخلي
         const status = f.ok ? 'active' : 'flagged';
         const flagReason = f.ok ? null : 'content_filter';
-        const id = await this.db.Community.createPost({
-            councilId: council.id, authorUserId: actor.id,
-            authorName: me ? me.display_name : actor.name, content: text, status, flagReason
-        });
-        if (!f.ok) {
-            await this.db.Community.audit({
-                actorId: actor.id, actorName: actor.name, action: 'post_flagged',
-                targetType: 'post', targetId: id,
-                detail: 'منشور أوقفه فلتر المحتوى في «' + council.name + '» — بانتظار مراجعة مشرف'
+        // الإنشاء (+ تدقيق الإيقاف عند المخالفة) في معاملة واحدة
+        return this.db.Community.atomic(async () => {
+            const id = await this.db.Community.createPost({
+                councilId: council.id, authorUserId: actor.id,
+                authorName: me ? me.display_name : actor.name, content: text, status, flagReason
             });
-        }
-        return {
-            id, status,
-            flagged: !f.ok,
-            message: f.ok ? null : 'أوقف المنشور للمراجعة وفق سياسة المحتوى ولن يظهر حتى يُعتمد'
-        };
+            if (!f.ok) {
+                await this.db.Community.audit({
+                    actorId: actor.id, actorName: actor.name, action: 'post_flagged',
+                    targetType: 'post', targetId: id,
+                    detail: 'منشور أوقفه فلتر المحتوى في «' + council.name + '» — بانتظار مراجعة مشرف'
+                });
+            }
+            return {
+                id, status,
+                flagged: !f.ok,
+                message: f.ok ? null : 'أوقف المنشور للمراجعة وفق سياسة المحتوى ولن يظهر حتى يُعتمد'
+            };
+        });
     }
 
     /** قائمة منشورات مجلس: active فقط + استبعاد الحظر المتبادل + Pagination. */
@@ -86,13 +89,16 @@ class CommunityPostService {
     async removeOwn(actor, postId) {
         const post = await this.db.Community.getPostById(postId);
         if (!post) throw this._err(404, 'المنشور غير موجود', 'POST_NOT_FOUND');
-        const r = await this.db.Community.deleteOwnPost(postId, actor.id);
-        if (!r || r.changes !== 1) throw this._err(403, 'لا يمكن حذف منشور غيرك', 'NOT_AUTHOR');
-        await this.db.Community.audit({
-            actorId: actor.id, actorName: actor.name, action: 'post_delete_own',
-            targetType: 'post', targetId: postId, detail: 'مؤلف حذف منشوره'
+        // الحذف + التدقيق في معاملة واحدة
+        return this.db.Community.atomic(async () => {
+            const r = await this.db.Community.deleteOwnPost(postId, actor.id);
+            if (!r || r.changes !== 1) throw this._err(403, 'لا يمكن حذف منشور غيرك', 'NOT_AUTHOR');
+            await this.db.Community.audit({
+                actorId: actor.id, actorName: actor.name, action: 'post_delete_own',
+                targetType: 'post', targetId: postId, detail: 'مؤلف حذف منشوره'
+            });
+            return { deleted: true };
         });
-        return { deleted: true };
     }
 
     /** إشراف مباشر على المحتوى (community.moderate عبر المسار): active/hidden/removed. */
@@ -103,13 +109,16 @@ class CommunityPostService {
         }
         const post = await this.db.Community.getPostById(postId);
         if (!post) throw this._err(404, 'المنشور غير موجود', 'POST_NOT_FOUND');
-        await this.db.Community.setPostStatus(postId, status, actor.name);
-        await this.db.Community.audit({
-            actorId: actor.id, actorName: actor.name, action: 'post_moderate',
-            targetType: 'post', targetId: postId,
-            detail: 'منشور #' + postId + ' ← ' + status + (note ? ' · ' + String(note).slice(0, 200) : '')
+        // تغيير الحالة + التدقيق في معاملة واحدة
+        return this.db.Community.atomic(async () => {
+            await this.db.Community.setPostStatus(postId, status, actor.name);
+            await this.db.Community.audit({
+                actorId: actor.id, actorName: actor.name, action: 'post_moderate',
+                targetType: 'post', targetId: postId,
+                detail: 'منشور #' + postId + ' ← ' + status + (note ? ' · ' + String(note).slice(0, 200) : '')
+            });
+            return { id: postId, status };
         });
-        return { id: postId, status };
     }
 
     /** قائمة الإشراف للمحتوى الموقوف (flagged بالفلتر / hidden بعتبة البلاغات). */

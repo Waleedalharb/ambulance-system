@@ -70,15 +70,18 @@ class CommunityActivityService {
         await this._filterOrThrow([[n, 'اسم النوع'], [description, 'الوصف']]);
         const existing = await this.db.Community.getActivityTypeByKey(k);
         if (existing) throw this._err(409, 'يوجد نوع نشاط بهذا المعرف', 'KEY_TAKEN');
-        const id = await this.db.Community.createActivityType({
-            key: k, name: n, description: description ? String(description).slice(0, 300) : null,
-            icon: icon ? String(icon).slice(0, 16) : null
+        // الإنشاء + التدقيق في معاملة واحدة: فشل التدقيق يُرجع النوع المُنشأ
+        return this.db.Community.atomic(async () => {
+            const id = await this.db.Community.createActivityType({
+                key: k, name: n, description: description ? String(description).slice(0, 300) : null,
+                icon: icon ? String(icon).slice(0, 16) : null
+            });
+            await this.db.Community.audit({
+                actorId: actor.id, actorName: actor.name, action: 'activity_type_create',
+                targetType: 'activity_type', targetId: id, detail: 'نوع نشاط جديد «' + n + '» (' + k + ')'
+            });
+            return { id, key: k };
         });
-        await this.db.Community.audit({
-            actorId: actor.id, actorName: actor.name, action: 'activity_type_create',
-            targetType: 'activity_type', targetId: id, detail: 'نوع نشاط جديد «' + n + '» (' + k + ')'
-        });
-        return { id, key: k };
     }
 
     async updateType(actor, id, { name, description, icon, enabled }) {
@@ -86,18 +89,21 @@ class CommunityActivityService {
         if (!t) throw this._err(404, 'نوع النشاط غير موجود', 'TYPE_NOT_FOUND');
         if (name != null) await this._filterOrThrow([[name, 'اسم النوع']]);
         if (description != null) await this._filterOrThrow([[description, 'الوصف']]);
-        await this.db.Community.updateActivityType(id, {
-            name: name != null ? String(name).trim() : null,
-            description: description != null ? String(description).slice(0, 300) : null,
-            icon: icon != null ? String(icon).slice(0, 16) : null,
-            enabled: typeof enabled === 'boolean' ? enabled : null
+        // التحديث + التدقيق في معاملة واحدة
+        return this.db.Community.atomic(async () => {
+            await this.db.Community.updateActivityType(id, {
+                name: name != null ? String(name).trim() : null,
+                description: description != null ? String(description).slice(0, 300) : null,
+                icon: icon != null ? String(icon).slice(0, 16) : null,
+                enabled: typeof enabled === 'boolean' ? enabled : null
+            });
+            await this.db.Community.audit({
+                actorId: actor.id, actorName: actor.name, action: 'activity_type_update',
+                targetType: 'activity_type', targetId: id,
+                detail: 'تحديث نوع «' + t.name + '»' + (typeof enabled === 'boolean' ? (enabled ? ' ← تفعيل' : ' ← تعطيل') : '')
+            });
+            return { id, updated: true };
         });
-        await this.db.Community.audit({
-            actorId: actor.id, actorName: actor.name, action: 'activity_type_update',
-            targetType: 'activity_type', targetId: id,
-            detail: 'تحديث نوع «' + t.name + '»' + (typeof enabled === 'boolean' ? (enabled ? ' ← تفعيل' : ' ← تعطيل') : '')
-        });
-        return { id, updated: true };
     }
 
     // ── الأنشطة ──
@@ -124,20 +130,23 @@ class CommunityActivityService {
         // المكان نص حر من المنظم — يُفلتر مثل أي UGC، ولا يُقبل أي تنسيق إحداثيات
         await this._filterOrThrow([[t, 'العنوان'], [description, 'الوصف'], [locationText, 'المكان']]);
         const me = await this.identity.resolveByUser(actor);
-        const id = await this.db.Community.createActivity({
-            typeId: type.id, councilId: council ? council.id : null, title: t,
-            description: description ? String(description).slice(0, 1000) : null,
-            locationText: locationText ? String(locationText).slice(0, 200) : null,
-            startsAt: startsAt || null, endsAt: endsAt || null,
-            maxParticipants: maxParticipants ?? null,
-            createdBy: actor.id, createdByName: me ? me.display_name : actor.name
+        // الإنشاء + انضمام المنشئ + التدقيق في معاملة واحدة: لا نشاط بلا تدقيق
+        return this.db.Community.atomic(async () => {
+            const id = await this.db.Community.createActivity({
+                typeId: type.id, councilId: council ? council.id : null, title: t,
+                description: description ? String(description).slice(0, 1000) : null,
+                locationText: locationText ? String(locationText).slice(0, 200) : null,
+                startsAt: startsAt || null, endsAt: endsAt || null,
+                maxParticipants: maxParticipants ?? null,
+                createdBy: actor.id, createdByName: me ? me.display_name : actor.name
+            });
+            await this.db.Community.joinActivity(id, actor.id); // المنشئ مشارك أول
+            await this.db.Community.audit({
+                actorId: actor.id, actorName: actor.name, action: 'activity_create',
+                targetType: 'activity', targetId: id, detail: 'نشاط «' + t + '» (' + type.name + ')'
+            });
+            return { id, status: 'open' };
         });
-        await this.db.Community.joinActivity(id, actor.id); // المنشئ مشارك أول
-        await this.db.Community.audit({
-            actorId: actor.id, actorName: actor.name, action: 'activity_create',
-            targetType: 'activity', targetId: id, detail: 'نشاط «' + t + '» (' + type.name + ')'
-        });
-        return { id, status: 'open' };
     }
 
     async get(actor, id) {
@@ -172,18 +181,21 @@ class CommunityActivityService {
             fields.maxParticipants = mp;
         }
         await this._filterOrThrow([[fields.title, 'العنوان'], [fields.description, 'الوصف'], [fields.locationText, 'المكان']]);
-        await this.db.Community.updateActivity(id, {
-            title: fields.title != null ? String(fields.title).trim() : null,
-            description: fields.description != null ? String(fields.description).slice(0, 1000) : null,
-            locationText: fields.locationText != null ? String(fields.locationText).slice(0, 200) : null,
-            startsAt: fields.startsAt || null, endsAt: fields.endsAt || null,
-            maxParticipants: fields.maxParticipants ?? null, status: fields.status || null
+        // التحديث + التدقيق في معاملة واحدة
+        return this.db.Community.atomic(async () => {
+            await this.db.Community.updateActivity(id, {
+                title: fields.title != null ? String(fields.title).trim() : null,
+                description: fields.description != null ? String(fields.description).slice(0, 1000) : null,
+                locationText: fields.locationText != null ? String(fields.locationText).slice(0, 200) : null,
+                startsAt: fields.startsAt || null, endsAt: fields.endsAt || null,
+                maxParticipants: fields.maxParticipants ?? null, status: fields.status || null
+            });
+            await this.db.Community.audit({
+                actorId: actor.id, actorName: actor.name, action: 'activity_update',
+                targetType: 'activity', targetId: id, detail: 'تحديث نشاط «' + a.title + '»' + (fields.status ? ' ← ' + fields.status : '')
+            });
+            return { id, updated: true };
         });
-        await this.db.Community.audit({
-            actorId: actor.id, actorName: actor.name, action: 'activity_update',
-            targetType: 'activity', targetId: id, detail: 'تحديث نشاط «' + a.title + '»' + (fields.status ? ' ← ' + fields.status : '')
-        });
-        return { id, updated: true };
     }
 
     /**
@@ -202,11 +214,11 @@ class CommunityActivityService {
         if (blocked) throw this._err(403, 'لا يمكن الانضمام لهذا النشاط', 'BLOCKED_INTERACTION');
         const existing = await this.db.Community.getActivityParticipant(a.id, actor.id);
         if (existing && existing.status === 'joined') return { joined: true, already: true };
-        if (a.max_participants != null) {
-            const count = await this.db.Community.countActivityParticipants(a.id);
-            if (count >= a.max_participants) throw this._err(409, 'اكتمل عدد المشاركين', 'ACTIVITY_FULL');
-        }
-        await this.db.Community.joinActivity(a.id, actor.id);
+        // السعة مضمونة ذرّيًا داخل قاعدة البيانات: فحص COUNT والإدراج في عبارة
+        // SQL واحدة (joinActivityWithCapacity) — لا فحص-ثم-إدراج قابل للسباق،
+        // فلا يمكن تجاوز max_participants حتى لو تسابق طلبا انضمام فعليًا.
+        const r = await this.db.Community.joinActivityWithCapacity(a.id, actor.id, a.max_participants);
+        if (!r || r.changes !== 1) throw this._err(409, 'اكتمل عدد المشاركين', 'ACTIVITY_FULL');
         return { joined: true };
     }
 
@@ -239,13 +251,16 @@ class CommunityActivityService {
         }
         const a = await this.db.Community.getActivityById(id);
         if (!a) throw this._err(404, 'النشاط غير موجود', 'ACTIVITY_NOT_FOUND');
-        await this.db.Community.updateActivity(id, { status });
-        await this.db.Community.audit({
-            actorId: actor.id, actorName: actor.name, action: 'activity_moderate',
-            targetType: 'activity', targetId: id,
-            detail: 'نشاط «' + a.title + '» ← ' + status + (note ? ' · ' + String(note).slice(0, 200) : '')
+        // التعطيل + التدقيق في معاملة واحدة
+        return this.db.Community.atomic(async () => {
+            await this.db.Community.updateActivity(id, { status });
+            await this.db.Community.audit({
+                actorId: actor.id, actorName: actor.name, action: 'activity_moderate',
+                targetType: 'activity', targetId: id,
+                detail: 'نشاط «' + a.title + '» ← ' + status + (note ? ' · ' + String(note).slice(0, 200) : '')
+            });
+            return { id, status };
         });
-        return { id, status };
     }
 }
 

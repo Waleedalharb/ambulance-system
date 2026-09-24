@@ -14,6 +14,11 @@
  *  - فلترة المحتوى: تطبيع ضد الالتفاف + قائمة إدارية توسيعية + flagged لا يُنشر.
  *  - الإشراف: بلاغات محتوى + منع الإغراق + عتبة إخفاء تلقائي (hidden وليس
  *    removed) + hide/remove للمنشورات فقط + freeze يطال مؤلف المنشور.
+ *  - السباقات والذرّية (مراجعة الـFinal Diff): سعة الانضمام مضمونة بعبارة SQL
+ *    واحدة تحت Promise.all، بلاغ pending واحد لكل (مبلِّغ، هدف) مضمون بفهرس
+ *    UNIQUE جزئي، فك التقييد يحسمه UPDATE الشرطي (changes=1)، وكل عملية
+ *    mutation+audit داخل معاملة — فشل التدقيق (بإخفاء الجدول فعليًا) يُرجع
+ *    العملية كاملة بلا أثر.
  *  - انحدار: /health و/api/ops/centers (P1) وقاعدة المصدر بلا جداول community.
  *
  * التشغيل: node scripts/community-full-test.js
@@ -73,7 +78,8 @@ async function unitFilter() {
         Community: {
             getSetting: async k => (k in settings ? settings[k] : null),
             setSetting: async (k, v) => { settings[k] = v; },
-            audit: async () => { }
+            audit: async () => { },
+            atomic: async fn => fn() // stub: معاملة مرورية — الخدمة تستدعيها دائمًا الآن
         }
     };
     const f = new Filter({ db: stubDb });
@@ -131,7 +137,7 @@ async function unitGuards() {
             getActivityById: async () => ({ id: 5, status: 'open', created_by: 'u-owner', type_id: 1, title: 'قهوة' }),
             getActivityParticipant: async () => null,
             countActivityParticipants: async () => 1,
-            joinActivity: async () => { joined = true; }
+            joinActivityWithCapacity: async () => { joined = true; return { changes: 1 }; }
         }
     };
     const act = new Activity({
@@ -622,6 +628,83 @@ async function unitStaticIsolation() {
         check('Z3) انحدار: /api/ops/centers (P1) ← 200', centers.status === 200, 'status=' + centers.status);
         const communityHtml = fs.existsSync(path.join(ROOT, 'public', 'community.html'));
         check('Z4) واجهة الويب public/community.html موجودة', communityHtml);
+
+        // ═══ 15) سباقات التزامن والذرّية — ملاحظات مراجعة الـFinal Diff (2026-09-24) ═══
+        console.log('\n── 15) السباقات والذرّية: سعة الانضمام/تكرار البلاغ/فك التقييد/فشل التدقيق ──');
+
+        // (أ) سباق سعة الانضمام: السعة 3 والمنشئ شغل مقعدًا ← 4 طلبات متزامنة على مقعدين
+        dbw.prepare("INSERT OR IGNORE INTO user_permissions (user_id, permission_key, granted, granted_by) VALUES ('emp-CM105','community.join_activity',1,'test')").run();
+        dbw.prepare("UPDATE community_restrictions SET active = 0, lifted_by = 'test', lifted_at = datetime('now') WHERE user_id = 'emp-CM105' AND active = 1").run();
+        const raceAct = await api('POST', '/api/community/activities', t1, { typeId, title: 'نشاط سباق السعة', maxParticipants: 3 });
+        const raceActId = raceAct.body && raceAct.body.id;
+        const raceJoins = await Promise.all([t2, t7, t8, t5].map(tok => api('POST', '/api/community/activities/' + raceActId + '/join', tok)));
+        const raceOk = raceJoins.filter(r => r.status === 200).length;
+        const raceFull = raceJoins.filter(r => r.status === 409 && r.body && r.body.code === 'ACTIVITY_FULL').length;
+        check('V1) سباق سعة (مقعدان/4 طلبات متزامنة): نجاحان بالضبط + ACTIVITY_FULL للباقي',
+            raceAct.status === 200 && raceOk === 2 && raceFull === 2, JSON.stringify(raceJoins.map(r => r.status)));
+        const raceCount = dbw.prepare("SELECT COUNT(*) c FROM community_activity_participants WHERE activity_id = ? AND status = 'joined'").get(raceActId).c;
+        check('V2) عدد المشاركين النهائي = السعة بالضبط (3) — لا تجاوز إطلاقًا', raceCount === 3, 'count=' + raceCount);
+
+        // (ب) سباق تكرار البلاغ: 3 بلاغات متزامنة من نفس المبلِّغ على نفس الهدف
+        const racePost = await api('POST', '/api/community/councils/' + councilId + '/posts', t2, { content: 'منشور لسباق البلاغات المتزامنة' });
+        const racePostId = racePost.body && racePost.body.id;
+        const raceReps = await Promise.all([1, 2, 3].map(() => api('POST', '/api/community/report', t1, { targetType: 'post', targetId: String(racePostId), reason: 'بلاغ سباق التكرار' })));
+        const repRaceOk = raceReps.filter(r => r.status === 200).length;
+        const repRaceDup = raceReps.filter(r => r.status === 409 && r.body && r.body.code === 'DUPLICATE_REPORT').length;
+        check('V3) سباق بلاغات مكررة (3 متزامنة): نجاح واحد + DUPLICATE_REPORT للباقي',
+            racePost.status === 200 && repRaceOk === 1 && repRaceDup === 2, JSON.stringify(raceReps.map(r => r.status)));
+        const pendingRows = dbw.prepare("SELECT COUNT(*) c FROM community_reports WHERE reporter_user_id = 'emp-CM101' AND target_type = 'post' AND target_id = ? AND status = 'pending'").get(String(racePostId)).c;
+        check('V4) صف pending واحد فقط لكل (مبلِّغ، هدف) في القاعدة', pendingRows === 1, 'rows=' + pendingRows);
+        let idxThrew = false;
+        try {
+            dbw.prepare("INSERT INTO community_reports (reporter_user_id, target_type, target_id, reason) VALUES ('emp-CM101', 'post', ?, 'تجاوز يدوي')").run(String(racePostId));
+        } catch (e) { idxThrew = /UNIQUE/i.test(String(e && e.message)); }
+        check('V5) فهرس idx_community_reports_pending_one يرفض pending ثانيًا مباشرة في القاعدة', idxThrew);
+
+        // (ج) سباق فك التقييد: طلبان متزامنان — UPDATE الشرطي (active=1) يحسم واحدًا فقط
+        const rstIns = dbw.prepare("INSERT INTO community_restrictions (user_id, kind, scope, reason, active, created_by) VALUES ('emp-CM108', 'participation_restrict', 'community', 'سباق الفك', 1, 'test')").run();
+        const raceRstId = rstIns.lastInsertRowid;
+        const raceLifts = await Promise.all([1, 2].map(() => api('POST', '/api/community/moderation/restrictions/' + raceRstId + '/lift', t3)));
+        const liftOk = raceLifts.filter(r => r.status === 200).length;
+        const lift409 = raceLifts.filter(r => r.status === 409 && r.body && r.body.code === 'RESTRICTION_NOT_ACTIVE').length;
+        check('V6) سباق فك تقييد (طلبان متزامنان): نجاح واحد + RESTRICTION_NOT_ACTIVE للآخر',
+            liftOk === 1 && lift409 === 1, JSON.stringify(raceLifts.map(r => r.status)));
+        const liftAudits = dbw.prepare("SELECT COUNT(*) c FROM community_audit_log WHERE action = 'restriction_lift' AND target_id = ?").get(String(raceRstId)).c;
+        check('V7) تدقيق فك واحد فقط — لا audit مزدوج ولا audit بلا أثر', liftAudits === 1, 'audits=' + liftAudits);
+        const rstState = dbw.prepare('SELECT active FROM community_restrictions WHERE id = ?').get(raceRstId);
+        check('V8) التقييد مرفوع فعلًا مرة واحدة (active=0)', rstState && rstState.active === 0);
+
+        // (د) مسار فشل التدقيق الحقيقي: إخفاء جدول التدقيق فعليًا أثناء عمليات
+        // mutation+audit — يجب أن تفشل كلها ولا يبقى أي أثر (ROLLBACK كامل)
+        const cntBefore = {
+            councils: dbw.prepare('SELECT COUNT(*) c FROM community_councils').get().c,
+            activities: dbw.prepare('SELECT COUNT(*) c FROM community_activities').get().c,
+            participants: dbw.prepare('SELECT COUNT(*) c FROM community_activity_participants').get().c,
+            events: dbw.prepare('SELECT COUNT(*) c FROM community_events').get().c,
+            competitions: dbw.prepare('SELECT COUNT(*) c FROM community_competitions').get().c
+        };
+        dbw.exec('ALTER TABLE community_audit_log RENAME TO community_audit_log__hidden');
+        let fpCouncil, fpAct, fpEvent, fpComp;
+        try {
+            fpCouncil = await api('POST', '/api/community/councils', t4, { slug: 'fail-path', name: 'مجلس مسار الفشل' });
+            fpAct = await api('POST', '/api/community/activities', t1, { typeId, title: 'نشاط مسار الفشل' });
+            fpEvent = await api('POST', '/api/community/admin/events', t4, { title: 'مناسبة مسار الفشل' });
+            fpComp = await api('POST', '/api/community/admin/competitions', t4, { name: 'منافسة مسار الفشل' });
+        } finally {
+            dbw.exec('ALTER TABLE community_audit_log__hidden RENAME TO community_audit_log');
+        }
+        check('V9) فشل التدقيق أثناء إنشاء مجلس ← خطأ خادم (لا نجاح زائف)', fpCouncil.status >= 500, 'status=' + (fpCouncil && fpCouncil.status));
+        check('V10) فشل التدقيق أثناء إنشاء نشاط ← خطأ خادم', fpAct.status >= 500, 'status=' + (fpAct && fpAct.status));
+        check('V11) فشل التدقيق أثناء إنشاء مناسبة ← خطأ خادم', fpEvent.status >= 500, 'status=' + (fpEvent && fpEvent.status));
+        check('V12) فشل التدقيق أثناء إنشاء منافسة ← خطأ خادم', fpComp.status >= 500, 'status=' + (fpComp && fpComp.status));
+        check('V13) ROLLBACK كامل: لا مجلس/نشاط/مشارك/مناسبة/منافسة بلا تدقيق',
+            dbw.prepare('SELECT COUNT(*) c FROM community_councils').get().c === cntBefore.councils &&
+            dbw.prepare('SELECT COUNT(*) c FROM community_activities').get().c === cntBefore.activities &&
+            dbw.prepare('SELECT COUNT(*) c FROM community_activity_participants').get().c === cntBefore.participants &&
+            dbw.prepare('SELECT COUNT(*) c FROM community_events').get().c === cntBefore.events &&
+            dbw.prepare('SELECT COUNT(*) c FROM community_competitions').get().c === cntBefore.competitions);
+        const auditBack = await api('GET', '/api/community/moderation/audit', t3);
+        check('V14) جدول التدقيق أُعيد وسليم بعد الاختبار', auditBack.status === 200, 'status=' + auditBack.status);
     } catch (e) {
         failed++;
         failures.push('fatal: ' + e.message);

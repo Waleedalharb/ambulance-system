@@ -43,15 +43,18 @@ class CommunityBadgeService {
                 if (!f.ok) throw this._err(422, label + ' يحتوي محتوى مخالفًا للسياسة', 'FILTER_REJECTED');
             }
         }
-        const id = await this.db.Community.createBadge({
-            key: k, name: n, description: description ? String(description).slice(0, 300) : null,
-            icon: icon ? String(icon).slice(0, 16) : null
+        // الإنشاء + التدقيق في معاملة واحدة
+        return this.db.Community.atomic(async () => {
+            const id = await this.db.Community.createBadge({
+                key: k, name: n, description: description ? String(description).slice(0, 300) : null,
+                icon: icon ? String(icon).slice(0, 16) : null
+            });
+            await this.db.Community.audit({
+                actorId: actor.id, actorName: actor.name, action: 'badge_create',
+                targetType: 'badge', targetId: id, detail: 'شارة جديدة «' + n + '» (' + k + ')'
+            });
+            return { id, key: k };
         });
-        await this.db.Community.audit({
-            actorId: actor.id, actorName: actor.name, action: 'badge_create',
-            targetType: 'badge', targetId: id, detail: 'شارة جديدة «' + n + '» (' + k + ')'
-        });
-        return { id, key: k };
     }
 
     /** شارات مستخدم — الحظر متبادل الأثر يمنع استعراض ملف من حظرك/حظرته. */
@@ -75,15 +78,18 @@ class CommunityBadgeService {
         const target = await this.identity.resolveByUserId(userId);
         if (!target) throw this._err(404, 'المستخدم غير موجود', 'USER_NOT_FOUND');
         const ctx = String(context || '').trim().slice(0, 200);
-        const id = await this.db.Community.awardBadge({
-            userId, badgeId: badge.id, context: ctx, awardedBy: actor.name
+        // المنح + التدقيق في معاملة واحدة: لا شارة بلا تدقيق ولا تدقيق بلا شارة
+        return this.db.Community.atomic(async () => {
+            const id = await this.db.Community.awardBadge({
+                userId, badgeId: badge.id, context: ctx, awardedBy: actor.name
+            });
+            await this.db.Community.audit({
+                actorId: actor.id, actorName: actor.name, action: 'badge_award',
+                targetType: 'user', targetId: userId,
+                detail: 'منح شارة «' + badge.name + '» لـ' + target.display_name + (ctx ? ' — ' + ctx : '')
+            });
+            return { awarded: true, id };
         });
-        await this.db.Community.audit({
-            actorId: actor.id, actorName: actor.name, action: 'badge_award',
-            targetType: 'user', targetId: userId,
-            detail: 'منح شارة «' + badge.name + '» لـ' + target.display_name + (ctx ? ' — ' + ctx : '')
-        });
-        return { awarded: true, id };
     }
 
     /** سحب شارة — community.moderate عبر المسار. */
@@ -91,14 +97,17 @@ class CommunityBadgeService {
         const row = await this.db.Community.getUserBadgeById(userBadgeId);
         if (!row) throw this._err(404, 'المنحة غير موجودة', 'AWARD_NOT_FOUND');
         const badge = await this.db.Community.getBadgeById(row.badge_id);
-        const r = await this.db.Community.revokeUserBadge(userBadgeId);
-        if (!r || r.changes !== 1) throw this._err(404, 'المنحة غير موجودة', 'AWARD_NOT_FOUND');
-        await this.db.Community.audit({
-            actorId: actor.id, actorName: actor.name, action: 'badge_revoke',
-            targetType: 'user', targetId: row.user_id,
-            detail: 'سحب شارة «' + (badge ? badge.name : row.badge_id) + '» (منحة #' + userBadgeId + ')'
+        // السحب + التدقيق في معاملة واحدة
+        return this.db.Community.atomic(async () => {
+            const r = await this.db.Community.revokeUserBadge(userBadgeId);
+            if (!r || r.changes !== 1) throw this._err(404, 'المنحة غير موجودة', 'AWARD_NOT_FOUND');
+            await this.db.Community.audit({
+                actorId: actor.id, actorName: actor.name, action: 'badge_revoke',
+                targetType: 'user', targetId: row.user_id,
+                detail: 'سحب شارة «' + (badge ? badge.name : row.badge_id) + '» (منحة #' + userBadgeId + ')'
+            });
+            return { revoked: true };
         });
-        return { revoked: true };
     }
 }
 

@@ -89,15 +89,18 @@ class CommunityCouncilService {
         }
         const existing = await this.db.Community.getCouncilBySlug(s);
         if (existing) throw this._err(409, 'يوجد مجلس بهذا المعرف (slug)', 'SLUG_TAKEN');
-        const id = await this.db.Community.createCouncil({
-            slug: s, name: n, description: description ? String(description).slice(0, 500) : null,
-            icon: icon ? String(icon).slice(0, 16) : null, membership: membership || 'open', createdBy: actor.name
+        // الإنشاء + التدقيق في معاملة واحدة: فشل التدقيق يُرجع المجلس المُنشأ
+        return this.db.Community.atomic(async () => {
+            const id = await this.db.Community.createCouncil({
+                slug: s, name: n, description: description ? String(description).slice(0, 500) : null,
+                icon: icon ? String(icon).slice(0, 16) : null, membership: membership || 'open', createdBy: actor.name
+            });
+            await this.db.Community.audit({
+                actorId: actor.id, actorName: actor.name, action: 'council_create',
+                targetType: 'majlis', targetId: id, detail: 'إنشاء مجلس «' + n + '» (' + s + ')'
+            });
+            return { id, slug: s };
         });
-        await this.db.Community.audit({
-            actorId: actor.id, actorName: actor.name, action: 'council_create',
-            targetType: 'majlis', targetId: id, detail: 'إنشاء مجلس «' + n + '» (' + s + ')'
-        });
-        return { id, slug: s };
     }
 
     /** تحديث مجلس (اسم/وصف/أيقونة/عضوية/حالة) — community.admin عبر المسار. */
@@ -120,18 +123,21 @@ class CommunityCouncilService {
             const f = await this.filter.checkContent(description);
             if (!f.ok) throw this._err(422, 'الوصف يحتوي محتوى مخالفًا للسياسة', 'FILTER_REJECTED');
         }
-        await this.db.Community.updateCouncil(id, {
-            name: name != null ? String(name).trim() : null,
-            description: description != null ? String(description).slice(0, 500) : null,
-            icon: icon != null ? String(icon).slice(0, 16) : null,
-            membership: membership || null, status: status || null
+        // التحديث + التدقيق في معاملة واحدة
+        return this.db.Community.atomic(async () => {
+            await this.db.Community.updateCouncil(id, {
+                name: name != null ? String(name).trim() : null,
+                description: description != null ? String(description).slice(0, 500) : null,
+                icon: icon != null ? String(icon).slice(0, 16) : null,
+                membership: membership || null, status: status || null
+            });
+            await this.db.Community.audit({
+                actorId: actor.id, actorName: actor.name, action: 'council_update',
+                targetType: 'majlis', targetId: id,
+                detail: 'تحديث مجلس «' + c.name + '»' + (status ? ' ← الحالة: ' + status : '')
+            });
+            return { id: c.id, updated: true };
         });
-        await this.db.Community.audit({
-            actorId: actor.id, actorName: actor.name, action: 'council_update',
-            targetType: 'majlis', targetId: id,
-            detail: 'تحديث مجلس «' + c.name + '»' + (status ? ' ← الحالة: ' + status : '')
-        });
-        return { id: c.id, updated: true };
     }
 
     /**
@@ -165,25 +171,31 @@ class CommunityCouncilService {
         }
         const target = await this.identity.resolveByUserId(userId);
         if (!target) throw this._err(404, 'المستخدم غير موجود', 'USER_NOT_FOUND');
-        await this.db.Community.addCouncilMember(c.id, userId, role);
-        await this.db.Community.audit({
-            actorId: actor.id, actorName: actor.name, action: 'council_member_set',
-            targetType: 'majlis', targetId: id,
-            detail: 'إضافة/تعديل عضو ' + target.display_name + ' بدور ' + role + ' في «' + c.name + '»'
+        // الإضافة/التعديل + التدقيق في معاملة واحدة
+        return this.db.Community.atomic(async () => {
+            await this.db.Community.addCouncilMember(c.id, userId, role);
+            await this.db.Community.audit({
+                actorId: actor.id, actorName: actor.name, action: 'council_member_set',
+                targetType: 'majlis', targetId: id,
+                detail: 'إضافة/تعديل عضو ' + target.display_name + ' بدور ' + role + ' في «' + c.name + '»'
+            });
+            return { set: true };
         });
-        return { set: true };
     }
 
     async removeMember(actor, id, userId) {
         const c = await this.db.Community.getCouncilById(id);
         if (!c) throw this._err(404, 'المجلس غير موجود', 'COUNCIL_NOT_FOUND');
-        const r = await this.db.Community.removeCouncilMember(id, userId);
-        if (!r || r.changes !== 1) throw this._err(404, 'العضو غير موجود في هذا المجلس', 'NOT_A_MEMBER');
-        await this.db.Community.audit({
-            actorId: actor.id, actorName: actor.name, action: 'council_member_remove',
-            targetType: 'majlis', targetId: id, detail: 'إزالة عضو ' + userId + ' من «' + c.name + '»'
+        // الإزالة + التدقيق في معاملة واحدة (وفشل التدقيق يُرجع الإزالة)
+        return this.db.Community.atomic(async () => {
+            const r = await this.db.Community.removeCouncilMember(id, userId);
+            if (!r || r.changes !== 1) throw this._err(404, 'العضو غير موجود في هذا المجلس', 'NOT_A_MEMBER');
+            await this.db.Community.audit({
+                actorId: actor.id, actorName: actor.name, action: 'council_member_remove',
+                targetType: 'majlis', targetId: id, detail: 'إزالة عضو ' + userId + ' من «' + c.name + '»'
+            });
+            return { removed: true };
         });
-        return { removed: true };
     }
 
     /** قائمة الأعضاء بهوية Projection (4 حقول فقط) + Pagination. */

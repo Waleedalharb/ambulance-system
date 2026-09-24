@@ -90,13 +90,16 @@ class CommunityContentFilterService {
         const list = Array.isArray(words)
             ? words.filter(w => typeof w === 'string' && w.trim()).map(w => w.trim()).slice(0, 500)
             : [];
-        await this.db.Community.setSetting('banned_words', JSON.stringify(list), actor && actor.name);
-        await this.db.Community.audit({
-            actorId: actor && actor.id, actorName: actor && actor.name,
-            action: 'content_filter_update', targetType: 'settings', targetId: 'banned_words',
-            detail: 'تحديث قائمة فلترة المحتوى (' + list.length + ' كلمة إدارية)'
+        // الحفظ + التدقيق في معاملة واحدة
+        return this.db.Community.atomic(async () => {
+            await this.db.Community.setSetting('banned_words', JSON.stringify(list), actor && actor.name);
+            await this.db.Community.audit({
+                actorId: actor && actor.id, actorName: actor && actor.name,
+                action: 'content_filter_update', targetType: 'settings', targetId: 'banned_words',
+                detail: 'تحديث قائمة فلترة المحتوى (' + list.length + ' كلمة إدارية)'
+            });
+            return { count: list.length };
         });
-        return { count: list.length };
     }
 
     async getCustomWords() {

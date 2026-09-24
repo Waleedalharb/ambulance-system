@@ -60,18 +60,21 @@ class CommunityEventService {
             const a = await this.db.Community.getActivityById(linkedActivityId);
             if (!a) throw this._err(404, 'النشاط المرتبط غير موجود', 'ACTIVITY_NOT_FOUND');
         }
-        const id = await this.db.Community.createEvent({
-            title: t, icon: icon ? String(icon).slice(0, 16) : null,
-            description: description ? String(description).slice(0, 1000) : null,
-            banner: banner ? String(banner).slice(0, 500) : null,
-            startsAt: startsAt || null, endsAt: endsAt || null,
-            linkedActivityId: linkedActivityId ?? null, createdBy: actor.name
+        // الإنشاء + التدقيق في معاملة واحدة
+        return this.db.Community.atomic(async () => {
+            const id = await this.db.Community.createEvent({
+                title: t, icon: icon ? String(icon).slice(0, 16) : null,
+                description: description ? String(description).slice(0, 1000) : null,
+                banner: banner ? String(banner).slice(0, 500) : null,
+                startsAt: startsAt || null, endsAt: endsAt || null,
+                linkedActivityId: linkedActivityId ?? null, createdBy: actor.name
+            });
+            await this.db.Community.audit({
+                actorId: actor.id, actorName: actor.name, action: 'event_create',
+                targetType: 'event', targetId: id, detail: 'مناسبة «' + t + '»'
+            });
+            return { id };
         });
-        await this.db.Community.audit({
-            actorId: actor.id, actorName: actor.name, action: 'event_create',
-            targetType: 'event', targetId: id, detail: 'مناسبة «' + t + '»'
-        });
-        return { id };
     }
 
     /** تحديث مناسبة — community.admin عبر المسار. */
@@ -86,20 +89,23 @@ class CommunityEventService {
             const a = await this.db.Community.getActivityById(linkedActivityId);
             if (!a) throw this._err(404, 'النشاط المرتبط غير موجود', 'ACTIVITY_NOT_FOUND');
         }
-        await this.db.Community.updateEvent(id, {
-            title: title != null ? String(title).trim() : null,
-            icon: icon != null ? String(icon).slice(0, 16) : null,
-            description: description != null ? String(description).slice(0, 1000) : null,
-            banner: banner != null ? String(banner).slice(0, 500) : null,
-            startsAt: startsAt || null, endsAt: endsAt || null,
-            status: status || null, linkedActivityId: linkedActivityId ?? null
+        // التحديث + التدقيق في معاملة واحدة
+        return this.db.Community.atomic(async () => {
+            await this.db.Community.updateEvent(id, {
+                title: title != null ? String(title).trim() : null,
+                icon: icon != null ? String(icon).slice(0, 16) : null,
+                description: description != null ? String(description).slice(0, 1000) : null,
+                banner: banner != null ? String(banner).slice(0, 500) : null,
+                startsAt: startsAt || null, endsAt: endsAt || null,
+                status: status || null, linkedActivityId: linkedActivityId ?? null
+            });
+            await this.db.Community.audit({
+                actorId: actor.id, actorName: actor.name, action: 'event_update',
+                targetType: 'event', targetId: id,
+                detail: 'تحديث مناسبة «' + e.title + '»' + (status ? ' ← ' + status : '')
+            });
+            return { id, updated: true };
         });
-        await this.db.Community.audit({
-            actorId: actor.id, actorName: actor.name, action: 'event_update',
-            targetType: 'event', targetId: id,
-            detail: 'تحديث مناسبة «' + e.title + '»' + (status ? ' ← ' + status : '')
-        });
-        return { id, updated: true };
     }
 }
 

@@ -44,27 +44,33 @@ class CommunityService {
 
     /** تعطيل/تفعيل المنظومة — admin فقط عبر المسار، ويُدقَّق هنا. */
     async setEnabled(enabled, actor) {
-        await this.db.Community.setSetting('enabled', enabled ? '1' : '0', actor && actor.name);
-        await this.db.Community.audit({
-            actorId: actor && actor.id, actorName: actor && actor.name,
-            action: enabled ? 'community_enable' : 'community_disable',
-            targetType: 'settings', targetId: 'enabled',
-            detail: enabled ? 'تفعيل منظومة المجتمع' : 'إطفاء منظومة المجتمع بالكامل'
+        // الحفظ + التدقيق في معاملة واحدة
+        return this.db.Community.atomic(async () => {
+            await this.db.Community.setSetting('enabled', enabled ? '1' : '0', actor && actor.name);
+            await this.db.Community.audit({
+                actorId: actor && actor.id, actorName: actor && actor.name,
+                action: enabled ? 'community_enable' : 'community_disable',
+                targetType: 'settings', targetId: 'enabled',
+                detail: enabled ? 'تفعيل منظومة المجتمع' : 'إطفاء منظومة المجتمع بالكامل'
+            });
+            return { enabled: !!enabled };
         });
-        return { enabled: !!enabled };
     }
 
     /** تعطيل أدوار محددة (تقييد فقط) — admin فقط عبر المسار. */
     async setDisabledRoles(roles, actor) {
         const list = Array.isArray(roles) ? roles.filter(r => typeof r === 'string' && r) : [];
-        await this.db.Community.setSetting('disabled_roles', JSON.stringify(list), actor && actor.name);
-        await this.db.Community.audit({
-            actorId: actor && actor.id, actorName: actor && actor.name,
-            action: 'community_disable_roles',
-            targetType: 'settings', targetId: 'disabled_roles',
-            detail: 'الأدوار المعطّلة من المجتمع: ' + (list.join(', ') || '(لا شيء)')
+        // الحفظ + التدقيق في معاملة واحدة
+        return this.db.Community.atomic(async () => {
+            await this.db.Community.setSetting('disabled_roles', JSON.stringify(list), actor && actor.name);
+            await this.db.Community.audit({
+                actorId: actor && actor.id, actorName: actor && actor.name,
+                action: 'community_disable_roles',
+                targetType: 'settings', targetId: 'disabled_roles',
+                detail: 'الأدوار المعطّلة من المجتمع: ' + (list.join(', ') || '(لا شيء)')
+            });
+            return { disabledRoles: list };
         });
-        return { disabledRoles: list };
     }
 
     async getSettings() {
