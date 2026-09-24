@@ -1,0 +1,867 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>مجتمع EMS — المجالس والأنشطة</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+    /* هوية منصة الجنوب المعتمدة: كحلي داكن + زمردي + ذهبي — سطوح زجاجية */
+    :root {
+        --navy-900: #0B1E33; --navy-700: #1A3A5C;
+        --teal-id: #2E8B7A; --gold-id: #E8C84A;
+        --bg: #0A1728;
+        --surface: rgba(255,255,255,0.035);
+        --surface-2: rgba(255,255,255,0.06);
+        --border: rgba(255,255,255,0.09);
+        --border-soft: rgba(255,255,255,0.06);
+        --text: #F1F5F9; --text-2: #A9BACD; --muted: #8A9BB0;
+        --emerald: #0EA47A; --coral: #EF4444; --ops: #60A5FA;
+        --th-bg: #0E2038;
+        --radius: 16px; --radius-md: 12px;
+        --shadow-card: inset 0 1px 0 rgba(255,255,255,0.045), 0 10px 30px rgba(0,0,0,0.30);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'IBM Plex Sans Arabic', 'Segoe UI', Tahoma, Arial, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; padding: 20px 16px 48px; }
+    body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+        background: radial-gradient(ellipse 60% 40% at 50% -10%, rgba(46,139,122,0.10), transparent 70%),
+                    radial-gradient(ellipse 45% 32% at 50% 110%, rgba(232,200,74,0.05), transparent 70%),
+                    linear-gradient(180deg, #0B1E33 0%, #0A1728 55%, #081220 100%); }
+    .container { max-width: 1200px; margin: 0 auto; }
+    .header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+    .header h1 { font-size: 1.4rem; font-weight: 700; }
+    .header h1 i { color: var(--gold-id); margin-left: 8px; }
+    .subtitle { color: var(--text-2); font-size: 0.83rem; margin-top: 4px; }
+    .me-chip { display: flex; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--border-soft); border-radius: 999px; padding: 8px 14px; font-size: 0.85rem; box-shadow: var(--shadow-card); }
+    .me-chip .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--emerald); }
+    .gate-banner { display: none; background: rgba(96,165,250,0.08); border: 1px solid rgba(96,165,250,0.30); border-radius: var(--radius-md); padding: 10px 14px; margin-bottom: 14px; font-size: 0.82rem; color: #Bcd0f5; }
+    .gate-banner.show { display: block; }
+    .frozen-banner { display: none; background: rgba(239,68,68,0.09); border: 1px solid rgba(239,68,68,0.35); border-radius: var(--radius-md); padding: 10px 14px; margin-bottom: 14px; font-size: 0.82rem; color: #f3c1c1; }
+    .frozen-banner.show { display: block; }
+    .tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 18px; background: var(--surface); border: 1px solid var(--border-soft); border-radius: var(--radius-md); padding: 6px; }
+    .tab { padding: 9px 16px; border-radius: 9px; cursor: pointer; font-size: 0.88rem; font-weight: 600; color: var(--text-2); border: none; background: transparent; font-family: inherit; transition: all 0.15s ease; }
+    .tab:hover { color: var(--text); background: var(--surface-2); }
+    .tab.active { background: linear-gradient(135deg, var(--teal-id), var(--emerald)); color: #fff; box-shadow: 0 6px 18px rgba(14,164,122,0.25); }
+    .tab.hidden-tab { display: none; }
+    .panel { display: none; }
+    .panel.active { display: block; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+    .card { background: var(--surface); border: 1px solid var(--border-soft); border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow-card); }
+    .card h3 { font-size: 1.02rem; font-weight: 700; margin-bottom: 4px; }
+    .card .meta { color: var(--muted); font-size: 0.78rem; margin-top: 8px; display: flex; gap: 12px; flex-wrap: wrap; }
+    .card .desc { color: var(--text-2); font-size: 0.85rem; margin-top: 6px; line-height: 1.6; }
+    .card .icon-lg { font-size: 1.6rem; margin-bottom: 8px; }
+    .btn { font-family: inherit; padding: 8px 14px; border-radius: 9px; border: 1px solid var(--border); background: var(--th-bg); color: var(--text); font-size: 0.84rem; cursor: pointer; font-weight: 600; transition: filter 0.15s ease; }
+    .btn:hover { filter: brightness(1.15); }
+    .btn.primary { background: linear-gradient(135deg, var(--teal-id), var(--emerald)); border: none; color: #fff; }
+    .btn.danger { background: rgba(239,68,68,0.15); border-color: rgba(239,68,68,0.4); color: #fca5a5; }
+    .btn.ghost { background: transparent; }
+    .btn.sm { padding: 5px 10px; font-size: 0.78rem; }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .spacer { flex: 1; }
+    input, textarea, select { font-family: inherit; padding: 9px 12px; border-radius: 9px; border: 1px solid var(--border); background: var(--th-bg); color: var(--text); font-size: 0.88rem; width: 100%; }
+    textarea { resize: vertical; min-height: 70px; }
+    label { font-size: 0.8rem; color: var(--text-2); display: block; margin: 10px 0 4px; }
+    .form-card { background: var(--surface); border: 1px solid var(--border-soft); border-radius: var(--radius); padding: 16px; margin-bottom: 16px; box-shadow: var(--shadow-card); }
+    .form-card h3 { font-size: 0.95rem; margin-bottom: 4px; color: var(--gold-id); }
+    .post { background: var(--surface); border: 1px solid var(--border-soft); border-radius: var(--radius-md); padding: 13px 15px; margin-bottom: 10px; }
+    .post .p-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+    .post .p-author { font-weight: 700; font-size: 0.9rem; }
+    .post .p-time { color: var(--muted); font-size: 0.74rem; }
+    .post .p-body { font-size: 0.9rem; line-height: 1.75; white-space: pre-wrap; word-break: break-word; }
+    .badge-chip { display: inline-flex; align-items: center; gap: 6px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 999px; padding: 6px 12px; font-size: 0.8rem; margin: 3px; }
+    .presence-btn { flex: 1; min-width: 120px; padding: 12px; border-radius: var(--radius-md); border: 1px solid var(--border); background: var(--surface); color: var(--text-2); cursor: pointer; font-family: inherit; font-weight: 600; font-size: 0.88rem; text-align: center; transition: all 0.15s ease; }
+    .presence-btn.active { border-color: var(--teal-id); color: #fff; background: linear-gradient(135deg, rgba(46,139,122,0.35), rgba(14,164,122,0.25)); }
+    .presence-btn.active.st-unavailable { border-color: var(--coral); background: rgba(239,68,68,0.18); }
+    .presence-btn.active.st-busy { border-color: var(--gold-id); background: rgba(232,200,74,0.12); }
+    .presence-btn.active.st-in_activity { border-color: var(--ops); background: rgba(96,165,250,0.14); }
+    .status-pill { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 0.72rem; font-weight: 700; }
+    .status-pill.available { background: rgba(14,164,122,0.18); color: #6EE7B7; }
+    .status-pill.busy { background: rgba(232,200,74,0.15); color: #FDE68A; }
+    .status-pill.in_activity { background: rgba(96,165,250,0.16); color: #93C5FD; }
+    .status-pill.unavailable { background: rgba(239,68,68,0.14); color: #FCA5A5; }
+    .person { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--surface); border: 1px solid var(--border-soft); border-radius: var(--radius-md); margin-bottom: 8px; }
+    .person .avatar { width: 36px; height: 36px; border-radius: 50%; background: var(--navy-700); display: flex; align-items: center; justify-content: center; font-weight: 700; color: var(--gold-id); font-size: 0.9rem; }
+    .person .p-name { font-weight: 600; font-size: 0.88rem; }
+    .person .p-note { color: var(--muted); font-size: 0.76rem; }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    th, td { padding: 9px 10px; text-align: right; border-bottom: 1px solid var(--border-soft); }
+    th { color: var(--gold-id); font-size: 0.78rem; font-weight: 700; }
+    .empty { text-align: center; color: var(--muted); padding: 34px 10px; font-size: 0.88rem; }
+    .empty i { font-size: 1.8rem; display: block; margin-bottom: 8px; opacity: 0.5; }
+    .toast { position: fixed; bottom: 22px; right: 50%; transform: translateX(50%); background: var(--navy-700); border: 1px solid var(--border); border-radius: 10px; padding: 11px 20px; font-size: 0.86rem; z-index: 100; box-shadow: 0 12px 40px rgba(0,0,0,0.5); display: none; max-width: 90vw; }
+    .toast.ok { border-color: var(--emerald); }
+    .toast.err { border-color: var(--coral); }
+    .modal-overlay { position: fixed; inset: 0; background: rgba(4,10,20,0.7); backdrop-filter: blur(4px); z-index: 90; display: none; align-items: center; justify-content: center; padding: 16px; }
+    .modal-overlay.show { display: flex; }
+    .modal { background: var(--navy-900); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; width: 100%; max-width: 440px; box-shadow: var(--shadow-card); }
+    .modal h3 { font-size: 1rem; margin-bottom: 10px; }
+    .event-banner { border-radius: var(--radius); padding: 22px; margin-bottom: 14px; border: 1px solid rgba(232,200,74,0.25); background: linear-gradient(135deg, rgba(46,139,122,0.16), rgba(11,30,51,0.6)); box-shadow: var(--shadow-card); }
+    .event-banner h3 { font-size: 1.15rem; }
+    .event-banner .e-icon { font-size: 2rem; margin-bottom: 6px; }
+    .back-link { color: var(--text-2); cursor: pointer; font-size: 0.85rem; margin-bottom: 12px; display: inline-flex; align-items: center; gap: 6px; background: none; border: none; font-family: inherit; }
+    .back-link:hover { color: var(--text); }
+    .section-title { font-size: 1.05rem; font-weight: 700; margin: 18px 0 10px; display: flex; align-items: center; gap: 8px; }
+    .section-title i { color: var(--teal-id); }
+    .admin-note { font-size: 0.76rem; color: var(--muted); margin-top: 4px; }
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    @media (max-width: 720px) { .two-col { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <div>
+            <h1><i class="fa-solid fa-people-group"></i>مجتمع EMS</h1>
+            <div class="subtitle">المجالس · من موجود؟ · الأنشطة · المناسبات · المنافسات · الشارات — مساحة اجتماعية مستقلة تمامًا عن التشغيل</div>
+        </div>
+        <div class="me-chip"><span class="dot"></span><span id="meName">…</span></div>
+    </div>
+
+    <div class="gate-banner" id="gateBanner"><i class="fa-solid fa-shield-halved"></i> <span id="gateText"></span></div>
+    <div class="frozen-banner" id="frozenBanner"><i class="fa-solid fa-snowflake"></i> مشاركتك الاجتماعية مجمّدة حاليًا بقرار إشرافي — يمكنك الاطلاع فقط.</div>
+
+    <div class="tabs" id="tabs">
+        <button class="tab active" data-tab="councils"><i class="fa-solid fa-house-chimney"></i> المجالس</button>
+        <button class="tab" data-tab="presence"><i class="fa-solid fa-circle-dot"></i> من موجود؟</button>
+        <button class="tab" data-tab="activities"><i class="fa-solid fa-calendar-check"></i> الأنشطة</button>
+        <button class="tab" data-tab="events"><i class="fa-solid fa-star"></i> المناسبات</button>
+        <button class="tab" data-tab="competitions"><i class="fa-solid fa-trophy"></i> المنافسات</button>
+        <button class="tab" data-tab="badges"><i class="fa-solid fa-award"></i> الشارات</button>
+        <button class="tab hidden-tab" data-tab="moderation" id="tabModeration"><i class="fa-solid fa-shield"></i> الإشراف</button>
+        <button class="tab hidden-tab" data-tab="admin" id="tabAdmin"><i class="fa-solid fa-gear"></i> الإدارة</button>
+    </div>
+
+    <!-- ═══ المجالس ═══ -->
+    <div class="panel active" id="panel-councils">
+        <div id="councilsListView">
+            <div class="grid" id="councilsGrid"></div>
+        </div>
+        <div id="councilDetailView" style="display:none">
+            <button class="back-link" id="backToCouncils"><i class="fa-solid fa-arrow-right"></i> عودة للمجالس</button>
+            <div class="card" style="margin-bottom:14px">
+                <div class="row">
+                    <span class="icon-lg" id="cdIcon"></span>
+                    <div><h3 id="cdName"></h3><div class="desc" id="cdDesc"></div></div>
+                    <div class="spacer"></div>
+                    <button class="btn sm" id="cdJoinBtn"></button>
+                </div>
+                <div class="meta"><span id="cdMembers"></span></div>
+            </div>
+            <div class="form-card" id="composerCard" style="display:none">
+                <h3><i class="fa-solid fa-pen"></i> منشور جديد</h3>
+                <textarea id="postContent" maxlength="2000" placeholder="اكتب منشورك… (بلا تعليقات — المنشورات فقط، وتخضع لفلترة المحتوى)"></textarea>
+                <div class="row" style="margin-top:8px">
+                    <button class="btn primary" id="publishBtn"><i class="fa-solid fa-paper-plane"></i> نشر</button>
+                    <span class="admin-note">المحتوى المخالف يُوقف تلقائيًا للمراجعة ولا يُنشر.</span>
+                </div>
+            </div>
+            <div id="postsList"></div>
+        </div>
+    </div>
+
+    <!-- ═══ من موجود؟ ═══ -->
+    <div class="panel" id="panel-presence">
+        <div class="form-card">
+            <h3><i class="fa-solid fa-circle-dot"></i> حالتك الآن — اختيار صريح منك فقط</h3>
+            <div class="admin-note">لا يُستخدم موقعك ولا نشاطك في التطبيق لتحديد هذه الحالة — أنت فقط من يضبطها، وتختفي تلقائيًا بعد 12 ساعة.</div>
+            <div class="row" style="margin-top:10px">
+                <button class="presence-btn st-available" data-st="available">🟢 متاح للمجلس</button>
+                <button class="presence-btn st-busy" data-st="busy">🟡 مشغول</button>
+                <button class="presence-btn st-in_activity" data-st="in_activity">🔵 في نشاط</button>
+                <button class="presence-btn st-unavailable" data-st="unavailable">🔴 غير متاح</button>
+            </div>
+            <div class="row" style="margin-top:10px">
+                <input id="presenceNote" maxlength="120" placeholder="ملاحظة اختيارية (مثال: في مجلس القهوة حتى ٩)" style="flex:1">
+                <button class="btn primary" id="savePresenceBtn">حفظ حالتي</button>
+            </div>
+        </div>
+        <div class="section-title"><i class="fa-solid fa-users"></i> الموجودون الآن</div>
+        <div id="presenceList"></div>
+        <div class="section-title"><i class="fa-solid fa-ban"></i> قائمة الحظر</div>
+        <div id="blocksList"></div>
+    </div>
+
+    <!-- ═══ الأنشطة ═══ -->
+    <div class="panel" id="panel-activities">
+        <div class="form-card" id="activityCreateCard" style="display:none">
+            <h3><i class="fa-solid fa-plus"></i> إنشاء نشاط / فعالية</h3>
+            <div class="two-col">
+                <div><label>نوع النشاط</label><select id="actType"></select></div>
+                <div><label>العنوان</label><input id="actTitle" maxlength="120" placeholder="مثال: مجلس قهوة الخميس"></div>
+                <div><label>الموعد (اختياري)</label><input id="actStarts" type="datetime-local"></div>
+                <div><label>المكان — نص منك كمنظم (اختياري)</label><input id="actLocation" maxlength="200" placeholder="مثال: استراحة القطاع"></div>
+                <div><label>الحد الأقصى للمشاركين (اختياري)</label><input id="actMax" type="number" min="2" max="500"></div>
+                <div><label>المجلس (اختياري)</label><select id="actCouncil"><option value="">— بدون مجلس —</option></select></div>
+            </div>
+            <label>الوصف (اختياري)</label><textarea id="actDesc" maxlength="1000"></textarea>
+            <div class="row" style="margin-top:10px"><button class="btn primary" id="createActivityBtn"><i class="fa-solid fa-plus"></i> إنشاء النشاط</button></div>
+        </div>
+        <div class="row" style="margin-bottom:10px">
+            <select id="actStatusFilter" style="width:auto">
+                <option value="">كل الأنشطة</option>
+                <option value="open" selected>المفتوحة</option>
+                <option value="ongoing">الجارية</option>
+                <option value="completed">المكتملة</option>
+                <option value="cancelled">الملغاة</option>
+            </select>
+            <button class="btn sm" id="reloadActivities"><i class="fa-solid fa-rotate"></i> تحديث</button>
+        </div>
+        <div class="grid" id="activitiesGrid"></div>
+    </div>
+
+    <!-- ═══ المناسبات ═══ -->
+    <div class="panel" id="panel-events"><div id="eventsList"></div></div>
+
+    <!-- ═══ المنافسات ═══ -->
+    <div class="panel" id="panel-competitions">
+        <div class="grid" id="competitionsGrid"></div>
+        <div id="compDetail" style="display:none">
+            <button class="back-link" id="backToComps"><i class="fa-solid fa-arrow-right"></i> عودة للمنافسات</button>
+            <div class="card">
+                <h3 id="compName"></h3>
+                <div class="desc" id="compDesc"></div>
+                <div class="meta" id="compMeta"></div>
+                <div class="table-wrap" style="margin-top:12px">
+                    <table><thead><tr><th>#</th><th>المشارك</th><th>النقاط</th><th>الترتيب</th><th>ملاحظة</th></tr></thead>
+                    <tbody id="compParticipants"></tbody></table>
+                </div>
+                <div class="row" style="margin-top:12px" id="compJoinRow"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ الشارات ═══ -->
+    <div class="panel" id="panel-badges">
+        <div class="section-title"><i class="fa-solid fa-award"></i> شاراتي</div>
+        <div id="myBadges"></div>
+        <div class="section-title"><i class="fa-solid fa-list"></i> دليل الشارات</div>
+        <div class="grid" id="badgesGrid"></div>
+    </div>
+
+    <!-- ═══ الإشراف ═══ -->
+    <div class="panel" id="panel-moderation">
+        <div class="section-title"><i class="fa-solid fa-flag"></i> قائمة البلاغات</div>
+        <div id="modQueue"></div>
+        <div class="section-title"><i class="fa-solid fa-eye-slash"></i> المحتوى الموقوف (فلتر/عتبة البلاغات)</div>
+        <div id="modFlagged"></div>
+        <div class="section-title"><i class="fa-solid fa-scroll"></i> سجل التدقيق</div>
+        <div id="modAudit"></div>
+    </div>
+
+    <!-- ═══ الإدارة ═══ -->
+    <div class="panel" id="panel-admin">
+        <div class="two-col">
+            <div class="form-card">
+                <h3><i class="fa-solid fa-house-chimney"></i> إنشاء مجلس</h3>
+                <label>المعرف (slug — إنجليزي)</label><input id="cSlug" placeholder="south-riyadh" maxlength="50">
+                <label>الاسم</label><input id="cName" maxlength="80" placeholder="مجلس جنوب الرياض">
+                <label>أيقونة (إيموجي)</label><input id="cIcon" maxlength="4" placeholder="🏠">
+                <label>الوصف</label><textarea id="cDesc" maxlength="500"></textarea>
+                <label>العضوية</label><select id="cMembership"><option value="open">مفتوح — انضمام ذاتي</option><option value="closed">مغلق — بإضافة الإدارة</option></select>
+                <div class="row" style="margin-top:10px"><button class="btn primary" id="createCouncilBtn">إنشاء</button></div>
+            </div>
+            <div class="form-card">
+                <h3><i class="fa-solid fa-star"></i> إنشاء مناسبة</h3>
+                <label>العنوان</label><input id="eTitle" maxlength="120" placeholder="اليوم الوطني 95">
+                <label>أيقونة</label><input id="eIcon" maxlength="4" placeholder="🇸🇦">
+                <label>من</label><input id="eStarts" type="datetime-local">
+                <label>إلى</label><input id="eEnds" type="datetime-local">
+                <label>الوصف</label><textarea id="eDesc" maxlength="1000"></textarea>
+                <div class="row" style="margin-top:10px"><button class="btn primary" id="createEventBtn">إنشاء</button></div>
+            </div>
+            <div class="form-card">
+                <h3><i class="fa-solid fa-trophy"></i> إنشاء منافسة</h3>
+                <label>الاسم</label><input id="compName2" maxlength="120" placeholder="بطولة البلوت الرمضانية">
+                <label>النطاق</label><select id="compScope"><option value="teams">فرق</option><option value="centers">مراكز</option><option value="individuals">أفراد</option></select>
+                <label>القواعد</label><textarea id="compRules" maxlength="2000" placeholder="جوائز معنوية وشارات فقط — لا جوائز مالية"></textarea>
+                <div class="row" style="margin-top:10px"><button class="btn primary" id="createCompBtn">إنشاء</button></div>
+                <div class="admin-note">إدارة المشاركين والنتائج من بطاقة المنافسة في تبويب المنافسات.</div>
+            </div>
+            <div class="form-card">
+                <h3><i class="fa-solid fa-toggle-on"></i> مفاتيح المنظومة</h3>
+                <div class="row">
+                    <span>منظومة المجتمع</span><div class="spacer"></div>
+                    <button class="btn sm" id="toggleCommunityBtn">…</button>
+                </div>
+                <div class="admin-note">الإطفاء يوقف كل وظائف المجتمع للأعضاء ولا يؤثر إطلاقًا على الأنظمة التشغيلية.</div>
+                <label style="margin-top:12px">كلمات فلترة المحتوى الإدارية (سطر لكل كلمة — توسيع فوق القائمة المدمجة)</label>
+                <textarea id="filterWords" rows="4"></textarea>
+                <div class="row" style="margin-top:8px"><button class="btn sm" id="saveFilterWordsBtn">حفظ القائمة</button></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="reportModal">
+    <div class="modal">
+        <h3><i class="fa-solid fa-flag"></i> إبلاغ</h3>
+        <div class="admin-note" id="reportTargetLabel"></div>
+        <label>سبب الإبلاغ</label>
+        <textarea id="reportReason" maxlength="500" placeholder="اشرح المخالفة باختصار (3 أحرف على الأقل)"></textarea>
+        <div class="row" style="margin-top:12px">
+            <button class="btn danger" id="submitReportBtn"><i class="fa-solid fa-flag"></i> إرسال البلاغ</button>
+            <div class="spacer"></div>
+            <button class="btn ghost" id="cancelReportBtn">إلغاء</button>
+        </div>
+    </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+/* ═══ مجتمع EMS — واجهة الويب (Full Foundation, اعتماد المالك 2026-09-24) ═══
+   عرض + تفاعل فقط: كل الحسم خادمي (صلاحيات/بوابة تشغيلية/فلترة/إشراف).
+   لا GPS ولا realtime — On-demand fetch فقط عند فتح التبويب/التحديث اليدوي. */
+const $ = s => document.querySelector(s);
+const $$ = s => Array.from(document.querySelectorAll(s));
+const TOKEN = localStorage.getItem('auth_access_token') || localStorage.getItem('authToken') || '';
+const S = { me: null, perms: [], star: false, gate: null, frozen: false, councils: [], currentCouncil: null, types: [] };
+
+function toast(msg, ok) {
+    const t = $('#toast'); t.textContent = msg; t.className = 'toast ' + (ok === false ? 'err' : 'ok');
+    t.style.display = 'block'; clearTimeout(t._h); t._h = setTimeout(() => { t.style.display = 'none'; }, 3500);
+}
+async function api(method, path, payload) {
+    const r = await fetch(path, {
+        method,
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + TOKEN },
+        body: payload ? JSON.stringify(payload) : undefined
+    });
+    let b = null; try { b = await r.json(); } catch (_) { }
+    if (r.status === 401) { toast('انتهت الجلسة — سجّل الدخول من المنصة أولًا', false); throw new Error('401'); }
+    if (!r.ok) { const e = new Error((b && b.error) || ('خطأ ' + r.status)); e.status = r.status; e.code = b && b.code; throw e; }
+    return b;
+}
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const fmtTime = iso => { if (!iso) return ''; const d = new Date(iso + (iso.indexOf('Z') === -1 ? 'Z' : '')); return d.toLocaleString('ar-SA-u-nu-latn', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }); };
+const can = p => S.star || S.perms.indexOf(p) !== -1;
+const PRESENCE_LABELS = { available: 'متاح للمجلس', busy: 'مشغول', in_activity: 'في نشاط', unavailable: 'غير متاح' };
+
+/* ── التبويبات ── */
+$('#tabs').addEventListener('click', e => {
+    const b = e.target.closest('.tab'); if (!b) return;
+    $$('.tab').forEach(t => t.classList.remove('active')); b.classList.add('active');
+    $$('.panel').forEach(p => p.classList.remove('active'));
+    $('#panel-' + b.dataset.tab).classList.add('active');
+    loadTab(b.dataset.tab);
+});
+function loadTab(tab) {
+    if (tab === 'councils') loadCouncils();
+    else if (tab === 'presence') { loadPresence(); loadBlocks(); }
+    else if (tab === 'activities') { loadTypes(); loadActivities(); }
+    else if (tab === 'events') loadEvents();
+    else if (tab === 'competitions') loadCompetitions();
+    else if (tab === 'badges') { loadMyBadges(); loadBadges(); }
+    else if (tab === 'moderation') { loadModQueue(); loadModFlagged(); loadModAudit(); }
+    else if (tab === 'admin') loadAdmin();
+}
+
+/* ── الإقلاع ── */
+(async function init() {
+    if (!TOKEN) { document.body.innerHTML = '<div class="empty" style="margin-top:20vh"><i class="fa-solid fa-lock"></i>سجّل الدخول من المنصة أولًا ثم افتح هذه الصفحة.</div>'; return; }
+    try {
+        const p = await api('GET', '/api/auth/me/permissions');
+        S.perms = p.permissions || []; S.star = p.permissions_star === true;
+        try { const me = await api('GET', '/api/auth/me'); S.meId = me.user && me.user.id; } catch (_) { }
+        const st = await api('GET', '/api/community/status');
+        S.me = st.me; S.gate = st.gate; S.frozen = !!st.participationFrozen;
+        $('#meName').textContent = S.me ? S.me.display_name : 'مستخدم';
+        if (S.gate && !S.gate.allowParticipation) {
+            $('#gateBanner').classList.add('show');
+            $('#gateText').textContent = 'أنت حاليًا في حالة تشغيلية — الاطلاع متاح لكن المشاركة الاجتماعية (نشر/انضمام/توفر) موقوفة حتى تنتهي.';
+        }
+        if (S.frozen) $('#frozenBanner').classList.add('show');
+        if (can('community.moderate')) $('#tabModeration').classList.remove('hidden-tab');
+        if (can('community.admin')) $('#tabAdmin').classList.remove('hidden-tab');
+        if (can('community.create_activity')) $('#activityCreateCard').style.display = 'block';
+        loadCouncils();
+    } catch (e) {
+        if (e.code === 'COMMUNITY_DISABLED') {
+            document.querySelector('.container').innerHTML = '<div class="empty" style="margin-top:20vh"><i class="fa-solid fa-power-off"></i>منظومة المجتمع غير متاحة حاليًا.</div>';
+        } else if (e.status === 403) {
+            document.querySelector('.container').innerHTML = '<div class="empty" style="margin-top:20vh"><i class="fa-solid fa-lock"></i>لا تملك صلاحية المجتمع (community.view) — تُمنح فرديًا من إدارة المستخدمين.</div>';
+        }
+    }
+})();
+
+/* ═══ المجالس ═══ */
+async function loadCouncils() {
+    $('#councilsListView').style.display = 'block'; $('#councilDetailView').style.display = 'none';
+    try {
+        const d = await api('GET', '/api/community/councils');
+        S.councils = d.councils || [];
+        const g = $('#councilsGrid');
+        if (!S.councils.length) { g.innerHTML = '<div class="empty"><i class="fa-solid fa-house-chimney"></i>لا توجد مجالس بعد — تُنشأ من الإدارة.</div>'; return; }
+        g.innerHTML = S.councils.map(c => `
+            <div class="card">
+                <div class="icon-lg">${esc(c.icon || '🏠')}</div>
+                <h3>${esc(c.name)}</h3>
+                <div class="desc">${esc(c.description || '')}</div>
+                <div class="meta"><span><i class="fa-solid fa-users"></i> ${c.members_count} عضو</span>
+                ${c.membership === 'closed' ? '<span><i class="fa-solid fa-lock"></i> مغلق</span>' : ''}</div>
+                <div class="row" style="margin-top:10px">
+                    <button class="btn sm primary" onclick="openCouncil(${c.id})"><i class="fa-solid fa-door-open"></i> فتح</button>
+                    <div class="spacer"></div>
+                    ${c.joined
+                        ? `<button class="btn sm ghost" onclick="leaveCouncil(${c.id})">مغادرة</button>`
+                        : (c.membership === 'open' ? `<button class="btn sm" onclick="joinCouncil(${c.id})">انضمام</button>` : '')}
+                </div>
+            </div>`).join('');
+    } catch (e) { toast(e.message, false); }
+}
+window.joinCouncil = async id => {
+    try { await api('POST', '/api/community/councils/' + id + '/join'); toast('انضممت للمجلس'); loadCouncils(); }
+    catch (e) { toast(e.message, false); }
+};
+window.leaveCouncil = async id => {
+    try { await api('POST', '/api/community/councils/' + id + '/leave'); toast('غادرت المجلس'); loadCouncils(); }
+    catch (e) { toast(e.message, false); }
+};
+window.openCouncil = async id => {
+    try {
+        const d = await api('GET', '/api/community/councils/' + id);
+        S.currentCouncil = d.council;
+        const c = d.council;
+        $('#councilsListView').style.display = 'none'; $('#councilDetailView').style.display = 'block';
+        $('#cdIcon').textContent = c.icon || '🏠'; $('#cdName').textContent = c.name;
+        $('#cdDesc').textContent = c.description || ''; $('#cdMembers').textContent = c.members_count + ' عضو';
+        const jb = $('#cdJoinBtn');
+        if (c.joined) { jb.textContent = 'مغادرة'; jb.className = 'btn sm ghost'; jb.onclick = () => leaveCouncil(id).then(() => openCouncil(id)); }
+        else { jb.textContent = 'انضمام'; jb.className = 'btn sm primary'; jb.onclick = () => joinCouncil(id).then(() => openCouncil(id)); }
+        $('#composerCard').style.display = (c.joined && can('community.post')) ? 'block' : 'none';
+        loadPosts(id);
+    } catch (e) { toast(e.message, false); }
+};
+$('#backToCouncils').addEventListener('click', loadCouncils);
+async function loadPosts(councilId) {
+    try {
+        const d = await api('GET', '/api/community/councils/' + councilId + '/posts?limit=30');
+        const list = $('#postsList');
+        if (!d.posts.length) { list.innerHTML = '<div class="empty"><i class="fa-solid fa-comments"></i>لا منشورات بعد — كن أول من ينشر.</div>'; return; }
+        list.innerHTML = d.posts.map(p => `
+            <div class="post">
+                <div class="p-head">
+                    <span class="p-author">${esc(p.author.displayName || 'مستخدم')}</span>
+                    <span class="p-time">${fmtTime(p.createdAt)}</span>
+                    <div class="spacer"></div>
+                    ${p.mine
+                        ? `<button class="btn sm ghost" title="حذف" onclick="deletePost(${p.id})"><i class="fa-solid fa-trash"></i></button>`
+                        : `<button class="btn sm ghost" title="إبلاغ" onclick="openReport('post','${p.id}','منشور في ${esc(S.currentCouncil ? S.currentCouncil.name : '')}')"><i class="fa-solid fa-flag"></i></button>`}
+                </div>
+                <div class="p-body">${esc(p.content)}</div>
+            </div>`).join('');
+    } catch (e) {
+        $('#postsList').innerHTML = e.code === 'NOT_A_MEMBER'
+            ? '<div class="empty"><i class="fa-solid fa-lock"></i>المنشورات للأعضاء — انضم للمجلس للاطلاع والنشر.</div>'
+            : '<div class="empty">' + esc(e.message) + '</div>';
+    }
+}
+$('#publishBtn').addEventListener('click', async () => {
+    const content = $('#postContent').value.trim();
+    if (!content) return toast('اكتب المنشور أولًا', false);
+    try {
+        const d = await api('POST', '/api/community/councils/' + S.currentCouncil.id + '/posts', { content });
+        $('#postContent').value = '';
+        if (d.flagged) toast(d.message || 'أوقف المنشور للمراجعة', false);
+        else { toast('نُشر منشورك'); loadPosts(S.currentCouncil.id); }
+    } catch (e) { toast(e.message, false); }
+});
+window.deletePost = async id => {
+    try { await api('DELETE', '/api/community/posts/' + id); toast('حُذف المنشور'); loadPosts(S.currentCouncil.id); }
+    catch (e) { toast(e.message, false); }
+};
+
+/* ═══ الإبلاغ (مشترك) ═══ */
+let reportTarget = null;
+window.openReport = (type, id, label) => {
+    reportTarget = { type, id };
+    $('#reportTargetLabel').textContent = 'الهدف: ' + (label || type + ' #' + id);
+    $('#reportReason').value = '';
+    $('#reportModal').classList.add('show');
+};
+$('#cancelReportBtn').addEventListener('click', () => $('#reportModal').classList.remove('show'));
+$('#submitReportBtn').addEventListener('click', async () => {
+    const reason = $('#reportReason').value.trim();
+    if (reason.length < 3) return toast('اكتب سبب الإبلاغ', false);
+    try {
+        await api('POST', '/api/community/report', { targetType: reportTarget.type, targetId: String(reportTarget.id), reason });
+        $('#reportModal').classList.remove('show');
+        toast('وصل بلاغك لفريق الإشراف — شكرًا لك');
+    } catch (e) { toast(e.message, false); }
+});
+
+/* ═══ من موجود؟ ═══ */
+$$('.presence-btn').forEach(b => b.addEventListener('click', () => {
+    $$('.presence-btn').forEach(x => x.classList.remove('active')); b.classList.add('active');
+}));
+$('#savePresenceBtn').addEventListener('click', async () => {
+    const active = $('.presence-btn.active');
+    if (!active) return toast('اختر حالتك أولًا', false);
+    try {
+        await api('PUT', '/api/community/presence', { status: active.dataset.st, note: $('#presenceNote').value.trim() || undefined });
+        toast('حُفظت حالتك'); loadPresence();
+    } catch (e) { toast(e.message, false); }
+});
+async function loadPresence() {
+    try {
+        const mine = await api('GET', '/api/community/presence/me');
+        if (mine.presence) {
+            $$('.presence-btn').forEach(x => x.classList.toggle('active', x.dataset.st === mine.presence.status));
+            $('#presenceNote').value = mine.presence.note || '';
+        }
+        const d = await api('GET', '/api/community/presence?limit=60');
+        const list = $('#presenceList');
+        if (!d.presence.length) { list.innerHTML = '<div class="empty"><i class="fa-solid fa-circle-dot"></i>لا أحد أعلن توفره حاليًا — كن أول من يضبط حالته.</div>'; return; }
+        list.innerHTML = d.presence.map(p => `
+            <div class="person">
+                <div class="avatar">${esc((p.user && p.user.display_name || '؟').trim().charAt(0))}</div>
+                <div>
+                    <div class="p-name">${esc(p.user ? p.user.display_name : 'مستخدم')}</div>
+                    ${p.note ? `<div class="p-note">${esc(p.note)}</div>` : ''}
+                </div>
+                <div class="spacer"></div>
+                <span class="status-pill ${esc(p.status)}">${PRESENCE_LABELS[p.status] || esc(p.status)}</span>
+                ${String(p.userId) !== String(S.meId) ? `<button class="btn sm ghost" title="حظر" onclick="blockUser('${esc(p.userId)}','${esc(p.user ? p.user.display_name : '')}')"><i class="fa-solid fa-ban"></i></button>` : ''}
+            </div>`).join('');
+    } catch (e) { toast(e.message, false); }
+}
+window.blockUser = async (userId, name) => {
+    if (!confirm('حظر ' + (name || 'هذا المستخدم') + '؟ لن يظهر لك ولن تظهر له في المجتمع.')) return;
+    try { await api('POST', '/api/community/block', { userId }); toast('تم الحظر'); loadPresence(); loadBlocks(); }
+    catch (e) { toast(e.message, false); }
+};
+async function loadBlocks() {
+    try {
+        const d = await api('GET', '/api/community/blocks');
+        const list = $('#blocksList');
+        if (!d.blocks.length) { list.innerHTML = '<div class="empty" style="padding:14px">لا محظورين.</div>'; return; }
+        list.innerHTML = d.blocks.map(b => `
+            <div class="person">
+                <div class="p-name">${esc(b.user ? b.user.display_name : b.userId)}</div>
+                <div class="spacer"></div>
+                <button class="btn sm" onclick="unblockUser('${esc(b.userId)}')">فك الحظر</button>
+            </div>`).join('');
+    } catch (e) { /* صامت */ }
+}
+window.unblockUser = async userId => {
+    try { await api('POST', '/api/community/unblock', { userId }); toast('فُك الحظر'); loadBlocks(); loadPresence(); }
+    catch (e) { toast(e.message, false); }
+};
+
+/* ═══ الأنشطة ═══ */
+async function loadTypes() {
+    try {
+        const d = await api('GET', '/api/community/activity-types');
+        S.types = d.types || [];
+        $('#actType').innerHTML = S.types.map(t => `<option value="${t.id}">${esc(t.icon || '')} ${esc(t.name)}</option>`).join('');
+        $('#actCouncil').innerHTML = '<option value="">— بدون مجلس —</option>' +
+            S.councils.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
+    } catch (e) { /* صامت */ }
+}
+$('#createActivityBtn').addEventListener('click', async () => {
+    try {
+        const payload = {
+            typeId: parseInt($('#actType').value, 10),
+            title: $('#actTitle').value.trim(),
+            description: $('#actDesc').value.trim() || undefined,
+            locationText: $('#actLocation').value.trim() || undefined,
+            startsAt: $('#actStarts').value ? $('#actStarts').value.replace('T', ' ') + ':00' : undefined,
+            maxParticipants: $('#actMax').value ? parseInt($('#actMax').value, 10) : undefined,
+            councilId: $('#actCouncil').value ? parseInt($('#actCouncil').value, 10) : undefined
+        };
+        await api('POST', '/api/community/activities', payload);
+        toast('أُنشئ النشاط وانضممت إليه');
+        $('#actTitle').value = ''; $('#actDesc').value = ''; $('#actLocation').value = '';
+        loadActivities();
+    } catch (e) { toast(e.message, false); }
+});
+$('#reloadActivities').addEventListener('click', loadActivities);
+$('#actStatusFilter').addEventListener('change', loadActivities);
+async function loadActivities() {
+    try {
+        const st = $('#actStatusFilter').value;
+        const d = await api('GET', '/api/community/activities?limit=30' + (st ? '&status=' + st : ''));
+        const g = $('#activitiesGrid');
+        if (!d.activities.length) { g.innerHTML = '<div class="empty"><i class="fa-solid fa-calendar-xmark"></i>لا أنشطة هنا حاليًا.</div>'; return; }
+        g.innerHTML = d.activities.map(a => `
+            <div class="card">
+                <div class="icon-lg">${esc(a.typeIcon || '📅')}</div>
+                <h3>${esc(a.title)}</h3>
+                <div class="desc">${esc(a.description || '')}</div>
+                <div class="meta">
+                    <span><i class="fa-solid fa-tag"></i> ${esc(a.typeName || '')}</span>
+                    ${a.startsAt ? `<span><i class="fa-solid fa-clock"></i> ${fmtTime(a.startsAt)}</span>` : ''}
+                    ${a.locationText ? `<span><i class="fa-solid fa-location-dot"></i> ${esc(a.locationText)}</span>` : ''}
+                    <span><i class="fa-solid fa-users"></i> ${a.participants_count}${a.maxParticipants ? '/' + a.maxParticipants : ''}</span>
+                    <span><i class="fa-solid fa-user"></i> ${esc(a.createdByName || '')}</span>
+                </div>
+                <div class="row" style="margin-top:10px">
+                    ${a.my_status === 'joined'
+                        ? `<button class="btn sm ghost" onclick="leaveActivity(${a.id})">مغادرة</button>`
+                        : ((a.status === 'open' || a.status === 'ongoing') && can('community.join_activity')
+                            ? `<button class="btn sm primary" onclick="joinActivity(${a.id})">انضمام</button>` : '')}
+                    <div class="spacer"></div>
+                    <button class="btn sm ghost" title="إبلاغ" onclick="openReport('activity','${a.id}','نشاط: ${esc(a.title)}')"><i class="fa-solid fa-flag"></i></button>
+                </div>
+            </div>`).join('');
+    } catch (e) { toast(e.message, false); }
+}
+window.joinActivity = async id => {
+    try { await api('POST', '/api/community/activities/' + id + '/join'); toast('انضممت للنشاط'); loadActivities(); }
+    catch (e) { toast(e.message, false); }
+};
+window.leaveActivity = async id => {
+    try { await api('POST', '/api/community/activities/' + id + '/leave'); toast('غادرت النشاط'); loadActivities(); }
+    catch (e) { toast(e.message, false); }
+};
+
+/* ═══ المناسبات ═══ */
+async function loadEvents() {
+    try {
+        const d = await api('GET', '/api/community/events');
+        const list = $('#eventsList');
+        if (!d.events.length) { list.innerHTML = '<div class="empty"><i class="fa-solid fa-star"></i>لا مناسبات نشطة حاليًا.</div>'; return; }
+        list.innerHTML = d.events.map(e => `
+            <div class="event-banner">
+                <div class="e-icon">${esc(e.icon || '⭐')}</div>
+                <h3>${esc(e.title)}</h3>
+                <div class="desc" style="color:var(--text-2);margin-top:6px">${esc(e.description || '')}</div>
+                <div class="meta" style="margin-top:10px;color:var(--muted);font-size:0.78rem">
+                    ${e.startsAt ? `<span><i class="fa-solid fa-calendar"></i> من ${fmtTime(e.startsAt)}</span>` : ''}
+                    ${e.endsAt ? `<span>إلى ${fmtTime(e.endsAt)}</span>` : ''}
+                </div>
+            </div>`).join('');
+    } catch (e) { toast(e.message, false); }
+}
+
+/* ═══ المنافسات ═══ */
+async function loadCompetitions() {
+    $('#compDetail').style.display = 'none'; $('#competitionsGrid').style.display = 'grid';
+    try {
+        const d = await api('GET', '/api/community/competitions?limit=30');
+        const g = $('#competitionsGrid');
+        if (!d.competitions.length) { g.innerHTML = '<div class="empty"><i class="fa-solid fa-trophy"></i>لا منافسات حاليًا — تُنشأ من الإدارة.</div>'; return; }
+        const scopeLabels = { teams: 'فرق', centers: 'مراكز', individuals: 'أفراد' };
+        g.innerHTML = d.competitions.map(c => `
+            <div class="card">
+                <div class="icon-lg">🏆</div>
+                <h3>${esc(c.name)}</h3>
+                <div class="desc">${esc(c.description || '')}</div>
+                <div class="meta">
+                    <span><i class="fa-solid fa-layer-group"></i> ${scopeLabels[c.scope] || esc(c.scope)}</span>
+                    <span><i class="fa-solid fa-circle-info"></i> ${esc(c.status)}</span>
+                </div>
+                <div class="row" style="margin-top:10px">
+                    <button class="btn sm primary" onclick="openCompetition(${c.id})"><i class="fa-solid fa-ranking-star"></i> النتائج</button>
+                </div>
+            </div>`).join('');
+    } catch (e) { toast(e.message, false); }
+}
+window.openCompetition = async id => {
+    try {
+        const d = await api('GET', '/api/community/competitions/' + id);
+        const c = d.competition;
+        $('#competitionsGrid').style.display = 'none'; $('#compDetail').style.display = 'block';
+        $('#compName').textContent = c.name; $('#compDesc').textContent = c.description || '';
+        $('#compMeta').innerHTML = `<span>الحالة: ${esc(c.status)}</span><span>النطاق: ${esc(c.scope)}</span>`;
+        const tb = $('#compParticipants');
+        tb.innerHTML = c.participants.length
+            ? c.participants.map((p, i) => `<tr><td>${i + 1}</td><td>${esc(p.participant_label)}</td><td>${p.score}</td><td>${p.rank || '—'}</td><td>${esc(p.result_note || '')}</td></tr>`).join('')
+            : '<tr><td colspan="5" style="text-align:center;color:var(--muted)">لا مشاركين بعد</td></tr>';
+        const jr = $('#compJoinRow');
+        jr.innerHTML = (c.scope === 'individuals' && (c.status === 'open' || c.status === 'ongoing') && can('community.tournament'))
+            ? '<button class="btn primary" onclick="joinCompetition(' + c.id + ')"><i class="fa-solid fa-plus"></i> شارك في المنافسة</button>' : '';
+        if (can('community.admin')) {
+            jr.innerHTML += `<button class="btn sm" onclick="adminAddParticipant(${c.id})">إضافة مشارك</button>`;
+            tb.innerHTML = c.participants.length
+                ? c.participants.map((p, i) => `<tr><td>${i + 1}</td><td>${esc(p.participant_label)}</td>
+                    <td><input type="number" value="${p.score}" style="width:70px;padding:4px" onchange="adminSetResult(${p.id}, this.value, null)"></td>
+                    <td><input type="number" value="${p.rank || ''}" style="width:60px;padding:4px" onchange="adminSetResult(${p.id}, null, this.value)"></td>
+                    <td>${esc(p.result_note || '')}</td></tr>`).join('')
+                : tb.innerHTML;
+        }
+    } catch (e) { toast(e.message, false); }
+};
+window.joinCompetition = async id => {
+    try { await api('POST', '/api/community/competitions/' + id + '/join'); toast('انضممت للمنافسة'); openCompetition(id); }
+    catch (e) { toast(e.message, false); }
+};
+window.adminAddParticipant = async id => {
+    const label = prompt('تسمية المشارك (فريق/مركز/فرد):'); if (!label) return;
+    try { await api('POST', '/api/community/admin/competitions/' + id + '/participants', { label }); toast('أُضيف المشارك'); openCompetition(id); }
+    catch (e) { toast(e.message, false); }
+};
+window.adminSetResult = async (pid, score, rank) => {
+    try {
+        const payload = {}; if (score != null && score !== '') payload.score = parseInt(score, 10);
+        if (rank != null && rank !== '') payload.rank = parseInt(rank, 10);
+        if (!Object.keys(payload).length) return;
+        await api('PUT', '/api/community/admin/competition-participants/' + pid, payload);
+        toast('سُجلت النتيجة');
+    } catch (e) { toast(e.message, false); }
+};
+$('#backToComps').addEventListener('click', loadCompetitions);
+
+/* ═══ الشارات ═══ */
+async function loadMyBadges() {
+    const box = $('#myBadges');
+    if (!S.meId) { box.innerHTML = '<div class="empty" style="padding:14px">تعذر تحديد هويتك لعرض الشارات.</div>'; return; }
+    try {
+        const b = await api('GET', '/api/community/users/' + encodeURIComponent(S.meId) + '/badges');
+        box.innerHTML = b.badges.length
+            ? b.badges.map(x => `<span class="badge-chip">${esc(x.icon || '🏅')} ${esc(x.name)}${x.context ? ' · ' + esc(x.context) : ''}</span>`).join('')
+            : '<div class="empty" style="padding:14px">لا شارات بعد — شارك في المجالس والأنشطة.</div>';
+    } catch (e) { box.innerHTML = '<div class="empty" style="padding:14px">' + esc(e.message) + '</div>'; }
+}
+async function loadBadges() {
+    try {
+        const d = await api('GET', '/api/community/badges');
+        $('#badgesGrid').innerHTML = d.badges.map(b => `
+            <div class="card"><div class="icon-lg">${esc(b.icon || '🏅')}</div>
+            <h3>${esc(b.name)}</h3><div class="desc">${esc(b.description || '')}</div></div>`).join('');
+    } catch (e) { toast(e.message, false); }
+}
+
+/* ═══ الإشراف ═══ */
+async function loadModQueue() {
+    try {
+        const d = await api('GET', '/api/community/moderation/queue');
+        const q = $('#modQueue');
+        if (!d.reports.length) { q.innerHTML = '<div class="empty" style="padding:14px">لا بلاغات معلّقة — القائمة نظيفة.</div>'; return; }
+        const typeLabels = { user: 'مستخدم', post: 'منشور', activity: 'نشاط', majlis: 'مجلس' };
+        q.innerHTML = d.reports.map(r => `
+            <div class="card" style="margin-bottom:10px">
+                <div class="row">
+                    <span class="status-pill busy">#${r.id}</span>
+                    <strong>${typeLabels[r.target_type] || esc(r.target_type)}</strong>
+                    <span style="color:var(--muted);font-size:0.78rem">هدف: ${esc(r.target_id)}</span>
+                    <div class="spacer"></div>
+                    <span class="p-time">${fmtTime(r.created_at)}</span>
+                </div>
+                <div class="desc" style="margin-top:6px">${esc(r.reason)}</div>
+                <div class="meta">من: ${esc(r.reporter_name || r.reporter_user_id)}</div>
+                <div class="row" style="margin-top:10px">
+                    ${r.target_type === 'post' ? `
+                        <button class="btn sm" onclick="modAction(${r.id},'hide')">إخفاء</button>
+                        <button class="btn sm danger" onclick="modAction(${r.id},'remove')">حذف المحتوى</button>` : ''}
+                    ${r.target_type !== 'majlis' ? `
+                        <button class="btn sm" onclick="modAction(${r.id},'warn')">تحذير</button>
+                        <button class="btn sm" onclick="modAction(${r.id},'freeze')">تجميد مشاركة</button>` : ''}
+                    <button class="btn sm ghost" onclick="modAction(${r.id},'dismiss')">رفض البلاغ</button>
+                </div>
+            </div>`).join('');
+    } catch (e) { toast(e.message, false); }
+}
+window.modAction = async (id, action) => {
+    const note = action === 'dismiss' ? undefined : (prompt('ملاحظة (اختياري):') || undefined);
+    try {
+        await api('POST', '/api/community/moderation/reports/' + id + '/action', { action, note });
+        toast('نُفذ الإجراء: ' + action); loadModQueue(); loadModFlagged(); loadModAudit();
+    } catch (e) { toast(e.message, false); }
+};
+async function loadModFlagged() {
+    try {
+        const d = await api('GET', '/api/community/moderation/posts?status=flagged');
+        const d2 = await api('GET', '/api/community/moderation/posts?status=hidden');
+        const posts = (d.posts || []).concat(d2.posts || []);
+        const q = $('#modFlagged');
+        if (!posts.length) { q.innerHTML = '<div class="empty" style="padding:14px">لا محتوى موقوف.</div>'; return; }
+        q.innerHTML = posts.map(p => `
+            <div class="card" style="margin-bottom:10px">
+                <div class="row">
+                    <span class="status-pill ${p.status === 'hidden' ? 'unavailable' : 'busy'}">${p.status === 'hidden' ? 'مخفي (عتبة بلاغات)' : 'موقوف (فلتر)'}</span>
+                    <span style="color:var(--muted);font-size:0.78rem">${esc(p.council_name || '')}</span>
+                    <div class="spacer"></div><span class="p-time">${fmtTime(p.created_at)}</span>
+                </div>
+                <div class="desc" style="margin-top:6px">${esc(p.content)}</div>
+                <div class="meta">المؤلف: ${esc(p.author_name || p.author_user_id)}</div>
+                <div class="row" style="margin-top:10px">
+                    <button class="btn sm primary" onclick="modPost(${p.id},'active')">اعتماد ونشر</button>
+                    <button class="btn sm" onclick="modPost(${p.id},'hidden')">إبقاء مخفيًا</button>
+                    <button class="btn sm danger" onclick="modPost(${p.id},'removed')">حذف نهائي</button>
+                </div>
+            </div>`).join('');
+    } catch (e) { toast(e.message, false); }
+}
+window.modPost = async (id, status) => {
+    try {
+        await api('POST', '/api/community/moderation/posts/' + id + '/status', { status });
+        toast('نُفذ: ' + status); loadModFlagged(); loadModAudit();
+    } catch (e) { toast(e.message, false); }
+};
+async function loadModAudit() {
+    try {
+        const d = await api('GET', '/api/community/moderation/audit?limit=20');
+        $('#modAudit').innerHTML = d.audit.length
+            ? '<div class="card"><div class="table-wrap"><table><thead><tr><th>الفعل</th><th>الفاعل</th><th>الهدف</th><th>التفصيل</th><th>الوقت</th></tr></thead><tbody>' +
+              d.audit.map(a => `<tr><td>${esc(a.action)}</td><td>${esc(a.actor_name || '—')}</td>
+                <td>${esc(a.target_type || '')} ${esc(a.target_id || '')}</td>
+                <td style="max-width:320px">${esc(a.detail || '')}</td><td>${fmtTime(a.created_at)}</td></tr>`).join('') +
+              '</tbody></table></div></div>'
+            : '<div class="empty" style="padding:14px">لا سجل بعد.</div>';
+    } catch (e) { /* صامت */ }
+}
+
+/* ═══ الإدارة ═══ */
+async function loadAdmin() {
+    try {
+        const s = await api('GET', '/api/community/admin/settings');
+        const b = $('#toggleCommunityBtn');
+        b.textContent = s.enabled ? 'مفعّلة — إطفاء' : 'مطفأة — تفعيل';
+        b.className = 'btn sm ' + (s.enabled ? 'danger' : 'primary');
+        b.onclick = async () => {
+            try {
+                const d = await api('PUT', '/api/community/admin/settings', { enabled: !s.enabled });
+                toast(d.enabled ? 'فُعّلت المنظومة' : 'أُطفئت المنظومة'); loadAdmin();
+            } catch (e) { toast(e.message, false); }
+        };
+        const f = await api('GET', '/api/community/admin/content-filter');
+        $('#filterWords').value = (f.words || []).join('\n');
+    } catch (e) { toast(e.message, false); }
+}
+$('#createCouncilBtn').addEventListener('click', async () => {
+    try {
+        await api('POST', '/api/community/councils', {
+            slug: $('#cSlug').value.trim(), name: $('#cName').value.trim(),
+            description: $('#cDesc').value.trim() || undefined,
+            icon: $('#cIcon').value.trim() || undefined,
+            membership: $('#cMembership').value
+        });
+        toast('أُنشئ المجلس'); loadCouncils();
+    } catch (e) { toast(e.message, false); }
+});
+$('#createEventBtn').addEventListener('click', async () => {
+    try {
+        await api('POST', '/api/community/admin/events', {
+            title: $('#eTitle').value.trim(), icon: $('#eIcon').value.trim() || undefined,
+            description: $('#eDesc').value.trim() || undefined,
+            startsAt: $('#eStarts').value ? $('#eStarts').value.replace('T', ' ') + ':00' : undefined,
+            endsAt: $('#eEnds').value ? $('#eEnds').value.replace('T', ' ') + ':00' : undefined
+        });
+        toast('أُنشئت المناسبة');
+    } catch (e) { toast(e.message, false); }
+});
+$('#createCompBtn').addEventListener('click', async () => {
+    try {
+        await api('POST', '/api/community/admin/competitions', {
+            name: $('#compName2').value.trim(), scope: $('#compScope').value,
+            rules: $('#compRules').value.trim() || undefined
+        });
+        toast('أُنشئت المنافسة');
+    } catch (e) { toast(e.message, false); }
+});
+$('#saveFilterWordsBtn').addEventListener('click', async () => {
+    try {
+        const words = $('#filterWords').value.split('\n').map(w => w.trim()).filter(Boolean);
+        await api('PUT', '/api/community/admin/content-filter', { words });
+        toast('حُفظت قائمة الفلترة (' + words.length + ')');
+    } catch (e) { toast(e.message, false); }
+});
+</script>
+</body>
+</html>

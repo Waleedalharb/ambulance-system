@@ -80,7 +80,18 @@ const PERMISSIONS = {
     // assets.inventory منح فردي حصرًا (موظف الجرد) — لا يُمنح لأي دور تلقائيًا
     'assets.view':          { label: 'عرض العهد والأصول والبحث وبطاقة الجهاز', domain: 'assets' },
     'assets.inventory':     { label: 'تنفيذ جلسات الجرد (منح فردي فقط — لا دور يحملها)', domain: 'assets' },
-    'assets.manage':        { label: 'إدارة العهد: اعتماد الاستيراد/الجرد والنقل والاستبدال والأرشفة', domain: 'assets' }
+    'assets.manage':        { label: 'إدارة العهد: اعتماد الاستيراد/الجرد والنقل والاستبدال والأرشفة', domain: 'assets' },
+    // ═══ EMS Community — C1 Foundation (اعتماد المالك الكتابي 2026-09-24) ═══
+    // مساحة مستقلة بالكامل عن التشغيل: كلها منح فردي حصرًا — لا دور يحمل أيًّا منها
+    // (نفس سابقة ops.my_portal / staff.phone_view / ops.team_locations.view).
+    // مفاتيح التعطيل تعمل في اتجاه التقييد فقط ولا تفتح ما تمنعه قاعدة التشغيل.
+    'community.view':            { label: 'المجتمع: الدخول والاطلاع (منح فردي فقط — لا دور يحملها)', domain: 'community' },
+    'community.post':            { label: 'المجتمع: النشر والتفاعل داخل المجالس (منح فردي فقط)', domain: 'community' },
+    'community.create_activity': { label: 'المجتمع: إنشاء فعاليات «اجتمعوا» (منح فردي فقط)', domain: 'community' },
+    'community.join_activity':   { label: 'المجتمع: الانضمام للفعاليات (منح فردي فقط)', domain: 'community' },
+    'community.tournament':      { label: 'المجتمع: المشاركة في التحديات والبطولات (منح فردي فقط)', domain: 'community' },
+    'community.moderate':        { label: 'المجتمع: الإشراف ومعالجة البلاغات (منح فردي فقط)', domain: 'community' },
+    'community.admin':           { label: 'المجتمع: الإدارة ومفاتيح التعطيل (منح فردي فقط)', domain: 'community' }
 };
 
 const PERMISSION_KEYS = Object.keys(PERMISSIONS);
