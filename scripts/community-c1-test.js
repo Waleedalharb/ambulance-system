@@ -271,7 +271,7 @@ async function unitFixes() {
         // ═══ Report → Queue → Action → Audit ═══
         const selfRep = await api('POST', '/api/community/report', tok2, { targetType: 'user', targetId: 'emp-CM002', reason: 'تجربة' });
         check('B12) الإبلاغ عن النفس ← 422 SELF_REPORT', selfRep.status === 422 && selfRep.body && selfRep.body.code === 'SELF_REPORT');
-        const badType = await api('POST', '/api/community/report', tok2, { targetType: 'post', targetId: '1', reason: 'تجربة محتوى' });
+        const badType = await api('POST', '/api/community/report', tok2, { targetType: 'post', targetId: '99999999', reason: 'تجربة محتوى' });
         // Full Foundation (اعتماد المالك 2026-09-24): بلاغات المحتوى أصبحت موجودة فعلًا —
         // التوقع المحدّث: منشور غير موجود ← 404 POST_NOT_FOUND (لا TARGET_NOT_AVAILABLE من C1)
         check('B13) بلاغ على منشور غير موجود ← 404 POST_NOT_FOUND (البلاغات على المحتوى مدعومة منذ Full Foundation)',

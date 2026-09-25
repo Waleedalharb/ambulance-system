@@ -1,5 +1,5 @@
 // ============================================
-// CommunityPresenceService — EMS Community Full Foundation (اعتماد المالك 2026-09-24)
+// CommunityPresenceService — EMS Community (اعتماد المالك 2026-09-24)
 // ============================================
 // «من موجود؟» — Explicit Social Status فقط. يضبط الموظف حالته بيده:
 //   available (متاح للمجلس) · busy (مشغول) · in_activity (في نشاط) · unavailable (غير متاح)
@@ -11,13 +11,15 @@
 //   ✗ لا last_seen ولا استنتاج من نشاط التطبيق/الجلسة
 // الحالة تنتهي صلاحيتها عرضيًا بعد 12 ساعة (القديمة ليست «موجودًا» افتراضيًا).
 //
-// ضبط «متاح/في نشاط» مشاركة اجتماعية ← حارس المشاركة الموحد (البوابة التشغيلية
-// تمنع إعلان التوفر أثناء التكليف). «مشغول/غير متاح» انسحاب ← متاح دائمًا.
+// قرار المالك 2026-09-24 (D1): إعلان الحالة الاجتماعية اختيار شخصي بحت —
+// لا يمر بالبوابة التشغيلية إطلاقًا (الموظف يحدد حالته بنفسه متى شاء، والمهمة
+// التشغيلية لا تمنعه من تغييرها). يبقى على إعلان التوفر فقط: توفر المنظومة
+// (إطفاء/تعطيل دور) والتجميد الإشرافي. «مشغول/غير متاح» انسحاب ← متاح دائمًا.
 // ============================================
 'use strict';
 
 const STATUSES = Object.freeze(['available', 'busy', 'in_activity', 'unavailable']);
-// حالات الإعلان الإيجابي تتطلب أهلية المشاركة؛ حالات الانسحاب لا تتطلب شيئًا
+// حالات الإعلان الإيجابي تخضع للتعطيل/التجميد الإشرافي فقط؛ حالات الانسحاب حرة دائمًا
 const OPT_IN_STATUSES = Object.freeze(['available', 'in_activity']);
 const MAX_AGE_HOURS = 12;
 
@@ -37,15 +39,22 @@ class CommunityPresenceService {
         const e = new Error(message); e.statusCode = statusCode; e.code = code; return e;
     }
 
-    /** ضبط حالتي — اختيار صريح من الموظف نفسه، ولا مصدر آخر للحالة إطلاقًا. */
+    /** ضبط حالتي — اختيار صريح من الموظف نفسه، ولا مصدر آخر للحالة إطلاقًا.
+     *  لا بوابة تشغيلية هنا (قرار المالك D1): participationGuard لا يُستدعى أبدًا
+     *  من هذا المسار. التعطيل الإداري والتجميد الإشرافي فقط على حالات الإعلان. */
     async setMine(actor, { status, note }) {
         if (STATUSES.indexOf(status) === -1) {
             throw this._err(422, 'حالة غير معروفة (' + STATUSES.join('/') + ')', 'BAD_STATUS');
         }
-        // إعلان التوفر/النشاط = مشاركة اجتماعية ← البوابة التشغيلية + التجميد + التعطيل
+        // إعلان التوفر/النشاط: إطفاء المنظومة/تعطيل الدور + التجميد الإشرافي فقط
         if (OPT_IN_STATUSES.indexOf(status) !== -1) {
-            const guard = await this.core.participationGuard(actor);
-            if (!guard.allow) throw this._err(403, 'لا يمكن إعلان التوفر حاليًا', guard.reason);
+            if (!(await this.core.isAvailableFor(actor))) {
+                throw this._err(403, 'منظومة المجتمع غير متاحة حاليًا', 'COMMUNITY_DISABLED');
+            }
+            const restrictions = await this.db.Community.getActiveRestrictions(actor.id);
+            if (restrictions.length > 0) {
+                throw this._err(403, 'مشاركتك الاجتماعية مجمّدة حاليًا بقرار إشرافي', 'PARTICIPATION_FROZEN');
+            }
         }
         let cleanNote = null;
         if (note != null && String(note).trim()) {

@@ -5,12 +5,14 @@
  * فلترة UGC + إشراف المحتوى + عزل تشغيلي كامل + بوابة خادمية + انحدار.
  *
  * يغطي شروط الاعتماد:
- *  - بنيوي: 17 جدولًا additive، FKs داخل community_* فقط، لا أعمدة مال/رهان،
+ *  - بنيوي: 20 جدولًا additive، FKs داخل community_* فقط، لا أعمدة مال/رهان،
  *    لا team_live_locations/GPS/realtime في كود الخدمات (فحص ساكن بلا تعليقات)،
  *    ولا أي حقل موقع في استجابات الحضور/الأنشطة.
  *  - صلاحيات community.* منح فردي حصرًا ← 401/403 على كل مجموعة مسارات.
- *  - البوابة/الحارس: كل مسارات المشاركة (نشر/انضمام/توفر/منافسة) تمر بالحارس
- *    الموحد — التجميد الإشرافي يوقفها كلها، والانسحاب (unavailable) يبقى متاحًا.
+ *  - البوابة/الحارس: مسارات المشاركة (نشر/انضمام/منافسة/إنشاء غرفة/إرسال رسالة)
+ *    تمر بالحارس الموحد — التجميد الإشرافي يوقفها كلها. الحضور (قرار D1):
+ *    إعلان الحالة لا يمر بالبوابة التشغيلية إطلاقًا؛ التعطيل/التجميد فقط،
+ *    والانسحاب (unavailable) يبقى متاحًا دائمًا.
  *  - فلترة المحتوى: تطبيع ضد الالتفاف + قائمة إدارية توسيعية + flagged لا يُنشر.
  *  - الإشراف: بلاغات محتوى + منع الإغراق + عتبة إخفاء تلقائي (hidden وليس
  *    removed) + hide/remove للمنشورات فقط + freeze يطال مؤلف المنشور.
@@ -120,15 +122,30 @@ async function unitGuards() {
     const stubIdentity = { resolveByUser: async () => ({ employee_id: 1, display_name: 'اختبار', avatar_url: null, is_active: true }) };
     const stubFilter = { checkContent: async () => ({ ok: true, matched: [] }) };
 
-    // الحضور: «متاح» مشاركة ← تُمنع بحالة تشغيلية؛ «غير متاح» انسحاب ← متاح دائمًا
+    // الحضور (قرار المالك D1 2026-09-24): إعلان الحالة اختيار شخصي بحت —
+    // participationGuard لا يُستدعى إطلاقًا من هذا المسار. إعلان التوفر يخضع
+    // فقط لتعطيل المنظومة (isAvailableFor) والتجميد الإشرافي؛ الانسحاب حر دائمًا.
+    const guardCalled = [];
+    const mkCore = avail => ({
+        isAvailableFor: async () => avail,
+        participationGuard: async () => { guardCalled.push('guard'); throw new Error('participationGuard لا يجب أن يُستدعى من الحضور'); }
+    });
     const calls = [];
-    const pDb = { Community: { setPresence: async () => calls.push('set') } };
-    const pres = new Presence({ db: pDb, identity: stubIdentity, core: denyCore, filter: stubFilter });
-    const e1 = await pres.setMine({ id: 'u1' }, { status: 'available' }).catch(e => e);
-    check('B1) «متاح للمجلس» أثناء حالة تشغيلية مانعة ← 403 ACTIVE_ASSIGNMENT',
-        e1 && e1.statusCode === 403 && e1.code === 'ACTIVE_ASSIGNMENT' && calls.length === 0, JSON.stringify({ code: e1 && e1.code }));
-    const okOut = await pres.setMine({ id: 'u1' }, { status: 'unavailable' });
-    check('B2) «غير متاح» (انسحاب) متاح رغم الحالة التشغيلية', okOut && okOut.status === 'unavailable' && calls.length === 1);
+    const mkPres = (avail, restrictions) => new Presence({
+        db: { Community: { setPresence: async () => calls.push('set'), getActiveRestrictions: async () => restrictions } },
+        identity: stubIdentity, core: mkCore(avail), filter: stubFilter
+    });
+    const e1 = await mkPres(false, []).setMine({ id: 'u1' }, { status: 'available' }).catch(e => e);
+    check('B1) إعلان توفر أثناء إطفاء/تعطيل المنظومة ← 403 COMMUNITY_DISABLED ولا كتابة',
+        e1 && e1.statusCode === 403 && e1.code === 'COMMUNITY_DISABLED' && calls.length === 0, JSON.stringify({ code: e1 && e1.code }));
+    const e1b = await mkPres(true, [{ kind: 'participation_freeze' }]).setMine({ id: 'u1' }, { status: 'available' }).catch(e => e);
+    check('B1ب) إعلان توفر أثناء تجميد إشرافي ← 403 PARTICIPATION_FROZEN ولا كتابة',
+        e1b && e1b.statusCode === 403 && e1b.code === 'PARTICIPATION_FROZEN' && calls.length === 0, JSON.stringify({ code: e1b && e1b.code }));
+    const okOptIn = await mkPres(true, []).setMine({ id: 'u1' }, { status: 'in_activity' });
+    check('B1ج) إعلان «في نشاط» سليم ← ينجح (لا بوابة تشغيلية في الحضور)', okOptIn && okOptIn.status === 'in_activity' && calls.length === 1);
+    const okOut = await mkPres(false, [{ kind: 'participation_freeze' }]).setMine({ id: 'u1' }, { status: 'unavailable' });
+    check('B2) «غير متاح» (انسحاب) متاح دائمًا — حتى مع التعطيل والتجميد معًا', okOut && okOut.status === 'unavailable');
+    check('B2ب) participationGuard لم يُستدعَ إطلاقًا من مسار الحضور (قرار D1)', guardCalled.length === 0);
 
     // الانضمام لنشاط: الأهلية خادمية — حارس يمنع ← لا انضمام مهما قال العميل
     let joined = false;
@@ -262,14 +279,15 @@ async function unitStaticIsolation() {
         check('S8) admin/content-filter بلا admin (مشرف فقط) ← 403', noPerm7.status === 403);
 
         // ═══ 2) الفحص البنيوي: الجداول والفهارس وFKs وأعمدة المال ═══
-        console.log('\n── 2) البنية: 17 جدولًا additive وعزل FK ولا أعمدة مال ──');
+        console.log('\n── 2) البنية: 20 جدولًا additive وعزل FK ولا أعمدة مال ──');
         const tbls = dbw.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'community_%' ORDER BY name").all().map(t => t.name);
         const EXPECTED_TABLES = ['community_activities', 'community_activity_participants', 'community_activity_types',
-            'community_audit_log', 'community_badges', 'community_blocks', 'community_competition_participants',
-            'community_competitions', 'community_council_members', 'community_councils', 'community_events',
-            'community_posts', 'community_presence', 'community_reports', 'community_restrictions',
+            'community_audit_log', 'community_badges', 'community_blocks', 'community_chat_messages',
+            'community_competition_participants', 'community_competitions', 'community_council_members',
+            'community_councils', 'community_events', 'community_posts', 'community_presence',
+            'community_reports', 'community_restrictions', 'community_room_members', 'community_rooms',
             'community_settings', 'community_user_badges'];
-        check('T1) جداول community_* السبعة عشر كلها أُنشئت additive',
+        check('T1) جداول community_* العشرون كلها أُنشئت additive (17 أساس + 3 لـD1: الغرف/الأعضاء/الدردشة)',
             JSON.stringify(tbls) === JSON.stringify(EXPECTED_TABLES), tbls.join(','));
         let fkClean = true; const fkHits = [];
         for (const t of EXPECTED_TABLES) {
@@ -291,7 +309,8 @@ async function unitStaticIsolation() {
         // اختبار (emp-CM*) تسربت إلى المصدر إطلاقًا.
         let leaked = 0;
         for (const [t, c] of [['community_posts', 'author_user_id'], ['community_council_members', 'user_id'],
-            ['community_presence', 'user_id'], ['community_reports', 'reporter_user_id'], ['community_audit_log', 'actor_id']]) {
+            ['community_presence', 'user_id'], ['community_reports', 'reporter_user_id'], ['community_audit_log', 'actor_id'],
+            ['community_chat_messages', 'author_user_id'], ['community_room_members', 'user_id']]) {
             try {
                 const exists = src2.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name = ?").get(t);
                 if (exists) leaked += src2.prepare(`SELECT COUNT(*) c FROM ${t} WHERE CAST(${c} AS TEXT) LIKE 'emp-CM%'`).get().c;
@@ -375,6 +394,39 @@ async function unitStaticIsolation() {
             prList.status === 200 && prList.body.presence.length >= 2, JSON.stringify(prList.body).slice(0, 200));
         check('H6) شكل الاستجابة خالٍ من أي حقل موقع/مصدر (userId/status/note/updatedAt/user فقط)',
             JSON.stringify(prKeys) === JSON.stringify(['note', 'status', 'updatedAt', 'user', 'userId'].sort()), prKeys.join(','));
+
+        // ═══ 5ب) قرار D1: الحضور خارج البوابة التشغيلية — إثبات بحالة مانعة حقيقية ═══
+        // ننشئ مناوبة active فعلية في النسخة المعزولة ← البوابة تعدّ الموظفين
+        // OPERATIONAL_DUTY (منع مشاركة حقيقي)، ثم نثبت: إعلان الحالة ينجح في
+        // الحالتين، والبوابة تبقى تعمل في إنشاء/الانضمام للنشاط وإنشاء الغرف.
+        console.log('\n── 5ب) D1: إعلان الحالة تحت حالة تشغيلية مانعة حقيقية (OPERATIONAL_DUTY) ──');
+        const shiftRow = dbw.prepare("SELECT id FROM shifts ORDER BY id DESC LIMIT 1").get();
+        try {
+            dbw.prepare("UPDATE shifts SET status = 'active' WHERE id = ?").run(shiftRow.id);
+            const stGate = await api('GET', '/api/community/status', t2);
+            check('N1) مناوبة نشطة حقيقية ← البوابة تمنع المشاركة فعلًا (OPERATIONAL_DUTY)',
+                stGate.status === 200 && stGate.body.gate && stGate.body.gate.allowParticipation === false &&
+                stGate.body.gate.reason === 'OPERATIONAL_DUTY', JSON.stringify(stGate.body.gate));
+            const prDuty1 = await api('PUT', '/api/community/presence', t2, { status: 'available', note: 'تحت حالة مانعة' });
+            check('N2) إعلان «متاح» تحت OPERATIONAL_DUTY ← 200 (الحضور خارج البوابة — قرار D1)',
+                prDuty1.status === 200 && prDuty1.body && prDuty1.body.status === 'available',
+                'status=' + prDuty1.status + ' ' + JSON.stringify(prDuty1.body));
+            const prDuty2 = await api('PUT', '/api/community/presence', t1, { status: 'in_activity' });
+            check('N3) إعلان «في نشاط» تحت OPERATIONAL_DUTY ← 200', prDuty2.status === 200, 'status=' + prDuty2.status);
+            const actDuty = await api('POST', '/api/community/activities', t1, { typeId: 1, title: 'محاولة نشاط تحت المنع' });
+            check('N4) إنشاء نشاط تحت OPERATIONAL_DUTY ← 403 (البوابة تعمل حيث يجب)',
+                actDuty.status === 403 && actDuty.body && actDuty.body.code === 'OPERATIONAL_DUTY', 'status=' + actDuty.status);
+            const roomDuty = await api('POST', '/api/community/rooms', t1, { name: 'محاولة غرفة تحت المنع' });
+            check('N5) إنشاء غرفة تحت OPERATIONAL_DUTY ← 403 (البوابة تعمل في الغرف أيضًا)',
+                roomDuty.status === 403 && roomDuty.body && roomDuty.body.code === 'OPERATIONAL_DUTY', 'status=' + roomDuty.status);
+        } finally {
+            dbw.prepare("UPDATE shifts SET status = 'archived' WHERE id = ?").run(shiftRow.id);
+        }
+        const stAfter = await api('GET', '/api/community/status', t2);
+        check('N6) بعد الأرشفة ← البوابة تسمح بالمشاركة مجددًا',
+            stAfter.status === 200 && stAfter.body.gate && stAfter.body.gate.allowParticipation === true, JSON.stringify(stAfter.body.gate));
+        const prFree = await api('PUT', '/api/community/presence', t2, { status: 'busy' });
+        check('N7) إعلان الحالة في حالة تسمح بالمشاركة ← 200', prFree.status === 200 && prFree.body && prFree.body.status === 'busy');
 
         // ═══ 6) الحظر متبادل الأثر عبر كل مسارات التفاعل ═══
         console.log('\n── 6) الحظر: منشورات/حضور/انضمام/ملفات ──');
@@ -742,6 +794,167 @@ async function unitStaticIsolation() {
         check('V20) الصف عاد joined والعدد اكتمل 2/2',
             capRow('emp-CM102') && capRow('emp-CM102').status === 'joined' && capCount() === 2,
             JSON.stringify(capRow('emp-CM102')) + ' count=' + capCount());
+
+        // ═══ 16) D1: الغرف والدردشة الجماعية (اعتماد المالك الكتابي 2026-09-24) ═══
+        console.log('\n── 16) D1: الغرف — صلاحيات/غرفة مجلس كسولة/سباق إنشاء ──');
+        const rmNoTok = await api('GET', '/api/community/rooms', null);
+        check('D1-S1) rooms بلا توكن ← 401', rmNoTok.status === 401);
+        const rmNoPerm = await api('GET', '/api/community/rooms', t6);
+        check('D1-S2) rooms بلا community.view ← 403', rmNoPerm.status === 403);
+        const rmCreateNoPerm = await api('POST', '/api/community/rooms', t7, { name: 'غرفة بلا صلاحية' });
+        check('D1-S3) إنشاء غرفة خاصة بلا community.post ← 403 صلاحيات', rmCreateNoPerm.status === 403);
+
+        // غرفة المجلس الكسولة: councilId (t1/t2/t5/t7/t8 أعضاء؛ t3 مشرف بلا عضوية)
+        const roomDenied = await api('GET', '/api/community/councils/' + councilId + '/room', t3);
+        check('D1-R1) فتح غرفة مجلس بلا عضوية ← 403 NOT_A_MEMBER',
+            roomDenied.status === 403 && roomDenied.body && roomDenied.body.code === 'NOT_A_MEMBER', 'status=' + roomDenied.status);
+        const raceRooms = await Promise.all([t1, t2, t1].map(tok => api('GET', '/api/community/councils/' + councilId + '/room', tok)));
+        check('D1-R2) سباق الفتح الأول (3 متزامنة) ← 200 للكل ونفس الغرفة (الفهرس الفريد يحسم)',
+            raceRooms.every(r => r.status === 200) && new Set(raceRooms.map(r => r.body.room.id)).size === 1,
+            JSON.stringify(raceRooms.map(r => r.status)));
+        const councilRoomId = raceRooms[0].body.room.id;
+        const roomAgain = await api('GET', '/api/community/councils/' + councilId + '/room', t2);
+        check('D1-R3) الفتح المتكرر يعيد نفس الغرفة (كسولة — لا تكرار أبدًا)',
+            roomAgain.status === 200 && roomAgain.body.room.id === councilRoomId);
+        const myRooms = await api('GET', '/api/community/rooms', t1);
+        check('D1-R4) غرفة المجلس تظهر في قائمة «غرفي»',
+            myRooms.status === 200 && myRooms.body.councilRooms.some(r => r.id === councilRoomId), JSON.stringify(myRooms.body).slice(0, 200));
+
+        console.log('\n── 16ب) D1: الدردشة — إرسال/مزامنة تزايدية/فلترة/وصول ──');
+        const msg1 = await api('POST', '/api/community/rooms/' + councilRoomId + '/messages', t1, { content: 'السلام عليكم — أول رسالة في الغرفة' });
+        check('D1-C1) عضو يرسل رسالة نظيفة ← visible', msg1.status === 200 && msg1.body && msg1.body.status === 'visible', JSON.stringify(msg1.body));
+        await api('POST', '/api/community/rooms/' + councilRoomId + '/messages', t2, { content: 'وعليكم السلام — القهوة جاهزة' });
+        const list0 = await api('GET', '/api/community/rooms/' + councilRoomId + '/messages', t2);
+        check('D1-C2) القراءة الأولية تعرض الرسالتين تصاعديًا مع lastId',
+            list0.status === 200 && list0.body.messages.length === 2 && list0.body.messages[0].id < list0.body.messages[1].id && list0.body.lastId === list0.body.messages[1].id,
+            JSON.stringify(list0.body).slice(0, 250));
+        const lastId = list0.body.lastId;
+        const listNew0 = await api('GET', '/api/community/rooms/' + councilRoomId + '/messages?since_id=' + lastId, t2);
+        check('D1-C3) since_id=lastId بلا جديد ← قائمة فارغة (مزامنة رخيصة)', listNew0.status === 200 && listNew0.body.messages.length === 0);
+        await api('POST', '/api/community/rooms/' + councilRoomId + '/messages', t1, { content: 'رسالة ثالثة للمزامنة' });
+        const listSync = await api('GET', '/api/community/rooms/' + councilRoomId + '/messages?since_id=' + lastId, t2);
+        check('D1-C4) المزامنة التزايدية تعيد الجديد فقط (رسالة واحدة)',
+            listSync.status === 200 && listSync.body.messages.length === 1 && listSync.body.messages[0].content === 'رسالة ثالثة للمزامنة', JSON.stringify(listSync.body).slice(0, 200));
+        const msgBad = await api('POST', '/api/community/rooms/' + councilRoomId + '/messages', t1, { content: 'هذا الكلام غبي' });
+        check('D1-C5) رسالة مخالفة للفلتر ← flagged ولا تُنشر', msgBad.status === 200 && msgBad.body.flagged === true && msgBad.body.status === 'flagged', JSON.stringify(msgBad.body));
+        const listFlag = await api('GET', '/api/community/rooms/' + councilRoomId + '/messages?limit=50', t2);
+        check('D1-C6) الرسالة الموقوفة لا تظهر للأعضاء', !listFlag.body.messages.some(m => m.id === msgBad.body.id));
+        const modChatList = await api('GET', '/api/community/moderation/chat-messages?status=flagged', t3);
+        check('D1-C7) الرسالة الموقوفة تظهر في قائمة إشراف الدردشة',
+            modChatList.status === 200 && modChatList.body.messages.some(m => m.id === msgBad.body.id && m.room_name), JSON.stringify(modChatList.body).slice(0, 200));
+        const modChatNoPerm = await api('GET', '/api/community/moderation/chat-messages', t1);
+        check('D1-C8) قائمة إشراف الدردشة بلا community.moderate ← 403', modChatNoPerm.status === 403);
+        const approveMsg = await api('POST', '/api/community/moderation/chat-messages/' + msgBad.body.id + '/status', t3, { status: 'visible' });
+        check('D1-C9) المشرف يعتمد الرسالة الموقوفة ← 200', approveMsg.status === 200, JSON.stringify(approveMsg.body));
+        const listApproved = await api('GET', '/api/community/rooms/' + councilRoomId + '/messages?limit=50', t2);
+        check('D1-C10) الرسالة المعتمدة تظهر للأعضاء', listApproved.body.messages.some(m => m.id === msgBad.body.id));
+        const chatDenied = await api('GET', '/api/community/rooms/' + councilRoomId + '/messages', t4);
+        check('D1-C11) قراءة دردشة مجلس بلا عضوية ← 403 NOT_A_MEMBER (حتى للإدارة)',
+            chatDenied.status === 403 && chatDenied.body && chatDenied.body.code === 'NOT_A_MEMBER', 'status=' + chatDenied.status);
+        const sendNoPerm = await api('POST', '/api/community/rooms/' + councilRoomId + '/messages', t7, { content: 'x' });
+        check('D1-C12) إرسال بعضوية بلا community.post ← 403 صلاحيات', sendNoPerm.status === 403);
+
+        console.log('\n── 16ج) D1: الحظر متبادل الأثر في الدردشة ──');
+        const blkChat = await api('POST', '/api/community/block', t1, { userId: 'emp-CM102' });
+        check('D1-B1) CM101 يحظر CM102', blkChat.status === 200);
+        const listBlk = await api('GET', '/api/community/rooms/' + councilRoomId + '/messages?limit=50', t1);
+        check('D1-B2) رسائل المحظور تختفي من دردشة الحاظر',
+            !listBlk.body.messages.some(m => m.author.userId === 'emp-CM102'), JSON.stringify(listBlk.body.messages.map(m => m.author.userId)));
+        const listBlkRev = await api('GET', '/api/community/rooms/' + councilRoomId + '/messages?limit=50', t2);
+        check('D1-B3) رسائل الحاظر تختفي من دردشة المحظور (أثر متبادل)',
+            !listBlkRev.body.messages.some(m => m.author.userId === 'emp-CM101'));
+        await api('POST', '/api/community/unblock', t1, { userId: 'emp-CM102' });
+
+        console.log('\n── 16د) D1: الغرف الخاصة — إنشاء/أعضاء/مغادرة/إغلاق ──');
+        const pv = await api('POST', '/api/community/rooms', t1, { name: 'سوالف المناوبة' });
+        check('D1-P1) إنشاء غرفة خاصة ← 200', pv.status === 200 && pv.body && pv.body.id != null, JSON.stringify(pv.body));
+        const pvId = pv.body && pv.body.id;
+        const pvFiltered = await api('POST', '/api/community/rooms', t1, { name: 'غرفة الغبي' });
+        check('D1-P2) اسم غرفة مخالف للفلتر ← 422 FILTER_REJECTED', pvFiltered.status === 422 && pvFiltered.body && pvFiltered.body.code === 'FILTER_REJECTED');
+        const pvDenied = await api('GET', '/api/community/rooms/' + pvId, t5);
+        check('D1-P3) غير العضو يقرأ غرفة خاصة ← 403 NOT_A_MEMBER', pvDenied.status === 403 && pvDenied.body && pvDenied.body.code === 'NOT_A_MEMBER');
+        const addByOther = await api('POST', '/api/community/rooms/' + pvId + '/members', t2, { userId: 'emp-CM105' });
+        check('D1-P4) غير المنشئ يضيف عضوًا ← 403 NOT_ROOM_OWNER', addByOther.status === 403 && addByOther.body && addByOther.body.code === 'NOT_ROOM_OWNER');
+        const addMem = await api('POST', '/api/community/rooms/' + pvId + '/members', t1, { userId: 'emp-CM102' });
+        check('D1-P5) المنشئ يضيف عضوًا ← 200', addMem.status === 200 && addMem.body.added === true, JSON.stringify(addMem.body));
+        const pvMsg = await api('POST', '/api/community/rooms/' + pvId + '/messages', t2, { content: 'أهلًا من العضو المضاف' });
+        check('D1-P6) العضو المضاف يرسل ← 200', pvMsg.status === 200);
+        const pvListMine = await api('GET', '/api/community/rooms', t2);
+        check('D1-P7) الغرفة الخاصة تظهر في قائمة العضو المضاف',
+            pvListMine.status === 200 && pvListMine.body.privateRooms.some(r => r.id === pvId));
+        const closeByOther = await api('POST', '/api/community/rooms/' + pvId + '/close', t2);
+        check('D1-P8) غير المنشئ يغلق ← 403 NOT_ROOM_OWNER', closeByOther.status === 403 && closeByOther.body && closeByOther.body.code === 'NOT_ROOM_OWNER');
+        const leaveOwner = await api('POST', '/api/community/rooms/' + pvId + '/leave', t1);
+        check('D1-P9) المنشئ يغادر ← 422 OWNER_CANNOT_LEAVE (يغلق بدل المغادرة)',
+            leaveOwner.status === 422 && leaveOwner.body && leaveOwner.body.code === 'OWNER_CANNOT_LEAVE');
+        const leaveMem = await api('POST', '/api/community/rooms/' + pvId + '/leave', t2);
+        check('D1-P10) العضو يغادر ذاتيًا ← 200', leaveMem.status === 200);
+        const sendAfterLeave = await api('POST', '/api/community/rooms/' + pvId + '/messages', t2, { content: 'بعد المغادرة' });
+        check('D1-P11) إرسال بعد المغادرة ← 403 NOT_A_MEMBER', sendAfterLeave.status === 403 && sendAfterLeave.body && sendAfterLeave.body.code === 'NOT_A_MEMBER');
+        const raceClose = await Promise.all([1, 2].map(() => api('POST', '/api/community/rooms/' + pvId + '/close', t1)));
+        check('D1-P12) سباق الإغلاق (طلبان متزامنان): نجاح واحد + ROOM_CLOSED للآخر (UPDATE الشرطي)',
+            raceClose.filter(r => r.status === 200).length === 1 &&
+            raceClose.filter(r => r.status === 409 && r.body && r.body.code === 'ROOM_CLOSED').length === 1,
+            JSON.stringify(raceClose.map(r => r.status)));
+        const sendClosed = await api('POST', '/api/community/rooms/' + pvId + '/messages', t1, { content: 'في غرفة مغلقة' });
+        check('D1-P13) الإرسال لغرفة مغلقة ← 409 ROOM_CLOSED', sendClosed.status === 409 && sendClosed.body && sendClosed.body.code === 'ROOM_CLOSED');
+
+        console.log('\n── 16هـ) D1: بلاغات الدردشة — عتبة تلقائية/حذف مشرف/تجميد المؤلف ──');
+        const pv2 = await api('POST', '/api/community/rooms', t1, { name: 'غرفة اختبار إشراف الدردشة' });
+        const pv2Id = pv2.body && pv2.body.id;
+        for (const u of ['emp-CM105', 'emp-CM102', 'emp-CM108']) {
+            await api('POST', '/api/community/rooms/' + pv2Id + '/members', t1, { userId: u });
+        }
+        const tMsg = await api('POST', '/api/community/rooms/' + pv2Id + '/messages', t5, { content: 'رسالة مزعجة لاختبار بلاغات الدردشة' });
+        check('D1-M1) رسالة الهدف أُرسلت visible', tMsg.status === 200 && tMsg.body.status === 'visible', JSON.stringify(tMsg.body));
+        const selfRep = await api('POST', '/api/community/report', t5, { targetType: 'chat_message', targetId: String(tMsg.body.id), reason: 'أبلغ عن رسالتي' });
+        check('D1-M2) الإبلاغ عن رسالة النفس ← 422 SELF_REPORT', selfRep.status === 422 && selfRep.body && selfRep.body.code === 'SELF_REPORT');
+        const cRep1 = await api('POST', '/api/community/report', t1, { targetType: 'chat_message', targetId: String(tMsg.body.id), reason: 'رسالة مخالفة للسياسة' });
+        check('D1-M3) بلاغ على رسالة ← pending', cRep1.status === 200 && cRep1.body && cRep1.body.status === 'pending', JSON.stringify(cRep1.body));
+        const cRepDup = await api('POST', '/api/community/report', t1, { targetType: 'chat_message', targetId: String(tMsg.body.id), reason: 'إغراق بنفس البلاغ' });
+        check('D1-M4) بلاغ مكرر على نفس الرسالة ← 409 DUPLICATE_REPORT', cRepDup.status === 409 && cRepDup.body && cRepDup.body.code === 'DUPLICATE_REPORT');
+        const cRepGhost = await api('POST', '/api/community/report', t1, { targetType: 'chat_message', targetId: '99999', reason: 'بلاغ شبح' });
+        check('D1-M5) بلاغ على رسالة غير موجودة ← 404 (لا بلاغات أشباح)', cRepGhost.status === 404);
+        await api('POST', '/api/community/report', t2, { targetType: 'chat_message', targetId: String(tMsg.body.id), reason: 'بلاغ ثانٍ' });
+        await api('POST', '/api/community/report', t8, { targetType: 'chat_message', targetId: String(tMsg.body.id), reason: 'بلاغ ثالث' });
+        const hiddenChat = dbw.prepare('SELECT status FROM community_chat_messages WHERE id = ?').get(tMsg.body.id);
+        check('D1-M6) بلوغ العتبة (3) ← إخفاء تلقائي hidden للرسالة (وليس حذفًا)',
+            hiddenChat && hiddenChat.status === 'hidden', JSON.stringify(hiddenChat));
+        const chatAutoAudit = dbw.prepare("SELECT COUNT(*) c FROM community_audit_log WHERE action='chat_auto_hide' AND target_id = ?").get(String(tMsg.body.id));
+        check('D1-M7) الإخفاء التلقائي للرسالة مُدقَّق (chat_auto_hide)', chatAutoAudit.c === 1);
+        const listAfterHide = await api('GET', '/api/community/rooms/' + pv2Id + '/messages?limit=50', t1);
+        check('D1-M8) الرسالة المخفية لا تظهر في الغرفة', !listAfterHide.body.messages.some(m => m.id === tMsg.body.id));
+        const removeChat = await api('POST', '/api/community/moderation/chat-messages/' + tMsg.body.id + '/status', t3, { status: 'removed', note: 'مخالفة مؤكدة' });
+        const removedChat = dbw.prepare('SELECT status FROM community_chat_messages WHERE id = ?').get(tMsg.body.id);
+        check('D1-M9) المشرف يحذف الرسالة نهائيًا ← removed في القاعدة',
+            removeChat.status === 200 && removedChat && removedChat.status === 'removed');
+        const chatRepRow = dbw.prepare("SELECT id FROM community_reports WHERE target_type='chat_message' AND target_id = ? AND status='pending' ORDER BY id LIMIT 1").get(String(tMsg.body.id));
+        const freezeChat = await api('POST', '/api/community/moderation/reports/' + chatRepRow.id + '/action', t3, { action: 'freeze', note: 'تكرار المخالفة في الدردشة' });
+        check('D1-M10) freeze على بلاغ رسالة ← resolved', freezeChat.status === 200, JSON.stringify(freezeChat.body));
+        const rstChatAuthor = dbw.prepare("SELECT * FROM community_restrictions WHERE user_id='emp-CM105' AND active=1").get();
+        check('D1-M11) التجميد يطال مؤلف الرسالة (وليس معرّفها)', !!rstChatAuthor && rstChatAuthor.kind === 'participation_freeze', JSON.stringify(rstChatAuthor));
+        const fzChat = await api('POST', '/api/community/rooms/' + pv2Id + '/messages', t5, { content: 'محاولة أثناء التجميد' });
+        check('D1-M12) المجمّد يرسل رسالة ← 403 PARTICIPATION_FROZEN', fzChat.status === 403 && fzChat.body && fzChat.body.code === 'PARTICIPATION_FROZEN');
+
+        console.log('\n── 16و) D1: مسار فشل التدقيق — mutation+audit ذرّية في الغرف والدردشة ──');
+        const d1Before = {
+            rooms: dbw.prepare('SELECT COUNT(*) c FROM community_rooms').get().c,
+            msgs: dbw.prepare('SELECT COUNT(*) c FROM community_chat_messages').get().c
+        };
+        dbw.exec('ALTER TABLE community_audit_log RENAME TO community_audit_log__hidden');
+        let fpRoom, fpMsg;
+        try {
+            fpRoom = await api('POST', '/api/community/rooms', t1, { name: 'غرفة مسار الفشل' });
+            fpMsg = await api('POST', '/api/community/rooms/' + councilRoomId + '/messages', t1, { content: 'هذا غبي — مسار فشل التدقيق' });
+        } finally {
+            dbw.exec('ALTER TABLE community_audit_log__hidden RENAME TO community_audit_log');
+        }
+        check('D1-V1) فشل التدقيق أثناء إنشاء غرفة ← خطأ خادم ولا غرفة بلا تدقيق (ROLLBACK)',
+            fpRoom.status >= 500 && dbw.prepare('SELECT COUNT(*) c FROM community_rooms').get().c === d1Before.rooms,
+            'status=' + (fpRoom && fpRoom.status));
+        check('D1-V2) فشل التدقيق أثناء إيقاف رسالة مخالفة ← خطأ خادم ولا رسالة بلا تدقيق',
+            fpMsg.status >= 500 && dbw.prepare('SELECT COUNT(*) c FROM community_chat_messages').get().c === d1Before.msgs,
+            'status=' + (fpMsg && fpMsg.status));
     } catch (e) {
         failed++;
         failures.push('fatal: ' + e.message);

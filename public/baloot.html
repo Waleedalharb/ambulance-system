@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>مجلس البلوت — منصة الجنوب</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+    /* هوية منصة الجنوب المعتمدة: كحلي داكن + زمردي + ذهبي — سطوح زجاجية */
+    :root {
+        --navy-900: #0B1E33; --navy-700: #1A3A5C;
+        --teal-id: #2E8B7A; --gold-id: #E8C84A;
+        --bg: #0A1728;
+        --surface: rgba(255,255,255,0.035);
+        --surface-2: rgba(255,255,255,0.06);
+        --border: rgba(255,255,255,0.09);
+        --border-soft: rgba(255,255,255,0.06);
+        --text: #F1F5F9; --text-2: #A9BACD; --muted: #8A9BB0;
+        --emerald: #0EA47A; --coral: #EF4444; --ops: #60A5FA;
+        --th-bg: #0E2038;
+        --radius: 16px; --radius-md: 12px;
+        --shadow-card: inset 0 1px 0 rgba(255,255,255,0.045), 0 10px 30px rgba(0,0,0,0.30);
+        --felt-1: #0d5c43; --felt-2: #084430;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'IBM Plex Sans Arabic', 'Segoe UI', Tahoma, Arial, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; padding: 16px 12px 48px; }
+    body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+        background: radial-gradient(ellipse 60% 40% at 50% -10%, rgba(46,139,122,0.12), transparent 70%),
+                    radial-gradient(ellipse 45% 32% at 50% 110%, rgba(232,200,74,0.05), transparent 70%),
+                    linear-gradient(180deg, #0B1E33 0%, #0A1728 55%, #081220 100%); }
+    .container { max-width: 980px; margin: 0 auto; }
+    .header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; }
+    .header h1 { font-size: 1.35rem; font-weight: 700; }
+    .header h1 i { color: var(--gold-id); margin-left: 8px; }
+    .subtitle { color: var(--text-2); font-size: 0.82rem; margin-top: 3px; }
+    .me-chip { display: flex; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--border-soft); border-radius: 999px; padding: 8px 14px; font-size: 0.85rem; box-shadow: var(--shadow-card); }
+    .me-chip .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--emerald); }
+    .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .spacer { flex: 1; }
+    .btn { font-family: inherit; padding: 9px 15px; border-radius: 10px; border: 1px solid var(--border); background: var(--th-bg); color: var(--text); font-size: 0.86rem; cursor: pointer; font-weight: 600; transition: filter 0.15s ease, transform 0.1s ease; }
+    .btn:hover { filter: brightness(1.15); }
+    .btn:active { transform: scale(0.97); }
+    .btn.primary { background: linear-gradient(135deg, var(--teal-id), var(--emerald)); border: none; color: #fff; }
+    .btn.danger { background: rgba(239,68,68,0.15); border-color: rgba(239,68,68,0.4); color: #fca5a5; }
+    .btn.ghost { background: transparent; }
+    .btn.sm { padding: 6px 11px; font-size: 0.78rem; }
+    .btn.big { padding: 13px 26px; font-size: 1rem; }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .card { background: var(--surface); border: 1px solid var(--border-soft); border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow-card); }
+    .card h3 { font-size: 1rem; font-weight: 700; }
+    .meta { color: var(--muted); font-size: 0.78rem; margin-top: 8px; display: flex; gap: 12px; flex-wrap: wrap; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+    .empty { text-align: center; color: var(--muted); padding: 34px 10px; font-size: 0.9rem; }
+    .empty i { font-size: 1.9rem; display: block; margin-bottom: 8px; opacity: 0.5; }
+    .toast { position: fixed; bottom: 22px; right: 50%; transform: translateX(50%); background: var(--navy-700); border: 1px solid var(--border); border-radius: 10px; padding: 11px 20px; font-size: 0.88rem; z-index: 120; box-shadow: 0 12px 40px rgba(0,0,0,0.5); display: none; max-width: 92vw; }
+    .toast.show { display: block; }
+    .toast.ok { border-color: var(--emerald); }
+    .toast.err { border-color: var(--coral); }
+    .view { display: none; }
+    .view.active { display: block; }
+    .status-pill { display: inline-block; padding: 3px 11px; border-radius: 999px; font-size: 0.72rem; font-weight: 700; background: rgba(96,165,250,0.14); color: #93C5FD; }
+
+    /* ── اللوبي ── */
+    .lobby-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+    .join-bar { display: none; align-items: center; gap: 10px; background: rgba(232,200,74,0.07); border: 1px solid rgba(232,200,74,0.3); border-radius: var(--radius-md); padding: 11px 14px; margin-bottom: 14px; font-size: 0.85rem; color: #FDE68A; }
+    .seats-row { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+    .seat-chip { flex: 1; min-width: 60px; text-align: center; padding: 7px 6px; border-radius: 9px; font-size: 0.76rem; background: rgba(255,255,255,0.03); border: 1px dashed var(--border); color: var(--muted); }
+    .seat-chip.taken { background: rgba(14,164,122,0.13); border: 1px solid rgba(14,164,122,0.35); color: var(--text); border-style: solid; }
+    .ratings-card { margin-top: 18px; }
+    .rating-row { display: flex; align-items: center; gap: 10px; padding: 8px 4px; border-bottom: 1px solid var(--border-soft); font-size: 0.87rem; }
+    .rating-row:last-child { border-bottom: none; }
+    .rating-rank { width: 26px; height: 26px; border-radius: 50%; background: var(--navy-700); display: flex; align-items: center; justify-content: center; font-weight: 700; color: var(--gold-id); font-size: 0.8rem; }
+
+    /* ── شاشة الطاولة ── */
+    .table-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+    .scores { display: flex; gap: 10px; align-items: center; }
+    .score-pill { background: var(--surface-2); border: 1px solid var(--border); border-radius: 999px; padding: 6px 14px; font-size: 0.85rem; }
+    .score-pill b { color: var(--gold-id); font-size: 1rem; margin-right: 3px; }
+    .score-target { color: var(--muted); font-size: 0.75rem; }
+    .spec-count { color: var(--muted); font-size: 0.8rem; }
+    .paused-banner { background: rgba(232,200,74,0.1); border: 1px solid rgba(232,200,74,0.35); color: #FDE68A; border-radius: var(--radius-md); padding: 10px 14px; margin: 8px 0; font-size: 0.86rem; text-align: center; }
+
+    .table-stage { position: relative; width: 100%; max-width: 720px; height: 380px; margin: 6px auto 0; }
+    .felt { position: absolute; inset: 64px 108px; border-radius: 130px;
+        background: radial-gradient(ellipse at 50% 35%, var(--felt-1), var(--felt-2) 75%);
+        border: 5px solid rgba(11,30,51,0.9);
+        box-shadow: inset 0 3px 18px rgba(0,0,0,0.45), 0 18px 44px rgba(0,0,0,0.35); }
+    .seat { position: absolute; min-width: 128px; max-width: 170px; background: var(--surface); border: 1px solid var(--border-soft); border-radius: 13px; padding: 9px 12px; text-align: center; box-shadow: var(--shadow-card); z-index: 3; }
+    .seat-top { top: 0; left: 50%; transform: translateX(-50%); }
+    .seat-bottom { bottom: 0; left: 50%; transform: translateX(-50%); border-color: rgba(232,200,74,0.35); }
+    .seat-right { right: 0; top: 50%; transform: translateY(-50%); }
+    .seat-left { left: 0; top: 50%; transform: translateY(-50%); }
+    .seat.vacant { opacity: 0.55; border-style: dashed; }
+    .seat.turn { border-color: var(--gold-id); box-shadow: 0 0 0 2px rgba(232,200,74,0.45), 0 10px 30px rgba(0,0,0,0.35); }
+    .seat-name { font-weight: 700; font-size: 0.86rem; }
+    .seat-name.empty-seat { color: var(--muted); font-weight: 500; }
+    .seat-sub { color: var(--muted); font-size: 0.7rem; margin-top: 3px; }
+    .seat-sub .st.on { color: #6EE7B7; } .seat-sub .st.off { color: #FCA5A5; }
+    .seat-sub .st.ready { color: #6EE7B7; } .seat-sub .st.wait { color: #FDE68A; }
+
+    /* الورق على الأرض */
+    .trick { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+    .trick-card { position: absolute; }
+    .trick-card.t-bottom { bottom: 16px; left: 50%; transform: translateX(-50%); }
+    .trick-card.t-top { top: 16px; left: 50%; transform: translateX(-50%); }
+    .trick-card.t-right { right: 16px; top: 50%; transform: translateY(-50%); }
+    .trick-card.t-left { left: 16px; top: 50%; transform: translateY(-50%); }
+    .contract-badge { position: absolute; bottom: -14px; left: 50%; transform: translateX(-50%); background: var(--navy-900); border: 1px solid var(--gold-id); color: var(--gold-id); border-radius: 999px; padding: 5px 16px; font-size: 0.82rem; font-weight: 700; white-space: nowrap; }
+
+    /* الكروت */
+    .bcard { display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+        width: 62px; height: 88px; border-radius: 11px; border: none; cursor: default; font-family: inherit;
+        background: linear-gradient(160deg, #FDFDF8, #ECEFE9); color: #1A2332;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.35); margin: 0 -4px; position: relative; transition: transform 0.12s ease, box-shadow 0.12s ease; }
+    .bcard .rank { font-size: 1.25rem; font-weight: 700; line-height: 1; }
+    .bcard .suit { font-size: 1.3rem; line-height: 1.1; }
+    .bcard .ar { font-size: 0.6rem; color: #5a6a7d; }
+    .bcard.red { color: #C22F3D; }
+    .bcard.red .ar { color: #d08089; }
+    .bcard.sm { width: 44px; height: 62px; border-radius: 8px; margin: 0; }
+    .bcard.sm .rank { font-size: 0.95rem; } .bcard.sm .suit { font-size: 0.95rem; } .bcard.sm .ar { display: none; }
+    .bcard.back { background: linear-gradient(160deg, var(--navy-700), var(--navy-900)); color: var(--gold-id); border: 1px solid var(--border); }
+    .bcard.playable { cursor: pointer; transform: translateY(-10px); box-shadow: 0 10px 22px rgba(232,200,74,0.25); outline: 2px solid rgba(232,200,74,0.55); }
+    .bcard.playable:hover { transform: translateY(-16px) scale(1.05); }
+    .bcard.dimmed { opacity: 0.45; filter: grayscale(0.5); cursor: not-allowed; }
+    .bcard .blt { position: absolute; top: -7px; right: -7px; background: var(--gold-id); color: #1A2332; font-size: 0.58rem; font-weight: 700; border-radius: 999px; padding: 2px 6px; }
+    .my-hand { display: flex; justify-content: center; align-items: flex-end; padding: 22px 8px 6px; min-height: 118px; flex-wrap: nowrap; overflow-x: auto; }
+    .hand-hint { text-align: center; color: var(--muted); font-size: 0.78rem; padding-bottom: 8px; }
+    .spectator-note { text-align: center; color: var(--muted); font-size: 0.85rem; padding: 22px 10px; background: var(--surface); border: 1px dashed var(--border); border-radius: var(--radius-md); margin-top: 12px; }
+    .hint-line { text-align: center; color: var(--text-2); font-size: 0.88rem; margin: 10px 0 4px; min-height: 22px; }
+
+    /* السوق والأفعال */
+    .bid-bar { background: var(--surface); border: 1px solid var(--border-soft); border-radius: var(--radius); padding: 13px 15px; margin-top: 10px; box-shadow: var(--shadow-card); }
+    .bid-title { font-weight: 700; color: var(--gold-id); font-size: 0.92rem; margin-bottom: 9px; }
+    .bid-wait { color: var(--text-2); font-size: 0.87rem; }
+    .faceup { display: flex; align-items: center; gap: 8px; color: var(--text-2); font-size: 0.8rem; margin: 7px 0; }
+    .bid-btns { display: flex; gap: 9px; flex-wrap: wrap; }
+    .btn.bid { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 11px 18px; min-width: 96px; font-size: 1rem; }
+    .btn.bid small { font-size: 0.64rem; color: var(--muted); font-weight: 400; max-width: 150px; line-height: 1.4; }
+    .actions-bar { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+    .proj-row, .dbl-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; background: rgba(232,200,74,0.06); border: 1px solid rgba(232,200,74,0.25); border-radius: var(--radius-md); padding: 9px 12px; font-size: 0.83rem; }
+    .btn.proj { background: rgba(232,200,74,0.15); border-color: var(--gold-id); color: var(--gold-id); }
+    .btn.dbl { background: rgba(239,68,68,0.12); border-color: rgba(239,68,68,0.45); color: #fca5a5; }
+
+    /* نهاية الصفقة/المباراة */
+    .match-end { background: var(--surface); border: 1px solid var(--gold-id); border-radius: var(--radius); padding: 18px; margin-top: 14px; text-align: center; box-shadow: var(--shadow-card); }
+    .end-title { font-size: 1.15rem; font-weight: 700; color: var(--gold-id); }
+    .end-score { font-size: 1.05rem; margin: 8px 0; }
+    .end-winner { font-size: 1rem; color: #6EE7B7; font-weight: 700; margin-bottom: 10px; }
+    .rematch-box { margin-top: 12px; border-top: 1px solid var(--border-soft); padding-top: 12px; }
+    .rematch-title { font-weight: 700; margin-bottom: 9px; }
+    .rematch-wait { color: var(--muted); font-size: 0.85rem; }
+    .rematch-box .row { justify-content: center; }
+    .hand-score .score-line { padding: 7px 2px; border-bottom: 1px solid var(--border-soft); font-size: 0.88rem; }
+    .hand-score .score-line.big { font-size: 1rem; font-weight: 700; color: var(--gold-id); }
+    .hand-score .score-line.note { color: var(--text-2); font-size: 0.8rem; }
+
+    /* سوالف الطاولة */
+    .chat-panel { background: var(--surface); border: 1px solid var(--border-soft); border-radius: var(--radius); padding: 12px 14px; margin-top: 14px; }
+    .chat-panel h4 { font-size: 0.88rem; color: var(--gold-id); margin-bottom: 8px; }
+    #chatLog { max-height: 150px; overflow-y: auto; display: flex; flex-direction: column; gap: 5px; margin-bottom: 9px; }
+    .chat-msg { font-size: 0.84rem; line-height: 1.6; background: rgba(255,255,255,0.03); border-radius: 8px; padding: 5px 10px; }
+    .chat-msg b { color: var(--gold-id); }
+    .chat-row { display: flex; gap: 8px; }
+    .chat-row input { flex: 1; font-family: inherit; padding: 9px 12px; border-radius: 9px; border: 1px solid var(--border); background: var(--th-bg); color: var(--text); font-size: 0.88rem; }
+
+    /* مودال */
+    .modal-overlay { position: fixed; inset: 0; background: rgba(4,10,20,0.72); backdrop-filter: blur(4px); z-index: 110; display: none; align-items: center; justify-content: center; padding: 16px; }
+    .modal-overlay.show { display: flex; }
+    .modal { background: var(--navy-900); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; width: 100%; max-width: 460px; box-shadow: var(--shadow-card); }
+    .modal h3 { color: var(--gold-id); margin-bottom: 10px; font-size: 1rem; }
+
+    .prematch-bar { display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; margin: 14px 0 4px; }
+    .prematch-bar .hint { color: var(--muted); font-size: 0.82rem; }
+
+    @media (max-width: 640px) {
+        .table-stage { height: 330px; }
+        .felt { inset: 58px 64px; }
+        .seat { min-width: 102px; padding: 7px 8px; }
+        .seat-name { font-size: 0.76rem; }
+        .bcard { width: 52px; height: 76px; }
+        .bcard .rank { font-size: 1.05rem; } .bcard .suit { font-size: 1.1rem; }
+        .btn.bid { min-width: 80px; padding: 9px 12px; font-size: 0.9rem; }
+    }
+</style>
+</head>
+<body>
+<div class="container">
+
+    <div class="header">
+        <div>
+            <h1><i class="fa-solid fa-chess"></i> مجلس البلوت</h1>
+            <div class="subtitle">طاولات البلوت لمنصة الجنوب — العب، شاهد، وسولف</div>
+        </div>
+        <div class="me-chip" id="meChip"><span class="dot"></span> …</div>
+    </div>
+
+    <!-- ═══ اللوبي ═══ -->
+    <div class="view active" id="view-lobby">
+        <div class="join-bar" id="joinCouncilBar">
+            <span>انضم لمجلس البلوت حتى تقدر تشاهد الطاولات الجارية وتسولف مع الشباب.</span>
+            <div class="spacer"></div>
+            <button class="btn sm primary" id="btnJoinCouncil">انضمام للمجلس</button>
+        </div>
+        <div class="lobby-head">
+            <button class="btn primary" id="btnOpenTable"><i class="fa-solid fa-plus"></i> افتح طاولة جديدة</button>
+            <div class="spacer"></div>
+            <a class="btn ghost sm" href="community.html"><i class="fa-solid fa-arrow-right"></i> رجوع للمجتمع</a>
+        </div>
+        <div class="grid" id="tablesGrid"></div>
+
+        <div class="card ratings-card">
+            <h3>🏅 الترتيب الشرفي</h3>
+            <div id="ratingsList"><div class="empty" style="padding:16px">لا مباريات مكتملة بعد — أول فوز يصنع الاسم.</div></div>
+        </div>
+    </div>
+
+    <!-- ═══ شاشة الطاولة ═══ -->
+    <div class="view" id="view-table">
+        <div class="lobby-head">
+            <h2 id="tableTitle" style="font-size:1.1rem">طاولة بلوت</h2>
+            <div class="spacer"></div>
+            <button class="btn ghost sm" id="btnBack"><i class="fa-solid fa-arrow-right"></i> اللوبي</button>
+        </div>
+        <div class="prematch-bar" id="preMatchBar"></div>
+        <div id="tableHost"></div>
+        <div class="chat-panel" id="chatPanel">
+            <h4>💬 سوالف الطاولة</h4>
+            <div id="chatLog"></div>
+            <div class="chat-row">
+                <input id="chatInput" maxlength="500" placeholder="اسولف مع اللي على الطاولة…">
+                <button class="btn primary" id="btnChatSend">أرسل</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- مودال تفصيل نقاط الصفقة -->
+<div class="modal-overlay" id="scoreModal">
+    <div class="modal">
+        <h3>📊 تفصيل نقاط الصفقة</h3>
+        <div id="scoreModalBody"></div>
+        <div class="row" style="margin-top:12px;justify-content:center">
+            <button class="btn primary" id="scoreModalClose">تم</button>
+        </div>
+    </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<script src="js/baloot-app.js"></script>
+</body>
+</html>
