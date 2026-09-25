@@ -35,8 +35,6 @@
     .subtitle { color: var(--text-2); font-size: 0.83rem; margin-top: 4px; }
     .me-chip { display: flex; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--border-soft); border-radius: 999px; padding: 8px 14px; font-size: 0.85rem; box-shadow: var(--shadow-card); }
     .me-chip .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--emerald); }
-    .gate-banner { display: none; background: rgba(96,165,250,0.08); border: 1px solid rgba(96,165,250,0.30); border-radius: var(--radius-md); padding: 10px 14px; margin-bottom: 14px; font-size: 0.82rem; color: #Bcd0f5; }
-    .gate-banner.show { display: block; }
     .frozen-banner { display: none; background: rgba(239,68,68,0.09); border: 1px solid rgba(239,68,68,0.35); border-radius: var(--radius-md); padding: 10px 14px; margin-bottom: 14px; font-size: 0.82rem; color: #f3c1c1; }
     .frozen-banner.show { display: block; }
     .tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 18px; background: var(--surface); border: 1px solid var(--border-soft); border-radius: var(--radius-md); padding: 6px; }
@@ -130,7 +128,6 @@
         <div class="me-chip"><span class="dot"></span><span id="meName">…</span></div>
     </div>
 
-    <div class="gate-banner" id="gateBanner"><i class="fa-solid fa-shield-halved"></i> <span id="gateText"></span></div>
     <div class="frozen-banner" id="frozenBanner"><i class="fa-solid fa-snowflake"></i> مشاركتك الاجتماعية مجمّدة حاليًا بقرار إشرافي — يمكنك الاطلاع فقط.</div>
 
     <div class="tabs" id="tabs">
@@ -371,7 +368,7 @@
 const $ = s => document.querySelector(s);
 const $$ = s => Array.from(document.querySelectorAll(s));
 const TOKEN = localStorage.getItem('auth_access_token') || localStorage.getItem('authToken') || '';
-const S = { me: null, perms: [], star: false, gate: null, frozen: false, councils: [], currentCouncil: null, types: [] };
+const S = { me: null, perms: [], star: false, frozen: false, councils: [], currentCouncil: null, types: [] };
 
 function toast(msg, ok) {
     const t = $('#toast'); t.textContent = msg; t.className = 'toast ' + (ok === false ? 'err' : 'ok');
@@ -422,12 +419,9 @@ function loadTab(tab) {
         S.perms = p.permissions || []; S.star = p.permissions_star === true;
         try { const me = await api('GET', '/api/auth/me'); S.meId = me.user && me.user.id; } catch (_) { }
         const st = await api('GET', '/api/community/status');
-        S.me = st.me; S.gate = st.gate; S.frozen = !!st.participationFrozen;
+        S.me = st.me; S.frozen = !!st.participationFrozen;
         $('#meName').textContent = S.me ? S.me.display_name : 'مستخدم';
-        if (S.gate && !S.gate.allowParticipation) {
-            $('#gateBanner').classList.add('show');
-            $('#gateText').textContent = 'أنت حاليًا في حالة تشغيلية — الاطلاع متاح لكن المشاركة الاجتماعية (نشر/انضمام/إنشاء) موقوفة حتى تنتهي.';
-        }
+        // (قرار 2026-09-25: لا بانر بوابة تشغيلية — المناوبة لا توقف المشاركة)
         if (S.frozen) $('#frozenBanner').classList.add('show');
         if (can('community.moderate')) $('#tabModeration').classList.remove('hidden-tab');
         if (can('community.admin')) $('#tabAdmin').classList.remove('hidden-tab');

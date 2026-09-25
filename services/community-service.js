@@ -11,17 +11,20 @@
 // حارس المشاركة participationGuard(user) — الترتيب إلزامي:
 //   1) المنظومة متاحة للمستخدم (enabled + الدور غير معطّل)
 //   2) لا تقييد نشط (تجميد مشاركة بقرار مشرف)
-//   3) البوابة التشغيلية (CommunityOperationalGateService) — ثابتة معماريًا
 // كل طبقة لا تستطيع إلا التضييق على التي قبلها.
+//
+// ⚠️ قرار المالك النهائي (2026-09-25): أُلغيت البوابة التشغيلية عن المشاركة
+// الاجتماعية/الترفيهية بالكامل. حالة المناوبة/التكليف/الجاهزية لا تؤثر على
+// أهلية Community/Baloot إطلاقًا، ولا تُقرأ بيانات التكليف أو
+// team_live_locations لغرض منع المشاركة. الأهلية = صلاحية community.*
+// + المنظومة مفعّلة + لا تجميد إشرافي.
 // ============================================
 'use strict';
 
 class CommunityService {
-    constructor({ db, gate }) {
+    constructor({ db }) {
         if (!db) throw new Error('CommunityService: db مطلوب');
-        if (!gate) throw new Error('CommunityService: gate مطلوب');
         this.db = db;
-        this.gate = gate;
     }
 
     async isEnabled() {
@@ -80,6 +83,7 @@ class CommunityService {
     /**
      * حارس المشاركة الموحد — يرفض بسبب عام واحد. لا يتحايل عليه أي مسار مشاركة
      * (C2+). إجراءات السلامة (بلاغ/حظر) لا تمر هنا — تبقى متاحة دائمًا.
+     * (قرار 2026-09-25: لا بوابة تشغيلية هنا — المناوبة لا تمنع المشاركة.)
      * @returns {Promise<{allow:boolean, reason:string|null}>}
      */
     async participationGuard(user) {
@@ -89,10 +93,6 @@ class CommunityService {
         const restrictions = await this.db.Community.getActiveRestrictions(user.id);
         if (restrictions.length > 0) {
             return { allow: false, reason: 'PARTICIPATION_FROZEN' };
-        }
-        const gate = await this.gate.evaluate(user);
-        if (!gate.allowParticipation) {
-            return { allow: false, reason: gate.reason }; // OPERATIONAL_DUTY/ACTIVE_ASSIGNMENT/ATTENDANCE_STATE
         }
         return { allow: true, reason: null };
     }

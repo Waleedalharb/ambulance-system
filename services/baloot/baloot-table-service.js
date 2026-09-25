@@ -21,20 +21,21 @@ class BalootTableService {
      * @param {object} deps.store        — makeBalootStore
      * @param {object} deps.matchService — BalootMatchService
      * @param {object} deps.timers       — BalootTimerService
-     * @param {object} deps.gate         — CommunityOperationalGateService (جلوس فقط)
      * @param {object} deps.moderation   — CommunityModerationService (isBlockedEitherWay)
      * @param {function} [deps.broadcast]
+     *
+     * قرار المالك النهائي (2026-09-25): لا بوابة تشغيلية في البلوت إطلاقًا —
+     * لا عند فتح الطاولة ولا الجلوس ولا الجاهزية ولا اللعب ولا المشاهدة.
+     * الأهلية = صلاحية community.* المناسبة فقط (تُفحص في طبقة المسارات).
      */
-    constructor({ store, matchService, timers, gate, moderation, broadcast, readyCheckTtlMs, lobbyIdleTtlMs }) {
+    constructor({ store, matchService, timers, moderation, broadcast, readyCheckTtlMs, lobbyIdleTtlMs }) {
         if (!store) throw new Error('BalootTableService: store مطلوب');
         if (!matchService) throw new Error('BalootTableService: matchService مطلوب');
         if (!timers) throw new Error('BalootTableService: timers مطلوب');
-        if (!gate) throw new Error('BalootTableService: gate مطلوب');
         if (!moderation) throw new Error('BalootTableService: moderation مطلوب');
         this.store = store;
         this.matchService = matchService;
         this.timers = timers;
-        this.gate = gate;
         this.moderation = moderation;
         this.broadcast = broadcast || (() => {});
         this.readyCheckTtlMs = readyCheckTtlMs ?? READY_CHECK_TTL_MS;
@@ -77,13 +78,7 @@ class BalootTableService {
             throw makeError('ALREADY_SEATED', 'أنت جالس على هذه الطاولة');
         }
 
-        // البوابة التشغيلية — مرة واحدة عند الجلوس فقط (A8 مجمّد)
-        const g = await this.gate.evaluate(user);
-        if (!g.allowParticipation) {
-            const err = makeError('GATE_DENIED', 'لا يمكن الجلوس حاليًا');
-            err.reason = g.reason; // OPERATIONAL_DUTY · ACTIVE_ASSIGNMENT · ATTENDANCE_STATE
-            throw err;
-        }
+        // (قرار 2026-09-25: لا بوابة تشغيلية عند الجلوس — المناوبة لا تمنع اللعب)
 
         // الحظر متبادل الأثر: من حظر/حُظر جالسًا لا يجلس معه (Architecture §15)
         for (const s of seats) {
@@ -120,14 +115,8 @@ class BalootTableService {
         return { tableId, seat: targetSeat };
     }
 
-    // جلوس استبدال أثناء مباراة — يمر بالبوابة أيضًا (جلوس جديد)
+    // جلوس استبدال أثناء مباراة (قرار 2026-09-25: بلا بوابة تشغيلية)
     async _sitReplacement(user, match, outSeat) {
-        const g = await this.gate.evaluate(user);
-        if (!g.allowParticipation) {
-            const err = makeError('GATE_DENIED', 'لا يمكن الجلوس حاليًا');
-            err.reason = g.reason;
-            throw err;
-        }
         const players = await this.store.getMatchPlayers(match.id);
         for (const p of players) {
             if (p.user_id === String(user.id)) continue;

@@ -1493,19 +1493,13 @@ function getCommunityIdentityService() {
     }
     return communityIdentityService;
 }
-let communityGateService = null;
-function getCommunityGateService() {
-    if (!communityGateService && db) {
-        const CommunityOperationalGateService = require('./services/community-operational-gate-service');
-        communityGateService = new CommunityOperationalGateService({ assignment: getOperationalAssignmentService() });
-    }
-    return communityGateService;
-}
 let communityService = null;
 function getCommunityService() {
     if (!communityService && db) {
         const CommunityService = require('./services/community-service');
-        communityService = new CommunityService({ db, gate: getCommunityGateService() });
+        // قرار المالك النهائي (2026-09-25): لا بوابة تشغيلية في المجتمع —
+        // CommunityOperationalGateService أُلغي وحُذف من مسار المشاركة.
+        communityService = new CommunityService({ db });
     }
     return communityService;
 }
@@ -1709,7 +1703,6 @@ function getBalootTableService() {
             store: getBalootStore(),
             matchService: getBalootMatchService(),
             timers: getBalootTimerService(),
-            gate: getCommunityGateService(),       // الجلوس فقط — لا استدعاء أثناء المباراة
             moderation: getCommunityModerationService(), // الحظر متبادل الأثر على الطاولة
             readyCheckTtlMs: process.env.BALOOT_READY_TTL_MS ? Number(process.env.BALOOT_READY_TTL_MS) : undefined,
             lobbyIdleTtlMs: process.env.BALOOT_LOBBY_IDLE_TTL_MS ? Number(process.env.BALOOT_LOBBY_IDLE_TTL_MS) : undefined,
@@ -1994,15 +1987,16 @@ app.get('/api/ops/team-locations', authenticate, authorizePerm('ops.team_locatio
 // لا مجالس ولا منشورات ولا فعاليات ولا بطولات ولا realtime (C2+).
 // إجراءات السلامة (بلاغ/حظر) لا تمر بالبوابة التشغيلية — تبقى متاحة دائمًا.
 
-// حالة المجتمع للمستخدم الحالي: توفر + هوية العرض (Projection) + قرار البوابة + تقييدات
+// حالة المجتمع للمستخدم الحالي: توفر + هوية العرض (Projection) + تقييدات
+// (قرار المالك 2026-09-25: أُلغيت البوابة التشغيلية — gate يُعاد ثابتًا
+//  allow دائمًا لتوافق الواجهة، والمناوبة لا تؤثر على الأهلية إطلاقًا)
 app.get('/api/community/status', authenticate, authorizePerm('community.view'), authorizeCommunityAvailable, async (req, res) => {
     try {
         const me = await getCommunityIdentityService().resolveByUser(req.user);
-        const gate = await getCommunityGateService().evaluate(req.user);
         const restrictions = await db.Community.getActiveRestrictions(req.user.id);
         res.json({
             success: true, enabled: true, me,
-            gate, // { allowRead, allowParticipation, reason } — reason عام غير حساس
+            gate: { allowRead: true, allowParticipation: true, reason: null },
             participationFrozen: restrictions.length > 0
         });
     } catch (error) { myCheckError(res, error, 'فشل في جلب حالة المجتمع'); }

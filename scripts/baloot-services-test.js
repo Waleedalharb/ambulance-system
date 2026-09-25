@@ -46,15 +46,7 @@ function makeEnv(file) {
         }
     });
 
-    const gate = {
-        calls: 0, deny: new Set(),
-        async evaluate(user) {
-            this.calls++;
-            return this.deny.has(String(user.id))
-                ? { allowRead: true, allowParticipation: false, reason: 'OPERATIONAL_DUTY' }
-                : { allowRead: true, allowParticipation: true, reason: null };
-        }
-    };
+    // (قرار المالك 2026-09-25: أُلغيت البوابة التشغيلية — لا gate في الحزمة)
     const moderation = {
         blocked: new Set(),
         async isBlockedEitherWay(a, b) { return this.blocked.has(`${a}|${b}`) || this.blocked.has(`${b}|${a}`); }
@@ -69,13 +61,13 @@ function makeEnv(file) {
         turnTtlMs: 90, reconnectTtlMs: 110, replaceWindowTtlMs: 140
     });
     const tableService = new BalootTableService({
-        store, matchService, timers, gate, moderation, broadcast,
+        store, matchService, timers, moderation, broadcast,
         readyCheckTtlMs: 120, lobbyIdleTtlMs: 120
     });
     matchService.onMatchEnd = (matchId) => tableService.onMatchEnded(matchId);
     matchService.onMatchAbort = (matchId) => tableService.onMatchAborted(matchId);
 
-    return { raw, store, gate, moderation, timers, matchService, tableService, broadcasts };
+    return { raw, store, moderation, timers, matchService, tableService, broadcasts };
 }
 
 const U = (id) => ({ id, name: 'مستخدم ' + id });
@@ -147,9 +139,10 @@ async function main() {
     });
 
     // ---------- اللوبي والجلوس ----------
-    console.log('— اللوبي والجلوس (البوابة عند الجلوس فقط) —');
+    // (قرار المالك 2026-09-25: أُلغيت البوابة التشغيلية — الجلوس بلا استشارة تشغيلية)
+    console.log('— اللوبي والجلوس —');
 
-    await t('S03 فتح طاولة + جلوس 4 ← ready_check · البوابة استُدعيت 4 مرات فقط', async () => {
+    await t('S03 فتح طاولة + جلوس 4 ← ready_check', async () => {
         const env = makeEnv(tmp);
         await createBalootTables((sql) => env.raw.exec(sql));
         const table = await env.tableService.createTable(U('u1'), 1);
@@ -157,17 +150,15 @@ async function main() {
         for (const id of ['u1', 'u2', 'u3', 'u4']) await env.tableService.sit(U(id), table.id);
         const after = await env.store.getTable(table.id);
         eq(after.status, 'ready_check');
-        eq(env.gate.calls, 4, 'استدعاء واحد لكل جلوس — لا أكثر');
         env.timers.shutdown(); env.raw.close();
     });
 
-    await t('S04 البوابة تمنع الجلوس عند OPERATIONAL_DUTY', async () => {
+    await t('S04 الجلوس لا يستشير أي حالة تشغيلية (إلغاء البوابة — قرار 2026-09-25)', async () => {
         const env = makeEnv(tmp);
-        env.gate.deny.add('u9');
+        // الخدمة لا تملك أي مرجع بوابة أصلًا — الجلوس ينجح لأي مستخدم
         const table = await env.tableService.createTable(U('u1'), 1);
-        await throwsAsync(() => env.tableService.sit(U('u9'), table.id), 'GATE_DENIED');
-        const seats = await env.store.getSeats(table.id);
-        eq(seats.length, 0, 'لا مقعد بعد الرفض');
+        const r = await env.tableService.sit(U('u9'), table.id);
+        eq(r.seat, 0, 'جلوس ناجح بلا بوابة');
         env.timers.shutdown(); env.raw.close();
     });
 
@@ -343,7 +334,6 @@ async function main() {
         let state = await env.matchService._load(matchId);
         const bidder = players.find((p) => p.seat === state.hand.biddingTurn);
         await env.matchService.submit(matchId, bidder.user_id, 'bid-r', 'BID', { kind: 'sun' });
-        const gateCallsBefore = env.gate.calls;
 
         await env.matchService.disconnect(matchId, players[1].user_id);
         await sleep(200); // reconnect = 110ms ← انتهت
@@ -354,9 +344,8 @@ async function main() {
         state = await env.matchService._load(matchId);
         const cardsOfSeat = JSON.stringify(state.hand.hands[outSeat]);
 
-        // لاعب جديد من المجلس يجلس على المقعد الخارج — يمر بالبوابة (جلوس جديد)
+        // لاعب جديد من المجلس يجلس على المقعد الخارج (بلا بوابة — قرار 2026-09-25)
         await env.tableService.sit(U('u-new'), row.table_id);
-        eq(env.gate.calls, gateCallsBefore + 1, 'الاستبدال = جلوس جديد يمر بالبوابة');
         row = await env.store.getMatch(matchId);
         eq(row.paused, 0, 'استؤنفت بعد الاستبدال');
         const newPlayers = await env.store.getMatchPlayers(matchId);
@@ -528,15 +517,14 @@ async function main() {
         env.timers.shutdown(); env.raw.close();
     });
 
-    await t('S23 العزل التشغيلي: البوابة لم تُستدعَ أثناء أي مباراة — عند الجلوس فقط (A8)', async () => {
-        // عبر كل السيناريوهات السابقة: gate.calls = عدد الجلسات فقط.
-        // هنا اختبار صريح: مباراة كاملة بلا أي استدعاء إضافي
+    await t('S23 العزل التشغيلي: لا بوابة أصلًا في الخدمة — مباراة كاملة بلا أي استشارة تشغيلية (قرار 2026-09-25)', async () => {
         const env = makeEnv(tmp);
+        eq(env.tableService.gate, undefined, 'لا مرجع بوابة في BalootTableService إطلاقًا');
         const { matchId } = await startMatch(env);
-        const callsAfterSitting = env.gate.calls;
         await autoHand(env, matchId);
         await sleep(30);
-        eq(env.gate.calls, callsAfterSitting, 'صفر استدعاءات بوابة داخل المباراة');
+        const row = await env.store.getMatch(matchId);
+        ok(row, 'مباراة كاملة سارت بلا أي بوابة تشغيلية');
         env.timers.shutdown(); env.raw.close();
     });
 
