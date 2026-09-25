@@ -109,6 +109,15 @@
     .admin-note { font-size: 0.76rem; color: var(--muted); margin-top: 4px; }
     .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
     @media (max-width: 720px) { .two-col { grid-template-columns: 1fr; } }
+    /* D1: دردشة الغرف */
+    .chat-box { background: var(--surface); border: 1px solid var(--border-soft); border-radius: var(--radius); padding: 12px; height: 380px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+    .chat-msg { max-width: 78%; padding: 8px 12px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--border-soft); align-self: flex-start; }
+    .chat-msg.mine { align-self: flex-end; background: rgba(46,139,122,0.18); border-color: rgba(46,139,122,0.35); }
+    .chat-msg .c-author { font-size: 0.72rem; color: var(--gold-id); font-weight: 700; margin-bottom: 2px; }
+    .chat-msg .c-body { font-size: 0.88rem; line-height: 1.7; white-space: pre-wrap; word-break: break-word; }
+    .chat-msg .c-time { font-size: 0.68rem; color: var(--muted); margin-top: 3px; }
+    .chat-msg .c-time a { color: var(--muted); cursor: pointer; }
+    .chat-input-row { display: flex; gap: 8px; margin-top: 10px; }
 </style>
 </head>
 <body>
@@ -116,7 +125,7 @@
     <div class="header">
         <div>
             <h1><i class="fa-solid fa-people-group"></i>مجتمع EMS</h1>
-            <div class="subtitle">المجالس · من موجود؟ · الأنشطة · المناسبات · المنافسات · الشارات — مساحة اجتماعية مستقلة تمامًا عن التشغيل</div>
+            <div class="subtitle">سوالف ومجالس وأنشطة زملاء القطاع — مساحة اجتماعية مستقلة تمامًا عن التشغيل: حالتك بيدك وحدك، ولا تتبع ولا مراقبة هنا.</div>
         </div>
         <div class="me-chip"><span class="dot"></span><span id="meName">…</span></div>
     </div>
@@ -127,6 +136,7 @@
     <div class="tabs" id="tabs">
         <button class="tab active" data-tab="councils"><i class="fa-solid fa-house-chimney"></i> المجالس</button>
         <button class="tab" data-tab="presence"><i class="fa-solid fa-circle-dot"></i> من موجود؟</button>
+        <button class="tab" data-tab="rooms"><i class="fa-solid fa-comments"></i> السوالف</button>
         <button class="tab" data-tab="activities"><i class="fa-solid fa-calendar-check"></i> الأنشطة</button>
         <button class="tab" data-tab="events"><i class="fa-solid fa-star"></i> المناسبات</button>
         <button class="tab" data-tab="competitions"><i class="fa-solid fa-trophy"></i> المنافسات</button>
@@ -147,6 +157,7 @@
                     <span class="icon-lg" id="cdIcon"></span>
                     <div><h3 id="cdName"></h3><div class="desc" id="cdDesc"></div></div>
                     <div class="spacer"></div>
+                    <button class="btn sm" id="cdRoomBtn" style="display:none"><i class="fa-solid fa-comments"></i> غرفة السوالف</button>
                     <button class="btn sm" id="cdJoinBtn"></button>
                 </div>
                 <div class="meta"><span id="cdMembers"></span></div>
@@ -160,6 +171,46 @@
                 </div>
             </div>
             <div id="postsList"></div>
+        </div>
+    </div>
+
+    <!-- ═══ الغرف والدردشة الجماعية (D1) ═══ -->
+    <div class="panel" id="panel-rooms">
+        <div id="roomsListView">
+            <div class="form-card" id="roomCreateCard" style="display:none">
+                <h3><i class="fa-solid fa-plus"></i> سالفة خاصة جديدة</h3>
+                <div class="admin-note">سوالف خاصة بك — تضيف إليها من تريد برقمه الوظيفي، وتغلقها متى شئت. دردشة جماعية خفيفة: بلا عدادات ولا إشعارات ولا «شاهد الرسالة».</div>
+                <div class="row" style="margin-top:8px">
+                    <input id="roomName" maxlength="60" placeholder="اسم السالفة (مثال: سوالف مناوبة الخميس)" style="flex:1">
+                    <button class="btn primary" id="createRoomBtn"><i class="fa-solid fa-plus"></i> إنشاء</button>
+                </div>
+            </div>
+            <div class="section-title"><i class="fa-solid fa-house-chimney"></i> سوالف مجالسي</div>
+            <div class="grid" id="councilRoomsGrid"></div>
+            <div class="section-title"><i class="fa-solid fa-user-group"></i> سوالفي الخاصة</div>
+            <div class="grid" id="privateRoomsGrid"></div>
+        </div>
+        <div id="roomChatView" style="display:none">
+            <button class="back-link" id="backToRooms"><i class="fa-solid fa-arrow-right"></i> عودة للغرف</button>
+            <div class="card" style="margin-bottom:12px">
+                <div class="row">
+                    <div><h3 id="rcName"></h3><div class="meta" id="rcMeta"></div></div>
+                    <div class="spacer"></div>
+                    <button class="btn sm" id="rcRefreshBtn" title="تحديث"><i class="fa-solid fa-rotate"></i></button>
+                    <button class="btn sm ghost" id="rcLeaveBtn" style="display:none">مغادرة</button>
+                    <button class="btn sm danger" id="rcCloseBtn" style="display:none">إغلاق الغرفة</button>
+                </div>
+                <div class="row" id="rcAddMemberRow" style="display:none;margin-top:8px">
+                    <input id="rcAddMemberId" maxlength="20" placeholder="رقم الموظف لإضافته للغرفة" style="flex:1">
+                    <button class="btn sm" id="rcAddMemberBtn">إضافة عضو</button>
+                </div>
+                <div class="meta" id="rcMembers" style="margin-top:8px"></div>
+            </div>
+            <div class="chat-box" id="chatBox"></div>
+            <div class="chat-input-row" id="chatInputRow">
+                <input id="chatInput" maxlength="1000" placeholder="اكتب رسالتك…">
+                <button class="btn primary" id="chatSendBtn" title="إرسال"><i class="fa-solid fa-paper-plane"></i></button>
+            </div>
         </div>
     </div>
 
@@ -351,7 +402,9 @@ $('#tabs').addEventListener('click', e => {
     loadTab(b.dataset.tab);
 });
 function loadTab(tab) {
+    stopChatPoll(); // إيقاف مؤقت الدردشة عند مغادرة تبويب الغرف (عميل فقط)
     if (tab === 'councils') loadCouncils();
+    else if (tab === 'rooms') loadRooms();
     else if (tab === 'presence') { loadPresence(); loadBlocks(); }
     else if (tab === 'activities') { loadTypes(); loadActivities(); }
     else if (tab === 'events') loadEvents();
@@ -373,7 +426,7 @@ function loadTab(tab) {
         $('#meName').textContent = S.me ? S.me.display_name : 'مستخدم';
         if (S.gate && !S.gate.allowParticipation) {
             $('#gateBanner').classList.add('show');
-            $('#gateText').textContent = 'أنت حاليًا في حالة تشغيلية — الاطلاع متاح لكن المشاركة الاجتماعية (نشر/انضمام/توفر) موقوفة حتى تنتهي.';
+            $('#gateText').textContent = 'أنت حاليًا في حالة تشغيلية — الاطلاع متاح لكن المشاركة الاجتماعية (نشر/انضمام/إنشاء) موقوفة حتى تنتهي.';
         }
         if (S.frozen) $('#frozenBanner').classList.add('show');
         if (can('community.moderate')) $('#tabModeration').classList.remove('hidden-tab');
@@ -406,6 +459,8 @@ async function loadCouncils() {
                 ${c.membership === 'closed' ? '<span><i class="fa-solid fa-lock"></i> مغلق</span>' : ''}</div>
                 <div class="row" style="margin-top:10px">
                     <button class="btn sm primary" onclick="openCouncil(${c.id})"><i class="fa-solid fa-door-open"></i> فتح</button>
+                    ${c.slug === 'baloot' ? `<a class="btn sm primary" href="baloot.html" style="text-decoration:none" title="طاولات البلوت"><i class="fa-solid fa-chess"></i> الطاولات 🃏</a>` : ''}
+                    ${c.joined ? `<button class="btn sm" onclick="openCouncilRoom(${c.id})" title="غرفة سوالف المجلس"><i class="fa-solid fa-comments"></i> السوالف</button>` : ''}
                     <div class="spacer"></div>
                     ${c.joined
                         ? `<button class="btn sm ghost" onclick="leaveCouncil(${c.id})">مغادرة</button>`
@@ -434,6 +489,11 @@ window.openCouncil = async id => {
         if (c.joined) { jb.textContent = 'مغادرة'; jb.className = 'btn sm ghost'; jb.onclick = () => leaveCouncil(id).then(() => openCouncil(id)); }
         else { jb.textContent = 'انضمام'; jb.className = 'btn sm primary'; jb.onclick = () => joinCouncil(id).then(() => openCouncil(id)); }
         $('#composerCard').style.display = (c.joined && can('community.post')) ? 'block' : 'none';
+        const rb = $('#cdRoomBtn');
+        if (c.joined) {
+            rb.style.display = 'inline-block';
+            rb.onclick = () => openCouncilRoom(id);
+        } else rb.style.display = 'none';
         loadPosts(id);
     } catch (e) { toast(e.message, false); }
 };
@@ -475,6 +535,147 @@ window.deletePost = async id => {
     try { await api('DELETE', '/api/community/posts/' + id); toast('حُذف المنشور'); loadPosts(S.currentCouncil.id); }
     catch (e) { toast(e.message, false); }
 };
+
+/* ═══ الغرف والدردشة الجماعية (D1) ═══
+   استعلام تزايدي بـsince_id + مؤقت عميل 15 ثانية يُلغى عند المغادرة —
+   لا WebSocket ولا SSE ولا مؤقتات خادم (قرار D1). */
+const R = { room: null, lastId: 0, poll: null };
+function stopChatPoll() { if (R.poll) { clearInterval(R.poll); R.poll = null; } }
+async function loadRooms() {
+    stopChatPoll();
+    $('#roomsListView').style.display = 'block'; $('#roomChatView').style.display = 'none';
+    $('#roomCreateCard').style.display = can('community.post') ? 'block' : 'none';
+    try {
+        if (!S.councils.length) { try { const c = await api('GET', '/api/community/councils'); S.councils = c.councils || []; } catch (_) { } }
+        const d = await api('GET', '/api/community/rooms');
+        // سوالف مجالسي: تظهر لكل مجلس أنا عضو فيه — حتى لو لم تُنشأ غرفته بعد
+        // (الإنشاء الكسول يتم عند أول ضغطة «افتح السوالف» — خادميًا)
+        const byCouncil = {};
+        (d.councilRooms || []).forEach(r => { byCouncil[r.councilId] = r; });
+        const myCouncils = S.councils.filter(c => c.joined);
+        $('#councilRoomsGrid').innerHTML = myCouncils.length ? myCouncils.map(c => {
+            const r = byCouncil[c.id];
+            return `
+            <div class="card">
+                <div class="icon-lg">${esc(c.icon || '💬')}</div>
+                <h3>${esc(r ? r.name : 'سوالف ' + c.name)}</h3>
+                <div class="meta"><span><i class="fa-solid fa-house-chimney"></i> ${esc(c.name)}</span></div>
+                <div class="row" style="margin-top:10px"><button class="btn sm primary" onclick="openCouncilRoom(${c.id})"><i class="fa-solid fa-comments"></i> ${r ? 'فتح الدردشة' : 'افتح السوالف'}</button></div>
+            </div>`;
+        }).join('') : '<div class="empty"><i class="fa-solid fa-house-chimney"></i>لا سوالف مجالس بعد — انضم لمجلس من تبويب المجالس وستجد سالفته هنا.</div>';
+        $('#privateRoomsGrid').innerHTML = (d.privateRooms || []).length ? d.privateRooms.map(r => `
+            <div class="card">
+                <div class="icon-lg">👥</div>
+                <h3>${esc(r.name)}</h3>
+                <div class="meta"><span>${r.mine ? 'أنشأتها أنت' : 'عضو فيها'}</span></div>
+                <div class="row" style="margin-top:10px"><button class="btn sm primary" onclick="openRoom(${r.id})"><i class="fa-solid fa-comments"></i> فتح الدردشة</button></div>
+            </div>`).join('') : '<div class="empty"><i class="fa-solid fa-user-group"></i>لا سوالف خاصة بعد — أنشئ سالفة وادعُ إليها من تريد.</div>';
+    } catch (e) { toast(e.message, false); }
+}
+// فتح سالفة مجلس من أي مكان (بطاقة المجلس/تفاصيله/تبويب السوالف) — إنشاء كسول خادمي
+window.openCouncilRoom = async councilId => {
+    try {
+        const rr = await api('GET', '/api/community/councils/' + councilId + '/room');
+        $$('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === 'rooms'));
+        $$('.panel').forEach(p => p.classList.remove('active'));
+        $('#panel-rooms').classList.add('active');
+        openRoom(rr.room.id);
+    } catch (e) { toast(e.message, false); }
+};
+$('#createRoomBtn').addEventListener('click', async () => {
+    const name = $('#roomName').value.trim();
+    if (name.length < 2) return toast('اكتب اسم الغرفة (حرفان على الأقل)', false);
+    try {
+        const d = await api('POST', '/api/community/rooms', { name });
+        $('#roomName').value = ''; toast('أُنشئت الغرفة'); openRoom(d.id);
+    } catch (e) { toast(e.message, false); }
+});
+window.openRoom = async id => {
+    stopChatPoll();
+    try {
+        const d = await api('GET', '/api/community/rooms/' + id);
+        R.room = d.room; R.lastId = 0;
+        $('#roomsListView').style.display = 'none'; $('#roomChatView').style.display = 'block';
+        $('#rcName').textContent = d.room.name;
+        $('#rcMeta').innerHTML = `<span>${d.room.kind === 'council' ? 'غرفة مجلس · ' + esc(d.room.councilName || '') : 'غرفة خاصة'}</span><span><i class="fa-solid fa-users"></i> ${d.room.membersCount} عضو</span>`;
+        const isPriv = d.room.kind === 'private';
+        $('#rcCloseBtn').style.display = (isPriv && d.room.mine && can('community.post')) ? 'inline-block' : 'none';
+        $('#rcLeaveBtn').style.display = (isPriv && !d.room.mine) ? 'inline-block' : 'none';
+        $('#rcAddMemberRow').style.display = (isPriv && d.room.mine) ? 'flex' : 'none';
+        $('#rcMembers').innerHTML = (isPriv && d.room.members)
+            ? d.room.members.map(m => `<span class="badge-chip">${esc(m.user ? m.user.display_name : m.userId)}${m.role === 'owner' ? ' · منشئ' : ''}${(d.room.mine && m.role !== 'owner') ? ` <i class="fa-solid fa-xmark" style="cursor:pointer" title="إزالة من الغرفة" onclick="removeRoomMember('${esc(m.userId)}')"></i>` : ''}</span>`).join('')
+            : '';
+        $('#chatInputRow').style.display = can('community.post') ? 'flex' : 'none';
+        await loadChat(true);
+        R.poll = setInterval(() => loadChat(false), 15000);
+    } catch (e) { toast(e.message, false); loadRooms(); }
+};
+$('#backToRooms').addEventListener('click', loadRooms);
+$('#rcRefreshBtn').addEventListener('click', () => loadChat(true));
+function renderMsg(m) {
+    return `<div class="chat-msg${m.mine ? ' mine' : ''}" data-id="${m.id}">
+        ${m.mine ? '' : `<div class="c-author">${esc(m.author.displayName || 'مستخدم')}</div>`}
+        <div class="c-body">${esc(m.content)}</div>
+        <div class="c-time">${fmtTime(m.createdAt)}${!m.mine ? ` · <a onclick="openReport('chat_message','${m.id}','رسالة في ${esc(R.room ? R.room.name : 'غرفة')}')">إبلاغ</a> · <a onclick="blockFromChat('${esc(m.author.userId)}','${esc(m.author.displayName || '')}')">حظر</a>` : ''}</div>
+    </div>`;
+}
+// حظر من داخل السالفة مباشرة — لا حاجة للبحث عنه في «من موجود؟»
+window.blockFromChat = async (uid, name) => {
+    await blockUser(uid, name);
+    if (R.room) loadChat(true);
+};
+async function loadChat(initial) {
+    if (!R.room) return;
+    try {
+        const d = await api('GET', '/api/community/rooms/' + R.room.id + '/messages?limit=40&since_id=' + (initial ? 0 : R.lastId));
+        const box = $('#chatBox');
+        if (initial) {
+            box.innerHTML = d.messages.length
+                ? d.messages.map(renderMsg).join('')
+                : '<div class="empty" style="margin:auto"><i class="fa-solid fa-comments"></i>لا رسائل بعد — ابدأ الحديث.</div>';
+        } else if (d.messages.length) {
+            if (box.querySelector('.empty')) box.innerHTML = '';
+            box.insertAdjacentHTML('beforeend', d.messages.map(renderMsg).join(''));
+        }
+        if (d.lastId > R.lastId) R.lastId = d.lastId;
+        box.scrollTop = box.scrollHeight;
+    } catch (e) { if (initial) toast(e.message, false); }
+}
+async function sendChat() {
+    const text = $('#chatInput').value.trim();
+    if (!text || !R.room) return;
+    try {
+        const d = await api('POST', '/api/community/rooms/' + R.room.id + '/messages', { content: text });
+        $('#chatInput').value = '';
+        if (d.flagged) toast(d.message || 'أوقفت الرسالة للمراجعة', false);
+        await loadChat(false);
+    } catch (e) { toast(e.message, false); }
+}
+$('#chatSendBtn').addEventListener('click', sendChat);
+$('#chatInput').addEventListener('keydown', e => { if (e.key === 'Enter') sendChat(); });
+$('#rcAddMemberBtn').addEventListener('click', async () => {
+    const uid = $('#rcAddMemberId').value.trim();
+    if (!uid || !R.room) return toast('اكتب رقم الموظف', false);
+    try {
+        await api('POST', '/api/community/rooms/' + R.room.id + '/members', { userId: uid });
+        $('#rcAddMemberId').value = ''; toast('أُضيف العضو'); openRoom(R.room.id);
+    } catch (e) { toast(e.message, false); }
+});
+window.removeRoomMember = async uid => {
+    if (!R.room) return;
+    try { await api('DELETE', '/api/community/rooms/' + R.room.id + '/members/' + encodeURIComponent(uid)); toast('أُزيل العضو'); openRoom(R.room.id); }
+    catch (e) { toast(e.message, false); }
+};
+$('#rcLeaveBtn').addEventListener('click', async () => {
+    if (!R.room) return;
+    try { await api('POST', '/api/community/rooms/' + R.room.id + '/leave'); toast('غادرت الغرفة'); loadRooms(); }
+    catch (e) { toast(e.message, false); }
+});
+$('#rcCloseBtn').addEventListener('click', async () => {
+    if (!R.room || !confirm('إغلاق الغرفة نهائيًا؟ لن يستطيع أحد الإرسال فيها بعدها.')) return;
+    try { await api('POST', '/api/community/rooms/' + R.room.id + '/close'); toast('أُغلقت الغرفة'); loadRooms(); }
+    catch (e) { toast(e.message, false); }
+});
 
 /* ═══ الإبلاغ (مشترك) ═══ */
 let reportTarget = null;
@@ -733,7 +934,7 @@ async function loadModQueue() {
         const d = await api('GET', '/api/community/moderation/queue');
         const q = $('#modQueue');
         if (!d.reports.length) { q.innerHTML = '<div class="empty" style="padding:14px">لا بلاغات معلّقة — القائمة نظيفة.</div>'; return; }
-        const typeLabels = { user: 'مستخدم', post: 'منشور', activity: 'نشاط', majlis: 'مجلس' };
+        const typeLabels = { user: 'مستخدم', post: 'منشور', activity: 'نشاط', majlis: 'مجلس', chat_message: 'رسالة دردشة' };
         q.innerHTML = d.reports.map(r => `
             <div class="card" style="margin-bottom:10px">
                 <div class="row">
@@ -746,7 +947,7 @@ async function loadModQueue() {
                 <div class="desc" style="margin-top:6px">${esc(r.reason)}</div>
                 <div class="meta">من: ${esc(r.reporter_name || r.reporter_user_id)}</div>
                 <div class="row" style="margin-top:10px">
-                    ${r.target_type === 'post' ? `
+                    ${(r.target_type === 'post' || r.target_type === 'chat_message') ? `
                         <button class="btn sm" onclick="modAction(${r.id},'hide')">إخفاء</button>
                         <button class="btn sm danger" onclick="modAction(${r.id},'remove')">حذف المحتوى</button>` : ''}
                     ${r.target_type !== 'majlis' ? `
@@ -768,9 +969,12 @@ async function loadModFlagged() {
     try {
         const d = await api('GET', '/api/community/moderation/posts?status=flagged');
         const d2 = await api('GET', '/api/community/moderation/posts?status=hidden');
+        const cm1 = await api('GET', '/api/community/moderation/chat-messages?status=flagged');
+        const cm2 = await api('GET', '/api/community/moderation/chat-messages?status=hidden');
         const posts = (d.posts || []).concat(d2.posts || []);
+        const chats = (cm1.messages || []).concat(cm2.messages || []);
         const q = $('#modFlagged');
-        if (!posts.length) { q.innerHTML = '<div class="empty" style="padding:14px">لا محتوى موقوف.</div>'; return; }
+        if (!posts.length && !chats.length) { q.innerHTML = '<div class="empty" style="padding:14px">لا محتوى موقوف.</div>'; return; }
         q.innerHTML = posts.map(p => `
             <div class="card" style="margin-bottom:10px">
                 <div class="row">
@@ -785,12 +989,32 @@ async function loadModFlagged() {
                     <button class="btn sm" onclick="modPost(${p.id},'hidden')">إبقاء مخفيًا</button>
                     <button class="btn sm danger" onclick="modPost(${p.id},'removed')">حذف نهائي</button>
                 </div>
+            </div>`).join('') + chats.map(c => `
+            <div class="card" style="margin-bottom:10px">
+                <div class="row">
+                    <span class="status-pill ${c.status === 'hidden' ? 'unavailable' : 'busy'}">${c.status === 'hidden' ? 'رسالة مخفية (عتبة بلاغات)' : 'رسالة موقوفة (فلتر)'}</span>
+                    <span style="color:var(--muted);font-size:0.78rem">💬 ${esc(c.room_name || '')}</span>
+                    <div class="spacer"></div><span class="p-time">${fmtTime(c.created_at)}</span>
+                </div>
+                <div class="desc" style="margin-top:6px">${esc(c.content)}</div>
+                <div class="meta">المؤلف: ${esc(c.author_name || c.author_user_id)}</div>
+                <div class="row" style="margin-top:10px">
+                    <button class="btn sm primary" onclick="modChat(${c.id},'visible')">اعتماد وإظهار</button>
+                    <button class="btn sm" onclick="modChat(${c.id},'hidden')">إبقاء مخفية</button>
+                    <button class="btn sm danger" onclick="modChat(${c.id},'removed')">حذف نهائي</button>
+                </div>
             </div>`).join('');
     } catch (e) { toast(e.message, false); }
 }
 window.modPost = async (id, status) => {
     try {
         await api('POST', '/api/community/moderation/posts/' + id + '/status', { status });
+        toast('نُفذ: ' + status); loadModFlagged(); loadModAudit();
+    } catch (e) { toast(e.message, false); }
+};
+window.modChat = async (id, status) => {
+    try {
+        await api('POST', '/api/community/moderation/chat-messages/' + id + '/status', { status });
         toast('نُفذ: ' + status); loadModFlagged(); loadModAudit();
     } catch (e) { toast(e.message, false); }
 };

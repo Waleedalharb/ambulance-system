@@ -9,13 +9,14 @@
 // إلا الحاظر.
 //
 // Report Workflow: مستخدم → community_reports(pending) → قائمة المشرف →
-// إجراء → تدقيق. الأهداف: user · post · activity · majlis (مع التحقق من وجود
-// الهدف — لا بلاغات على أشباح). بلاغ pending واحد لكل (مبلِّغ، هدف) — منع
-// الإغراق. الإجراءات: none · warn · freeze · restrict · dismiss لكل الأهداف،
-// وhide/remove للمنشورات فقط. العتبة التلقائية: تعدد البلاغات على منشور ←
-// إخفاء مؤقت (hidden) بانتظار مشرف بشري — الحذف النهائي قرار بشري دائمًا
-// ولا يكون تلقائيًا أبدًا. إجراءات المستخدم (warn/freeze/restrict) تطال
-// المسؤول عن الهدف: المستخدم نفسه، مؤلف المنشور، أو منشئ النشاط.
+// إجراء → تدقيق. الأهداف: user · post · activity · majlis · chat_message (D1)
+// (مع التحقق من وجود الهدف — لا بلاغات على أشباح). بلاغ pending واحد لكل
+// (مبلِّغ، هدف) — منع الإغراق. الإجراءات: none · warn · freeze · restrict ·
+// dismiss لكل الأهداف، وhide/remove للمحتوى (منشورات ورسائل الغرف) فقط.
+// العتبة التلقائية: تعدد البلاغات على محتوى ← إخفاء مؤقت (hidden) بانتظار
+// مشرف بشري — الحذف النهائي قرار بشري دائمًا ولا يكون تلقائيًا أبدًا.
+// إجراءات المستخدم (warn/freeze/restrict) تطال المسؤول عن الهدف: المستخدم
+// نفسه، مؤلف المنشور/الرسالة، أو منشئ النشاط.
 //
 // الذرّية: كل عملية كاتبة محمية بمعاملة حقيقية (BEGIN/COMMIT/ROLLBACK):
 // فشل أي خطوة (التحديث/التقييد/إخفاء المحتوى/التدقيق) يُرجع العملية كاملة،
@@ -24,8 +25,9 @@
 'use strict';
 
 const ACTIONS = Object.freeze(['none', 'warn', 'freeze', 'restrict', 'dismiss', 'hide', 'remove']);
-const CONTENT_ACTIONS = Object.freeze(['hide', 'remove']); // لمنشورات المجالس فقط
-const TARGET_TYPES = Object.freeze(['user', 'post', 'activity', 'majlis']);
+const CONTENT_ACTIONS = Object.freeze(['hide', 'remove']); // للمحتوى فقط: منشورات المجالس ورسائل الغرف (D1)
+const CONTENT_TARGETS = Object.freeze(['post', 'chat_message']);
+const TARGET_TYPES = Object.freeze(['user', 'post', 'activity', 'majlis', 'chat_message']);
 const DEFAULT_AUTO_HIDE_THRESHOLD = 3;
 
 class CommunityModerationService {
@@ -118,6 +120,10 @@ class CommunityModerationService {
             const a = await this.db.Community.getActivityById(report.target_id);
             return a ? a.created_by : null;
         }
+        if (report.target_type === 'chat_message') {
+            const m = await this.db.Community.getChatMessageById(report.target_id);
+            return m ? m.author_user_id : null;
+        }
         return null; // majlis — كيان بلا مستخدم مسؤول مباشر
     }
 
@@ -145,6 +151,12 @@ class CommunityModerationService {
         } else if (targetType === 'activity') {
             const a = await this.db.Community.getActivityById(tid);
             if (!a || a.status === 'disabled') throw this._err(404, 'النشاط غير موجود', 'ACTIVITY_NOT_FOUND');
+        } else if (targetType === 'chat_message') {
+            const m = await this.db.Community.getChatMessageById(tid);
+            if (!m || m.status === 'removed') throw this._err(404, 'الرسالة غير موجودة', 'MESSAGE_NOT_FOUND');
+            if (String(m.author_user_id) === String(actor.id)) {
+                throw this._err(422, 'لا يمكن الإبلاغ عن محتواك', 'SELF_REPORT');
+            }
         } else if (targetType === 'majlis') {
             const c = await this.db.Community.getCouncilById(tid);
             if (!c) throw this._err(404, 'المجلس غير موجود', 'COUNCIL_NOT_FOUND');
@@ -167,16 +179,21 @@ class CommunityModerationService {
                 }
                 throw e;
             }
-            // العتبة التلقائية: تعدد البلاغات على منشور ← إخفاء مؤقت بانتظار قرار
-            // مشرف بشري (hidden وليس removed — الحذف لا يكون تلقائيًا أبدًا)
-            if (targetType === 'post') {
+            // العتبة التلقائية: تعدد البلاغات على محتوى (منشور/رسالة) ← إخفاء
+            // مؤقت بانتظار قرار مشرف بشري (hidden وليس removed — الحذف لا يكون
+            // تلقائيًا أبدًا)
+            if (CONTENT_TARGETS.indexOf(targetType) !== -1) {
                 const threshold = await this._autoHideThreshold();
-                const pending = await this.db.Community.countPendingForTarget('post', tid);
+                const pending = await this.db.Community.countPendingForTarget(targetType, tid);
                 if (pending >= threshold) {
-                    await this.db.Community.setPostStatus(tid, 'hidden', 'auto:' + threshold + '-reports');
+                    if (targetType === 'post') {
+                        await this.db.Community.setPostStatus(tid, 'hidden', 'auto:' + threshold + '-reports');
+                    } else {
+                        await this.db.Community.setChatMessageStatus(tid, 'hidden', 'auto:' + threshold + '-reports');
+                    }
                     await this.db.Community.audit({
-                        actorId: null, actorName: 'system', action: 'post_auto_hide',
-                        targetType: 'post', targetId: tid,
+                        actorId: null, actorName: 'system', action: targetType === 'post' ? 'post_auto_hide' : 'chat_auto_hide',
+                        targetType, targetId: tid,
                         detail: 'إخفاء تلقائي مؤقت عند بلوغ ' + pending + ' بلاغًا — بانتظار قرار مشرف بشري'
                     });
                 }
@@ -196,8 +213,9 @@ class CommunityModerationService {
     /**
      * معالجة بلاغ — العملية كلها (resolve + restriction/إخفاء المحتوى + audit)
      * داخل معاملة واحدة: فشل أي خطوة يُرجعها جميعًا، فلا توجد حالة جزئية بلا تدقيق.
-     * hide/remove لمنشورات المجالس فقط؛ warn/freeze/restrict تطال المسؤول عن
-     * الهدف (المستخدم/المؤلف/المنشئ) — وترفض للمجالس (لا مستخدم مسؤول).
+     * hide/remove للمحتوى فقط (منشورات المجالس ورسائل الغرف)؛ warn/freeze/restrict
+     * تطال المسؤول عن الهدف (المستخدم/المؤلف/المنشئ) — وترفض للمجالس (لا مستخدم
+     * مسؤول).
      */
     async handleReport(actor, reportId, { action, note }) {
         if (ACTIONS.indexOf(action) === -1) {
@@ -207,8 +225,8 @@ class CommunityModerationService {
         if (!report) throw this._err(404, 'البلاغ غير موجود', 'REPORT_NOT_FOUND');
         if (report.status !== 'pending') throw this._err(409, 'البلاغ عولج مسبقًا', 'ALREADY_HANDLED');
         const isContentAction = CONTENT_ACTIONS.indexOf(action) !== -1;
-        if (isContentAction && report.target_type !== 'post') {
-            throw this._err(422, 'إجراءات hide/remove لمنشورات المجالس فقط', 'BAD_ACTION');
+        if (isContentAction && CONTENT_TARGETS.indexOf(report.target_type) === -1) {
+            throw this._err(422, 'إجراءات hide/remove للمحتوى فقط (منشور/رسالة)', 'BAD_ACTION');
         }
         const targetUserId = await this._resolveTargetUser(report);
         if (['warn', 'freeze', 'restrict'].indexOf(action) !== -1 && !targetUserId) {
@@ -239,8 +257,12 @@ class CommunityModerationService {
                 });
             }
             if (isContentAction) {
-                await this.db.Community.setPostStatus(
-                    report.target_id, action === 'hide' ? 'hidden' : 'removed', actor.name);
+                const newStatus = action === 'hide' ? 'hidden' : 'removed';
+                if (report.target_type === 'post') {
+                    await this.db.Community.setPostStatus(report.target_id, newStatus, actor.name);
+                } else {
+                    await this.db.Community.setChatMessageStatus(report.target_id, newStatus, actor.name);
+                }
             }
             await this.db.Community.audit({
                 actorId: actor.id, actorName: actor.name, action: 'report_handle',
