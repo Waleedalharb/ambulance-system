@@ -205,6 +205,29 @@ enum PermissionMapper {
     static func canOpsFiles(_ permissions: [String], star: Bool) -> Bool {
         has(permissions, star: star, "ops.files")
     }
+
+    // ── مفاتيح المجتمع والبلوت (community.* — منح فردية، server.js) ──
+    // قرار المالك 2026-09-25: لا بوابة تشغيلية — المناوبة لا تؤثر على الأهلية.
+
+    /// دخول المجتمع/مجلس البلوت والمشاهدة.
+    static func canAccessCommunity(_ permissions: [String], star: Bool) -> Bool {
+        has(permissions, star: star, "community.view")
+    }
+
+    /// فتح طاولة بلوت / إنشاء نشاط.
+    static func canCreateCommunityActivity(_ permissions: [String], star: Bool) -> Bool {
+        has(permissions, star: star, "community.create_activity")
+    }
+
+    /// الجلوس والجاهزية وأفعال اللعب.
+    static func canJoinCommunityActivity(_ permissions: [String], star: Bool) -> Bool {
+        has(permissions, star: star, "community.join_activity")
+    }
+
+    /// إرسال رسائل السوالف.
+    static func canPostCommunity(_ permissions: [String], star: Bool) -> Bool {
+        has(permissions, star: star, "community.post")
+    }
 }
 
 @MainActor
@@ -262,6 +285,12 @@ final class PermissionStore: ObservableObject {
     var canOpsAlerts: Bool { PermissionMapper.canOpsAlerts(permissions, star: isStar) }
     var canTeamExit: Bool { PermissionMapper.canTeamExit(permissions, star: isStar) }
     var canOpsFiles: Bool { PermissionMapper.canOpsFiles(permissions, star: isStar) }
+
+    // ── المجتمع والبلوت (لا بوابة تشغيلية — قرار 2026-09-25) ──
+    var canAccessCommunity: Bool { PermissionMapper.canAccessCommunity(permissions, star: isStar) }
+    var canCreateCommunityActivity: Bool { PermissionMapper.canCreateCommunityActivity(permissions, star: isStar) }
+    var canJoinCommunityActivity: Bool { PermissionMapper.canJoinCommunityActivity(permissions, star: isStar) }
+    var canPostCommunity: Bool { PermissionMapper.canPostCommunity(permissions, star: isStar) }
 
     /// بوابة مركز الإدارة (§20): دور admin/director أو أي مفتاح إداري —
     /// كل شاشة داخل المركز تُقيَّد بصلاحيتها الخاصة، والحسم النهائي سيرفري.

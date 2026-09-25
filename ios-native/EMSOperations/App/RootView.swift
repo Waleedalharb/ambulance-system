@@ -65,7 +65,7 @@ struct MainTabView: View {
     @EnvironmentObject private var deepLinks: DeepLinkRouter
     @State private var selectedTab: AppTab = .home
 
-    enum AppTab: Hashable { case home, operations, scheduleOps, schedule, notifications, chat, account }
+    enum AppTab: Hashable { case home, operations, scheduleOps, schedule, notifications, baloot, chat, account }
 
     /// بند 11: بطاقة تفاصيل التمركز المنبثقة من إشعار Push.
     @State private var positioningNotice: PositioningNotice?
@@ -73,6 +73,7 @@ struct MainTabView: View {
     private var showOperations: Bool { session.permissions.canAccessOperations }
     private var showScheduleOps: Bool { session.permissions.canViewSchedules }
     private var showPortalTabs: Bool { session.permissions.canAccessEmployeePortal }
+    private var showCommunity: Bool { session.permissions.canAccessCommunity }
 
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -97,6 +98,12 @@ struct MainTabView: View {
                     .tabItem { Label("الإشعارات", systemImage: "bell.fill") }
                     .tag(AppTab.notifications)
                     .badge(session.unreadNotifications > 0 ? session.unreadNotifications : 0)
+            }
+            if showCommunity {
+                // اللوبي يملك NavigationStack الخاص به (مسارات الطاولة) — لا تغليف هنا.
+                BalootLobbyView()
+                    .tabItem { Label("البلوت", systemImage: "suit.spade.fill") }
+                    .tag(AppTab.baloot)
             }
             NavigationStack { ChatView() }
                 .tabItem { Label("المحادثات", systemImage: "bubble.left.and.bubble.right.fill") }

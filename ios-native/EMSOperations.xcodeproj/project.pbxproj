@@ -117,6 +117,14 @@
 		5E400000000000000000004C /* ArchiveOpsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000004C /* ArchiveOpsViewModel.swift */; };
 		5E400000000000000000004D /* ArchiveOpsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000004D /* ArchiveOpsView.swift */; };
 		5E40000000000000000000E1 /* EMSOperationsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000E1 /* EMSOperationsTests.swift */; };
+		5E40000000000000000000E2 /* BalootModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000E2 /* BalootModelsTests.swift */; };
+		5E40000000000000000000B1 /* BalootModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000B1 /* BalootModels.swift */; };
+		5E40000000000000000000B2 /* BalootService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000B2 /* BalootService.swift */; };
+		5E40000000000000000000B3 /* BalootSocket.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000B3 /* BalootSocket.swift */; };
+		5E40000000000000000000B4 /* BalootLobbyViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000B4 /* BalootLobbyViewModel.swift */; };
+		5E40000000000000000000B5 /* BalootLobbyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000B5 /* BalootLobbyView.swift */; };
+		5E40000000000000000000B6 /* BalootTableViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000B6 /* BalootTableViewModel.swift */; };
+		5E40000000000000000000B7 /* BalootTableView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000B7 /* BalootTableView.swift */; };
 		5E40000000000000000000F0 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000F0 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
@@ -246,6 +254,14 @@
 		5E30000000000000000000F1 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		5E30000000000000000000F2 /* EMSOperations.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = EMSOperations.entitlements; sourceTree = "<group>"; };
 		5E30000000000000000000F3 /* RefreshNoticeCenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RefreshNoticeCenter.swift; sourceTree = "<group>"; };
+		5E30000000000000000000E2 /* BalootModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalootModelsTests.swift; sourceTree = "<group>"; };
+		5E30000000000000000000B1 /* BalootModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalootModels.swift; sourceTree = "<group>"; };
+		5E30000000000000000000B2 /* BalootService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalootService.swift; sourceTree = "<group>"; };
+		5E30000000000000000000B3 /* BalootSocket.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalootSocket.swift; sourceTree = "<group>"; };
+		5E30000000000000000000B4 /* BalootLobbyViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalootLobbyViewModel.swift; sourceTree = "<group>"; };
+		5E30000000000000000000B5 /* BalootLobbyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalootLobbyView.swift; sourceTree = "<group>"; };
+		5E30000000000000000000B6 /* BalootTableViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalootTableViewModel.swift; sourceTree = "<group>"; };
+		5E30000000000000000000B7 /* BalootTableView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalootTableView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -484,8 +500,23 @@
 				5E2000000000000000000064 /* IndicatorsOps */,
 				5E2000000000000000000065 /* Requests */,
 				5E2000000000000000000066 /* FilesOps */,
+				5E2000000000000000000067 /* Baloot */,
 			);
 			path = Features;
+			sourceTree = "<group>";
+		};
+		5E2000000000000000000067 /* Baloot */ = {
+			isa = PBXGroup;
+			children = (
+				5E30000000000000000000B1 /* BalootModels.swift */,
+				5E30000000000000000000B2 /* BalootService.swift */,
+				5E30000000000000000000B3 /* BalootSocket.swift */,
+				5E30000000000000000000B4 /* BalootLobbyViewModel.swift */,
+				5E30000000000000000000B5 /* BalootLobbyView.swift */,
+				5E30000000000000000000B6 /* BalootTableViewModel.swift */,
+				5E30000000000000000000B7 /* BalootTableView.swift */,
+			);
+			path = Baloot;
 			sourceTree = "<group>";
 		};
 		5E2000000000000000000059 /* CompletionOps */ = {
@@ -767,6 +798,7 @@
 			isa = PBXGroup;
 			children = (
 				5E30000000000000000000E1 /* EMSOperationsTests.swift */,
+				5E30000000000000000000E2 /* BalootModelsTests.swift */,
 			);
 			path = EMSOperationsTests;
 			sourceTree = "<group>";
@@ -980,6 +1012,13 @@
 				5E400000000000000000006C /* AdminPermissionsView.swift in Sources */,
 				5E400000000000000000004C /* ArchiveOpsViewModel.swift in Sources */,
 				5E400000000000000000004D /* ArchiveOpsView.swift in Sources */,
+				5E40000000000000000000B1 /* BalootModels.swift in Sources */,
+				5E40000000000000000000B2 /* BalootService.swift in Sources */,
+				5E40000000000000000000B3 /* BalootSocket.swift in Sources */,
+				5E40000000000000000000B4 /* BalootLobbyViewModel.swift in Sources */,
+				5E40000000000000000000B5 /* BalootLobbyView.swift in Sources */,
+				5E40000000000000000000B6 /* BalootTableViewModel.swift in Sources */,
+				5E40000000000000000000B7 /* BalootTableView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -988,6 +1027,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				5E40000000000000000000E1 /* EMSOperationsTests.swift in Sources */,
+				5E40000000000000000000E2 /* BalootModelsTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
