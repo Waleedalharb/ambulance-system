@@ -213,9 +213,9 @@ async function unitStaticIsolation() {
         }
         dbw = new Database(TMP_DB);
         dbw.pragma('journal_mode = WAL');
-        // عزل بيئي: نسخة الإنتاج تحمل مناوبة active حقيقية — والبوابة (بصواب) تعدّ
-        // كل موظف «في مناوبة بلا تكليف» ← OPERATIONAL_DUTY. نُرشفها في النسخة
-        // المؤقتة فقط حتى يكون موظفو الاختبار roster_only (ALLOW) كما هو مقصود.
+        // نُرشف المناوبات النشطة في النسخة المعزولة فقط حتى يكون الوضع الافتراضي
+        // «خارج مناوبة»؛ قسم 5ب يعيد تنشيط واحدة ليثبت أن المناوبة لا تمنع
+        // المشاركة الاجتماعية إطلاقًا (قرار المالك النهائي 2026-09-25).
         dbw.prepare("UPDATE shifts SET status = 'archived' WHERE status = 'active'").run();
 
         // مستخدمو الاختبار بأذونات متدرجة — community.* منح فردي حصرًا
@@ -395,38 +395,79 @@ async function unitStaticIsolation() {
         check('H6) شكل الاستجابة خالٍ من أي حقل موقع/مصدر (userId/status/note/updatedAt/user فقط)',
             JSON.stringify(prKeys) === JSON.stringify(['note', 'status', 'updatedAt', 'user', 'userId'].sort()), prKeys.join(','));
 
-        // ═══ 5ب) قرار D1: الحضور خارج البوابة التشغيلية — إثبات بحالة مانعة حقيقية ═══
-        // ننشئ مناوبة active فعلية في النسخة المعزولة ← البوابة تعدّ الموظفين
-        // OPERATIONAL_DUTY (منع مشاركة حقيقي)، ثم نثبت: إعلان الحالة ينجح في
-        // الحالتين، والبوابة تبقى تعمل في إنشاء/الانضمام للنشاط وإنشاء الغرف.
-        console.log('\n── 5ب) D1: إعلان الحالة تحت حالة تشغيلية مانعة حقيقية (OPERATIONAL_DUTY) ──');
+        // ═══ 5ب) قرار المالك النهائي (2026-09-25): إلغاء البوابة التشغيلية ═══
+        // ننشئ مناوبة active فعلية في النسخة المعزولة، ثم نثبت أن كل خطوات
+        // Community/Baloot تنجح تحتها: الحضور، إنشاء نشاط، إنشاء غرفة،
+        // ورحلة بلوت كاملة (فتح طاولة ← جلوس 4 ← جاهزية ← بدء اللعب).
+        console.log('\n── 5ب) مناوبة فعلية نشطة: المشاركة الاجتماعية والبلوت بلا أي بوابة تشغيلية ──');
         const shiftRow = dbw.prepare("SELECT id FROM shifts ORDER BY id DESC LIMIT 1").get();
+        // صلاحيات الجلوس/الجاهزية لبقية اللاعبين (INSERT OR IGNORE — idempotent)
+        for (const u of ['emp-CM102', 'emp-CM107', 'emp-CM108']) {
+            dbw.prepare("INSERT OR IGNORE INTO user_permissions (user_id, permission_key, granted, granted_by) VALUES (?, 'community.join_activity', 1, 'test')").run(u);
+        }
+        let dutyRoomId = null, dutyTableId = null, dutyMatchId = null;
         try {
             dbw.prepare("UPDATE shifts SET status = 'active' WHERE id = ?").run(shiftRow.id);
             const stGate = await api('GET', '/api/community/status', t2);
-            check('N1) مناوبة نشطة حقيقية ← البوابة تمنع المشاركة فعلًا (OPERATIONAL_DUTY)',
-                stGate.status === 200 && stGate.body.gate && stGate.body.gate.allowParticipation === false &&
-                stGate.body.gate.reason === 'OPERATIONAL_DUTY', JSON.stringify(stGate.body.gate));
-            const prDuty1 = await api('PUT', '/api/community/presence', t2, { status: 'available', note: 'تحت حالة مانعة' });
-            check('N2) إعلان «متاح» تحت OPERATIONAL_DUTY ← 200 (الحضور خارج البوابة — قرار D1)',
+            check('N1) مناوبة نشطة حقيقية ← status يعيد allowParticipation=true دائمًا (لا بوابة)',
+                stGate.status === 200 && stGate.body.gate && stGate.body.gate.allowParticipation === true &&
+                stGate.body.gate.allowRead === true && stGate.body.gate.reason === null, JSON.stringify(stGate.body.gate));
+            const prDuty1 = await api('PUT', '/api/community/presence', t2, { status: 'available', note: 'مناوب ومتاح للمجلس' });
+            check('N2) إعلان «متاح» أثناء المناوبة ← 200',
                 prDuty1.status === 200 && prDuty1.body && prDuty1.body.status === 'available',
                 'status=' + prDuty1.status + ' ' + JSON.stringify(prDuty1.body));
             const prDuty2 = await api('PUT', '/api/community/presence', t1, { status: 'in_activity' });
-            check('N3) إعلان «في نشاط» تحت OPERATIONAL_DUTY ← 200', prDuty2.status === 200, 'status=' + prDuty2.status);
-            const actDuty = await api('POST', '/api/community/activities', t1, { typeId: 1, title: 'محاولة نشاط تحت المنع' });
-            check('N4) إنشاء نشاط تحت OPERATIONAL_DUTY ← 403 (البوابة تعمل حيث يجب)',
-                actDuty.status === 403 && actDuty.body && actDuty.body.code === 'OPERATIONAL_DUTY', 'status=' + actDuty.status);
-            const roomDuty = await api('POST', '/api/community/rooms', t1, { name: 'محاولة غرفة تحت المنع' });
-            check('N5) إنشاء غرفة تحت OPERATIONAL_DUTY ← 403 (البوابة تعمل في الغرف أيضًا)',
-                roomDuty.status === 403 && roomDuty.body && roomDuty.body.code === 'OPERATIONAL_DUTY', 'status=' + roomDuty.status);
+            check('N3) إعلان «في نشاط» أثناء المناوبة ← 200', prDuty2.status === 200, 'status=' + prDuty2.status);
+            const actDuty = await api('POST', '/api/community/activities', t1, { typeId: 1, title: 'نشاط أثناء المناوبة' });
+            check('N4) إنشاء نشاط أثناء المناوبة ← 200/201 (لا OPERATIONAL_DUTY)',
+                (actDuty.status === 200 || actDuty.status === 201) && actDuty.body && actDuty.body.id, 'status=' + actDuty.status);
+            const roomDuty = await api('POST', '/api/community/rooms', t1, { name: 'سالفة أثناء المناوبة' });
+            dutyRoomId = roomDuty.body && roomDuty.body.id;
+            check('N5) إنشاء غرفة أثناء المناوبة ← 200/201',
+                (roomDuty.status === 200 || roomDuty.status === 201) && !!dutyRoomId, 'status=' + roomDuty.status);
+
+            // ── رحلة البلوت الكاملة تحت مناوبة فعلية (الاختبار المطلوب صراحة) ──
+            const btCreate = await api('POST', '/api/baloot/tables', t1, {});
+            dutyTableId = btCreate.body && (btCreate.body.table && btCreate.body.table.id || btCreate.body.id);
+            check('N8) فتح طاولة بلوت أثناء المناوبة ← نجاح',
+                (btCreate.status === 200 || btCreate.status === 201) && !!dutyTableId, 'status=' + btCreate.status);
+            const councilsDuty = await api('GET', '/api/community/councils', t1);
+            const balootSeen = councilsDuty.body && (councilsDuty.body.councils || councilsDuty.body).some(c => c.slug === 'baloot');
+            check('N8ب) مجلس البلوت ظهر ضمن المجالس (إنشاء كسول)', balootSeen === true);
+            let sitOk = true, readyOk = true;
+            for (const [i, tok] of [t1, t2, t7, t8].entries()) {
+                const s = await api('POST', '/api/baloot/tables/' + dutyTableId + '/sit', tok, { seat: i });
+                if (s.status !== 200) { sitOk = false; console.log('   sit fail seat', i, s.status, JSON.stringify(s.body)); }
+            }
+            check('N9) جلوس الأربعة أثناء المناوبة ← نجاح (لا GATE_DENIED)', sitOk);
+            for (const tok of [t1, t2, t7, t8]) {
+                const r = await api('POST', '/api/baloot/tables/' + dutyTableId + '/ready', tok);
+                if (r.status !== 200) { readyOk = false; console.log('   ready fail', r.status, JSON.stringify(r.body)); }
+            }
+            check('N10) جاهزية الأربعة أثناء المناوبة ← نجاح', readyOk);
+            const tbl = await api('GET', '/api/baloot/tables/' + dutyTableId, t1);
+            dutyMatchId = tbl.body && tbl.body.activeMatchId;
+            check('N11) المباراة بدأت فعلًا أثناء المناوبة (activeMatchId موجود)',
+                !!dutyMatchId, JSON.stringify(tbl.body).slice(0, 200));
+            if (dutyMatchId) {
+                const mst = await api('GET', '/api/baloot/matches/' + dutyMatchId + '/state', t1);
+                check('N12) حالة المباراة متاحة للاعب + يده مرئية له (اللعب جارٍ)',
+                    mst.status === 200 && mst.body && mst.body.state && mst.body.state.hand && Array.isArray(mst.body.state.hand.myHand) && mst.body.state.hand.myHand.length > 0, 'status=' + mst.status + ' body=' + JSON.stringify(mst.body).slice(0, 300));
+                const opts = await api('GET', '/api/baloot/matches/' + dutyMatchId + '/options', t1);
+                check('N13) /options ترد أثناء المناوبة', opts.status === 200, 'status=' + opts.status);
+                // إنهاء ودي: تصويت الأربعة على الإنهاء (تنظيف)
+                for (const tok of [t1, t2, t7, t8]) await api('POST', '/api/baloot/matches/' + dutyMatchId + '/vote-abort', tok);
+            }
         } finally {
+            if (dutyRoomId) await api('POST', '/api/community/rooms/' + dutyRoomId + '/close', t1);
+            if (dutyTableId) await api('POST', '/api/baloot/tables/' + dutyTableId + '/close', t1);
             dbw.prepare("UPDATE shifts SET status = 'archived' WHERE id = ?").run(shiftRow.id);
         }
         const stAfter = await api('GET', '/api/community/status', t2);
-        check('N6) بعد الأرشفة ← البوابة تسمح بالمشاركة مجددًا',
+        check('N6) بعد الأرشفة ← المشاركة مسموحة كما كانت',
             stAfter.status === 200 && stAfter.body.gate && stAfter.body.gate.allowParticipation === true, JSON.stringify(stAfter.body.gate));
         const prFree = await api('PUT', '/api/community/presence', t2, { status: 'busy' });
-        check('N7) إعلان الحالة في حالة تسمح بالمشاركة ← 200', prFree.status === 200 && prFree.body && prFree.body.status === 'busy');
+        check('N7) إعلان الحالة بعد الأرشفة ← 200', prFree.status === 200 && prFree.body && prFree.body.status === 'busy');
 
         // ═══ 6) الحظر متبادل الأثر عبر كل مسارات التفاعل ═══
         console.log('\n── 6) الحظر: منشورات/حضور/انضمام/ملفات ──');

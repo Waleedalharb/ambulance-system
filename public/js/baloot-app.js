@@ -612,7 +612,7 @@
                 toast('جلست — المقعد ' + (d.seat + 1), true);
                 if (!S.table) await openTable(tableId); else await refreshTableInfo();
             } catch (e) {
-                toast(e.code === 'GATE_DENIED' ? 'لا يمكن الجلوس أثناء الواجب التشغيلي' : e.message, false);
+                toast(e.message, false);
             }
         }
         async function sendAction(type, payload) {

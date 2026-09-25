@@ -64,43 +64,23 @@ async function api(method, p, tok, payload) {
     return { status: r.status, body };
 }
 
-// ═══ الوحدة A: البوابة التشغيلية بستاب حتمي — تعيين حالات الكود الفعلي ═══
-async function unitGate() {
-    console.log('\n═══ الوحدة A: البوابة التشغيلية (حالات resolveEffectiveAssignment الفعلية) ═══');
-    const Gate = require(path.join(ROOT, 'services', 'community-operational-gate-service'));
-    const mk = eff => new Gate({ assignment: { resolveEffectiveAssignment: async () => eff } });
-    const U = { id: 'u1' };
+// ═══ الوحدة A: أُلغيت (قرار المالك النهائي 2026-09-25) ═══
+// البوابة التشغيلية (CommunityOperationalGateService) أُزيلت من المنتج:
+// لا تمنع المشاركة الاجتماعية/الترفيهية بحسب المناوبة، وحُذف ملف الخدمة.
+// نتحقق هنا أن الملف لم يعد موجودًا وأن النواة لا تتطلبه.
+async function unitGateRemoved() {
+    console.log('\n═══ الوحدة A: إلغاء البوابة التشغيلية (قرار المالك 2026-09-25) ═══');
+    check('A1) ملف community-operational-gate-service.js محذوف من المنتج',
+        !fs.existsSync(path.join(ROOT, 'services', 'community-operational-gate-service.js')));
 
-    const g1 = await mk({ deployable: true, teamId: 1, shiftMode: 'active_shift', warnings: [] }).evaluate(U);
-    check('A1) مناوبة نشطة + تكليف ميداني ← DENY ACTIVE_ASSIGNMENT + قفل القراءة',
-        g1.allowParticipation === false && g1.allowRead === false && g1.reason === 'ACTIVE_ASSIGNMENT', JSON.stringify(g1));
-
-    const g2 = await mk({ deployable: false, blockReason: 'no_assignment', shiftMode: 'active_shift', warnings: [] }).evaluate(U);
-    check('A2) مناوبة نشطة بدون تكليف ← DENY OPERATIONAL_DUTY + قراءة مسموحة',
-        g2.allowParticipation === false && g2.allowRead === true && g2.reason === 'OPERATIONAL_DUTY', JSON.stringify(g2));
-
-    const g3 = await mk({ deployable: false, blockReason: 'absent', shiftMode: 'active_shift', warnings: [] }).evaluate(U);
-    check('A3) غياب/تأخر ← DENY ATTENDANCE_STATE',
-        g3.allowParticipation === false && g3.reason === 'ATTENDANCE_STATE', JSON.stringify(g3));
-
-    const g4 = await mk({ deployable: true, teamId: 1, shiftMode: 'staffing_unavailable', warnings: [] }).evaluate(U);
-    check('A4) staffing_unavailable (مناوبة نشطة بلا حالة) ← DENY fail-closed',
-        g4.allowParticipation === false && g4.reason === 'OPERATIONAL_DUTY', JSON.stringify(g4));
-
-    const g5 = await mk({ deployable: true, teamId: 1, shiftMode: 'roster_only', warnings: [] }).evaluate(U);
-    check('A5) roster_only (خارج المناوبة/تكليف قادم) ← ALLOW كامل',
-        g5.allowParticipation === true && g5.allowRead === true && g5.reason === null, JSON.stringify(g5));
-
-    const g6 = await mk({ notFound: true, deployable: false, blockReason: 'no_employee', shiftMode: 'roster_only', warnings: [] }).evaluate(U);
-    check('A6) بلا ملف موظف (حساب نظام) ← ALLOW',
-        g6.allowParticipation === true && g6.reason === null, JSON.stringify(g6));
-
-    const g7 = await new Gate({ assignment: { resolveEffectiveAssignment: async () => { throw new Error('boom'); } } }).evaluate(U);
-    check('A7) خطأ في الاستعلام ← DENY fail-closed بسبب عام',
-        g7.allowParticipation === false && g7.reason === 'OPERATIONAL_DUTY', JSON.stringify(g7));
-
-    check('A8) reason لا يحمل تفاصيل تشغيلية (فريق/بلاغ/موقع) في كل الحالات',
-        [g1, g2, g3, g4, g7].every(g => g.reason === null || /^(OPERATIONAL_DUTY|ACTIVE_ASSIGNMENT|ATTENDANCE_STATE)$/.test(g.reason)));
+    const CommunityService = require(path.join(ROOT, 'services', 'community-service'));
+    const core = new CommunityService({
+        db: { Community: { getSetting: async () => null, getActiveRestrictions: async () => [] } }
+    }); // بلا gate — يجب أن تعمل النواة
+    const g = await core.participationGuard({ id: 'u1', role: 'operator' });
+    check('A2) participationGuard تعمل بلا بوابة وتسمح (لا تعطيل/لا تجميد)',
+        g.allow === true && g.reason === null, JSON.stringify(g));
+    check('A3) النواة لا تحتفظ بأي مرجع بوابة', core.gate === undefined);
 }
 
 // ═══ الوحدة C: إثبات إصلاحَي مراجعة الـdiff (2026-09-24) ═══
@@ -178,7 +158,7 @@ async function unitFixes() {
 (async () => {
     let server = null;
     try {
-        await unitGate();
+        await unitGateRemoved();
         await unitFixes();
 
         console.log('\n═══ الوحدة B: API معزول (صلاحيات/هوية/حظر/بلاغ/إشراف/تعطيل) ═══');
