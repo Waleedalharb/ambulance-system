@@ -336,7 +336,7 @@
 				5E2000000000000000000054 /* DeepLinks */,
 				5E2000000000000000000055 /* Storage */,
 				5E2000000000000000000056 /* Network */,
-				5E2000000000000000000060 /* UI */,
+				5E2000000000000000000068 /* UI */,
 			);
 			path = Core;
 			sourceTree = "<group>";
@@ -389,7 +389,7 @@
 			path = Network;
 			sourceTree = "<group>";
 		};
-		5E2000000000000000000060 /* UI */ = {
+		5E2000000000000000000068 /* UI */ = {
 			isa = PBXGroup;
 			children = (
 				5E30000000000000000000F3 /* RefreshNoticeCenter.swift */,
