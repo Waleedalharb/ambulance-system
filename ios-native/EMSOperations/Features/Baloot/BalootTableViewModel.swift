@@ -159,10 +159,29 @@ final class BalootTableViewModel: ObservableObject {
             switch ev.type {
             case "hand_started", "redeal": sound.play(.deal)
             case "card_played", "auto_play": sound.play(.cardPlayed)
-            case "bid", "bidding_round2": sound.play(.select)
-            case "contract_set": sound.play(.contract)
-            case "declaration_announced", "declarations_revealed", "doubled",
-                 "baloot_announced", "baloot_confirmed": sound.play(.select)
+            // النداءات المنطوقة — كل مزايدة تُنطق باسمها (sun/hokum/pass/ashkal)
+            case "bid":
+                switch ev.kind {
+                case "sun": sound.play(.saySunn)
+                case "hokum": sound.play(.sayHokum)
+                case "pass": sound.play(.sayPass)
+                case "ashkal": sound.play(.sayAshkal)
+                default: sound.play(.select)
+                }
+            case "contract_set": break // النداء صدر مع المزايدة نفسها — لا تكرار
+            case "doubled": sound.play(.sayDouble)
+            case "baloot_announced": sound.play(.sayBaloot)
+            case "baloot_confirmed": break // تأكيد لاحق لنفس البلوت — لا تكرار
+            // المشاريع تُنطق بأسمائها حسب نوعها القادم من المحرك
+            case "declaration_announced":
+                switch ev.project {
+                case "sara": sound.play(.saySara)
+                case "khamsin": sound.play(.sayKhamsin)
+                case "miya": sound.play(.sayMiya)
+                case "arba": sound.play(.sayArba)
+                default: sound.play(.select)
+                }
+            case "declarations_revealed", "bidding_round2": break
             case "trick_won": sound.play(.trick)
             case "hand_scored": sound.play(.handEnd)
             case "match_ended": sound.play(.matchEnd)

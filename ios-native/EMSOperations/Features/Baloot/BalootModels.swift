@@ -345,6 +345,7 @@ struct BalootWSEvent: Decodable, Equatable {
     let seat: Int?
     let team: String?
     let kind: String?
+    let project: String? // نوع المشروع في declaration_announced (sara/khamsin/miya/arba)
     let contract: BalootContractDTO?
 
     init(from decoder: Decoder) throws {
@@ -353,6 +354,7 @@ struct BalootWSEvent: Decodable, Equatable {
         seat = try? c.decode(Int.self, forKey: DynamicKey("seat"))
         team = try? c.decode(String.self, forKey: DynamicKey("team"))
         kind = try? c.decode(String.self, forKey: DynamicKey("kind"))
+        project = try? c.decode(String.self, forKey: DynamicKey("project"))
         contract = try? c.decode(BalootContractDTO.self, forKey: DynamicKey("contract"))
     }
 

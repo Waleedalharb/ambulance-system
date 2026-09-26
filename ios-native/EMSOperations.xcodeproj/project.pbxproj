@@ -134,6 +134,16 @@
 		5E40000000000000000000C6 /* hand_end.wav in Resources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000C6 /* hand_end.wav */; };
 		5E40000000000000000000C7 /* match_end.wav in Resources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000C7 /* match_end.wav */; };
 		5E40000000000000000000C8 /* your_turn.wav in Resources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000C8 /* your_turn.wav */; };
+		5E4000000000000000000000 /* say_sunn.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000000 /* say_sunn.mp3 */; };
+		5E400000000000000000006D /* say_hokum.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000006D /* say_hokum.mp3 */; };
+		5E400000000000000000006E /* say_pass.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000006E /* say_pass.mp3 */; };
+		5E400000000000000000006F /* say_ashkal.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000006F /* say_ashkal.mp3 */; };
+		5E4000000000000000000070 /* say_double.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000070 /* say_double.mp3 */; };
+		5E4000000000000000000071 /* say_baloot.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000071 /* say_baloot.mp3 */; };
+		5E4000000000000000000072 /* say_sara.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000072 /* say_sara.mp3 */; };
+		5E4000000000000000000073 /* say_khamsin.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000073 /* say_khamsin.mp3 */; };
+		5E4000000000000000000074 /* say_miya.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000074 /* say_miya.mp3 */; };
+		5E4000000000000000000075 /* say_arba.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000075 /* say_arba.mp3 */; };
 		5E40000000000000000000F0 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000F0 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
@@ -280,6 +290,16 @@
 		5E30000000000000000000C6 /* hand_end.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = hand_end.wav; sourceTree = "<group>"; };
 		5E30000000000000000000C7 /* match_end.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = match_end.wav; sourceTree = "<group>"; };
 		5E30000000000000000000C8 /* your_turn.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = your_turn.wav; sourceTree = "<group>"; };
+		5E3000000000000000000000 /* say_sunn.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = say_sunn.mp3; sourceTree = "<group>"; };
+		5E300000000000000000006D /* say_hokum.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = say_hokum.mp3; sourceTree = "<group>"; };
+		5E300000000000000000006E /* say_pass.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = say_pass.mp3; sourceTree = "<group>"; };
+		5E300000000000000000006F /* say_ashkal.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = say_ashkal.mp3; sourceTree = "<group>"; };
+		5E3000000000000000000070 /* say_double.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = say_double.mp3; sourceTree = "<group>"; };
+		5E3000000000000000000071 /* say_baloot.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = say_baloot.mp3; sourceTree = "<group>"; };
+		5E3000000000000000000072 /* say_sara.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = say_sara.mp3; sourceTree = "<group>"; };
+		5E3000000000000000000073 /* say_khamsin.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = say_khamsin.mp3; sourceTree = "<group>"; };
+		5E3000000000000000000074 /* say_miya.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = say_miya.mp3; sourceTree = "<group>"; };
+		5E3000000000000000000075 /* say_arba.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = say_arba.mp3; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -825,6 +845,16 @@
 				5E30000000000000000000C6 /* hand_end.wav */,
 				5E30000000000000000000C7 /* match_end.wav */,
 				5E30000000000000000000C8 /* your_turn.wav */,
+				5E3000000000000000000000 /* say_sunn.mp3 */,
+				5E300000000000000000006D /* say_hokum.mp3 */,
+				5E300000000000000000006E /* say_pass.mp3 */,
+				5E300000000000000000006F /* say_ashkal.mp3 */,
+				5E3000000000000000000070 /* say_double.mp3 */,
+				5E3000000000000000000071 /* say_baloot.mp3 */,
+				5E3000000000000000000072 /* say_sara.mp3 */,
+				5E3000000000000000000073 /* say_khamsin.mp3 */,
+				5E3000000000000000000074 /* say_miya.mp3 */,
+				5E3000000000000000000075 /* say_arba.mp3 */,
 			);
 			path = Sounds;
 			sourceTree = "<group>";
@@ -929,6 +959,16 @@
 				5E40000000000000000000C6 /* hand_end.wav in Resources */,
 				5E40000000000000000000C7 /* match_end.wav in Resources */,
 				5E40000000000000000000C8 /* your_turn.wav in Resources */,
+				5E4000000000000000000000 /* say_sunn.mp3 in Resources */,
+				5E400000000000000000006D /* say_hokum.mp3 in Resources */,
+				5E400000000000000000006E /* say_pass.mp3 in Resources */,
+				5E400000000000000000006F /* say_ashkal.mp3 in Resources */,
+				5E4000000000000000000070 /* say_double.mp3 in Resources */,
+				5E4000000000000000000071 /* say_baloot.mp3 in Resources */,
+				5E4000000000000000000072 /* say_sara.mp3 in Resources */,
+				5E4000000000000000000073 /* say_khamsin.mp3 in Resources */,
+				5E4000000000000000000074 /* say_miya.mp3 in Resources */,
+				5E4000000000000000000075 /* say_arba.mp3 in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

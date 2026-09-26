@@ -32,6 +32,20 @@ final class BalootSoundService: ObservableObject {
         case handEnd = "hand_end"
         case matchEnd = "match_end"
         case yourTurn = "your_turn"
+        // نداءات منطوقة (mp3) — صوت رجالي يعلن الحدث نفسه
+        case saySunn = "say_sunn"       // «صن»
+        case sayHokum = "say_hokum"     // «حكم»
+        case sayPass = "say_pass"       // «بس»
+        case sayAshkal = "say_ashkal"   // «أشكل»
+        case sayDouble = "say_double"   // «دبل»
+        case sayBaloot = "say_baloot"   // «بلوت»
+        case saySara = "say_sara"       // «سرا»
+        case sayKhamsin = "say_khamsin" // «خمسين»
+        case sayMiya = "say_miya"       // «مية»
+        case sayArba = "say_arba"       // «أربعمية»
+
+        /// النداءات المنطوقة mp3 والمؤثرات wav.
+        var fileExtension: String { rawValue.hasPrefix("say_") ? "mp3" : "wav" }
     }
 
     private static let muteKey = "baloot.soundMuted"
@@ -59,7 +73,7 @@ final class BalootSoundService: ObservableObject {
 
     private func preload() {
         for fx in Effect.allCases {
-            guard let url = Bundle.main.url(forResource: fx.rawValue, withExtension: "wav"),
+            guard let url = Bundle.main.url(forResource: fx.rawValue, withExtension: fx.fileExtension),
                   let player = try? AVAudioPlayer(contentsOf: url) else { continue }
             player.prepareToPlay()
             players[fx] = player

@@ -104,7 +104,7 @@ struct BalootTableView: View {
             Button {
                 sound.playTest()
             } label: {
-                Label(sound.loadedCount > 0 ? "تجربة الصوت" : "الأصوات غير محمّلة (\(sound.loadedCount)/8)",
+                Label(sound.loadedCount > 0 ? "تجربة الصوت" : "الأصوات غير محمّلة (\(sound.loadedCount)/\(BalootSoundService.Effect.allCases.count))",
                       systemImage: "speaker.badge.plus")
             }
             if vm.table?.isInMatch == true, vm.isSeated, vm.matchStatus == "active" {
