@@ -400,23 +400,27 @@ enum BalootLabels {
 
     /// سطر توجيهي لحدث بث — nil يعني «لا يُعرض» (أحداث داخلية).
     static func eventLine(_ ev: BalootWSEvent, seatName: (Int) -> String) -> String? {
-        let n = { (s: Int?) in s.map(seatName) ?? "؟" }
+        // نداءات مباشرة متزامنة فقط — seatName معامل non-escaping،
+        // فلا نلتقطه داخل closure ولا نمرره لـOptional.map.
+        var seat = "؟"
+        if let s = ev.seat { seat = seatName(s) }
         switch ev.type {
-        case "seat_taken": return "\(n(ev.seat)) جلس"
-        case "player_ready": return "\(n(ev.seat)) جاهز ✓"
+        case "seat_taken": return "\(seat) جلس"
+        case "player_ready": return "\(seat) جاهز ✓"
         case "table_full": return "اكتملت الطاولة — تأكيد الجاهزية"
-        case "bid": return ev.kind == "pass" ? "\(n(ev.seat)): بس" : nil
+        case "bid": return ev.kind == "pass" ? "\(seat): بس" : nil
         case "bidding_round2": return "بسّ الجميع — جولة ثانية"
         case "redeal": return "بسّ الجميع مرتين — إعادة توزيع"
         case "contract":
-            let buyer = ev.contract?.buyerSeat
-            return "\(n(buyer)) اشترى \(contract(ev.contract))"
-        case "baloot_announced": return "\(n(ev.seat)): بلوت! 🌟"
-        case "baloot_confirmed": return "بلوت \(n(ev.seat)) مُثبَت ✓"
+            var buyer = "؟"
+            if let b = ev.contract?.buyerSeat { buyer = seatName(b) }
+            return "\(buyer) اشترى \(contract(ev.contract))"
+        case "baloot_announced": return "\(seat): بلوت! 🌟"
+        case "baloot_confirmed": return "بلوت \(seat) مُثبَت ✓"
         case "hand_end": return "انتهت الصفقة"
         case "match_end": return "انتهت المباراة 🏁"
-        case "player_disconnected": return "\(n(ev.seat)) انقطع — بانتظار عودته"
-        case "player_reconnected": return "\(n(ev.seat)) عاد ✓"
+        case "player_disconnected": return "\(seat) انقطع — بانتظار عودته"
+        case "player_reconnected": return "\(seat) عاد ✓"
         case "match_paused": return "المباراة متوقفة مؤقتًا"
         case "match_resumed": return "استؤنفت المباراة"
         case "rematch_offer": return "مباراة ثانية؟ بانتظار موافقة الجميع"
