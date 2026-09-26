@@ -118,6 +118,14 @@ final class BalootTableViewModel: ObservableObject {
         case .table(let id, let events):
             guard id == tableId else { return }
             appendFeed(events)
+            // أحداث طاولة مسموعة خفيفة (ريماچ/اكتمال) — مرة واحدة لكل حدث
+            let sound = BalootSoundService.shared
+            for ev in events {
+                switch ev.type {
+                case "rematch_accepted", "rematch_declined", "table_full": sound.play(.select)
+                default: break
+                }
+            }
             // حدث طاولة ← أعد جلب العرض (اكتمال/جاهزية/ريماچ/بدء مباراة)
             Task { await reloadTable() }
         case .match(let mid, _, let events, let state, let paused, let status, let spectators):
@@ -149,11 +157,12 @@ final class BalootTableViewModel: ObservableObject {
         let sound = BalootSoundService.shared
         for ev in events {
             switch ev.type {
-            case "hand_started": sound.play(.deal)
+            case "hand_started", "redeal": sound.play(.deal)
             case "card_played", "auto_play": sound.play(.cardPlayed)
-            case "bid": sound.play(.select)
+            case "bid", "bidding_round2": sound.play(.select)
             case "contract_set": sound.play(.contract)
-            case "declaration_announced", "doubled", "baloot_announced": sound.play(.select)
+            case "declaration_announced", "declarations_revealed", "doubled",
+                 "baloot_announced", "baloot_confirmed": sound.play(.select)
             case "trick_won": sound.play(.trick)
             case "hand_scored": sound.play(.handEnd)
             case "match_ended": sound.play(.matchEnd)
