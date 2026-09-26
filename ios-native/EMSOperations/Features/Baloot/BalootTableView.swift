@@ -45,7 +45,7 @@ struct BalootTableView: View {
         content
             .emsPage("طاولة بلوت #\(tableId)")
             .toolbar {
-                ToolbarItem(group: .topBarTrailing) {
+                ToolbarItem(placement: .topBarTrailing) {
                     HStack(spacing: 14) {
                         connectionDot
                         if vm.table?.roomId != nil {
