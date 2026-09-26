@@ -44,6 +44,8 @@ final class BalootTableViewModel: ObservableObject {
     private var chatLastId = 0
     private var chatOpen = false
     private var subscribedMatchId: Int?
+    private var lastHandNumber = 0
+    private var wasMyTurn = false
 
     init(tableId: Int, socket: BalootSocket) {
         self.tableId = tableId
@@ -122,6 +124,7 @@ final class BalootTableViewModel: ObservableObject {
             guard mid == activeMatchId else { return }
             applyMatch(state, paused: paused, status: status, spectators: spectators)
             appendFeed(events)
+            playSounds(events: events, state: state)
             refreshOptionsIfNeeded()
         case .error(_, let code, let message):
             if let code, let message { appendFeedLine("تنبيه: \(message) (\(code))") }
@@ -137,6 +140,36 @@ final class BalootTableViewModel: ObservableObject {
         self.paused = paused
         if let status { matchStatus = status }
         if let spectators { self.spectators = spectators }
+    }
+
+    // MARK: - الأصوات (خفيفة — BalootSoundService، وكتم من إعدادات الطاولة)
+
+    /// تُستدعى مع كل بث مباراة: أصوات الأحداث + انتقال الدور إليّ + توزيع صفقة جديدة.
+    private func playSounds(events: [BalootWSEvent], state: BalootMatchStateDTO) {
+        let sound = BalootSoundService.shared
+        for ev in events {
+            switch ev.type {
+            case "hand_started": sound.play(.deal)
+            case "card_played", "auto_play": sound.play(.cardPlayed)
+            case "bid": sound.play(.select)
+            case "contract_set": sound.play(.contract)
+            case "declaration_announced", "doubled", "baloot_announced": sound.play(.select)
+            case "trick_won": sound.play(.trick)
+            case "hand_scored": sound.play(.handEnd)
+            case "match_ended": sound.play(.matchEnd)
+            default: break
+            }
+        }
+        // توزيع جديد وصل بلا حدث (لقطة بعد عودة اتصال مثلًا)
+        if let hn = state.handNumber, hn > lastHandNumber, lastHandNumber != 0 {
+            // لا صوت هنا — hand_started يغطي المسار الحي؛ اللقطة الصامتة لا تُزعج
+        }
+        if let hn = state.handNumber { lastHandNumber = hn }
+        // الدور انتقل إليّ الآن — تنبيه واضح غير مزعج
+        let myTurn = activeTurnSeat != nil && activeTurnSeat == mySeat
+        if myTurn && !wasMyTurn { sound.play(.yourTurn) }
+        else if !myTurn && wasMyTurn { /* انتقل الدور عني — tick خفيف يكفي من card_played */ }
+        wasMyTurn = myTurn
     }
 
     /// الخيارات تُجلب عند تغيّر الحالة وأنا جالس — الخادم يحسم ماذا يمكنني.
@@ -314,6 +347,27 @@ final class BalootTableViewModel: ObservableObject {
 
     var isSeated: Bool { mySeat != nil }
     var isSpectator: Bool { !isSeated }
+
+    /// مقعد الدور الحالي — مصدر واحد authoritative من حالة الخادم، حسب الطور:
+    /// السوق (bidding1/bidding2) → biddingTurn فقط · اللعب → turnSeat فقط ·
+    /// غير ذلك → لا أحد. لا OR بين الحقلين: الـprojection يرسلهما معًا،
+    /// وقراءتهما معًا تُضيء مقعدين (خلل مؤشر الدور المزدوج).
+    var activeTurnSeat: Int? {
+        guard let hand = matchState?.hand, matchStatus == "active", !paused else { return nil }
+        if hand.phase.hasPrefix("bidding") { return hand.biddingTurn }
+        if hand.phase == "playing" { return hand.turnSeat }
+        return nil
+    }
+
+    /// هل الدور عليّ الآن؟ مشتق من نفس المصدر الواحد — لا من options.
+    var isMyTurnNow: Bool { activeTurnSeat != nil && activeTurnSeat == mySeat }
+
+    /// مقعد العرض حول الطاولة: اللاعب يرى نفسه أسفل (0=أنا، 1=يمين، 2=شريك، 3=يسار)؛
+    /// المشاهد يرى المقاعد المطلقة ثابتة كما هي (بلا إعادة تدوير).
+    func displaySeat(relative: Int) -> Int {
+        guard let mySeat else { return relative }
+        return (mySeat + relative) % 4
+    }
 
     /// المقعد النسبي: 0=أنا، 1=يمين، 2=شريكي (مقابل)، 3=يسار.
     func absoluteSeat(relative: Int) -> Int? {

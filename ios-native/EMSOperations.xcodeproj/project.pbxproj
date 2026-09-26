@@ -125,6 +125,15 @@
 		5E40000000000000000000B5 /* BalootLobbyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000B5 /* BalootLobbyView.swift */; };
 		5E40000000000000000000B6 /* BalootTableViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000B6 /* BalootTableViewModel.swift */; };
 		5E40000000000000000000B7 /* BalootTableView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000B7 /* BalootTableView.swift */; };
+		5E40000000000000000000B8 /* BalootSoundService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000B8 /* BalootSoundService.swift */; };
+		5E40000000000000000000C1 /* deal.wav in Resources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000C1 /* deal.wav */; };
+		5E40000000000000000000C2 /* card.wav in Resources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000C2 /* card.wav */; };
+		5E40000000000000000000C3 /* select.wav in Resources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000C3 /* select.wav */; };
+		5E40000000000000000000C4 /* contract.wav in Resources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000C4 /* contract.wav */; };
+		5E40000000000000000000C5 /* trick.wav in Resources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000C5 /* trick.wav */; };
+		5E40000000000000000000C6 /* hand_end.wav in Resources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000C6 /* hand_end.wav */; };
+		5E40000000000000000000C7 /* match_end.wav in Resources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000C7 /* match_end.wav */; };
+		5E40000000000000000000C8 /* your_turn.wav in Resources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000C8 /* your_turn.wav */; };
 		5E40000000000000000000F0 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000F0 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
@@ -262,6 +271,15 @@
 		5E30000000000000000000B5 /* BalootLobbyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalootLobbyView.swift; sourceTree = "<group>"; };
 		5E30000000000000000000B6 /* BalootTableViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalootTableViewModel.swift; sourceTree = "<group>"; };
 		5E30000000000000000000B7 /* BalootTableView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalootTableView.swift; sourceTree = "<group>"; };
+		5E30000000000000000000B8 /* BalootSoundService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalootSoundService.swift; sourceTree = "<group>"; };
+		5E30000000000000000000C1 /* deal.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = deal.wav; sourceTree = "<group>"; };
+		5E30000000000000000000C2 /* card.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = card.wav; sourceTree = "<group>"; };
+		5E30000000000000000000C3 /* select.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = select.wav; sourceTree = "<group>"; };
+		5E30000000000000000000C4 /* contract.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = contract.wav; sourceTree = "<group>"; };
+		5E30000000000000000000C5 /* trick.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = trick.wav; sourceTree = "<group>"; };
+		5E30000000000000000000C6 /* hand_end.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = hand_end.wav; sourceTree = "<group>"; };
+		5E30000000000000000000C7 /* match_end.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = match_end.wav; sourceTree = "<group>"; };
+		5E30000000000000000000C8 /* your_turn.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = your_turn.wav; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -515,6 +533,7 @@
 				5E30000000000000000000B5 /* BalootLobbyView.swift */,
 				5E30000000000000000000B6 /* BalootTableViewModel.swift */,
 				5E30000000000000000000B7 /* BalootTableView.swift */,
+				5E30000000000000000000B8 /* BalootSoundService.swift */,
 			);
 			path = Baloot;
 			sourceTree = "<group>";
@@ -790,8 +809,24 @@
 				5E30000000000000000000F0 /* Assets.xcassets */,
 				5E30000000000000000000F1 /* Info.plist */,
 				5E30000000000000000000F2 /* EMSOperations.entitlements */,
+				5E2000000000000000000069 /* Sounds */,
 			);
 			path = Resources;
+			sourceTree = "<group>";
+		};
+		5E2000000000000000000069 /* Sounds */ = {
+			isa = PBXGroup;
+			children = (
+				5E30000000000000000000C1 /* deal.wav */,
+				5E30000000000000000000C2 /* card.wav */,
+				5E30000000000000000000C3 /* select.wav */,
+				5E30000000000000000000C4 /* contract.wav */,
+				5E30000000000000000000C5 /* trick.wav */,
+				5E30000000000000000000C6 /* hand_end.wav */,
+				5E30000000000000000000C7 /* match_end.wav */,
+				5E30000000000000000000C8 /* your_turn.wav */,
+			);
+			path = Sounds;
 			sourceTree = "<group>";
 		};
 		5E2000000000000000000040 /* EMSOperationsTests */ = {
@@ -886,6 +921,14 @@
 			buildActionMask = 2147483647;
 			files = (
 				5E40000000000000000000F0 /* Assets.xcassets in Resources */,
+				5E40000000000000000000C1 /* deal.wav in Resources */,
+				5E40000000000000000000C2 /* card.wav in Resources */,
+				5E40000000000000000000C3 /* select.wav in Resources */,
+				5E40000000000000000000C4 /* contract.wav in Resources */,
+				5E40000000000000000000C5 /* trick.wav in Resources */,
+				5E40000000000000000000C6 /* hand_end.wav in Resources */,
+				5E40000000000000000000C7 /* match_end.wav in Resources */,
+				5E40000000000000000000C8 /* your_turn.wav in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1019,6 +1062,7 @@
 				5E40000000000000000000B5 /* BalootLobbyView.swift in Sources */,
 				5E40000000000000000000B6 /* BalootTableViewModel.swift in Sources */,
 				5E40000000000000000000B7 /* BalootTableView.swift in Sources */,
+				5E40000000000000000000B8 /* BalootSoundService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -411,19 +411,17 @@ enum BalootLabels {
         case "bid": return ev.kind == "pass" ? "\(seat): بس" : nil
         case "bidding_round2": return "بسّ الجميع — جولة ثانية"
         case "redeal": return "بسّ الجميع مرتين — إعادة توزيع"
-        case "contract":
+        case "contract_set":
             var buyer = "؟"
             if let b = ev.contract?.buyerSeat { buyer = seatName(b) }
             return "\(buyer) اشترى \(contract(ev.contract))"
         case "baloot_announced": return "\(seat): بلوت! 🌟"
         case "baloot_confirmed": return "بلوت \(seat) مُثبَت ✓"
-        case "hand_end": return "انتهت الصفقة"
-        case "match_end": return "انتهت المباراة 🏁"
+        case "hand_scored": return "انتهت الصفقة"
+        case "match_ended": return "انتهت المباراة 🏁"
         case "player_disconnected": return "\(seat) انقطع — بانتظار عودته"
         case "player_reconnected": return "\(seat) عاد ✓"
-        case "match_paused": return "المباراة متوقفة مؤقتًا"
-        case "match_resumed": return "استؤنفت المباراة"
-        case "rematch_offer": return "مباراة ثانية؟ بانتظار موافقة الجميع"
+        case "rematch_offered": return "مباراة ثانية؟ بانتظار موافقة الجميع"
         case "rematch_declined": return "أُلغي الريماچ — انتهت الجلسة"
         default: return nil
         }

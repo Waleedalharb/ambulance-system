@@ -2,11 +2,12 @@
 //  BalootTableView.swift
 //  EMSOperations
 //
-//  شاشة الطاولة — تجربة اللعب الكاملة:
-//   أربعة مقاعد (الشريك مقابلك) · اليد الكبيرة المريحة للمس · السوق
-//   (الخيارات المتاحة فقط) · اللعب واللفة · النقاط الفورية · المشاريع
-//   والبلوت والدبل · النهاية والريماچ (موافقة الأربعة/رفض واحد يلغي)
-//   · المشاهدة الصامتة بلا أيدٍ · سالفة الطاولة · حالة الاتصال والعودة.
+//  شاشة الطاولة — تجربة «أنا جالس على طاولة بلوت» وليست لوحة معلومات:
+//   طاولة لباد مركزية بإطار ذهبي · اللاعبون حولها (الشريك مقابلك) ·
+//   مؤشر دور واحد authoritative (لا يضيء إلا مقعدًا واحدًا) · يد كبيرة
+//   مريحة للمس · السوق والمشاريع والدبلات من /options فقط · النهاية
+//   والريماچ · المشاهدة بلا أيدٍ · سالفة الطاولة · أصوات خفيفة تُكتم
+//   من قائمة الإعدادات.
 //
 //  الواجهة لا تعرف قواعد البلوت — تعرض ما يرسله الخادم وتفعّل ما يعيده
 //  /options فقط. الممنوع غير قابل للضغط أصلًا.
@@ -20,6 +21,7 @@ struct BalootTableView: View {
     @StateObject private var vm: BalootTableViewModel
     /// القناة يملكها اللوبي وتبقى حية داخل الطاولة — نراقبها هنا للعرض فقط.
     @ObservedObject private var socket: BalootSocket
+    @ObservedObject private var sound = BalootSoundService.shared
     @State private var showChat = false
     @State private var chatDraft = ""
     @State private var confirmLeave = false
@@ -41,6 +43,13 @@ struct BalootTableView: View {
         return vm.rematch?.accepts?.contains(myId) ?? false
     }
 
+    // MARK: - ألوان الطاولة (هوية المنصة + لباد البلوت)
+
+    private let feltTop = Color(red: 0.09, green: 0.30, blue: 0.20)
+    private let feltBottom = Color(red: 0.04, green: 0.18, blue: 0.12)
+    private let feltRim = Color(red: 0.78, green: 0.62, blue: 0.28) // إطار ذهبي هادئ
+    private let podColor = Color(red: 0.03, green: 0.12, blue: 0.09)
+
     var body: some View {
         content
             .emsPage("طاولة بلوت #\(tableId)")
@@ -55,6 +64,18 @@ struct BalootTableView: View {
                             }
                             .accessibilityLabel("سالفة الطاولة")
                         }
+                        Menu {
+                            Button {
+                                sound.toggleMuted()
+                            } label: {
+                                Label(sound.isMuted ? "تشغيل الأصوات" : "كتم الأصوات",
+                                      systemImage: sound.isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
+                            }
+                        } label: {
+                            Image(systemName: "ellipsis.circle")
+                                .foregroundStyle(EMSTheme.Colors.teal)
+                        }
+                        .accessibilityLabel("إعدادات الطاولة")
                     }
                 }
             }
@@ -206,7 +227,7 @@ struct BalootTableView: View {
     private func matchSection(_ table: BalootLobbyTableDTO) -> some View {
         VStack(spacing: EMSTheme.spacing) {
             scoresBar
-            tableBoard
+            feltTable
             if vm.paused { pausedBanner }
             if vm.isSpectator { spectatorNote }
             actionsSection
@@ -214,18 +235,18 @@ struct BalootTableView: View {
         }
     }
 
-    /// شريط النقاط: فريقنا/فريقهم + رقم الصفقة + المشاهدون.
+    /// شريط النقاط: فريقنا/فريقهم حسب مقعدي (المشاهد يرى A/B) + العقد والصفقة.
     private var scoresBar: some View {
-        EMSCard {
+        let myTeam = vm.matchState?.seats?.first(where: { $0.seat == vm.mySeat })?.team
+        let scoreA = vm.matchState?.scores?.A ?? 0
+        let scoreB = vm.matchState?.scores?.B ?? 0
+        let ours = myTeam == "B" ? scoreB : scoreA
+        let theirs = myTeam == "B" ? scoreA : scoreB
+        return EMSCard {
             HStack {
-                VStack(spacing: 2) {
-                    Text("فريق A")
-                        .font(.caption)
-                        .foregroundStyle(EMSTheme.Colors.textMuted)
-                    Text("\(vm.matchState?.scores?.A ?? 0)")
-                        .font(.title2.weight(.bold))
-                        .foregroundStyle(EMSTheme.Colors.emerald)
-                }
+                scoreChip(title: myTeam == nil ? "فريق A" : "لنا",
+                          score: myTeam == nil ? scoreA : ours,
+                          color: EMSTheme.Colors.emerald)
                 Spacer()
                 VStack(spacing: 2) {
                     if let c = vm.matchState?.hand?.contract {
@@ -243,14 +264,9 @@ struct BalootTableView: View {
                     }
                 }
                 Spacer()
-                VStack(spacing: 2) {
-                    Text("فريق B")
-                        .font(.caption)
-                        .foregroundStyle(EMSTheme.Colors.textMuted)
-                    Text("\(vm.matchState?.scores?.B ?? 0)")
-                        .font(.title2.weight(.bold))
-                        .foregroundStyle(EMSTheme.Colors.danger)
-                }
+                scoreChip(title: myTeam == nil ? "فريق B" : "لهم",
+                          score: myTeam == nil ? scoreB : theirs,
+                          color: EMSTheme.Colors.danger)
             }
             .overlay(alignment: .bottom) {
                 if vm.spectators > 0 {
@@ -263,87 +279,150 @@ struct BalootTableView: View {
         }
     }
 
-    /// لوحة الطاولة: الشريك أعلى، الخصمان يمين/يسار، أنا أسفل — والوسط للّفة.
-    private var tableBoard: some View {
-        EMSCard {
-            VStack(spacing: 10) {
-                boardSeat(relative: 2) // الشريك
-                HStack {
-                    boardSeat(relative: 1) // يميني (RTL: أول عنصر يمين)
-                    Spacer()
-                    centerArea
-                    Spacer()
-                    boardSeat(relative: 3) // يساري
-                }
-                boardSeat(relative: 0) // أنا
-            }
+    private func scoreChip(title: String, score: Int, color: Color) -> some View {
+        VStack(spacing: 2) {
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(EMSTheme.Colors.textMuted)
+            Text("\(score)")
+                .font(.title2.weight(.bold))
+                .foregroundStyle(color)
         }
     }
 
-    @ViewBuilder
-    private func boardSeat(relative: Int) -> some View {
-        if let abs = vm.absoluteSeat(relative: relative) {
-            let info = vm.matchState?.seats?.first(where: { $0.seat == abs })
-            let isTurn = vm.matchState?.hand?.turnSeat == abs || vm.matchState?.hand?.biddingTurn == abs
-            let count = vm.matchState?.hand?.handCounts?[String(abs)] ?? 0
-            VStack(spacing: 4) {
-                Text(relative == 0 ? "أنت" : (info?.name ?? "مقعد \(abs + 1)"))
-                    .font(.caption.weight(isTurn ? .bold : .regular))
-                    .foregroundStyle(isTurn ? EMSTheme.Colors.warning : EMSTheme.Colors.textSecondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-                if relative != 0 {
-                    HStack(spacing: 2) {
-                        ForEach(0..<min(count, 8), id: \.self) { _ in
-                            RoundedRectangle(cornerRadius: 2)
-                                .fill(EMSTheme.Colors.navySoft)
-                                .overlay(RoundedRectangle(cornerRadius: 2).stroke(EMSTheme.Colors.teal.opacity(0.5), lineWidth: 0.5))
-                                .frame(width: 10, height: 15)
-                        }
-                    }
-                }
-                if isTurn {
-                    Text("الدور عليه")
-                        .font(.caption2.weight(.bold))
-                        .foregroundStyle(EMSTheme.Colors.warning)
-                }
+    // MARK: - الطاولة (اللباد المركزي)
+
+    /// طاولة اللباد: الشريك أعلى، الخصمان يمين/يسار، أنا أسفل — والوسط للّفة.
+    private var feltTable: some View {
+        VStack(spacing: 6) {
+            seatPod(relative: 2) // الشريك مقابلي
+            HStack(alignment: .center, spacing: 4) {
+                seatPod(relative: 1) // يميني (RTL: أول عنصر يمين)
+                    .frame(width: 86)
+                centerStage
+                    .frame(maxWidth: .infinity)
+                seatPod(relative: 3) // يساري
+                    .frame(width: 86)
             }
-            .padding(8)
-            .background(isTurn ? EMSTheme.Colors.warning.opacity(0.10) : Color.clear)
-            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            seatPod(relative: 0) // أنا (أو المقعد 0 للمشاهد)
         }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 14)
+        .background(
+            LinearGradient(colors: [feltTop, feltBottom], startPoint: .top, endPoint: .bottom)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .stroke(feltRim.opacity(0.8), lineWidth: 3)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .stroke(feltRim.opacity(0.25), lineWidth: 1)
+                .padding(6)
+        )
+        .shadow(color: .black.opacity(0.45), radius: 12, y: 6)
     }
 
-    /// الوسط: الورقة المكشوفة أثناء السوق، واللفة الحالية أثناء اللعب.
+    /// مقعد لاعب حول الطاولة — الاسم + مروحة ظهور الأوراق + توهّج الدور.
+    /// مؤشر الدور من vm.activeTurnSeat فقط (مصدر واحد — لا يضيء مقعدان أبدًا).
+    private func seatPod(relative: Int) -> some View {
+        let seat = vm.displaySeat(relative: relative)
+        let isTurn = vm.activeTurnSeat == seat
+        let count = vm.matchState?.hand?.handCounts?[String(seat)] ?? 0
+        let disconnected = vm.matchState?.hand == nil ? false : false // الانقطاع يظهر عبر بانر الإيقاف
+        let name = seatShortName(seat)
+        return VStack(spacing: 4) {
+            Text(name)
+                .font(.caption.weight(isTurn ? .bold : .semibold))
+                .foregroundStyle(isTurn ? EMSTheme.Colors.warning : EMSTheme.Colors.textPrimary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.65)
+            if relative != 0 || vm.isSpectator {
+                cardBackFan(count: count)
+            }
+            if isTurn {
+                Text("الدور عليه")
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(EMSTheme.Colors.warning)
+            }
+            if disconnected {
+                Text("منقطع")
+                    .font(.caption2)
+                    .foregroundStyle(EMSTheme.Colors.danger)
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 7)
+        .background(podColor.opacity(isTurn ? 0.95 : 0.75))
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(isTurn ? EMSTheme.Colors.warning : feltRim.opacity(0.25),
+                        lineWidth: isTurn ? 2 : 1)
+        )
+        .shadow(color: isTurn ? EMSTheme.Colors.warning.opacity(0.45) : .clear,
+                radius: isTurn ? 10 : 0)
+        .animation(.easeInOut(duration: 0.3), value: isTurn)
+    }
+
+    /// مروحة ظهور أوراق صغيرة بعدد أوراق اللاعب.
+    private func cardBackFan(count: Int) -> some View {
+        let shown = min(count, 8)
+        return HStack(spacing: -6) {
+            ForEach(0..<shown, id: \.self) { i in
+                RoundedRectangle(cornerRadius: 3, style: .continuous)
+                    .fill(LinearGradient(colors: [Color(red: 0.16, green: 0.24, blue: 0.45),
+                                                  Color(red: 0.10, green: 0.15, blue: 0.30)],
+                                         startPoint: .top, endPoint: .bottom))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 3, style: .continuous)
+                            .stroke(feltRim.opacity(0.5), lineWidth: 0.5)
+                    )
+                    .frame(width: 14, height: 20)
+                    .rotationEffect(.degrees(Double(i - shown / 2) * 4))
+                    .zIndex(Double(i))
+            }
+        }
+        .frame(height: 24)
+    }
+
+    /// وسط الطاولة: الورقة المكشوفة أثناء السوق، واللفة الحالية أثناء اللعب.
     @ViewBuilder
-    private var centerArea: some View {
+    private var centerStage: some View {
         let hand = vm.matchState?.hand
         VStack(spacing: 6) {
             if let hand, hand.phase.hasPrefix("bidding"), let faceUp = hand.faceUpCard {
                 Text("الورقة المكشوفة")
                     .font(.caption2)
-                    .foregroundStyle(EMSTheme.Colors.textMuted)
+                    .foregroundStyle(Color.white.opacity(0.6))
                 cardView(faceUp, size: .medium, enabled: false)
+                    .shadow(color: .black.opacity(0.4), radius: 6, y: 3)
             } else if let trick = hand?.currentTrick, !trick.isEmpty {
-                HStack(spacing: 6) {
+                HStack(spacing: 10) {
                     ForEach(trick, id: \.seat) { play in
-                        VStack(spacing: 2) {
+                        VStack(spacing: 3) {
                             cardView(play.card, size: .small, enabled: false)
+                                .rotationEffect(.degrees(playAngle(for: play.seat)))
+                                .shadow(color: .black.opacity(0.4), radius: 4, y: 2)
                             Text(seatShortName(play.seat))
                                 .font(.caption2)
-                                .foregroundStyle(EMSTheme.Colors.textMuted)
+                                .foregroundStyle(Color.white.opacity(0.65))
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.7)
                         }
                     }
                 }
+                .padding(.vertical, 4)
             } else {
                 Image(systemName: "suit.spade.fill")
-                    .font(.title)
-                    .foregroundStyle(EMSTheme.Colors.teal.opacity(0.4))
+                    .font(.largeTitle)
+                    .foregroundStyle(Color.white.opacity(0.12))
             }
             if let last = hand?.lastTrick, hand?.currentTrick?.isEmpty != false {
                 Text("اللفة السابقة: \(seatShortName(last.winnerSeat))")
                     .font(.caption2)
-                    .foregroundStyle(EMSTheme.Colors.textMuted)
+                    .foregroundStyle(Color.white.opacity(0.6))
             }
             // المشاريع المكشوفة بعد الحسم
             if let decl = hand?.declarations, decl.resolved, let projects = decl.projects, !projects.isEmpty {
@@ -361,12 +440,21 @@ struct BalootTableView: View {
                     .foregroundStyle(EMSTheme.Colors.warning)
             }
         }
-        .frame(minWidth: 120, minHeight: 90)
+        .frame(minHeight: 110)
+        .frame(maxWidth: .infinity)
+        .background(Color.black.opacity(0.12))
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(feltRim.opacity(0.2), lineWidth: 1)
+        )
     }
 
-    private func seatShortName(_ seat: Int) -> String {
-        if seat == vm.mySeat { return "أنت" }
-        return vm.matchState?.seats?.first(where: { $0.seat == seat })?.name ?? "م\(seat + 1)"
+    /// ميلان بصري بسيط لورقة اللفة حسب جهة مقعد صاحبها مني.
+    private func playAngle(for seat: Int) -> Double {
+        guard let mySeat = vm.mySeat else { return [0, -6, 0, 6][seat % 4] }
+        let rel = (seat - mySeat + 4) % 4
+        return [0, -8, 0, 8][rel]
     }
 
     private var pausedBanner: some View {
@@ -476,8 +564,8 @@ struct BalootTableView: View {
                     }
                 }
 
-                // دوري في اللعب — توجيه واضح
-                if opts.phase == "playing" && opts.myTurn {
+                // دوري في اللعب — توجيه واضح (من نفس مصدر الدور الواحد)
+                if vm.isMyTurnNow, opts.phase == "playing" {
                     Text("🎯 دورك — اضغط ورقة من يدك بالأسفل")
                         .font(.subheadline.weight(.bold))
                         .foregroundStyle(EMSTheme.Colors.warning)
@@ -509,27 +597,27 @@ struct BalootTableView: View {
     @ViewBuilder
     private var myHandSection: some View {
         if vm.isSeated, let hand = vm.matchState?.hand, let myHand = hand.myHand {
-            EMSCard {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Text("يدك (\(myHand.count))")
-                            .font(EMSTheme.headlineArabic)
-                            .foregroundStyle(EMSTheme.Colors.textPrimary)
-                        Spacer()
-                        if let turnSeat = hand.turnSeat, turnSeat == vm.mySeat, hand.phase == "playing" {
-                            Text("دورك")
-                                .font(.caption.weight(.bold))
-                                .foregroundStyle(EMSTheme.Colors.warning)
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text("يدك (\(myHand.count))")
+                        .font(EMSTheme.headlineArabic)
+                        .foregroundStyle(EMSTheme.Colors.textPrimary)
+                    Spacer()
+                    if vm.isMyTurnNow, hand.phase == "playing" {
+                        Text("دورك")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(EMSTheme.Colors.warning)
+                    }
+                }
+                .padding(.horizontal, 4)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 10) {
+                        ForEach(myHand, id: \.code) { card in
+                            cardButton(card)
                         }
                     }
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 8) {
-                            ForEach(myHand, id: \.code) { card in
-                                cardButton(card)
-                            }
-                        }
-                        .padding(.vertical, 4)
-                    }
+                    .padding(.vertical, 10)
+                    .padding(.horizontal, 4)
                 }
             }
             .confirmationDialog("بلوت مع هذه الورقة؟", isPresented: Binding(
@@ -555,13 +643,17 @@ struct BalootTableView: View {
             else if allowed { Task { await vm.playCard(card.code, baloot: false) } }
         } label: {
             cardView(card, size: .large, enabled: allowed || !playing)
+                .offset(y: allowed ? -8 : 0)
+                .shadow(color: allowed ? EMSTheme.Colors.teal.opacity(0.5) : .clear,
+                        radius: allowed ? 8 : 0)
+                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: allowed)
         }
         .disabled(!allowed)
         .overlay(alignment: .top) {
             if canBaloot {
                 Text("🌟")
                     .font(.caption)
-                    .offset(y: -6)
+                    .offset(y: -12)
             }
         }
     }
@@ -571,16 +663,16 @@ struct BalootTableView: View {
     private enum CardSize { case small, medium, large
         var dims: (CGFloat, CGFloat) {
             switch self {
-            case .small: return (36, 52)
-            case .medium: return (48, 68)
-            case .large: return (54, 78) // كبيرة ومريحة للمس
+            case .small: return (42, 60)
+            case .medium: return (54, 78)
+            case .large: return (62, 90) // كبيرة ومريحة للمس
             }
         }
         var font: Font {
             switch self {
-            case .small: return .caption.weight(.bold)
-            case .medium: return .subheadline.weight(.bold)
-            case .large: return .body.weight(.bold)
+            case .small: return .subheadline.weight(.bold)
+            case .medium: return .body.weight(.bold)
+            case .large: return .title3.weight(.bold)
             }
         }
     }
@@ -596,8 +688,8 @@ struct BalootTableView: View {
         .foregroundStyle(card.isRed ? Color(red: 0.85, green: 0.22, blue: 0.22) : Color.black)
         .frame(width: w, height: h)
         .background(Color.white)
-        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.black.opacity(0.2), lineWidth: 0.5))
+        .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 9).stroke(Color.black.opacity(0.2), lineWidth: 0.5))
         .opacity(enabled ? 1 : 0.35)
         .shadow(color: .black.opacity(0.25), radius: 2, y: 1)
     }
@@ -701,11 +793,10 @@ struct BalootTableView: View {
                         }
                     }
                 }
-
                 HStack(spacing: 8) {
                     TextField("اكتب رسالتك…", text: $chatDraft, axis: .vertical)
-                        .lineLimit(1...3)
-                        .padding(.horizontal, 12).padding(.vertical, 8)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
                         .background(EMSTheme.Colors.navySoft)
                         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                     Button {
@@ -729,7 +820,6 @@ struct BalootTableView: View {
             .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbarBackground(EMSTheme.Colors.navy, for: .navigationBar)
         }
-        .presentationDetents([.medium, .large])
     }
 
     private func chatBubble(_ msg: BalootChatMessageDTO) -> some View {
@@ -738,33 +828,34 @@ struct BalootTableView: View {
             VStack(alignment: .leading, spacing: 3) {
                 if !msg.mine {
                     Text(msg.author.displayName)
-                        .font(.caption2.weight(.bold))
+                        .font(.caption2.weight(.semibold))
                         .foregroundStyle(EMSTheme.Colors.teal)
                 }
                 Text(msg.content)
                     .font(EMSTheme.bodyArabic)
                     .foregroundStyle(EMSTheme.Colors.textPrimary)
             }
-            .padding(.horizontal, 12).padding(.vertical, 8)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
             .background(msg.mine ? EMSTheme.Colors.teal.opacity(0.25) : EMSTheme.Colors.card)
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             if !msg.mine { Spacer(minLength: 40) }
         }
     }
 
-    // MARK: - حالة الاتصال
+    // MARK: - مؤشر الاتصال
 
     private var connectionDot: some View {
         Group {
             switch socket.connection {
             case .connected:
                 Circle().fill(EMSTheme.Colors.emerald).frame(width: 9, height: 9)
-            case .connecting, .reconnecting:
-                ProgressView().scaleEffect(0.6).frame(width: 12, height: 12)
-            case .disconnected:
+            case .connecting:
+                ProgressView().controlSize(.mini)
+            default:
                 Circle().fill(EMSTheme.Colors.danger).frame(width: 9, height: 9)
             }
         }
-        .accessibilityLabel("حالة الاتصال اللحظي")
+        .accessibilityLabel("حالة الاتصال")
     }
 }
