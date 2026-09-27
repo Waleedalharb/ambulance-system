@@ -2,16 +2,16 @@
 //  BalootTableView.swift
 //  EMSOperations
 //
-//  شاشة الطاولة — «أنا جالس على طاولة بلوت» وليست لوحة معلومات:
-//   أثناء المباراة تصبح الشاشة كلها الطاولة: لباد يملأ الشاشة بإطار ذهبي،
-//   اللاعبون حولها (الشريك مقابلك، الخصمان يمينك ويسارك)، الأوراق الملعوبة
-//   تظهر في المركز باتجاه صاحبها، يدك مروحة كبيرة أسفل الشاشة، النقاط
-//   شريط رفيع أنيق داخل الإطار، ومؤشر الدور توهّج ذهبي واحد لا يضيء
-//   إلا مقعدًا واحدًا (vm.activeTurnSeat — مصدر authoritative وحيد).
+//  شاشة الطاولة — «مجلس سعودي فاخر + طاولة بلوت حقيقية + هوية قطاع جنوب الرياض»:
+//   أثناء المباراة تصبح الشاشة مشهد مجلس: خلفية دافئة داكنة، وطاولة لباد
+//   بإطار خشبي وحواف ذهبية، وعلامة «قطاع جنوب الرياض · EMS» مائية داخل اللباد
+//   (نبض ECG + نص — ويُستبدل لاحقًا برمز القطاع الرسمي). اللاعبون حول الطاولة
+//   بمقاعد داكنة، وصاحب الدور يتوهج بتوهج ذهبي ناعم واحد (vm.activeTurnSeat —
+//   مصدر authoritative وحيد). الأوراق كريمية معتمة 100% كأنها ورق حقيقي على
+//   الطاولة، والرتب بأسمائها البلوتية (شايب/بنت/ولد/إكّه).
 //
 //  الواجهة لا تعرف قواعد البلوت — تعرض ما يرسله الخادم وتفعّل ما يعيده
-//  /options فقط. الممنوع غير قابل للضغط أصلًا. الصوت من BalootSoundService
-//  (AVAudioPlayer — يعمل دائمًا، والكتم من قائمة الطاولة فقط).
+//  /options فقط. لا تغيير في أي منطق لعب أو صوت أو أحداث — UI فقط.
 //
 
 import SwiftUI
@@ -44,12 +44,17 @@ struct BalootTableView: View {
         return vm.rematch?.accepts?.contains(myId) ?? false
     }
 
-    // MARK: - ألوان الطاولة (هوية المنصة + لباد البلوت)
+    // MARK: - ألوان المجلس والطاولة (هوية المنصة + فخامة المجلس السعودي)
 
-    private let feltTop = Color(red: 0.10, green: 0.34, blue: 0.23)
-    private let feltBottom = Color(red: 0.03, green: 0.15, blue: 0.10)
+    private let feltTop = Color(red: 0.07, green: 0.28, blue: 0.18)
+    private let feltBottom = Color(red: 0.03, green: 0.14, blue: 0.09)
     private let gold = Color(red: 0.82, green: 0.66, blue: 0.32)
-    private let podColor = Color(red: 0.03, green: 0.11, blue: 0.08)
+    private let podColor = Color(red: 0.05, green: 0.09, blue: 0.08)
+    private let woodTop = Color(red: 0.20, green: 0.13, blue: 0.08)
+    private let woodBottom = Color(red: 0.10, green: 0.06, blue: 0.04)
+    private let cream = Color(red: 0.98, green: 0.965, blue: 0.92)
+    private let majlisTop = Color(red: 0.14, green: 0.08, blue: 0.06)
+    private let majlisBottom = Color(red: 0.03, green: 0.02, blue: 0.02)
 
     var body: some View {
         content
@@ -125,7 +130,7 @@ struct BalootTableView: View {
     @ViewBuilder
     private var content: some View {
         if let table = vm.table, table.isInMatch {
-            // أثناء المباراة: الشاشة كلها هي الطاولة — بلا تمرير وبلا بطاقات.
+            // أثناء المباراة: الشاشة كلها مشهد المجلس — بلا تمرير وبلا بطاقات.
             matchScreen(table)
         } else {
             ScrollView {
@@ -241,44 +246,75 @@ struct BalootTableView: View {
         return table.createdBy == me.id
     }
 
-    // MARK: - شاشة المباراة (الشاشة = الطاولة)
+    // MARK: - شاشة المباراة (مشهد المجلس)
 
     private func matchScreen(_ table: BalootLobbyTableDTO) -> some View {
-        VStack(spacing: 0) {
-            scoreStrip
-            if let err = vm.actionError {
-                Text(err)
-                    .font(.caption2)
-                    .foregroundStyle(EMSTheme.Colors.danger)
-                    .lineLimit(1)
-                    .padding(.top, 2)
-                    .onTapGesture { vm.actionError = nil }
+        ZStack {
+            // خلفية المجلس: دفء داكن مع تظليل محيطي يُبرز الطاولة
+            majlisBackdrop
+
+            VStack(spacing: 0) {
+                scoreStrip
+                if let err = vm.actionError {
+                    Text(err)
+                        .font(.caption2)
+                        .foregroundStyle(EMSTheme.Colors.danger)
+                        .lineLimit(1)
+                        .padding(.top, 2)
+                        .onTapGesture { vm.actionError = nil }
+                }
+                if vm.paused { pausedCapsule }
+                if vm.isSpectator { spectatorCapsule }
+                lastEventLine
+                framedTable
+                    .frame(maxHeight: .infinity)
+                meBar
+                actionChips
+                handFan
             }
-            if vm.paused { pausedCapsule }
-            if vm.isSpectator { spectatorCapsule }
-            lastEventLine
-            tableArena
-                .frame(maxHeight: .infinity)
-            meBar
-            actionChips
-            handFan
+            .padding(.horizontal, 10)
+            .padding(.bottom, 4)
         }
-        .padding(.horizontal, 8)
-        .padding(.bottom, 4)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(
-            LinearGradient(colors: [feltTop, feltBottom], startPoint: .top, endPoint: .bottom)
-                .ignoresSafeArea()
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 26, style: .continuous)
-                .stroke(gold.opacity(0.55), lineWidth: 2)
-                .padding(6)
-                .ignoresSafeArea(.keyboard)
-        )
     }
 
-    /// شريط النقاط الرفيع داخل إطار الطاولة: لنا/لهم + العقد والصفقة + المشاهدون.
+    /// خلفية المجلس السعودي الدافئة (تدرج عنبري غامق + فينييت) — إيحاء السدو
+    /// والإضاءة الدافئة دون صورة فوتوغرافية.
+    private var majlisBackdrop: some View {
+        ZStack {
+            LinearGradient(colors: [majlisTop, majlisBottom], startPoint: .top, endPoint: .bottom)
+            RadialGradient(colors: [Color(red: 0.55, green: 0.35, blue: 0.15).opacity(0.16), .clear],
+                           center: .top, startRadius: 10, endRadius: 420)
+            RadialGradient(colors: [.clear, .black.opacity(0.55)],
+                           center: .center, startRadius: 200, endRadius: 620)
+        }
+        .ignoresSafeArea()
+    }
+
+    /// الطاولة المؤطرة: إطار خشبي داكن + حافة ذهبية + لباد أخضر فاخر.
+    private var framedTable: some View {
+        tableArena
+            .padding(12)
+            .background(
+                LinearGradient(colors: [feltTop, feltBottom], startPoint: .top, endPoint: .bottom)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .stroke(gold.opacity(0.55), lineWidth: 1.5)
+            )
+            .padding(7) // سماكة الإطار الخشبي
+            .background(
+                LinearGradient(colors: [woodTop, woodBottom], startPoint: .top, endPoint: .bottom)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 28, style: .continuous)
+                    .stroke(gold.opacity(0.35), lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(0.6), radius: 18, y: 10)
+    }
+
+    /// شريط النقاط العلوي — كبسولة داكنة: لهم نقطة حمراء · العقد والصفقة · لنا نقطة خضراء.
     private var scoreStrip: some View {
         let myTeam = vm.matchState?.seats?.first(where: { $0.seat == vm.mySeat })?.team
         let scoreA = vm.matchState?.scores?.A ?? 0
@@ -286,7 +322,8 @@ struct BalootTableView: View {
         let ours = myTeam == "B" ? scoreB : scoreA
         let theirs = myTeam == "B" ? scoreA : scoreB
         return HStack(spacing: 10) {
-            HStack(spacing: 4) {
+            HStack(spacing: 5) {
+                Circle().fill(EMSTheme.Colors.emerald).frame(width: 7, height: 7)
                 Text(myTeam == nil ? "A" : "لنا")
                     .font(.caption2)
                 Text("\(myTeam == nil ? scoreA : ours)")
@@ -309,11 +346,12 @@ struct BalootTableView: View {
 
             Spacer()
 
-            HStack(spacing: 4) {
+            HStack(spacing: 5) {
                 Text("\(myTeam == nil ? scoreB : theirs)")
                     .font(.subheadline.weight(.bold))
                 Text(myTeam == nil ? "B" : "لهم")
                     .font(.caption2)
+                Circle().fill(EMSTheme.Colors.danger).frame(width: 7, height: 7)
             }
             .foregroundStyle(EMSTheme.Colors.danger)
 
@@ -325,8 +363,9 @@ struct BalootTableView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
-        .background(Color.black.opacity(0.22))
+        .background(Color.black.opacity(0.45))
         .clipShape(Capsule())
+        .overlay(Capsule().stroke(gold.opacity(0.25), lineWidth: 1))
         .padding(.top, 4)
     }
 
@@ -362,12 +401,12 @@ struct BalootTableView: View {
                 seatPod(relative: 3) // يساري
             }
         }
-        .padding(.horizontal, 4)
-        .padding(.vertical, 6)
+        .padding(.horizontal, 2)
+        .padding(.vertical, 4)
     }
 
-    /// مقعد لاعب: صورة رمزية بحرف اسمه + اسم قصير + عدّاد أوراقه،
-    /// وتوهّج ذهبي واحد لصاحب الدور (لا يضيء مقعدان أبدًا).
+    /// مقعد لاعب: دائرة داكنة بحرف اسمه + اسم قصير + ظهور أوراقه،
+    /// وتوهّج ذهبي ناعم واحد لصاحب الدور (لا يضيء مقعدان أبدًا).
     private func seatPod(relative: Int) -> some View {
         let seat = vm.displaySeat(relative: relative)
         let isTurn = vm.activeTurnSeat == seat
@@ -381,9 +420,9 @@ struct BalootTableView: View {
                     .frame(width: 46, height: 46)
                     .overlay(
                         Circle()
-                            .stroke(isTurn ? gold : gold.opacity(0.25), lineWidth: isTurn ? 2.5 : 1)
+                            .stroke(isTurn ? gold : gold.opacity(0.3), lineWidth: isTurn ? 2 : 1)
                     )
-                    .shadow(color: isTurn ? gold.opacity(0.6) : .clear, radius: isTurn ? 12 : 0)
+                    .shadow(color: isTurn ? gold.opacity(0.45) : .clear, radius: isTurn ? 8 : 0)
                 Text(String(name.prefix(1)))
                     .font(.title3.weight(.bold))
                     .foregroundStyle(isTurn ? gold : Color.white.opacity(0.9))
@@ -401,18 +440,18 @@ struct BalootTableView: View {
         .animation(.easeInOut(duration: 0.3), value: isTurn)
     }
 
-    /// ظهور أوراق صغيرة بعدد أوراق اللاعب (بديل مرئي عن العدد الرقمي).
+    /// ظهور أوراق زرقاء صغيرة بعدد أوراق اللاعب — كما في جلسات البلوت.
     private func miniCardBacks(count: Int) -> some View {
         let shown = min(count, 8)
         return HStack(spacing: -5) {
             ForEach(0..<shown, id: \.self) { i in
                 RoundedRectangle(cornerRadius: 2, style: .continuous)
-                    .fill(LinearGradient(colors: [Color(red: 0.16, green: 0.24, blue: 0.45),
-                                                  Color(red: 0.10, green: 0.15, blue: 0.30)],
+                    .fill(LinearGradient(colors: [Color(red: 0.15, green: 0.28, blue: 0.60),
+                                                  Color(red: 0.08, green: 0.16, blue: 0.38)],
                                          startPoint: .top, endPoint: .bottom))
                     .overlay(
                         RoundedRectangle(cornerRadius: 2, style: .continuous)
-                            .stroke(gold.opacity(0.5), lineWidth: 0.5)
+                            .stroke(Color.white.opacity(0.25), lineWidth: 0.5)
                     )
                     .frame(width: 10, height: 15)
                     .rotationEffect(.degrees(Double(i - shown / 2) * 5))
@@ -422,30 +461,29 @@ struct BalootTableView: View {
         .frame(height: 17)
     }
 
-    /// مركز الطاولة: الورقة المكشوفة في السوق، واللفة موزعة باتجاه أصحابها في اللعب.
+    /// مركز الطاولة: العلامة المائية للقطاع خلفًا، والورقة المكشوفة في السوق،
+    /// واللفة موزعة باتجاه أصحابها في اللعب — أوراق معتمة 100% كورق حقيقي.
     @ViewBuilder
     private var centerStage: some View {
         let hand = vm.matchState?.hand
         ZStack {
-            // زخرفة اللباد الخافتة
-            Image(systemName: "suit.spade.fill")
-                .font(.system(size: 90))
-                .foregroundStyle(Color.white.opacity(0.05))
+            // العلامة المائية: نبض ECG + هوية القطاع — تُستبدل لاحقًا برمز القطاع الرسمي
+            sectorWatermark
 
             if let hand, hand.phase.hasPrefix("bidding"), let faceUp = hand.faceUpCard {
                 VStack(spacing: 4) {
                     Text("الورقة المكشوفة")
                         .font(.caption2)
                         .foregroundStyle(Color.white.opacity(0.6))
-                    cardView(faceUp, size: .medium, enabled: false)
-                        .shadow(color: .black.opacity(0.4), radius: 6, y: 3)
-                        .transition(.scale.combined(with: .opacity))
+                    cardView(faceUp, size: .medium, dimmed: false)
+                        .shadow(color: .black.opacity(0.5), radius: 8, y: 4)
+                        .transition(.scale(scale: 0.7).combined(with: .opacity))
                 }
             } else if let trick = hand?.currentTrick, !trick.isEmpty {
-                // كل ورقة تنزاح نحو جهة صاحبها — كما على طاولة حقيقية
+                // كل ورقة تنزاح نحو جهة صاحبها — كأنها سقطت من يده على اللباد
                 ForEach(trick, id: \.seat) { play in
-                    cardView(play.card, size: .medium, enabled: false)
-                        .shadow(color: .black.opacity(0.4), radius: 4, y: 2)
+                    cardView(play.card, size: .medium, dimmed: false)
+                        .shadow(color: .black.opacity(0.5), radius: 5, y: 3)
                         .offset(trickOffset(for: play.seat))
                         .transition(.scale(scale: 0.6).combined(with: .opacity))
                 }
@@ -463,6 +501,35 @@ struct BalootTableView: View {
         }
         .animation(.spring(response: 0.35, dampingFraction: 0.75), value: hand?.currentTrick?.count)
         .animation(.easeInOut(duration: 0.25), value: hand?.faceUpCard?.code)
+    }
+
+    /// علامة مائية خفيفة داخل اللباد: نبض ECG يعبر مركز الطاولة + اسم القطاع.
+    /// باهتة عمدًا (لا تنافس الأوراق) — ومكانها جاهز لرمز قطاع جنوب الرياض الرسمي.
+    private var sectorWatermark: some View {
+        VStack(spacing: 6) {
+            GeometryReader { g in
+                let w = g.size.width, h = g.size.height, mid = h / 2
+                Path { p in
+                    p.move(to: CGPoint(x: w * 0.08, y: mid))
+                    p.addLine(to: CGPoint(x: w * 0.34, y: mid))
+                    p.addLine(to: CGPoint(x: w * 0.38, y: mid - h * 0.20))
+                    p.addLine(to: CGPoint(x: w * 0.42, y: mid + h * 0.22))
+                    p.addLine(to: CGPoint(x: w * 0.46, y: mid - h * 0.34))
+                    p.addLine(to: CGPoint(x: w * 0.50, y: mid))
+                    p.addLine(to: CGPoint(x: w * 0.92, y: mid))
+                }
+                .stroke(Color.white.opacity(0.07), style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
+            }
+            .frame(height: 60)
+            Text("قطاع جنوب الرياض")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(Color.white.opacity(0.08))
+            Text("EMS")
+                .font(.caption2.weight(.bold))
+                .tracking(4)
+                .foregroundStyle(Color.white.opacity(0.07))
+        }
+        .allowsHitTesting(false)
     }
 
     @ViewBuilder
@@ -560,11 +627,12 @@ struct BalootTableView: View {
                 Text("دورك 🎯")
                     .font(.caption.weight(.bold))
                     .foregroundStyle(gold)
-                    .shadow(color: gold.opacity(0.5), radius: 6)
+                    .shadow(color: gold.opacity(0.45), radius: 5)
             }
             Spacer()
         }
-        .padding(.horizontal, 6)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
         .padding(.bottom, 2)
         .animation(.easeInOut(duration: 0.25), value: vm.isMyTurnNow)
     }
@@ -586,10 +654,10 @@ struct BalootTableView: View {
                                     Text(bidLabel(bid))
                                         .font(.subheadline.weight(.bold))
                                         .padding(.horizontal, 16).frame(height: 40)
-                                        .background(bid.kind == "pass" ? Color.black.opacity(0.35) : EMSTheme.Colors.teal)
+                                        .background(bid.kind == "pass" ? Color.black.opacity(0.4) : EMSTheme.Colors.teal)
                                         .foregroundStyle(.white)
                                         .clipShape(Capsule())
-                                        .overlay(Capsule().stroke(gold.opacity(bid.kind == "pass" ? 0.3 : 0), lineWidth: 1))
+                                        .overlay(Capsule().stroke(gold.opacity(bid.kind == "pass" ? 0.35 : 0), lineWidth: 1))
                                 }
                             }
                         }
@@ -661,8 +729,8 @@ struct BalootTableView: View {
     /// تداخل المروحة: كلما كثرت الأوراق ضاقت المسافة حتى تملأ عرض الشاشة.
     private func handSpacing(for count: Int) -> CGFloat {
         guard count > 1 else { return 0 }
-        // عرض الورقة 64 — نجعل المروحة كلها ضمن ~عرض الجهاز
-        return count <= 5 ? 8 : (count <= 7 ? -18 : -26)
+        // عرض الورقة 66 — نجعل المروحة كلها ضمن ~عرض الجهاز
+        return count <= 5 ? 8 : (count <= 7 ? -20 : -28)
     }
 
     /// ورقة في يدي — قابلة للضغط فقط إن سمح الخادم؛ المسموح مرفوع ومتوهج.
@@ -676,7 +744,7 @@ struct BalootTableView: View {
             if canBaloot { pendingCard = card }
             else if allowed { Task { await vm.playCard(card.code, baloot: false) } }
         } label: {
-            cardView(card, size: .hand, enabled: allowed || !playing)
+            cardView(card, size: .hand, dimmed: playing && !allowed)
                 .rotationEffect(.degrees(fanAngle), anchor: .bottom)
                 .offset(y: allowed ? -12 : 0)
                 .shadow(color: allowed ? EMSTheme.Colors.teal.opacity(0.55) : .clear,
@@ -700,32 +768,50 @@ struct BalootTableView: View {
         var dims: (CGFloat, CGFloat) {
             switch self {
             case .medium: return (56, 80) // ورقة المركز واللفة
-            case .hand: return (64, 94)   // يد اللاعب — كبيرة ومريحة للمس
+            case .hand: return (66, 96)   // يد اللاعب — كبيرة ومريحة للمس
             }
         }
         var font: Font {
             switch self {
             case .medium: return .body.weight(.bold)
-            case .hand: return .title3.weight(.bold)
+            case .hand: return .headline.weight(.bold)
             }
         }
     }
 
-    private func cardView(_ card: BalootCardDTO, size: CardSize, enabled: Bool) -> some View {
+    /// ورقة كريمية معتمة 100% بحدود واضحة وظل — كأنها ورقة حقيقية على اللباد.
+    /// `dimmed` يخفت ورق اليد الممنوع فقط؛ ورق المركز يبقى معتمًا دائمًا.
+    private func cardView(_ card: BalootCardDTO, size: CardSize, dimmed: Bool) -> some View {
         let (w, h) = size.dims
-        return VStack(spacing: 1) {
-            Text(card.rankLabel)
+        return VStack(spacing: 2) {
+            Text(rankDisplay(card))
                 .font(size.font)
             Text(card.suitSymbol)
                 .font(size.font)
         }
-        .foregroundStyle(card.isRed ? Color(red: 0.85, green: 0.22, blue: 0.22) : Color.black)
+        .foregroundStyle(card.isRed ? Color(red: 0.78, green: 0.16, blue: 0.16) : Color(red: 0.13, green: 0.13, blue: 0.16))
         .frame(width: w, height: h)
-        .background(Color.white)
-        .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 9).stroke(Color.black.opacity(0.2), lineWidth: 0.5))
-        .opacity(enabled ? 1 : 0.35)
-        .shadow(color: .black.opacity(0.25), radius: 2, y: 1)
+        .background(cream)
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(Color(red: 0.35, green: 0.30, blue: 0.22).opacity(0.45), lineWidth: 1)
+        )
+        .opacity(dimmed ? 0.35 : 1)
+        .shadow(color: .black.opacity(0.45), radius: 4, y: 3)
+    }
+
+    /// أسماء الرتب البلوتية للعرض — شايب/بنت/ولد/إكّه، والأرقام كما هي (T تعرض 10).
+    /// عرض فقط؛ قيمة الورقة الحقيقية (code) لا تُمس وتبقى من الخادم.
+    private func rankDisplay(_ card: BalootCardDTO) -> String {
+        switch card.rankLabel {
+        case "A": return "إكّه"
+        case "K": return "شايب"
+        case "Q": return "بنت"
+        case "J": return "ولد"
+        case "T": return "10"
+        default: return card.rankLabel
+        }
     }
 
     // MARK: - أسماء مختصرة
