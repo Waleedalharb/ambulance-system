@@ -55,6 +55,11 @@ struct BalootTableView: View {
     var body: some View {
         content
             .emsPage("طاولة بلوت #\(tableId)")
+            // أثناء المباراة: لا شريط تنقّل ولا Tab Bar — المشهد يملأ الشاشة من
+            // أعلى Safe Area إلى أسفلها، والهيدر يصبح Overlay عائمًا فوق المجلس.
+            .toolbarBackground(vm.table?.isInMatch == true ? .hidden : .visible, for: .navigationBar)
+            .toolbar(vm.table?.isInMatch == true ? .hidden : .visible, for: .navigationBar)
+            .toolbar(vm.table?.isInMatch == true ? .hidden : .visible, for: .tabBar)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     HStack(spacing: 14) {
@@ -266,8 +271,9 @@ struct BalootTableView: View {
                 // ساحة اللعب: اللاعبون والمركز داخل حدود اللباد المرسوم نفسه
                 tableArena(felt: felt)
 
-                // HUD علوي خفيف: النقاط والحالات فوق المشهد دون حجبه
+                // HUD علوي خفيف: هيدر عائم (رجوع/اتصال/عنوان) + النقاط والحالات
                 VStack(spacing: 4) {
+                    floatingHeader
                     scoreStrip
                     if let err = vm.actionError {
                         Text(err)
@@ -282,7 +288,7 @@ struct BalootTableView: View {
                     Spacer()
                 }
                 .padding(.horizontal, 12)
-                .padding(.top, 50)
+                .padding(.top, 56)
 
                 // اليد والأفعال عند الحافة السفلية للطاولة — تتراكب على الإطار الخشبي
                 VStack(spacing: 6) {
@@ -620,6 +626,37 @@ struct BalootTableView: View {
         .padding(.horizontal, 12).padding(.vertical, 5)
         .background(Color.black.opacity(0.3))
         .clipShape(Capsule())
+    }
+
+    // MARK: - الهيدر العائم (أثناء المباراة — بديل شريط التنقل المخفي)
+
+    /// رجوع + اتصال + عنوان الطاولة كعناصر زجاجية عائمة فوق المشهد، حتى يبدأ
+    /// المجلس من أعلى Safe Area مباشرة دون شريط أزرق يحجب الشنطة واللاسلكي.
+    /// (RTL: أول عنصر يظهر يمينًا.)
+    private var floatingHeader: some View {
+        HStack(spacing: 10) {
+            Button { dismiss() } label: {
+                circleLabel("chevron.backward")
+            }
+            .accessibilityLabel("رجوع")
+
+            connectionDot
+                .padding(6)
+                .background(Color.black.opacity(0.45))
+                .clipShape(Circle())
+                .overlay(Circle().stroke(gold.opacity(0.25), lineWidth: 1))
+
+            Spacer()
+
+            Text("طاولة بلوت #\(tableId)")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(Color.white.opacity(0.85))
+                .padding(.horizontal, 12).padding(.vertical, 6)
+                .background(Color.black.opacity(0.45))
+                .clipShape(Capsule())
+                .overlay(Capsule().stroke(gold.opacity(0.2), lineWidth: 1))
+        }
+        .padding(.bottom, 2)
     }
 
     // MARK: - الشريط السفلي (كبسولة اليد + أزرار دائرية)
