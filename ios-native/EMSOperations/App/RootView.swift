@@ -56,6 +56,12 @@ struct LaunchView: View {
     }
 }
 
+/// موجّه التبويبات — يتيح لبلاطات الرئيسية السريعة الانتقال إلى التبويبات
+/// القائمة (العمليات/الجدول/المحادثات/الإشعارات) دون إعادة بناء أي شاشة.
+final class AppTabRouter: ObservableObject {
+    @Published var selected: MainTabView.AppTab = .home
+}
+
 /// التبويبات الرئيسية — مبنية على الصلاحيات الفعلية (v2 قسم 6):
 /// الرئيسية للجميع · العمليات لحاملي مفاتيح ops.* · الجدول/الإشعارات
 /// لحاملي بوابة الموظف · حسابي للجميع. إخفاء التبويب ليس حماية —
@@ -63,7 +69,7 @@ struct LaunchView: View {
 struct MainTabView: View {
     @EnvironmentObject private var session: SessionStore
     @EnvironmentObject private var deepLinks: DeepLinkRouter
-    @State private var selectedTab: AppTab = .home
+    @StateObject private var tabRouter = AppTabRouter()
 
     enum AppTab: Hashable { case home, operations, scheduleOps, schedule, notifications, baloot, chat, account }
 
@@ -76,7 +82,7 @@ struct MainTabView: View {
     private var showCommunity: Bool { session.permissions.canAccessCommunity }
 
     var body: some View {
-        TabView(selection: $selectedTab) {
+        TabView(selection: $tabRouter.selected) {
             NavigationStack { HomeView() }
                 .tabItem { Label("الرئيسية", systemImage: "house.fill") }
                 .tag(AppTab.home)
@@ -113,6 +119,7 @@ struct MainTabView: View {
                 .tag(AppTab.account)
         }
         .tint(EMSTeal)
+        .environmentObject(tabRouter) // بلاطات الرئيسية تبدّل التبويب عبره
         .onAppear {
             #if DEBUG
             AppLogger.ui.info("MainTabView appeared — operations tab: \(showOperations) · portal tabs: \(showPortalTabs)")
@@ -129,10 +136,10 @@ struct MainTabView: View {
             case .scheduleChanges:
                 if showPortalTabs {
                     deepLinks.requestScheduleChanges = true
-                    selectedTab = .schedule
+                    tabRouter.selected = .schedule
                 }
             case .notifications:
-                if showPortalTabs { selectedTab = .notifications }
+                if showPortalTabs { tabRouter.selected = .notifications }
             case .positioning:
                 // بند 11: الضغط على إشعار التمركز يفتح بطاقة التفاصيل مباشرة
                 // فوق التبويب الحالي — لا نقل لقائمة الإشعارات.
