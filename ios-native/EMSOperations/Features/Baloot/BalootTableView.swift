@@ -3,13 +3,14 @@
 //  EMSOperations
 //
 //  شاشة الطاولة — «مجلس سعودي فاخر + طاولة بلوت حقيقية + هوية قطاع جنوب الرياض»:
-//   أثناء المباراة تصبح الشاشة مشهد مجلس حقيقيًا: أصل رسومي مرسوم (سدو ودلة
-//   وفانوس وطاولة لباد بإطار خشبي ذهبي — baloot_majlis_bg) وتجلس عليه المقاعد
-//   والأوراق كمكونات تفاعلية حقيقية، مع علامة «قطاع جنوب الرياض · EMS» المائية
-//   فوق اللباد (تُستبدل لاحقًا برمز القطاع الرسمي). صاحب الدور يتوهج بتوهج
-//   ذهبي ناعم واحد (vm.activeTurnSeat — مصدر authoritative وحيد). الأوراق
-//   كريمية معتمة 100% كأنها ورق حقيقي، والرتب بأسمائها البلوتية
-//   (شايب/بنت/ولد/إكّه).
+//   أثناء المباراة تصبح الشاشة مشهد مجلس حقيقيًا: الأصل المرسوم (سدو ودلة
+//   وفانوس وشنطة إسعاف ولاسلكي وطاولة لباد بإطار خشبي ذهبي — baloot_majlis_bg)
+//   هو المسرح، وعناصر اللعب (مقاعد/أوراق/يد) مكونات SwiftUI حقيقية تجلس داخل
+//   حدود اللباد المرسوم نفسه عبر feltRect — لا طبقات خضراء ولا إطارات مكررة.
+//   علامة «قطاع جنوب الرياض · EMS» المائية فوق اللباد (تُستبدل لاحقًا برمز
+//   القطاع الرسمي). صاحب الدور يتوهج بتوهج ذهبي ناعم واحد (vm.activeTurnSeat —
+//   مصدر authoritative وحيد). الأوراق كريمية معتمة 100% كأنها ورق حقيقي،
+//   والرتب بأسمائها البلوتية (شايب/بنت/ولد/إكّه).
 //
 //  الواجهة لا تعرف قواعد البلوت — تعرض ما يرسله الخادم وتفعّل ما يعيده
 //  /options فقط. لا تغيير في أي منطق لعب أو صوت أو أحداث — UI فقط.
@@ -58,14 +59,17 @@ struct BalootTableView: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     HStack(spacing: 14) {
                         connectionDot
-                        if vm.table?.roomId != nil {
-                            Button { showChat = true } label: {
-                                Image(systemName: "bubble.left.and.bubble.right.fill")
-                                    .foregroundStyle(EMSTheme.Colors.teal)
+                        // أثناء المباراة تنتقل السوالف والقائمة إلى الشريط السفلي
+                        if vm.table?.isInMatch != true {
+                            if vm.table?.roomId != nil {
+                                Button { showChat = true } label: {
+                                    Image(systemName: "bubble.left.and.bubble.right.fill")
+                                        .foregroundStyle(EMSTheme.Colors.teal)
+                                }
+                                .accessibilityLabel("سالفة الطاولة")
                             }
-                            .accessibilityLabel("سالفة الطاولة")
+                            tableMenu
                         }
-                        tableMenu
                     }
                 }
             }
@@ -92,32 +96,39 @@ struct BalootTableView: View {
             }
     }
 
-    /// قائمة الطاولة: الصوت (كتم/تجربة) + الإنهاء الودي أثناء المباراة.
+    /// قائمة الطاولة (خارج المباراة — في التولبار).
     private var tableMenu: some View {
         Menu {
-            Button {
-                sound.toggleMuted()
-            } label: {
-                Label(sound.isMuted ? "تشغيل الأصوات" : "كتم الأصوات",
-                      systemImage: sound.isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
-            }
-            Button {
-                sound.playTest()
-            } label: {
-                Label(sound.loadedCount > 0 ? "تجربة الصوت" : "الأصوات غير محمّلة (\(sound.loadedCount)/\(BalootSoundService.Effect.allCases.count))",
-                      systemImage: "speaker.badge.plus")
-            }
-            if vm.table?.isInMatch == true, vm.isSeated, vm.matchStatus == "active" {
-                Divider()
-                Button(role: .destructive) { confirmAbort = true } label: {
-                    Label("تصويت إنهاء ودي", systemImage: "hand.raised.fill")
-                }
-            }
+            tableMenuItems
         } label: {
             Image(systemName: "ellipsis.circle")
                 .foregroundStyle(EMSTheme.Colors.teal)
         }
         .accessibilityLabel("إعدادات الطاولة")
+    }
+
+    /// عناصر قائمة الطاولة: الصوت (كتم/تجربة) + الإنهاء الودي أثناء المباراة —
+    /// تُستخدم في التولبار خارج المباراة وفي الشريط السفلي داخلها.
+    @ViewBuilder
+    private var tableMenuItems: some View {
+        Button {
+            sound.toggleMuted()
+        } label: {
+            Label(sound.isMuted ? "تشغيل الأصوات" : "كتم الأصوات",
+                  systemImage: sound.isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
+        }
+        Button {
+            sound.playTest()
+        } label: {
+            Label(sound.loadedCount > 0 ? "تجربة الصوت" : "الأصوات غير محمّلة (\(sound.loadedCount)/\(BalootSoundService.Effect.allCases.count))",
+                  systemImage: "speaker.badge.plus")
+        }
+        if vm.table?.isInMatch == true, vm.isSeated, vm.matchStatus == "active" {
+            Divider()
+            Button(role: .destructive) { confirmAbort = true } label: {
+                Label("تصويت إنهاء ودي", systemImage: "hand.raised.fill")
+            }
+        }
     }
 
     // MARK: - المحتوى حسب طور الطاولة
@@ -243,37 +254,75 @@ struct BalootTableView: View {
 
     // MARK: - شاشة المباراة (مشهد المجلس)
 
+    /// المشهد الكامل: الأصل المرسوم هو المسرح، وعناصر اللعب تجلس داخل اللباد
+    /// بإحداثيات محسوبة من feltRect، واليد تتراكب على الحافة السفلية للطاولة.
     private func matchScreen(_ table: BalootLobbyTableDTO) -> some View {
-        ZStack {
-            // خلفية المجلس: دفء داكن مع تظليل محيطي يُبرز الطاولة
-            majlisBackdrop
+        GeometryReader { geo in
+            let felt = feltRect(in: geo.size)
+            ZStack {
+                // خلفية المجلس: الأصل المرسوم كما هو — لا إطار ولا لباد مكرر فوقه
+                majlisBackdrop
 
-            VStack(spacing: 0) {
-                scoreStrip
-                if let err = vm.actionError {
-                    Text(err)
-                        .font(.caption2)
-                        .foregroundStyle(EMSTheme.Colors.danger)
-                        .lineLimit(1)
-                        .padding(.top, 2)
-                        .onTapGesture { vm.actionError = nil }
+                // ساحة اللعب: اللاعبون والمركز داخل حدود اللباد المرسوم نفسه
+                tableArena(felt: felt)
+
+                // HUD علوي خفيف: النقاط والحالات فوق المشهد دون حجبه
+                VStack(spacing: 4) {
+                    scoreStrip
+                    if let err = vm.actionError {
+                        Text(err)
+                            .font(.caption2)
+                            .foregroundStyle(EMSTheme.Colors.danger)
+                            .lineLimit(1)
+                            .onTapGesture { vm.actionError = nil }
+                    }
+                    if vm.paused { pausedCapsule }
+                    if vm.isSpectator { spectatorCapsule }
+                    lastEventLine
+                    Spacer()
                 }
-                if vm.paused { pausedCapsule }
-                if vm.isSpectator { spectatorCapsule }
-                lastEventLine
-                framedTable
-                    .frame(maxHeight: .infinity)
-                meBar
-                actionChips
-                handFan
+                .padding(.horizontal, 12)
+                .padding(.top, 50)
+
+                // اليد والأفعال عند الحافة السفلية للطاولة — تتراكب على الإطار الخشبي
+                VStack(spacing: 6) {
+                    Spacer()
+                    actionChips
+                    handFan
+                }
+                .padding(.bottom, max(0, geo.size.height - felt.maxY - 14))
+
+                // الشريط السفلي: كبسولة «يدك» يمينًا · سوالف/صوت/قائمة يسارًا
+                VStack {
+                    Spacer()
+                    bottomBar
+                }
+                .padding(.horizontal, 14)
+                .padding(.bottom, 6)
             }
-            .padding(.horizontal, 10)
-            .padding(.bottom, 4)
         }
+        .ignoresSafeArea()
     }
 
-    /// خلفية المجلس السعودي: أصل رسومي حقيقي (سدو/دلة/فانوس/طاولة لباد بإطار
-    /// خشبي ذهبي) + تظليل علوي وسفلي خفيف يضمن وضوح عناصر اللعب فوقه.
+    /// حدود اللباد المرسوم داخل الصورة (1024×2048) محسوبة على الشاشة مع
+    /// scaledToFill — حتى تجلس عناصر اللعب فوق اللباد الحقيقي لا فوق الخشب
+    /// أو السدو، على أي مقاس آيفون.
+    private func feltRect(in size: CGSize) -> CGRect {
+        let imgW: CGFloat = 1024, imgH: CGFloat = 2048
+        let scale = max(size.width / imgW, size.height / imgH)
+        let drawnW = imgW * scale, drawnH = imgH * scale
+        let originX = (size.width - drawnW) / 2
+        let originY = (size.height - drawnH) / 2
+        // نِسب اللباد داخل الصورة: يسار/يمين/أعلى/أسفل
+        let l: CGFloat = 0.088, r: CGFloat = 0.912, t: CGFloat = 0.105, b: CGFloat = 0.815
+        return CGRect(x: originX + l * drawnW,
+                      y: originY + t * drawnH,
+                      width: (r - l) * drawnW,
+                      height: (b - t) * drawnH)
+    }
+
+    /// خلفية المجلس السعودي: أصل رسومي حقيقي (سدو/دلة/فانوس/شنطة إسعاف/لاسلكي/
+    /// طاولة لباد بإطار خشبي ذهبي) + تظليل علوي وسفلي خفيف يضمن وضوح العناصر.
     private var majlisBackdrop: some View {
         ZStack {
             Image("baloot_majlis_bg")
@@ -284,12 +333,6 @@ struct BalootTableView: View {
                            startPoint: .top, endPoint: .bottom)
                 .ignoresSafeArea()
         }
-    }
-
-    /// الساحة فوق لباد الطاولة المرسوم في الأصل — شفافة بلا طبقات مسطحة،
-    /// فالمقاعد والأوراق تجلس مباشرة على اللباد الحقيقي.
-    private var framedTable: some View {
-        tableArena
     }
 
     /// شريط النقاط العلوي — كبسولة داكنة: لهم نقطة حمراء · العقد والصفقة · لنا نقطة خضراء.
@@ -344,7 +387,6 @@ struct BalootTableView: View {
         .background(Color.black.opacity(0.45))
         .clipShape(Capsule())
         .overlay(Capsule().stroke(gold.opacity(0.25), lineWidth: 1))
-        .padding(.top, 4)
     }
 
     /// آخر حدث بسطر واحد خفيف — السجل الكامل في طور ما قبل/بعد المباراة.
@@ -355,66 +397,63 @@ struct BalootTableView: View {
                 .font(.caption2)
                 .foregroundStyle(Color.white.opacity(0.6))
                 .lineLimit(1)
-                .padding(.top, 4)
                 .id(line) // انتقال ناعم مع كل حدث جديد
                 .transition(.opacity)
         }
     }
 
-    // MARK: - ساحة الطاولة (المقاعد + المركز)
+    // MARK: - ساحة الطاولة (المقاعد + المركز داخل اللباد)
 
-    /// اللاعبون حول اللباد: الشريك أعلى، يميني ويساري على الجانبين، والمركز للأوراق.
-    private var tableArena: some View {
+    /// اللاعبون والمركز داخل اللباد: الشريك أعلى اللباد، يميني ويساري على
+    /// حافتيه، والمركز للأوراق فوق العلامة المائية — الكل موضّع بإحداثيات
+    /// اللباد نفسه حتى يندمج مع المشهد المرسوم.
+    private func tableArena(felt: CGRect) -> some View {
         ZStack {
             centerStage
+                .frame(width: felt.width * 0.62, height: felt.height * 0.55)
+                .position(x: felt.midX, y: felt.midY + felt.height * 0.05)
 
-            VStack {
-                seatPod(relative: 2) // الشريك مقابلي
-                Spacer()
-            }
+            seatPod(relative: 2) // الشريك مقابلي
+                .position(x: felt.midX, y: felt.minY + 46)
 
-            HStack {
-                seatPod(relative: 1) // يميني (RTL: أول عنصر يظهر يمينًا)
-                Spacer()
-                seatPod(relative: 3) // يساري
-            }
+            seatPod(relative: 1) // يميني
+                .position(x: felt.maxX - 48, y: felt.midY - felt.height * 0.08)
+
+            seatPod(relative: 3) // يساري
+                .position(x: felt.minX + 48, y: felt.midY - felt.height * 0.08)
         }
-        .padding(.horizontal, 2)
-        .padding(.vertical, 4)
     }
 
-    /// مقعد لاعب: دائرة داكنة بحرف اسمه + اسم قصير + ظهور أوراقه،
+    /// مقعد لاعب: دائرة داكنة صغيرة بحرف اسمه + اسم قصير + ظهور أوراقه،
     /// وتوهّج ذهبي ناعم واحد لصاحب الدور (لا يضيء مقعدان أبدًا).
     private func seatPod(relative: Int) -> some View {
         let seat = vm.displaySeat(relative: relative)
         let isTurn = vm.activeTurnSeat == seat
         let count = vm.matchState?.hand?.handCounts?[String(seat)] ?? 0
-        let isMe = seat == vm.mySeat
         let name = podName(seat)
-        return VStack(spacing: 3) {
+        return VStack(spacing: 2) {
             ZStack {
                 Circle()
-                    .fill(podColor.opacity(0.95))
-                    .frame(width: 46, height: 46)
+                    .fill(podColor.opacity(0.9))
+                    .frame(width: 38, height: 38)
                     .overlay(
                         Circle()
                             .stroke(isTurn ? gold : gold.opacity(0.3), lineWidth: isTurn ? 2 : 1)
                     )
                     .shadow(color: isTurn ? gold.opacity(0.45) : .clear, radius: isTurn ? 8 : 0)
                 Text(String(name.prefix(1)))
-                    .font(.title3.weight(.bold))
+                    .font(.headline.weight(.bold))
                     .foregroundStyle(isTurn ? gold : Color.white.opacity(0.9))
             }
-            Text(isMe ? "أنت" : name)
+            Text(name)
                 .font(.caption2.weight(isTurn ? .bold : .medium))
                 .foregroundStyle(isTurn ? gold : Color.white.opacity(0.85))
                 .lineLimit(1)
-                .frame(width: 74)
+                .frame(width: 64)
             if count > 0 {
                 miniCardBacks(count: count)
             }
         }
-        .padding(.vertical, 4)
         .animation(.easeInOut(duration: 0.3), value: isTurn)
     }
 
@@ -568,7 +607,6 @@ struct BalootTableView: View {
         .padding(.horizontal, 12).padding(.vertical, 5)
         .background(Color.black.opacity(0.35))
         .clipShape(Capsule())
-        .padding(.top, 4)
     }
 
     private var spectatorCapsule: some View {
@@ -582,36 +620,66 @@ struct BalootTableView: View {
         .padding(.horizontal, 12).padding(.vertical, 5)
         .background(Color.black.opacity(0.3))
         .clipShape(Capsule())
-        .padding(.top, 4)
     }
 
-    // MARK: - شريط «أنا» فوق اليد
+    // MARK: - الشريط السفلي (كبسولة اليد + أزرار دائرية)
 
-    private var meBar: some View {
-        HStack(spacing: 8) {
-            Circle()
-                .fill(podColor)
-                .frame(width: 22, height: 22)
-                .overlay(Circle().stroke(vm.isMyTurnNow ? gold : gold.opacity(0.3), lineWidth: 1.5))
-                .overlay(
-                    Text(vm.isSpectator ? "👁" : String(podName(vm.mySeat ?? 0).prefix(1)))
-                        .font(.caption2.weight(.bold))
-                        .foregroundStyle(Color.white.opacity(0.9))
-                )
-            Text(vm.isSpectator ? "مشاهدة" : "يدك")
+    /// كبسولة «يدك» يمينًا وأزرار دائرية خفيفة يسارًا (سوالف/صوت/قائمة) —
+    /// HUD راقٍ لا يحجب المجلس، ويحل محل شريط «أنا» القديم داخل المباراة.
+    /// (RTL: أول عنصر في HStack يظهر يمينًا.)
+    private var bottomBar: some View {
+        HStack(spacing: 12) {
+            handCapsule
+
+            Spacer()
+
+            if vm.table?.roomId != nil {
+                circleButton("bubble.left.and.bubble.right.fill", label: "سالفة الطاولة") { showChat = true }
+            }
+            circleButton(sound.isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill",
+                         label: sound.isMuted ? "تشغيل الأصوات" : "كتم الأصوات") { sound.toggleMuted() }
+            Menu {
+                tableMenuItems
+            } label: {
+                circleLabel("ellipsis")
+            }
+            .accessibilityLabel("إعدادات الطاولة")
+        }
+    }
+
+    private func circleButton(_ icon: String, label: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) { circleLabel(icon) }
+            .accessibilityLabel(label)
+    }
+
+    private func circleLabel(_ icon: String) -> some View {
+        Image(systemName: icon)
+            .font(.subheadline)
+            .foregroundStyle(Color.white.opacity(0.9))
+            .frame(width: 38, height: 38)
+            .background(Color.black.opacity(0.45))
+            .clipShape(Circle())
+            .overlay(Circle().stroke(gold.opacity(0.25), lineWidth: 1))
+    }
+
+    /// كبسولة «يدك» — تتوهج ذهبيًا عند دوري، وتعرض «مشاهدة» للمتفرج.
+    private var handCapsule: some View {
+        HStack(spacing: 6) {
+            Text(vm.isSpectator ? "👁 مشاهدة" : "يدك")
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(Color.white.opacity(0.85))
             if vm.isMyTurnNow {
                 Text("دورك 🎯")
                     .font(.caption.weight(.bold))
                     .foregroundStyle(gold)
-                    .shadow(color: gold.opacity(0.45), radius: 5)
             }
-            Spacer()
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
-        .padding(.bottom, 2)
+        .padding(.horizontal, 12).padding(.vertical, 7)
+        .background(Color.black.opacity(0.45))
+        .clipShape(Capsule())
+        .overlay(Capsule().stroke(vm.isMyTurnNow ? gold : gold.opacity(0.2),
+                                  lineWidth: vm.isMyTurnNow ? 1.5 : 1))
+        .shadow(color: vm.isMyTurnNow ? gold.opacity(0.4) : .clear, radius: 8)
         .animation(.easeInOut(duration: 0.25), value: vm.isMyTurnNow)
     }
 
@@ -691,7 +759,6 @@ struct BalootTableView: View {
                 }
             }
             .padding(.top, 10)
-            .padding(.bottom, 6)
             .confirmationDialog("بلوت مع هذه الورقة؟", isPresented: Binding(
                 get: { pendingCard != nil }, set: { if !$0 { pendingCard = nil } }
             ), titleVisibility: .visible) {
@@ -717,7 +784,7 @@ struct BalootTableView: View {
         let playing = opts?.phase == "playing" && opts?.myTurn == true
         let allowed = playing && (opts?.cards.contains(card.code) ?? false)
         let canBaloot = allowed && (opts?.balootCards.contains(card.code) ?? false)
-        let fanAngle = Double(index - (total - 1) / 2) * 2.5
+        let fanAngle = Double(index - (total - 1) / 2) * 3.5
         return Button {
             if canBaloot { pendingCard = card }
             else if allowed { Task { await vm.playCard(card.code, baloot: false) } }
