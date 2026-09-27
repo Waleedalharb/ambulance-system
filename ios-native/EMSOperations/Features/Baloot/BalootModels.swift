@@ -50,6 +50,8 @@ struct BalootLobbySeatDTO: Decodable, Equatable {
     let occupied: Bool
     let name: String?
     let disconnected: Bool?
+    /// صورة الموظف — تصل لاحقًا من هوية المجتمع (avatar_url)؛ nil = fallback للحرف.
+    let avatarUrl: String?
 }
 
 /// بطاقة طاولة في مجلس البلوت.
@@ -100,6 +102,8 @@ struct BalootSeatInfoDTO: Decodable, Equatable {
     let seat: Int
     let team: String
     let name: String?
+    /// صورة الموظف — تصل لاحقًا من هوية المجتمع (avatar_url)؛ nil = fallback للحرف.
+    let avatarUrl: String?
 }
 
 /// مشروع مكشوف (بعد الحسم فقط — المُعلن قبل الكشف يبقى خاصًا بصاحبه).
