@@ -3,12 +3,13 @@
 //  EMSOperations
 //
 //  شاشة الطاولة — «مجلس سعودي فاخر + طاولة بلوت حقيقية + هوية قطاع جنوب الرياض»:
-//   أثناء المباراة تصبح الشاشة مشهد مجلس: خلفية دافئة داكنة، وطاولة لباد
-//   بإطار خشبي وحواف ذهبية، وعلامة «قطاع جنوب الرياض · EMS» مائية داخل اللباد
-//   (نبض ECG + نص — ويُستبدل لاحقًا برمز القطاع الرسمي). اللاعبون حول الطاولة
-//   بمقاعد داكنة، وصاحب الدور يتوهج بتوهج ذهبي ناعم واحد (vm.activeTurnSeat —
-//   مصدر authoritative وحيد). الأوراق كريمية معتمة 100% كأنها ورق حقيقي على
-//   الطاولة، والرتب بأسمائها البلوتية (شايب/بنت/ولد/إكّه).
+//   أثناء المباراة تصبح الشاشة مشهد مجلس حقيقيًا: أصل رسومي مرسوم (سدو ودلة
+//   وفانوس وطاولة لباد بإطار خشبي ذهبي — baloot_majlis_bg) وتجلس عليه المقاعد
+//   والأوراق كمكونات تفاعلية حقيقية، مع علامة «قطاع جنوب الرياض · EMS» المائية
+//   فوق اللباد (تُستبدل لاحقًا برمز القطاع الرسمي). صاحب الدور يتوهج بتوهج
+//   ذهبي ناعم واحد (vm.activeTurnSeat — مصدر authoritative وحيد). الأوراق
+//   كريمية معتمة 100% كأنها ورق حقيقي، والرتب بأسمائها البلوتية
+//   (شايب/بنت/ولد/إكّه).
 //
 //  الواجهة لا تعرف قواعد البلوت — تعرض ما يرسله الخادم وتفعّل ما يعيده
 //  /options فقط. لا تغيير في أي منطق لعب أو صوت أو أحداث — UI فقط.
@@ -44,17 +45,11 @@ struct BalootTableView: View {
         return vm.rematch?.accepts?.contains(myId) ?? false
     }
 
-    // MARK: - ألوان المجلس والطاولة (هوية المنصة + فخامة المجلس السعودي)
+    // MARK: - ألوان المشهد (الهوية فوق أصل المجلس المرسوم)
 
-    private let feltTop = Color(red: 0.07, green: 0.28, blue: 0.18)
-    private let feltBottom = Color(red: 0.03, green: 0.14, blue: 0.09)
     private let gold = Color(red: 0.82, green: 0.66, blue: 0.32)
     private let podColor = Color(red: 0.05, green: 0.09, blue: 0.08)
-    private let woodTop = Color(red: 0.20, green: 0.13, blue: 0.08)
-    private let woodBottom = Color(red: 0.10, green: 0.06, blue: 0.04)
     private let cream = Color(red: 0.98, green: 0.965, blue: 0.92)
-    private let majlisTop = Color(red: 0.14, green: 0.08, blue: 0.06)
-    private let majlisBottom = Color(red: 0.03, green: 0.02, blue: 0.02)
 
     var body: some View {
         content
@@ -277,41 +272,24 @@ struct BalootTableView: View {
         }
     }
 
-    /// خلفية المجلس السعودي الدافئة (تدرج عنبري غامق + فينييت) — إيحاء السدو
-    /// والإضاءة الدافئة دون صورة فوتوغرافية.
+    /// خلفية المجلس السعودي: أصل رسومي حقيقي (سدو/دلة/فانوس/طاولة لباد بإطار
+    /// خشبي ذهبي) + تظليل علوي وسفلي خفيف يضمن وضوح عناصر اللعب فوقه.
     private var majlisBackdrop: some View {
         ZStack {
-            LinearGradient(colors: [majlisTop, majlisBottom], startPoint: .top, endPoint: .bottom)
-            RadialGradient(colors: [Color(red: 0.55, green: 0.35, blue: 0.15).opacity(0.16), .clear],
-                           center: .top, startRadius: 10, endRadius: 420)
-            RadialGradient(colors: [.clear, .black.opacity(0.55)],
-                           center: .center, startRadius: 200, endRadius: 620)
+            Image("baloot_majlis_bg")
+                .resizable()
+                .scaledToFill()
+                .ignoresSafeArea()
+            LinearGradient(colors: [Color.black.opacity(0.30), .clear, .clear, Color.black.opacity(0.40)],
+                           startPoint: .top, endPoint: .bottom)
+                .ignoresSafeArea()
         }
-        .ignoresSafeArea()
     }
 
-    /// الطاولة المؤطرة: إطار خشبي داكن + حافة ذهبية + لباد أخضر فاخر.
+    /// الساحة فوق لباد الطاولة المرسوم في الأصل — شفافة بلا طبقات مسطحة،
+    /// فالمقاعد والأوراق تجلس مباشرة على اللباد الحقيقي.
     private var framedTable: some View {
         tableArena
-            .padding(12)
-            .background(
-                LinearGradient(colors: [feltTop, feltBottom], startPoint: .top, endPoint: .bottom)
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .stroke(gold.opacity(0.55), lineWidth: 1.5)
-            )
-            .padding(7) // سماكة الإطار الخشبي
-            .background(
-                LinearGradient(colors: [woodTop, woodBottom], startPoint: .top, endPoint: .bottom)
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 28, style: .continuous)
-                    .stroke(gold.opacity(0.35), lineWidth: 1)
-            )
-            .shadow(color: .black.opacity(0.6), radius: 18, y: 10)
     }
 
     /// شريط النقاط العلوي — كبسولة داكنة: لهم نقطة حمراء · العقد والصفقة · لنا نقطة خضراء.
