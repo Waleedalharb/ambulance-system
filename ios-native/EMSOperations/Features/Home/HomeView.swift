@@ -282,7 +282,7 @@ struct HomeView: View {
                 .stroke(EMSTheme.Colors.teal, style: StrokeStyle(lineWidth: 6.5, lineCap: .round))
                 .rotationEffect(.degrees(-90))
             VStack(spacing: 0) {
-                Text("\(rate)%")
+                Text(verbatim: "\(rate)%")
                     .font(.system(size: 16, weight: .bold))
                     .foregroundStyle(.white)
                 Text("الجاهزية")
