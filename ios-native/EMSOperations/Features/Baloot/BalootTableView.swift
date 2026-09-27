@@ -271,13 +271,12 @@ struct BalootTableView: View {
                 // ساحة اللعب: اللاعبون والمركز داخل حدود اللباد المرسوم نفسه
                 tableArena(felt: felt)
 
-                // HUD علوي كتدفق مرن بعرض الشاشة: هيدر عائم ← نقاط ← معلومات
-                // الجولة ← الحالات ← آخر حدث ← اللاعب العلوي أسفلها مباشرة
-                // (لا position ثابت — لا قصّ ولا تداخل على أي مقاس آيفون).
+                // HUD علوي كتدفق مرن بعرض الشاشة: هيدر عائم ← شريط النقاط
+                // (مع معلومات الجولة وسطه) ← الحالات ← آخر حدث ← اللاعب
+                // العلوي أسفلها مباشرة (لا position ثابت — لا قصّ ولا تداخل).
                 VStack(spacing: 6) {
                     floatingHeader
                     scoreStrip
-                    roundInfoCapsule
                     if let err = vm.actionError {
                         Text(err)
                             .font(.caption2)
@@ -326,8 +325,8 @@ struct BalootTableView: View {
         let drawnW = imgW * scale, drawnH = imgH * scale
         let originX = (size.width - drawnW) / 2
         let originY = (size.height - drawnH) / 2
-        // نِسب اللباد داخل الصورة: يسار/يمين/أعلى/أسفل
-        let l: CGFloat = 0.088, r: CGFloat = 0.912, t: CGFloat = 0.105, b: CGFloat = 0.815
+        // نِسب اللباد داخل الصورة: يسار/يمين/أعلى/أسفل (مقاسة آليًا من الأصل)
+        let l: CGFloat = 0.155, r: CGFloat = 0.845, t: CGFloat = 0.215, b: CGFloat = 0.845
         return CGRect(x: originX + l * drawnW,
                       y: originY + t * drawnH,
                       width: (r - l) * drawnW,
@@ -348,77 +347,74 @@ struct BalootTableView: View {
         }
     }
 
-    /// كبسولة النقاط بعرض الشاشة — «لنا» يمينًا و«لهم» يسارًا وعدّاد المشاهدين
-    /// في الوسط، مع padding واضح من الجانبين حتى لا يقصّ أي نص.
+    /// شريط النقاط حسب المرجع: «لنا» يمينًا (تسمية صغيرة فوق رقم كبير أخضر)،
+    /// العقد والصفقة في الوسط، «لهم» يسارًا (أحمر) — شريط داكن بإطار ذهبي
+    /// بعرض الشاشة وpadding واضح حتى لا يقصّ أي نص.
     private var scoreStrip: some View {
         let myTeam = vm.matchState?.seats?.first(where: { $0.seat == vm.mySeat })?.team
         let scoreA = vm.matchState?.scores?.A ?? 0
         let scoreB = vm.matchState?.scores?.B ?? 0
         let ours = myTeam == "B" ? scoreB : scoreA
         let theirs = myTeam == "B" ? scoreA : scoreB
-        return HStack(spacing: 10) {
-            HStack(spacing: 5) {
-                Circle().fill(EMSTheme.Colors.emerald).frame(width: 7, height: 7)
+        return HStack {
+            // لنا — يمين
+            VStack(spacing: 1) {
                 Text(myTeam == nil ? "A" : "لنا")
                     .font(.caption2)
                 Text("\(myTeam == nil ? scoreA : ours)")
-                    .font(.subheadline.weight(.bold))
+                    .font(.title3.weight(.bold))
             }
             .foregroundStyle(EMSTheme.Colors.emerald)
 
             Spacer()
 
-            if vm.spectators > 0 {
-                Text("👁 \(vm.spectators)")
+            // العقد + الصفقة — الوسط
+            VStack(spacing: 1) {
+                if let c = vm.matchState?.hand?.contract {
+                    Text(BalootLabels.contract(c) + (vm.matchState?.hand?.double != nil ? " ×\(vm.matchState?.hand?.double?.multiplier ?? 2)" : ""))
+                        .font(.subheadline.weight(.bold))
+                        .foregroundStyle(gold)
+                }
+                Text("صفقة \(vm.matchState?.handNumber ?? 1) · الهدف \(vm.matchState?.targetScore ?? 152)")
                     .font(.caption2)
-                    .foregroundStyle(Color.white.opacity(0.55))
+                    .foregroundStyle(Color.white.opacity(0.6))
             }
 
             Spacer()
 
-            HStack(spacing: 5) {
-                Text("\(myTeam == nil ? scoreB : theirs)")
-                    .font(.subheadline.weight(.bold))
+            // لهم — يسار
+            VStack(spacing: 1) {
                 Text(myTeam == nil ? "B" : "لهم")
                     .font(.caption2)
-                Circle().fill(EMSTheme.Colors.danger).frame(width: 7, height: 7)
+                Text("\(myTeam == nil ? scoreB : theirs)")
+                    .font(.title3.weight(.bold))
             }
             .foregroundStyle(EMSTheme.Colors.danger)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 6)
-        .background(Color.black.opacity(0.45))
-        .clipShape(Capsule())
-        .overlay(Capsule().stroke(gold.opacity(0.25), lineWidth: 1))
+        .padding(.horizontal, 20)
+        .padding(.vertical, 7)
+        .background(Color.black.opacity(0.55))
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(gold.opacity(0.3), lineWidth: 1)
+        )
         .frame(maxWidth: .infinity)
     }
 
-    /// معلومات الجولة في كبسولة مستقلة تحت النقاط: العقد (إن وُجد) + الصفقة والهدف.
-    private var roundInfoCapsule: some View {
-        HStack(spacing: 8) {
-            if let c = vm.matchState?.hand?.contract {
-                Text(BalootLabels.contract(c) + (vm.matchState?.hand?.double != nil ? " ×\(vm.matchState?.hand?.double?.multiplier ?? 2)" : ""))
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(gold)
-            }
-            Text("صفقة \(vm.matchState?.handNumber ?? 1) · الهدف \(vm.matchState?.targetScore ?? 152)")
-                .font(.caption2)
-                .foregroundStyle(Color.white.opacity(0.6))
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 4)
-        .background(Color.black.opacity(0.35))
-        .clipShape(Capsule())
-    }
-
-    /// آخر حدث بسطر واحد خفيف — السجل الكامل في طور ما قبل/بعد المباراة.
+    /// آخر حدث في كبسولة صغيرة تحت شريط النقاط — كما في المرجع.
     @ViewBuilder
     private var lastEventLine: some View {
         if let line = vm.feedLines.last {
             Text(line)
-                .font(.caption2)
-                .foregroundStyle(Color.white.opacity(0.6))
+                .font(.caption2.weight(.medium))
+                .foregroundStyle(Color.white.opacity(0.85))
                 .lineLimit(1)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 5)
+                .background(Color.black.opacity(0.5))
+                .clipShape(Capsule())
+                .overlay(Capsule().stroke(gold.opacity(0.2), lineWidth: 1))
                 .id(line) // انتقال ناعم مع كل حدث جديد
                 .transition(.opacity)
         }
@@ -426,13 +422,19 @@ struct BalootTableView: View {
 
     // MARK: - ساحة الطاولة (المقاعد + المركز داخل اللباد)
 
-    /// اللاعبان الجانبان والمركز داخل اللباد بإحداثياته — الشريك العلوي انتقل
-    /// إلى تدفق الـHUD (أسفل معلومات الجولة مباشرة) حتى لا يتداخل معه أبدًا.
+    /// اللاعبان الجانبان والمركز داخل اللباد بإحداثياته — الشريك العلوي في
+    /// تدفق الـHUD. العلامة المائية/شعار القطاع أسفل المركز بحيث لا تغطيها
+    /// أوراق اللعب أبدًا (مكان رمز قطاع جنوب الرياض الرسمي عند وصوله).
     private func tableArena(felt: CGRect) -> some View {
         ZStack {
+            // هوية القطاع: جزء من اللباد في منطقة واضحة — لا ورقة فوقها
+            sectorWatermark
+                .frame(width: felt.width * 0.58)
+                .position(x: felt.midX, y: felt.midY + felt.height * 0.17)
+
             centerStage
-                .frame(width: felt.width * 0.62, height: felt.height * 0.55)
-                .position(x: felt.midX, y: felt.midY + felt.height * 0.07)
+                .frame(width: felt.width * 0.62, height: felt.height * 0.45)
+                .position(x: felt.midX, y: felt.midY - felt.height * 0.03)
 
             seatPod(relative: 1) // يميني
                 .position(x: felt.maxX - 48, y: felt.midY - felt.height * 0.08)
@@ -480,14 +482,14 @@ struct BalootTableView: View {
                 avatarLetter(name, isTurn: isTurn)
             }
         }
-        .frame(width: 38, height: 38)
+        .frame(width: 46, height: 46)
         .background(podColor.opacity(0.9))
         .clipShape(Circle())
         .overlay(
             Circle()
-                .stroke(isTurn ? gold : gold.opacity(0.3), lineWidth: isTurn ? 2 : 1)
+                .stroke(isTurn ? gold : gold.opacity(0.45), lineWidth: isTurn ? 2.5 : 1.5)
         )
-        .shadow(color: isTurn ? gold.opacity(0.45) : .clear, radius: isTurn ? 8 : 0)
+        .shadow(color: isTurn ? gold.opacity(0.5) : .clear, radius: isTurn ? 9 : 0)
     }
 
     /// حرف الاسم — شكل الـfallback والحالة الحالية حتى يوفر الخادم الصور.
@@ -529,15 +531,13 @@ struct BalootTableView: View {
         .frame(height: 17)
     }
 
-    /// مركز الطاولة: العلامة المائية للقطاع خلفًا، والورقة المكشوفة في السوق،
-    /// واللفة موزعة باتجاه أصحابها في اللعب — أوراق معتمة 100% كورق حقيقي.
+    /// مركز الطاولة: الورقة المكشوفة في السوق، واللفة موزعة باتجاه أصحابها
+    /// في اللعب — أوراق معتمة 100% كورق حقيقي. (هوية القطاع منفصلة أسفل
+    /// المركز في tableArena حتى لا تغطيها الأوراق.)
     @ViewBuilder
     private var centerStage: some View {
         let hand = vm.matchState?.hand
         ZStack {
-            // العلامة المائية: نبض ECG + هوية القطاع — تُستبدل لاحقًا برمز القطاع الرسمي
-            sectorWatermark
-
             if let hand, hand.phase.hasPrefix("bidding"), let faceUp = hand.faceUpCard {
                 VStack(spacing: 4) {
                     Text("الورقة المكشوفة")
@@ -675,39 +675,43 @@ struct BalootTableView: View {
 
     // MARK: - الهيدر العائم (أثناء المباراة — بديل شريط التنقل المخفي)
 
-    /// رجوع + اتصال + عنوان الطاولة كعناصر زجاجية عائمة فوق المشهد، حتى يبدأ
-    /// المجلس من أعلى Safe Area مباشرة دون شريط أزرق يحجب الشنطة واللاسلكي.
-    /// (RTL: أول عنصر يظهر يمينًا.)
+    /// الهيدر العائم حسب المرجع: نقطة الاتصال في كبسولة يمينًا، وكبسولة
+    /// العنوان (سهم رجوع + «طاولة بلوت #N») يسارًا — عناصر زجاجية فوق المشهد.
+    /// (RTL: أول عنصر في HStack يظهر يمينًا.)
     private var floatingHeader: some View {
         HStack(spacing: 10) {
-            Button { dismiss() } label: {
-                circleLabel("chevron.backward")
-            }
-            .accessibilityLabel("رجوع")
-
             connectionDot
-                .padding(6)
-                .background(Color.black.opacity(0.45))
+                .padding(9)
+                .background(Color.black.opacity(0.5))
                 .clipShape(Circle())
-                .overlay(Circle().stroke(gold.opacity(0.25), lineWidth: 1))
+                .overlay(Circle().stroke(gold.opacity(0.35), lineWidth: 1))
 
             Spacer()
 
-            Text("طاولة بلوت #\(tableId)")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(Color.white.opacity(0.85))
-                .padding(.horizontal, 12).padding(.vertical, 6)
-                .background(Color.black.opacity(0.45))
+            Button { dismiss() } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "chevron.backward")
+                        .font(.subheadline.weight(.semibold))
+                    Text("طاولة بلوت #\(tableId)")
+                        .font(.subheadline.weight(.semibold))
+                        .lineLimit(1)
+                }
+                .foregroundStyle(Color.white.opacity(0.92))
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .background(Color.black.opacity(0.5))
                 .clipShape(Capsule())
-                .overlay(Capsule().stroke(gold.opacity(0.2), lineWidth: 1))
+                .overlay(Capsule().stroke(gold.opacity(0.35), lineWidth: 1))
+            }
+            .accessibilityLabel("رجوع")
         }
         .padding(.bottom, 2)
     }
 
     // MARK: - الشريط السفلي (كبسولة اليد + أزرار دائرية)
 
-    /// كبسولة «يدك» يمينًا وأزرار دائرية خفيفة يسارًا (سوالف/صوت/قائمة) —
-    /// HUD راقٍ لا يحجب المجلس، ويحل محل شريط «أنا» القديم داخل المباراة.
+    /// كبسولة «يدك» يمينًا وأزرار دائرية خفيفة يسارًا بترتيب المرجع
+    /// (صوت ← سوالف ← قائمة من اليسار) — HUD راقٍ لا يحجب المجلس.
     /// (RTL: أول عنصر في HStack يظهر يمينًا.)
     private var bottomBar: some View {
         HStack(spacing: 12) {
@@ -715,17 +719,17 @@ struct BalootTableView: View {
 
             Spacer()
 
-            if vm.table?.roomId != nil {
-                circleButton("bubble.left.and.bubble.right.fill", label: "سالفة الطاولة") { showChat = true }
-            }
-            circleButton(sound.isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill",
-                         label: sound.isMuted ? "تشغيل الأصوات" : "كتم الأصوات") { sound.toggleMuted() }
             Menu {
                 tableMenuItems
             } label: {
                 circleLabel("ellipsis")
             }
             .accessibilityLabel("إعدادات الطاولة")
+            if vm.table?.roomId != nil {
+                circleButton("bubble.left.and.bubble.right.fill", label: "سالفة الطاولة") { showChat = true }
+            }
+            circleButton(sound.isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill",
+                         label: sound.isMuted ? "تشغيل الأصوات" : "كتم الأصوات") { sound.toggleMuted() }
         }
     }
 
@@ -744,12 +748,21 @@ struct BalootTableView: View {
             .overlay(Circle().stroke(gold.opacity(0.25), lineWidth: 1))
     }
 
-    /// كبسولة «يدك» — تتوهج ذهبيًا عند دوري، وتعرض «مشاهدة» للمتفرج.
+    /// كبسولة «يدك» بأيقونة أوراق — تتوهج ذهبيًا عند دوري، و«مشاهدة» للمتفرج.
     private var handCapsule: some View {
         HStack(spacing: 6) {
-            Text(vm.isSpectator ? "👁 مشاهدة" : "يدك")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(Color.white.opacity(0.85))
+            if vm.isSpectator {
+                Text("👁 مشاهدة")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Color.white.opacity(0.85))
+            } else {
+                Text("يدك")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Color.white.opacity(0.85))
+                Image(systemName: "rectangle.stack.fill")
+                    .font(.caption)
+                    .foregroundStyle(Color.white.opacity(0.85))
+            }
             if vm.isMyTurnNow {
                 Text("دورك 🎯")
                     .font(.caption.weight(.bold))
@@ -757,9 +770,9 @@ struct BalootTableView: View {
             }
         }
         .padding(.horizontal, 12).padding(.vertical, 7)
-        .background(Color.black.opacity(0.45))
+        .background(Color.black.opacity(0.5))
         .clipShape(Capsule())
-        .overlay(Capsule().stroke(vm.isMyTurnNow ? gold : gold.opacity(0.2),
+        .overlay(Capsule().stroke(vm.isMyTurnNow ? gold : gold.opacity(0.3),
                                   lineWidth: vm.isMyTurnNow ? 1.5 : 1))
         .shadow(color: vm.isMyTurnNow ? gold.opacity(0.4) : .clear, radius: 8)
         .animation(.easeInOut(duration: 0.25), value: vm.isMyTurnNow)
