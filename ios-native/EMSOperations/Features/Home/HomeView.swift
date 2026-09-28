@@ -530,12 +530,12 @@ struct HomeView: View {
                     tabRouter.selected = .scheduleOps
                 }
             }
-            // «التكميل» — إعادة الوصول لوظيفة التشييك الموجودة أصلًا (توجيه المالك
-            // 2026-09-28): نفس Destination.completion المسجّلة في جذر الشاشة،
-            // مقيّدة بقسم check من /api/my/sections كما كانت في التصميم السابق.
+            // «جاهزية الفرقة» — إعادة الوصول لوظيفة التشييك الموجودة أصلًا (توجيه
+            // المالك 2026-09-28): نفس Destination.completion المسجّلة في جذر الشاشة،
+            // مقيّدة بقسم check من /api/my/sections — تغيير الاسم الظاهر فقط.
             if session.permissions.canAccessEmployeePortal, vm.sections?.check == true {
                 NavigationLink(value: Destination.completion) {
-                    quickTileLabel("التكميل", icon: "checklist.checked", color: EMSTheme.Colors.teal)
+                    quickTileLabel("جاهزية الفرقة", icon: "checklist.checked", color: EMSTheme.Colors.teal)
                 }
                 .buttonStyle(.plain)
             }

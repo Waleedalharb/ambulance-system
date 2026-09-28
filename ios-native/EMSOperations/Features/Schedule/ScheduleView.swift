@@ -86,13 +86,14 @@ struct ScheduleView: View {
             if let next = vm.nextShift {
                 HStack(spacing: 0) {
                     // الصورة يمين البطاقة (الأول في الترتيب = الأيمن تحت RTL).
-                    // أصل shift_hero مقصوص مسبقًا بنسبة الإطار نفسها (150×155) من
-                    // home_hero المعتمد — scaledToFill يملأ المساحة بلا قصّ علوي/سفلي
-                    // ولا أشرطة فارغة ولا تشويه لنسبة الأبعاد.
-                    Image("shift_hero")
+                    // نفس أصل home_hero المعتمد من الرئيسية — بلا صورة جديدة وبلا
+                    // تعديل على الأصل. الارتفاع هو البُعد الحاكم (155pt من 1184px)
+                    // فلا قصّ علوي/سفلي إطلاقًا؛ الفيض أفقي فقط، وبمحاذاة .trailing
+                    // تُعرض النافذة اليمنى من المشهد: برج المملكة + الإسعاف كاملًا.
+                    Image("home_hero")
                         .resizable()
                         .scaledToFill()
-                        .frame(width: 150, height: 155)
+                        .frame(width: 150, height: 155, alignment: .trailing)
                         .clipped()
                         .overlay(countdownPanel(next))
                     nextShiftContent(next)
