@@ -367,6 +367,36 @@ function initWebSocket(server) {
                         timestamp: new Date().toISOString()
                     });
                 }
+                if (msg.type === 'baloot_subscribe' && typeof msg.topic === 'string') {
+                    // D3: اشتراك مواضيع البلوت — التفويض خادمي عند الاشتراك (الاشتراك ليس تفويضًا)
+                    (async () => {
+                        try {
+                            const allow = await balootTopicAllowed(ws.user, msg.topic);
+                            if (!allow.ok) {
+                                ws.send(JSON.stringify({ type: 'baloot_error', topic: msg.topic, code: allow.code, error: 'لا يمكن الاشتراك في هذا الموضوع' }));
+                                return;
+                            }
+                            ws.balootTopics = ws.balootTopics || [];
+                            if (ws.balootTopics.indexOf(msg.topic) === -1) ws.balootTopics.push(msg.topic);
+                            ws.send(JSON.stringify({ type: 'baloot_subscribed', topic: msg.topic, role: allow.role || 'spectator' }));
+                            const mm = /^baloot:match:(\d+)$/.exec(msg.topic);
+                            if (mm) {
+                                const matchId = Number(mm[1]);
+                                const row = await getBalootStore().getMatch(matchId);
+                                if (row && row.status === 'active') {
+                                    // عودة لاعب منقطع: الاشتراك = reconnect (يبطل مهلة العودة)
+                                    if (allow.role === 'player' && row.paused) {
+                                        await getBalootMatchService().reconnect(matchId, ws.user.id);
+                                    }
+                                    await balootSendMatchSnapshot(ws, matchId);
+                                }
+                            }
+                        } catch (e) { console.error('[baloot-ws] subscribe error:', e.message); }
+                    })();
+                }
+                if (msg.type === 'baloot_unsubscribe' && typeof msg.topic === 'string') {
+                    if (ws.balootTopics) ws.balootTopics = ws.balootTopics.filter(function(t) { return t !== msg.topic; });
+                }
                 if (msg.type === 'ping') {
                     ws.send(JSON.stringify({ type: 'pong', timestamp: Date.now() }));
                 }
@@ -404,6 +434,16 @@ function initWebSocket(server) {
                 });
             }
             clients = clients.filter(function(c) { return c !== ws; });
+
+            // D3: انقطاع جالس في مباراة بلوت نشطة ← إيقاف مؤقت + مهلة عودة (Vision §1.8)
+            if (ws.user && ws.user.id && db) {
+                (async () => {
+                    try {
+                        const rows = await getBalootStore().getActiveMatchesForUser(ws.user.id);
+                        for (const r of rows) await getBalootMatchService().disconnect(r.id, ws.user.id);
+                    } catch (e) { console.error('[baloot-ws] disconnect hook error:', e.message); }
+                })();
+            }
         });
 
         ws.on('error', function(err) {
@@ -1442,6 +1482,397 @@ function getTeamLocationService() {
     }
     return teamLocationService;
 }
+// ═══ EMS Community — C1 Foundation (اعتماد المالك الكتابي 2026-09-24) ═══
+// خدمات مستقلة بالكامل. نقطتا العزل الوحيدتان نحو التشغيل: Identity (Projection
+// محدد) وGate (قراءة resolveEffectiveAssignment كما هو — بلا أي تعديل عليه).
+let communityIdentityService = null;
+function getCommunityIdentityService() {
+    if (!communityIdentityService && db) {
+        const CommunityIdentityService = require('./services/community-identity-service');
+        communityIdentityService = new CommunityIdentityService({ db, usersPath: USERS_PATH });
+    }
+    return communityIdentityService;
+}
+let communityService = null;
+function getCommunityService() {
+    if (!communityService && db) {
+        const CommunityService = require('./services/community-service');
+        // قرار المالك النهائي (2026-09-25): لا بوابة تشغيلية في المجتمع —
+        // CommunityOperationalGateService أُلغي وحُذف من مسار المشاركة.
+        communityService = new CommunityService({ db });
+    }
+    return communityService;
+}
+let communityModerationService = null;
+function getCommunityModerationService() {
+    if (!communityModerationService && db) {
+        const CommunityModerationService = require('./services/community-moderation-service');
+        communityModerationService = new CommunityModerationService({ db, identity: getCommunityIdentityService() });
+    }
+    return communityModerationService;
+}
+// ═══ EMS Community — Full Foundation (اعتماد المالك الكتابي 2026-09-24) ═══
+// مجالس/منشورات/حضور صريح/أنشطة/مناسبات/شارات/منافسات — نفس حدود العزل:
+// لا GPS، لا team_live_locations، لا realtime، ولا وصول لـemployees خارج Identity.
+let communityContentFilterService = null;
+function getCommunityContentFilterService() {
+    if (!communityContentFilterService && db) {
+        const CommunityContentFilterService = require('./services/community-content-filter-service');
+        communityContentFilterService = new CommunityContentFilterService({ db });
+    }
+    return communityContentFilterService;
+}
+let communityCouncilService = null;
+function getCommunityCouncilService() {
+    if (!communityCouncilService && db) {
+        const CommunityCouncilService = require('./services/community-council-service');
+        communityCouncilService = new CommunityCouncilService({
+            db, identity: getCommunityIdentityService(),
+            core: getCommunityService(), filter: getCommunityContentFilterService()
+        });
+    }
+    return communityCouncilService;
+}
+let communityPostService = null;
+function getCommunityPostService() {
+    if (!communityPostService && db) {
+        const CommunityPostService = require('./services/community-post-service');
+        communityPostService = new CommunityPostService({
+            db, identity: getCommunityIdentityService(),
+            core: getCommunityService(), filter: getCommunityContentFilterService()
+        });
+    }
+    return communityPostService;
+}
+let communityPresenceService = null;
+function getCommunityPresenceService() {
+    if (!communityPresenceService && db) {
+        const CommunityPresenceService = require('./services/community-presence-service');
+        communityPresenceService = new CommunityPresenceService({
+            db, identity: getCommunityIdentityService(),
+            core: getCommunityService(), filter: getCommunityContentFilterService()
+        });
+    }
+    return communityPresenceService;
+}
+// ═══ EMS Community — D1: الغرف والدردشة الجماعية (اعتماد المالك الكتابي 2026-09-24) ═══
+let communityRoomService = null;
+function getCommunityRoomService() {
+    if (!communityRoomService && db) {
+        const CommunityRoomService = require('./services/community-room-service');
+        communityRoomService = new CommunityRoomService({
+            db, identity: getCommunityIdentityService(),
+            core: getCommunityService(), filter: getCommunityContentFilterService(),
+            moderation: getCommunityModerationService()
+        });
+    }
+    return communityRoomService;
+}
+let communityChatService = null;
+function getCommunityChatService() {
+    if (!communityChatService && db) {
+        const CommunityChatService = require('./services/community-chat-service');
+        communityChatService = new CommunityChatService({
+            db, identity: getCommunityIdentityService(),
+            core: getCommunityService(), filter: getCommunityContentFilterService(),
+            rooms: getCommunityRoomService()
+        });
+    }
+    return communityChatService;
+}
+let communityActivityService = null;
+function getCommunityActivityService() {
+    if (!communityActivityService && db) {
+        const CommunityActivityService = require('./services/community-activity-service');
+        communityActivityService = new CommunityActivityService({
+            db, identity: getCommunityIdentityService(),
+            core: getCommunityService(), filter: getCommunityContentFilterService(),
+            moderation: getCommunityModerationService()
+        });
+    }
+    return communityActivityService;
+}
+let communityEventService = null;
+function getCommunityEventService() {
+    if (!communityEventService && db) {
+        const CommunityEventService = require('./services/community-event-service');
+        communityEventService = new CommunityEventService({
+            db, identity: getCommunityIdentityService(), filter: getCommunityContentFilterService()
+        });
+    }
+    return communityEventService;
+}
+let communityBadgeService = null;
+function getCommunityBadgeService() {
+    if (!communityBadgeService && db) {
+        const CommunityBadgeService = require('./services/community-badge-service');
+        communityBadgeService = new CommunityBadgeService({
+            db, identity: getCommunityIdentityService(),
+            filter: getCommunityContentFilterService(), moderation: getCommunityModerationService()
+        });
+    }
+    return communityBadgeService;
+}
+let communityCompetitionService = null;
+function getCommunityCompetitionService() {
+    if (!communityCompetitionService && db) {
+        const CommunityCompetitionService = require('./services/community-competition-service');
+        communityCompetitionService = new CommunityCompetitionService({
+            db, identity: getCommunityIdentityService(),
+            core: getCommunityService(), filter: getCommunityContentFilterService()
+        });
+    }
+    return communityCompetitionService;
+}
+/** فحص صلاحية برمجي داخل مسارات المجتمع (للعرض الإداري الموسّع مثلًا). */
+async function communityHasPerm(user, key) {
+    try { return await getPermissionService().hasPermission(user.id, user.role, key); }
+    catch (_) { return false; }
+}
+// حارس توفر المنظومة (مستوى 1 + 5): إطفاء كامل أو دور معطّل ← 403 عام.
+// مسارات admin/settings مستثناة حتى يستطيع المدير إعادة التفعيل.
+async function authorizeCommunityAvailable(req, res, next) {
+    try {
+        const ok = await getCommunityService().isAvailableFor(req.user);
+        if (!ok) return res.status(403).json({ error: 'منظومة المجتمع غير متاحة حاليًا', code: 'COMMUNITY_DISABLED' });
+        next();
+    } catch (e) {
+        console.error('authorizeCommunityAvailable error:', e.message);
+        return res.status(500).json({ error: 'فشل فحص توفر المجتمع' });
+    }
+}
+
+// ═══ EMS Baloot — D3: منصة البلوت الخادمية (اعتماد المالك الكتابي 2026-09-25) ═══
+// حدود مجمّدة (BALOOT-ARCHITECTURE-FREEZE):
+//   · SQLite بجداول baloot_* فقط — صفر قراءة/كتابة تشغيلية من هذه الطبقة.
+//   · البوابة التشغيلية تُستدعى عند «الجلوس» فقط داخل baloot-table-service —
+//     صفر استعلام تشغيلي أثناء المباراة (قرار مجمّد A8).
+//   · الصلاحيات: community.view للعرض/اللوبي · community.create_activity لفتح
+//     طاولة · community.join_activity للجلوس/اللعب — لا مفاتيح جديدة (§14).
+//   · WS: مواضيع baloot:* على قناة /ws القائمة — الاشتراك ليس تفويضًا، وكل
+//     بث مباراة projection حسب دور المشاهد (لاعب يرى يده، مشاهد بلا أيدٍ — A7).
+const balootProjection = require('./services/baloot/baloot-projection');
+
+let balootStore = null;
+function getBalootStore() {
+    if (!balootStore && db) {
+        balootStore = db.makeBalootStore({ get: db.get, all: db.all, run: db.run });
+    }
+    return balootStore;
+}
+let balootTimerService = null;
+function getBalootTimerService() {
+    if (!balootTimerService && db) {
+        const BalootTimerService = require('./services/baloot/baloot-timer-service');
+        balootTimerService = new BalootTimerService({ store: getBalootStore() });
+    }
+    return balootTimerService;
+}
+// ترتيب البث لكل مباراة/طاولة: وعود متسلسلة تحفظ ترتيب seq عند العملاء
+const balootBroadcastQueues = new Map();
+function balootQueueBroadcast(key, fn) {
+    const prev = balootBroadcastQueues.get(key) || Promise.resolve();
+    const next = prev.then(fn).catch(e => console.error('[baloot-ws] broadcast error:', e.message));
+    balootBroadcastQueues.set(key, next);
+}
+let balootMatchService = null;
+function getBalootMatchService() {
+    if (!balootMatchService && db) {
+        const BalootMatchService = require('./services/baloot/baloot-match-service');
+        balootMatchService = new BalootMatchService({
+            store: getBalootStore(),
+            timers: getBalootTimerService(),
+            // تجاوزات اختيارية للاختبارات المعزولة فقط — الإنتاج يبقى على §7.2
+            turnTtlMs: process.env.BALOOT_TURN_TTL_MS ? Number(process.env.BALOOT_TURN_TTL_MS) : undefined,
+            reconnectTtlMs: process.env.BALOOT_RECONNECT_TTL_MS ? Number(process.env.BALOOT_RECONNECT_TTL_MS) : undefined,
+            replaceWindowTtlMs: process.env.BALOOT_REPLACE_WINDOW_TTL_MS ? Number(process.env.BALOOT_REPLACE_WINDOW_TTL_MS) : undefined,
+            broadcast: (matchId, events) => balootQueueBroadcast('m' + matchId, () => balootBroadcastMatch(matchId, events)),
+            onMatchEnd: (matchId) => getBalootTableService().onMatchEnded(matchId)
+                .catch(e => console.error('[baloot] onMatchEnd error:', e.message)),
+            onMatchAbort: (matchId) => getBalootTableService().onMatchAborted(matchId)
+                .catch(e => console.error('[baloot] onMatchAbort error:', e.message))
+        });
+    }
+    return balootMatchService;
+}
+let balootTableService = null;
+function getBalootTableService() {
+    if (!balootTableService && db) {
+        const BalootTableService = require('./services/baloot/baloot-table-service');
+        balootTableService = new BalootTableService({
+            store: getBalootStore(),
+            matchService: getBalootMatchService(),
+            timers: getBalootTimerService(),
+            moderation: getCommunityModerationService(), // الحظر متبادل الأثر على الطاولة
+            readyCheckTtlMs: process.env.BALOOT_READY_TTL_MS ? Number(process.env.BALOOT_READY_TTL_MS) : undefined,
+            lobbyIdleTtlMs: process.env.BALOOT_LOBBY_IDLE_TTL_MS ? Number(process.env.BALOOT_LOBBY_IDLE_TTL_MS) : undefined,
+            broadcast: (tableId, events) => balootQueueBroadcast('t' + tableId, () => balootBroadcastTable(tableId, events))
+        });
+    }
+    return balootTableService;
+}
+
+// مجلس البلوت: كسل الإنشاء بسباق محسوم (slug فريد) — الحاوية المجتمعية للطاولات
+let balootCouncilId = null;
+async function getBalootCouncilId() {
+    if (balootCouncilId) return balootCouncilId;
+    let c = await db.Community.getCouncilBySlug('baloot');
+    if (!c) {
+        try {
+            const id = await db.Community.createCouncil({
+                slug: 'baloot', name: 'مجلس البلوت',
+                description: 'طاولات البلوت — مجلس اللعب الجماعي لمنصة الجنوب',
+                icon: '🃏', membership: 'open', createdBy: 'system'
+            });
+            c = await db.Community.getCouncilById(id);
+        } catch (e) {
+            c = await db.Community.getCouncilBySlug('baloot'); // سباق إنشاء: اقرأ الفائز
+        }
+    }
+    balootCouncilId = c ? c.id : null;
+    return balootCouncilId;
+}
+
+// بث موجه لموضوع baloot — payloadFn(client) تبني الحمولة حسب دور المشاهد (A7)
+function broadcastToBalootTopic(topic, payloadFn) {
+    clients.forEach(function(client) {
+        if (client.readyState !== WebSocket.OPEN || !client.isAuthenticated || !client.user) return;
+        if (!client.balootTopics || client.balootTopics.indexOf(topic) === -1) return;
+        try { client.send(JSON.stringify(payloadFn(client))); }
+        catch (e) { console.error('[baloot-ws] send error:', e.message); }
+    });
+}
+
+// بث أحداث مباراة: الأحداث كلها عامة (لا تحمل أيديًا)، والحالة projection لكل مشاهد
+async function balootBroadcastMatch(matchId, events) {
+    const store = getBalootStore();
+    const state = await getBalootMatchService()._load(matchId); // cache — الحقيقة في السجل
+    const players = await store.getMatchPlayers(matchId);
+    const names = await getCommunityIdentityService().resolveMany(players.map(p => p.user_id));
+    const playersBySeat = {};
+    for (const p of players) {
+        const idn = names[String(p.user_id)];
+        playersBySeat[p.seat] = { name: idn ? idn.display_name : null };
+    }
+    const topic = 'baloot:match:' + matchId;
+    const row = await store.getMatch(matchId);
+    // عدد المشاهدين: مشتركو الموضوع غير الجالسين (للعرض في شاشة الطاولة)
+    let spectators = 0;
+    clients.forEach(function(c) {
+        if (c.readyState === WebSocket.OPEN && c.isAuthenticated && c.balootTopics &&
+            c.balootTopics.indexOf(topic) !== -1 &&
+            !players.some(p => String(p.user_id) === String(c.user.id))) spectators++;
+    });
+    broadcastToBalootTopic(topic, function(client) {
+        const me = players.find(p => String(p.user_id) === String(client.user.id));
+        const proj = me
+            ? balootProjection.forPlayer(state, me.seat, playersBySeat)
+            : balootProjection.forSpectator(state, playersBySeat);
+        return { type: 'baloot_match', topic, matchId, seq: state.seq, events, state: proj, paused: !!(row && row.paused), spectators };
+    });
+}
+
+// بث أحداث طاولة: لمشتركي الطاولة + اللوبي (أحداث عامة بالكامل)
+async function balootBroadcastTable(tableId, events) {
+    const tableTopic = 'baloot:table:' + tableId;
+    broadcastToBalootTopic(tableTopic, () => ({ type: 'baloot_table', topic: tableTopic, tableId, events }));
+    broadcastToBalootTopic('baloot:lobby', () => ({ type: 'baloot_lobby', topic: 'baloot:lobby', tableId, events }));
+}
+
+// لقطة فورية لمشترك واحد (عند الاشتراك/العودة) — projection حسب دوره
+async function balootSendMatchSnapshot(ws, matchId) {
+    const store = getBalootStore();
+    const state = await getBalootMatchService()._load(matchId);
+    const players = await store.getMatchPlayers(matchId);
+    const names = await getCommunityIdentityService().resolveMany(players.map(p => p.user_id));
+    const playersBySeat = {};
+    for (const p of players) {
+        const idn = names[String(p.user_id)];
+        playersBySeat[p.seat] = { name: idn ? idn.display_name : null };
+    }
+    const me = players.find(p => String(p.user_id) === String(ws.user.id));
+    const proj = me
+        ? balootProjection.forPlayer(state, me.seat, playersBySeat)
+        : balootProjection.forSpectator(state, playersBySeat);
+    const row = await store.getMatch(matchId);
+    const topic = 'baloot:match:' + matchId;
+    let spectators = 0;
+    clients.forEach(function(c) {
+        if (c.readyState === WebSocket.OPEN && c.isAuthenticated && c.balootTopics &&
+            c.balootTopics.indexOf(topic) !== -1 &&
+            !players.some(p => String(p.user_id) === String(c.user.id))) spectators++;
+    });
+    ws.send(JSON.stringify({
+        type: 'baloot_match', topic, matchId,
+        seq: state.seq, events: [], state: proj,
+        paused: !!(row && row.paused), status: row ? row.status : null, spectators
+    }));
+}
+
+// تفويض الاشتراك: community.view أولًا، ثم جالس/لاعب أو عضو مجلس البلوت (مشاهد)
+async function balootTopicAllowed(user, topic) {
+    const canView = await getPermissionService().hasPermission(user.id, user.role, 'community.view');
+    if (!canView) return { ok: false, code: 'PERMISSION_DENIED' };
+    if (topic === 'baloot:lobby') return { ok: true, role: 'spectator' };
+    const m = /^baloot:(table|match):(\d+)$/.exec(topic);
+    if (!m) return { ok: false, code: 'BAD_TOPIC' };
+    const id = Number(m[2]);
+    const store = getBalootStore();
+    if (m[1] === 'table') {
+        const seats = await store.getSeats(id);
+        if (seats.some(s => s.user_id === String(user.id) && s.seat_status === 'seated')) {
+            return { ok: true, role: 'player' };
+        }
+    } else {
+        const players = await store.getMatchPlayers(id);
+        if (players.some(p => p.user_id === String(user.id))) return { ok: true, role: 'player' };
+    }
+    const councilId = await getBalootCouncilId();
+    const member = councilId ? await db.Community.getCouncilMember(councilId, user.id) : null;
+    if (member) return { ok: true, role: 'spectator' };
+    return { ok: false, code: 'NOT_A_MEMBER' };
+}
+
+// التجميد الإشرافي يمنع دخول البلوت (فتح/جلوس) — مثل كل مشاركة مجتمعية.
+// المباراة الجارية لا تتعطل: دور المجمّد يلعبه اللعب الآلي حتى نهايتها.
+async function balootAssertNotFrozen(req, res) {
+    const restrictions = await db.Community.getActiveRestrictions(req.user.id);
+    if (restrictions.length > 0) {
+        res.status(403).json({ error: 'مشاركتك في المجتمع مجمّدة حاليًا', code: 'PARTICIPATION_FROZEN' });
+        return false;
+    }
+    return true;
+}
+
+// مخطط أخطاء البلوت: أكواد الخدمات والمحرك ← HTTP (الرسالة العربية تمر كما هي)
+function balootError(res, error, fallback) {
+    const code = error && error.code;
+    const statusByCode = {
+        GATE_DENIED: 403, BLOCKED: 403, NOT_SEATED: 403, NOT_CREATOR: 403, VOTE_NOT_YOURS: 403,
+        PERMISSION_DENIED: 403, PARTICIPATION_FROZEN: 403,
+        MATCH_NOT_FOUND: 404, TABLE_NOT_FOUND: 404,
+        TABLE_CLOSED: 409, TABLE_NOT_OPEN: 409, TABLE_IN_MATCH: 409, TABLE_FULL: 409,
+        SEAT_TAKEN: 409, ALREADY_SEATED: 409, NO_READY_CHECK: 409, NO_REMATCH: 409,
+        MATCH_NOT_ACTIVE: 409, MATCH_PAUSED: 409, SEAT_NOT_OUT: 409, NO_VOTE_OPEN: 409,
+        MATCH_FINISHED: 409, HAND_ALREADY_RUNNING: 409,
+        NOT_YOUR_TURN: 409, NOT_BIDDING_PHASE: 409, NOT_PLAYING_PHASE: 409,
+        MUST_FOLLOW_SUIT: 409, DOUBLE_NOT_YOURS: 409, THRI_NOT_YOURS: 409,
+        FUR_NOT_YOURS: 409, DOUBLE_CHAIN_INVALID: 409, DOUBLE_SUN_LOCKED: 409,
+        QAHWA_TRAILING_ONLY: 409, QAHWA_ALREADY: 409, QAHWA_HOKUM_ONLY: 409,
+        BALOOT_ALREADY: 409, BALOOT_HOKUM_ONLY: 409, BALOOT_INCOMPLETE: 409,
+        BALOOT_BLOCKED_BY_MIYA: 409, DECLARATION_TOO_LATE: 409,
+        ASHKAL_ROUND2_ONLY: 409, ASHKAL_NOT_ALLOWED: 409, TRUMP_SUIT_INVALID: 409,
+        ACTION_NOT_ALLOWED: 400, ACTION_INVALID: 400, ACTION_UNKNOWN: 400,
+        BID_KIND_INVALID: 400, TRUMP_SUIT_REQUIRED: 400, CARD_NOT_IN_HAND: 400,
+        PROJECT_NOT_FOUND: 400, BALOOT_CARD_INVALID: 400, AUTO_NO_BALOOT: 400
+    };
+    const status = statusByCode[code] || 500;
+    if (status >= 500) console.error('[baloot]', error);
+    const body = { error: status >= 500 ? fallback : error.message, code: code || undefined };
+    if (code === 'GATE_DENIED' && error.reason) body.reason = error.reason; // OPERATIONAL_DUTY · ACTIVE_ASSIGNMENT · ATTENDANCE_STATE
+    res.status(status).json(body);
+}
+
 function myCheckError(res, error, fallback) {
     const status = error.statusCode || 500;
     if (status >= 500) console.error('[shift-check]', error);
@@ -1549,6 +1980,921 @@ app.get('/api/ops/team-locations', authenticate, authorizePerm('ops.team_locatio
         const out = await getTeamLocationService().list();
         res.json({ success: true, ...out });
     } catch (error) { myCheckError(res, error, 'فشل في جلب مواقع الفرق'); }
+});
+
+// ═══ EMS Community — C1 Foundation (اعتماد المالك الكتابي 2026-09-24) ═══
+// أساس فقط: حالة/هوية/بوابة + Block/Report/Queue/Audit + مفاتيح التعطيل.
+// لا مجالس ولا منشورات ولا فعاليات ولا بطولات ولا realtime (C2+).
+// إجراءات السلامة (بلاغ/حظر) لا تمر بالبوابة التشغيلية — تبقى متاحة دائمًا.
+
+// حالة المجتمع للمستخدم الحالي: توفر + هوية العرض (Projection) + تقييدات
+// (قرار المالك 2026-09-25: أُلغيت البوابة التشغيلية — gate يُعاد ثابتًا
+//  allow دائمًا لتوافق الواجهة، والمناوبة لا تؤثر على الأهلية إطلاقًا)
+app.get('/api/community/status', authenticate, authorizePerm('community.view'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const me = await getCommunityIdentityService().resolveByUser(req.user);
+        const restrictions = await db.Community.getActiveRestrictions(req.user.id);
+        res.json({
+            success: true, enabled: true, me,
+            gate: { allowRead: true, allowParticipation: true, reason: null },
+            participationFrozen: restrictions.length > 0
+        });
+    } catch (error) { myCheckError(res, error, 'فشل في جلب حالة المجتمع'); }
+});
+
+// ── Block (سلامة — متاح دائمًا ولو في حالة تشغيلية) ──
+app.post('/api/community/block', authenticate, authorizePerm('community.view'), authorizeCommunityAvailable, validateBody({
+    userId: { required: true, type: 'string', minLength: 1, maxLength: 64 }
+}), async (req, res) => {
+    try {
+        const out = await getCommunityModerationService().block(req.user, req.body.userId);
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في حظر المستخدم'); }
+});
+
+app.post('/api/community/unblock', authenticate, authorizePerm('community.view'), authorizeCommunityAvailable, validateBody({
+    userId: { required: true, type: 'string', minLength: 1, maxLength: 64 }
+}), async (req, res) => {
+    try {
+        const out = await getCommunityModerationService().unblock(req.user, req.body.userId);
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في فك الحظر'); }
+});
+
+app.get('/api/community/blocks', authenticate, authorizePerm('community.view'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const out = await getCommunityModerationService().myBlocks(req.user);
+        res.json({ success: true, blocks: out });
+    } catch (error) { myCheckError(res, error, 'فشل في جلب قائمة الحظر'); }
+});
+
+// ── Report (سلامة — متاح دائمًا) ──
+app.post('/api/community/report', authenticate, authorizePerm('community.view'), authorizeCommunityAvailable, validateBody({
+    targetType: { required: true, type: 'string', minLength: 2, maxLength: 20 },
+    targetId: { required: true, type: 'string', minLength: 1, maxLength: 64 },
+    reason: { required: true, type: 'string', minLength: 3, maxLength: 500 }
+}), async (req, res) => {
+    try {
+        const out = await getCommunityModerationService().report(req.user, req.body);
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في إرسال البلاغ'); }
+});
+
+// ── الإشراف (community.moderate) ──
+app.get('/api/community/moderation/queue', authenticate, authorizePerm('community.moderate'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const out = await getCommunityModerationService().queue(req.query.status);
+        res.json({ success: true, reports: out });
+    } catch (error) { myCheckError(res, error, 'فشل في جلب قائمة البلاغات'); }
+});
+
+app.post('/api/community/moderation/reports/:id/action', authenticate, authorizePerm('community.moderate'), authorizeCommunityAvailable, validateBody({
+    action: { required: true, type: 'string', minLength: 2, maxLength: 20 },
+    note: { required: false, type: 'string', maxLength: 300 }
+}), async (req, res) => {
+    try {
+        const out = await getCommunityModerationService().handleReport(req.user, req.params.id, req.body);
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في معالجة البلاغ'); }
+});
+
+app.post('/api/community/moderation/restrictions/:id/lift', authenticate, authorizePerm('community.moderate'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const out = await getCommunityModerationService().liftRestriction(req.user, req.params.id);
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في فك التقييد'); }
+});
+
+app.get('/api/community/moderation/audit', authenticate, authorizePerm('community.moderate'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const limit = Math.min(parseInt(req.query.limit, 10) || 50, 200);
+        const offset = parseInt(req.query.offset, 10) || 0;
+        const out = await getCommunityModerationService().auditTrail(limit, offset);
+        res.json({ success: true, audit: out });
+    } catch (error) { myCheckError(res, error, 'فشل في جلب سجل التدقيق'); }
+});
+
+// ── الإدارة (community.admin) — مستثناة من حارس التوفر حتى يمكن إعادة التفعيل ──
+app.get('/api/community/admin/settings', authenticate, authorizePerm('community.admin'), async (req, res) => {
+    try {
+        const out = await getCommunityService().getSettings();
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في جلب إعدادات المجتمع'); }
+});
+
+app.put('/api/community/admin/settings', authenticate, authorizePerm('community.admin'), validateBody({
+    enabled: { required: false, type: 'boolean' },
+    disabledRoles: { required: false, type: 'array' }
+}), async (req, res) => {
+    try {
+        const svc = getCommunityService();
+        if (typeof req.body.enabled === 'boolean') await svc.setEnabled(req.body.enabled, req.user);
+        if (Array.isArray(req.body.disabledRoles)) await svc.setDisabledRoles(req.body.disabledRoles, req.user);
+        const out = await svc.getSettings();
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في تحديث إعدادات المجتمع'); }
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// EMS Community — Full Foundation (اعتماد المالك الكتابي 2026-09-24)
+// مجالس/منشورات/حضور صريح/أنشطة/مناسبات/شارات/منافسات — On-demand API فقط:
+// لا WebSocket ولا SSE ولا realtime. مسارات community.admin مستثناة من حارس
+// التوفر (إدارة المحتوى تبقى ممكنة أثناء الإطفاء) — بقية المسارات خلف الحارس.
+// ════════════════════════════════════════════════════════════════════════════
+
+// ── المجالس ──
+app.get('/api/community/councils', authenticate, authorizePerm('community.view'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const includeDisabled = req.query.all === '1' && await communityHasPerm(req.user, 'community.admin');
+        const out = await getCommunityCouncilService().list(req.user, { includeDisabled });
+        res.json({ success: true, councils: out });
+    } catch (error) { myCheckError(res, error, 'فشل في جلب المجالس'); }
+});
+
+app.post('/api/community/councils', authenticate, authorizePerm('community.admin'), validateBody({
+    slug: { required: true, type: 'string', minLength: 3, maxLength: 50 },
+    name: { required: true, type: 'string', minLength: 2, maxLength: 80 },
+    description: { required: false, type: 'string', maxLength: 500 },
+    icon: { required: false, type: 'string', maxLength: 16 },
+    membership: { required: false, type: 'string', maxLength: 10 }
+}), async (req, res) => {
+    try {
+        const out = await getCommunityCouncilService().create(req.user, req.body);
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في إنشاء المجلس'); }
+});
+
+app.get('/api/community/councils/:id', authenticate, authorizePerm('community.view'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const out = await getCommunityCouncilService().get(req.user, parseInt(req.params.id, 10));
+        res.json({ success: true, council: out });
+    } catch (error) { myCheckError(res, error, 'فشل في جلب المجلس'); }
+});
+
+app.put('/api/community/councils/:id', authenticate, authorizePerm('community.admin'), validateBody({
+    name: { required: false, type: 'string', minLength: 2, maxLength: 80 },
+    description: { required: false, type: 'string', maxLength: 500 },
+    icon: { required: false, type: 'string', maxLength: 16 },
+    membership: { required: false, type: 'string', maxLength: 10 },
+    status: { required: false, type: 'string', maxLength: 12 }
+}), async (req, res) => {
+    try {
+        const out = await getCommunityCouncilService().update(req.user, parseInt(req.params.id, 10), req.body);
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في تحديث المجلس'); }
+});
+
+app.post('/api/community/councils/:id/join', authenticate, authorizePerm('community.view'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const out = await getCommunityCouncilService().join(req.user, parseInt(req.params.id, 10));
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في الانضمام للمجلس'); }
+});
+
+app.post('/api/community/councils/:id/leave', authenticate, authorizePerm('community.view'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const out = await getCommunityCouncilService().leave(req.user, parseInt(req.params.id, 10));
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في مغادرة المجلس'); }
+});
+
+app.get('/api/community/councils/:id/members', authenticate, authorizePerm('community.view'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const limit = Math.min(parseInt(req.query.limit, 10) || 100, 200);
+        const offset = parseInt(req.query.offset, 10) || 0;
+        const out = await getCommunityCouncilService().members(req.user, parseInt(req.params.id, 10), { limit, offset });
+        res.json({ success: true, members: out });
+    } catch (error) { myCheckError(res, error, 'فشل في جلب أعضاء المجلس'); }
+});
+
+app.put('/api/community/councils/:id/members/:userId', authenticate, authorizePerm('community.moderate'), authorizeCommunityAvailable, validateBody({
+    role: { required: true, type: 'string', minLength: 4, maxLength: 10 }
+}), async (req, res) => {
+    try {
+        const out = await getCommunityCouncilService().setMember(req.user, parseInt(req.params.id, 10), req.params.userId, req.body.role);
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في تعديل عضوية المجلس'); }
+});
+
+app.delete('/api/community/councils/:id/members/:userId', authenticate, authorizePerm('community.moderate'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const out = await getCommunityCouncilService().removeMember(req.user, parseInt(req.params.id, 10), req.params.userId);
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في إزالة عضو المجلس'); }
+});
+
+// ── منشورات المجالس (بلا تعليقات — قرار معماري v3) ──
+app.get('/api/community/councils/:id/posts', authenticate, authorizePerm('community.view'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const limit = Math.min(parseInt(req.query.limit, 10) || 20, 50);
+        const offset = parseInt(req.query.offset, 10) || 0;
+        const out = await getCommunityPostService().list(req.user, parseInt(req.params.id, 10), { limit, offset });
+        res.json({ success: true, posts: out });
+    } catch (error) { myCheckError(res, error, 'فشل في جلب المنشورات'); }
+});
+
+app.post('/api/community/councils/:id/posts', authenticate, authorizePerm('community.post'), authorizeCommunityAvailable, validateBody({
+    content: { required: true, type: 'string', minLength: 1, maxLength: 2000 }
+}), async (req, res) => {
+    try {
+        const out = await getCommunityPostService().create(req.user, parseInt(req.params.id, 10), req.body);
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في نشر المنشور'); }
+});
+
+app.delete('/api/community/posts/:id', authenticate, authorizePerm('community.post'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const out = await getCommunityPostService().removeOwn(req.user, parseInt(req.params.id, 10));
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في حذف المنشور'); }
+});
+
+// ── «من موجود؟» — Explicit Social Status فقط (لا GPS/لا موقع/لا استنتاج) ──
+app.get('/api/community/presence', authenticate, authorizePerm('community.view'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const limit = Math.min(parseInt(req.query.limit, 10) || 50, 100);
+        const offset = parseInt(req.query.offset, 10) || 0;
+        const out = await getCommunityPresenceService().list(req.user, { limit, offset });
+        res.json({ success: true, presence: out });
+    } catch (error) { myCheckError(res, error, 'فشل في جلب «من موجود؟»'); }
+});
+
+app.get('/api/community/presence/me', authenticate, authorizePerm('community.view'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const out = await getCommunityPresenceService().mine(req.user);
+        res.json({ success: true, presence: out });
+    } catch (error) { myCheckError(res, error, 'فشل في جلب حالتك'); }
+});
+
+app.put('/api/community/presence', authenticate, authorizePerm('community.view'), authorizeCommunityAvailable, validateBody({
+    status: { required: true, type: 'string', minLength: 3, maxLength: 15 },
+    note: { required: false, type: 'string', maxLength: 120 }
+}), async (req, res) => {
+    try {
+        const out = await getCommunityPresenceService().setMine(req.user, req.body);
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في ضبط حالتك'); }
+});
+
+// ── D1: الغرف والدردشة الجماعية (غرفة مجلس + غرفة خاصة — لا 1:1 إطلاقًا) ──
+// غرفي: غرف مجالسي القائمة + غرفي الخاصة
+app.get('/api/community/rooms', authenticate, authorizePerm('community.view'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const out = await getCommunityRoomService().listMine(req.user);
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في جلب الغرف'); }
+});
+
+// غرفة مجلس (كسولة الإنشاء — عضوية المجلس شرط)
+app.get('/api/community/councils/:id/room', authenticate, authorizePerm('community.view'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const out = await getCommunityRoomService().ensureCouncilRoom(req.user, parseInt(req.params.id, 10));
+        res.json({
+            success: true,
+            room: { id: out.room.id, kind: 'council', name: out.room.name, councilId: out.council.id, councilName: out.council.name, status: out.room.status }
+        });
+    } catch (error) { myCheckError(res, error, 'فشل في فتح غرفة المجلس'); }
+});
+
+// إنشاء غرفة خاصة — community.post (إنشاء = مشاركة اجتماعية)
+app.post('/api/community/rooms', authenticate, authorizePerm('community.post'), authorizeCommunityAvailable, validateBody({
+    name: { required: true, type: 'string', minLength: 2, maxLength: 60 }
+}), async (req, res) => {
+    try {
+        const out = await getCommunityRoomService().createPrivate(req.user, req.body);
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في إنشاء الغرفة'); }
+});
+
+// تفاصيل غرفة + أعضاؤها (وصول محروس داخل الخدمة)
+app.get('/api/community/rooms/:id', authenticate, authorizePerm('community.view'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const out = await getCommunityRoomService().getRoom(req.user, parseInt(req.params.id, 10));
+        res.json({ success: true, room: out });
+    } catch (error) { myCheckError(res, error, 'فشل في جلب الغرفة'); }
+});
+
+// إضافة عضو لغرفة خاصة (المنشئ فقط داخل الخدمة)
+app.post('/api/community/rooms/:id/members', authenticate, authorizePerm('community.post'), authorizeCommunityAvailable, validateBody({
+    userId: { required: true, type: 'string', minLength: 1, maxLength: 64 }
+}), async (req, res) => {
+    try {
+        const out = await getCommunityRoomService().addMember(req.user, parseInt(req.params.id, 10), req.body.userId);
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في إضافة العضو'); }
+});
+
+// إزالة عضو (المنشئ) / مغادرة ذاتية / إغلاق (المنشئ)
+app.delete('/api/community/rooms/:id/members/:userId', authenticate, authorizePerm('community.view'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const out = await getCommunityRoomService().removeMember(req.user, parseInt(req.params.id, 10), req.params.userId);
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في إزالة العضو'); }
+});
+
+app.post('/api/community/rooms/:id/leave', authenticate, authorizePerm('community.view'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const out = await getCommunityRoomService().leave(req.user, parseInt(req.params.id, 10));
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في مغادرة الغرفة'); }
+});
+
+app.post('/api/community/rooms/:id/close', authenticate, authorizePerm('community.post'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const out = await getCommunityRoomService().close(req.user, parseInt(req.params.id, 10));
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في إغلاق الغرفة'); }
+});
+
+// رسائل الغرفة — قراءة تزايدية بـsince_id (الجديد فقط) + إرسال محروس
+app.get('/api/community/rooms/:id/messages', authenticate, authorizePerm('community.view'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const out = await getCommunityChatService().list(req.user, parseInt(req.params.id, 10), {
+            sinceId: req.query.since_id, limit: req.query.limit
+        });
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في جلب الرسائل'); }
+});
+
+app.post('/api/community/rooms/:id/messages', authenticate, authorizePerm('community.post'), authorizeCommunityAvailable, validateBody({
+    content: { required: true, type: 'string', minLength: 1, maxLength: 1000 }
+}), async (req, res) => {
+    try {
+        const out = await getCommunityChatService().send(req.user, parseInt(req.params.id, 10), req.body);
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في إرسال الرسالة'); }
+});
+
+// إشراف رسائل الغرف — نفس نمط إشراف المنشورات
+app.get('/api/community/moderation/chat-messages', authenticate, authorizePerm('community.moderate'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const out = await getCommunityChatService().listModeration(req.user, { status: req.query.status });
+        res.json({ success: true, messages: out });
+    } catch (error) { myCheckError(res, error, 'فشل في جلب الرسائل الموقوفة'); }
+});
+
+app.post('/api/community/moderation/chat-messages/:id/status', authenticate, authorizePerm('community.moderate'), authorizeCommunityAvailable, validateBody({
+    status: { required: true, type: 'string', minLength: 3, maxLength: 15 },
+    note: { required: false, type: 'string', maxLength: 500 }
+}), async (req, res) => {
+    try {
+        const out = await getCommunityChatService().moderateSetStatus(req.user, parseInt(req.params.id, 10), req.body.status, req.body.note);
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في تحديث حالة الرسالة'); }
+});
+
+// ── أنواع الأنشطة ──
+app.get('/api/community/activity-types', authenticate, authorizePerm('community.view'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const out = await getCommunityActivityService().listTypes();
+        res.json({ success: true, types: out });
+    } catch (error) { myCheckError(res, error, 'فشل في جلب أنواع الأنشطة'); }
+});
+
+app.post('/api/community/admin/activity-types', authenticate, authorizePerm('community.admin'), validateBody({
+    key: { required: true, type: 'string', minLength: 3, maxLength: 40 },
+    name: { required: true, type: 'string', minLength: 2, maxLength: 60 },
+    description: { required: false, type: 'string', maxLength: 300 },
+    icon: { required: false, type: 'string', maxLength: 16 }
+}), async (req, res) => {
+    try {
+        const out = await getCommunityActivityService().createType(req.user, req.body);
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في إنشاء نوع النشاط'); }
+});
+
+app.put('/api/community/admin/activity-types/:id', authenticate, authorizePerm('community.admin'), validateBody({
+    name: { required: false, type: 'string', minLength: 2, maxLength: 60 },
+    description: { required: false, type: 'string', maxLength: 300 },
+    icon: { required: false, type: 'string', maxLength: 16 },
+    enabled: { required: false, type: 'boolean' }
+}), async (req, res) => {
+    try {
+        const out = await getCommunityActivityService().updateType(req.user, parseInt(req.params.id, 10), req.body);
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في تحديث نوع النشاط'); }
+});
+
+// ── الأنشطة / الفعاليات الواقعية ──
+app.get('/api/community/activities', authenticate, authorizePerm('community.view'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const limit = Math.min(parseInt(req.query.limit, 10) || 20, 50);
+        const offset = parseInt(req.query.offset, 10) || 0;
+        const councilId = req.query.councilId ? parseInt(req.query.councilId, 10) : undefined;
+        const out = await getCommunityActivityService().list(req.user, {
+            status: req.query.status || undefined, councilId, limit, offset
+        });
+        res.json({ success: true, activities: out });
+    } catch (error) { myCheckError(res, error, 'فشل في جلب الأنشطة'); }
+});
+
+app.post('/api/community/activities', authenticate, authorizePerm('community.create_activity'), authorizeCommunityAvailable, validateBody({
+    typeId: { required: true, type: 'number' },
+    councilId: { required: false, type: 'number' },
+    title: { required: true, type: 'string', minLength: 2, maxLength: 120 },
+    description: { required: false, type: 'string', maxLength: 1000 },
+    locationText: { required: false, type: 'string', maxLength: 200 },
+    startsAt: { required: false, type: 'string', maxLength: 40 },
+    endsAt: { required: false, type: 'string', maxLength: 40 },
+    maxParticipants: { required: false, type: 'number', min: 2, max: 500 }
+}), async (req, res) => {
+    try {
+        const out = await getCommunityActivityService().create(req.user, req.body);
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في إنشاء النشاط'); }
+});
+
+app.get('/api/community/activities/:id', authenticate, authorizePerm('community.view'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const out = await getCommunityActivityService().get(req.user, parseInt(req.params.id, 10));
+        res.json({ success: true, activity: out });
+    } catch (error) { myCheckError(res, error, 'فشل في جلب النشاط'); }
+});
+
+app.put('/api/community/activities/:id', authenticate, authorizePerm('community.create_activity'), authorizeCommunityAvailable, validateBody({
+    title: { required: false, type: 'string', minLength: 2, maxLength: 120 },
+    description: { required: false, type: 'string', maxLength: 1000 },
+    locationText: { required: false, type: 'string', maxLength: 200 },
+    startsAt: { required: false, type: 'string', maxLength: 40 },
+    endsAt: { required: false, type: 'string', maxLength: 40 },
+    maxParticipants: { required: false, type: 'number', min: 2, max: 500 },
+    status: { required: false, type: 'string', maxLength: 12 }
+}), async (req, res) => {
+    try {
+        const out = await getCommunityActivityService().updateOwn(req.user, parseInt(req.params.id, 10), req.body);
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في تحديث النشاط'); }
+});
+
+app.post('/api/community/activities/:id/join', authenticate, authorizePerm('community.join_activity'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const out = await getCommunityActivityService().join(req.user, parseInt(req.params.id, 10));
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في الانضمام للنشاط'); }
+});
+
+// الانسحاب انسحاب دائمًا — لا يتطلب إلا community.view (لا يُحبس أحد في نشاط)
+app.post('/api/community/activities/:id/leave', authenticate, authorizePerm('community.view'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const out = await getCommunityActivityService().leave(req.user, parseInt(req.params.id, 10));
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في مغادرة النشاط'); }
+});
+
+app.get('/api/community/activities/:id/participants', authenticate, authorizePerm('community.view'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const limit = Math.min(parseInt(req.query.limit, 10) || 100, 200);
+        const offset = parseInt(req.query.offset, 10) || 0;
+        const out = await getCommunityActivityService().participants(req.user, parseInt(req.params.id, 10), { limit, offset });
+        res.json({ success: true, participants: out });
+    } catch (error) { myCheckError(res, error, 'فشل في جلب المشاركين'); }
+});
+
+app.post('/api/community/moderation/activities/:id/status', authenticate, authorizePerm('community.moderate'), authorizeCommunityAvailable, validateBody({
+    status: { required: true, type: 'string', minLength: 5, maxLength: 12 },
+    note: { required: false, type: 'string', maxLength: 300 }
+}), async (req, res) => {
+    try {
+        const out = await getCommunityActivityService().moderateSetStatus(req.user, parseInt(req.params.id, 10), req.body.status, req.body.note);
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في الإشراف على النشاط'); }
+});
+
+// ── المناسبات ──
+app.get('/api/community/events', authenticate, authorizePerm('community.view'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const out = await getCommunityEventService().listCurrent();
+        res.json({ success: true, events: out });
+    } catch (error) { myCheckError(res, error, 'فشل في جلب المناسبات'); }
+});
+
+app.get('/api/community/admin/events', authenticate, authorizePerm('community.admin'), async (req, res) => {
+    try {
+        const out = await getCommunityEventService().listAll({});
+        res.json({ success: true, events: out });
+    } catch (error) { myCheckError(res, error, 'فشل في جلب المناسبات'); }
+});
+
+app.post('/api/community/admin/events', authenticate, authorizePerm('community.admin'), validateBody({
+    title: { required: true, type: 'string', minLength: 2, maxLength: 120 },
+    icon: { required: false, type: 'string', maxLength: 16 },
+    description: { required: false, type: 'string', maxLength: 1000 },
+    banner: { required: false, type: 'string', maxLength: 500 },
+    startsAt: { required: false, type: 'string', maxLength: 40 },
+    endsAt: { required: false, type: 'string', maxLength: 40 },
+    linkedActivityId: { required: false, type: 'number' }
+}), async (req, res) => {
+    try {
+        const out = await getCommunityEventService().create(req.user, req.body);
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في إنشاء المناسبة'); }
+});
+
+app.put('/api/community/admin/events/:id', authenticate, authorizePerm('community.admin'), validateBody({
+    title: { required: false, type: 'string', minLength: 2, maxLength: 120 },
+    icon: { required: false, type: 'string', maxLength: 16 },
+    description: { required: false, type: 'string', maxLength: 1000 },
+    banner: { required: false, type: 'string', maxLength: 500 },
+    startsAt: { required: false, type: 'string', maxLength: 40 },
+    endsAt: { required: false, type: 'string', maxLength: 40 },
+    status: { required: false, type: 'string', maxLength: 10 },
+    linkedActivityId: { required: false, type: 'number' }
+}), async (req, res) => {
+    try {
+        const out = await getCommunityEventService().update(req.user, parseInt(req.params.id, 10), req.body);
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في تحديث المناسبة'); }
+});
+
+// ── الشارات والإنجازات ──
+app.get('/api/community/badges', authenticate, authorizePerm('community.view'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const out = await getCommunityBadgeService().list();
+        res.json({ success: true, badges: out });
+    } catch (error) { myCheckError(res, error, 'فشل في جلب الشارات'); }
+});
+
+app.get('/api/community/users/:userId/badges', authenticate, authorizePerm('community.view'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const out = await getCommunityBadgeService().forUser(req.user, req.params.userId);
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في جلب شارات المستخدم'); }
+});
+
+app.post('/api/community/admin/badges', authenticate, authorizePerm('community.admin'), validateBody({
+    key: { required: true, type: 'string', minLength: 3, maxLength: 50 },
+    name: { required: true, type: 'string', minLength: 2, maxLength: 60 },
+    description: { required: false, type: 'string', maxLength: 300 },
+    icon: { required: false, type: 'string', maxLength: 16 }
+}), async (req, res) => {
+    try {
+        const out = await getCommunityBadgeService().create(req.user, req.body);
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في إنشاء الشارة'); }
+});
+
+app.post('/api/community/badges/:id/award', authenticate, authorizePerm('community.moderate'), authorizeCommunityAvailable, validateBody({
+    userId: { required: true, type: 'string', minLength: 1, maxLength: 64 },
+    context: { required: false, type: 'string', maxLength: 200 }
+}), async (req, res) => {
+    try {
+        const out = await getCommunityBadgeService().award(req.user, parseInt(req.params.id, 10), req.body);
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في منح الشارة'); }
+});
+
+app.post('/api/community/moderation/user-badges/:id/revoke', authenticate, authorizePerm('community.moderate'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const out = await getCommunityBadgeService().revoke(req.user, parseInt(req.params.id, 10));
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في سحب الشارة'); }
+});
+
+// ── المنافسات (معنوية فقط — لا مال/رهان/رسوم دخول بحكم التصميم) ──
+app.get('/api/community/competitions', authenticate, authorizePerm('community.view'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const limit = Math.min(parseInt(req.query.limit, 10) || 20, 50);
+        const offset = parseInt(req.query.offset, 10) || 0;
+        const out = await getCommunityCompetitionService().list(req.user, {
+            status: req.query.status || undefined, limit, offset
+        });
+        res.json({ success: true, competitions: out });
+    } catch (error) { myCheckError(res, error, 'فشل في جلب المنافسات'); }
+});
+
+app.get('/api/community/competitions/:id', authenticate, authorizePerm('community.view'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const out = await getCommunityCompetitionService().get(req.user, parseInt(req.params.id, 10));
+        res.json({ success: true, competition: out });
+    } catch (error) { myCheckError(res, error, 'فشل في جلب المنافسة'); }
+});
+
+app.post('/api/community/competitions/:id/join', authenticate, authorizePerm('community.tournament'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const out = await getCommunityCompetitionService().join(req.user, parseInt(req.params.id, 10));
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في الانضمام للمنافسة'); }
+});
+
+app.post('/api/community/admin/competitions', authenticate, authorizePerm('community.admin'), validateBody({
+    name: { required: true, type: 'string', minLength: 2, maxLength: 120 },
+    description: { required: false, type: 'string', maxLength: 1000 },
+    scope: { required: false, type: 'string', maxLength: 12 },
+    activityId: { required: false, type: 'number' },
+    rules: { required: false, type: 'string', maxLength: 2000 },
+    startsAt: { required: false, type: 'string', maxLength: 40 },
+    endsAt: { required: false, type: 'string', maxLength: 40 }
+}), async (req, res) => {
+    try {
+        const out = await getCommunityCompetitionService().create(req.user, req.body);
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في إنشاء المنافسة'); }
+});
+
+app.put('/api/community/admin/competitions/:id', authenticate, authorizePerm('community.admin'), validateBody({
+    name: { required: false, type: 'string', minLength: 2, maxLength: 120 },
+    description: { required: false, type: 'string', maxLength: 1000 },
+    scope: { required: false, type: 'string', maxLength: 12 },
+    status: { required: false, type: 'string', maxLength: 12 },
+    rules: { required: false, type: 'string', maxLength: 2000 },
+    startsAt: { required: false, type: 'string', maxLength: 40 },
+    endsAt: { required: false, type: 'string', maxLength: 40 },
+    activityId: { required: false, type: 'number' }
+}), async (req, res) => {
+    try {
+        const out = await getCommunityCompetitionService().update(req.user, parseInt(req.params.id, 10), req.body);
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في تحديث المنافسة'); }
+});
+
+app.post('/api/community/admin/competitions/:id/participants', authenticate, authorizePerm('community.admin'), validateBody({
+    label: { required: true, type: 'string', minLength: 2, maxLength: 80 },
+    userId: { required: false, type: 'string', minLength: 1, maxLength: 64 }
+}), async (req, res) => {
+    try {
+        const out = await getCommunityCompetitionService().addParticipant(req.user, parseInt(req.params.id, 10), req.body);
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في إضافة المشارك'); }
+});
+
+app.delete('/api/community/admin/competition-participants/:id', authenticate, authorizePerm('community.admin'), async (req, res) => {
+    try {
+        const out = await getCommunityCompetitionService().removeParticipant(req.user, parseInt(req.params.id, 10));
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في إزالة المشارك'); }
+});
+
+app.put('/api/community/admin/competition-participants/:id', authenticate, authorizePerm('community.admin'), validateBody({
+    score: { required: false, type: 'number', min: 0, max: 100000 },
+    rank: { required: false, type: 'number', min: 1, max: 1000 },
+    resultNote: { required: false, type: 'string', maxLength: 300 }
+}), async (req, res) => {
+    try {
+        const out = await getCommunityCompetitionService().updateResult(req.user, parseInt(req.params.id, 10), req.body);
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في تسجيل النتيجة'); }
+});
+
+// ── الإشراف على المحتوى الموقوف (flagged بالفلتر / hidden بعتبة البلاغات) ──
+app.get('/api/community/moderation/posts', authenticate, authorizePerm('community.moderate'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const limit = Math.min(parseInt(req.query.limit, 10) || 50, 200);
+        const offset = parseInt(req.query.offset, 10) || 0;
+        const out = await getCommunityPostService().listModeration(req.user, {
+            status: req.query.status, limit, offset
+        });
+        res.json({ success: true, posts: out });
+    } catch (error) { myCheckError(res, error, 'فشل في جلب المحتوى الموقوف'); }
+});
+
+app.post('/api/community/moderation/posts/:id/status', authenticate, authorizePerm('community.moderate'), authorizeCommunityAvailable, validateBody({
+    status: { required: true, type: 'string', minLength: 4, maxLength: 10 },
+    note: { required: false, type: 'string', maxLength: 300 }
+}), async (req, res) => {
+    try {
+        const out = await getCommunityPostService().moderateSetStatus(req.user, parseInt(req.params.id, 10), req.body.status, req.body.note);
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في الإشراف على المنشور'); }
+});
+
+// ── قائمة فلترة المحتوى الإدارية (توسيع فقط — المدمجة لا تُفرَّغ) ──
+app.get('/api/community/admin/content-filter', authenticate, authorizePerm('community.admin'), async (req, res) => {
+    try {
+        const out = await getCommunityContentFilterService().getCustomWords();
+        res.json({ success: true, words: out });
+    } catch (error) { myCheckError(res, error, 'فشل في جلب قائمة الفلترة'); }
+});
+
+app.put('/api/community/admin/content-filter', authenticate, authorizePerm('community.admin'), validateBody({
+    words: { required: true, type: 'array' }
+}), async (req, res) => {
+    try {
+        const out = await getCommunityContentFilterService().setCustomWords(req.body.words, req.user);
+        res.json({ success: true, ...out });
+    } catch (error) { myCheckError(res, error, 'فشل في تحديث قائمة الفلترة'); }
+});
+
+// ════════════════════════════════════════════════════════════════
+// EMS Baloot — D3: مسارات API (اعتماد المالك الكتابي 2026-09-25)
+// عرض: community.view · فتح طاولة: community.create_activity ·
+// جلوس/لعب: community.join_activity · كلها خلف authorizeCommunityAvailable.
+// لا منطق قواعد هنا — كل فعل لعب يمر بـ baloot-match-service → المحرك النقي.
+// ════════════════════════════════════════════════════════════════
+
+// اللوبي: طاولات مجلس البلوت المفتوحة/الجارية — بطاقات «تعال اجلس»
+app.get('/api/baloot/tables', authenticate, authorizePerm('community.view'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const councilId = await getBalootCouncilId();
+        const tables = councilId ? await getBalootStore().listOpenTables(councilId) : [];
+        const allSeats = {};
+        const userIds = new Set();
+        for (const t of tables) {
+            allSeats[t.id] = await getBalootStore().getSeats(t.id);
+            for (const s of allSeats[t.id]) userIds.add(String(s.user_id));
+        }
+        const names = await getCommunityIdentityService().resolveMany(Array.from(userIds));
+        const namesByUser = {};
+        for (const [uid, idn] of Object.entries(names)) namesByUser[uid] = idn ? idn.display_name : null;
+        res.json({
+            success: true, councilId,
+            tables: tables.map(t => balootProjection.lobbyTable(t, allSeats[t.id], namesByUser))
+        });
+    } catch (error) { balootError(res, error, 'فشل في جلب طاولات البلوت'); }
+});
+
+// فتح طاولة — create_activity + لا تجميد إشرافي · غرفة دردشة الطاولة تُنشأ معها (§15)
+app.post('/api/baloot/tables', authenticate, authorizePerm('community.create_activity'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        if (!(await balootAssertNotFrozen(req, res))) return;
+        const councilId = await getBalootCouncilId();
+        const table = await getBalootTableService().createTable(req.user, councilId);
+        // غرفة دردشة الطاولة: امتداد موثق على community_rooms (kind='table') —
+        // أعضاؤها الجالسون فقط، وتمر برسائل D1 القائمة بلا أي ازدواج.
+        const roomId = await db.Community.createRoom({
+            kind: 'table', councilId, name: 'طاولة بلوت #' + table.id, createdBy: req.user.id
+        });
+        await getBalootStore().setTableRoom(table.id, roomId);
+        res.json({ success: true, table: { ...table, room_id: roomId }, roomId });
+    } catch (error) { balootError(res, error, 'فشل في فتح الطاولة'); }
+});
+
+// تفاصيل طاولة + المباراة النشطة إن وُجدت
+app.get('/api/baloot/tables/:id', authenticate, authorizePerm('community.view'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const table = await getBalootStore().getTable(Number(req.params.id));
+        if (!table) return res.status(404).json({ error: 'الطاولة غير موجودة', code: 'TABLE_NOT_FOUND' });
+        const seats = await getBalootStore().getSeats(table.id);
+        const names = await getCommunityIdentityService().resolveMany(seats.map(s => String(s.user_id)));
+        const namesByUser = {};
+        for (const [uid, idn] of Object.entries(names)) namesByUser[uid] = idn ? idn.display_name : null;
+        const activeMatch = await getBalootStore().getActiveMatchForTable(table.id);
+        const me = seats.find(s => s.user_id === String(req.user.id) && s.seat_status === 'seated');
+        res.json({
+            success: true,
+            table: { ...balootProjection.lobbyTable(table, seats, namesByUser), roomId: table.room_id || null },
+            mySeat: me ? me.seat : null,
+            activeMatchId: activeMatch ? activeMatch.id : null,
+            rematch: table.status === 'post_match' ? JSON.parse(table.rematch_state || '{}') : null
+        });
+    } catch (error) { balootError(res, error, 'فشل في جلب الطاولة'); }
+});
+
+// الجلوس — الاستدعاء الوحيد للبوابة التشغيلية (داخل الخدمة) · join_activity
+app.post('/api/baloot/tables/:id/sit', authenticate, authorizePerm('community.join_activity'), authorizeCommunityAvailable, validateBody({
+    seat: { required: false, type: 'number', min: 0, max: 3 }
+}), async (req, res) => {
+    try {
+        if (!(await balootAssertNotFrozen(req, res))) return;
+        const out = await getBalootTableService().sit(req.user, Number(req.params.id), req.body.seat ?? null);
+        // عضوية غرفة دردشة الطاولة للجالسين فقط (المشاهد يسولف في سوالف المجلس)
+        const table = await getBalootStore().getTable(out.tableId);
+        if (table && table.room_id) {
+            await db.Community.addRoomMember(table.room_id, req.user.id, 'member');
+        }
+        res.json({ success: true, ...out });
+    } catch (error) { balootError(res, error, 'فشل في الجلوس'); }
+});
+
+// المغادرة — إجراء خروج آمن: متاح دائمًا للجالس (بلا حارس تجميد)
+app.post('/api/baloot/tables/:id/leave', authenticate, authorizePerm('community.view'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const tableId = Number(req.params.id);
+        const table = await getBalootStore().getTable(tableId);
+        const out = await getBalootTableService().leave(req.user, tableId);
+        if (table && table.room_id && !out.abandoned) {
+            await db.Community.removeRoomMember(table.room_id, req.user.id);
+        }
+        res.json({ success: true, ...out });
+    } catch (error) { balootError(res, error, 'فشل في المغادرة'); }
+});
+
+// تأكيد الجاهزية (فحص ما قبل بدء المباراة)
+app.post('/api/baloot/tables/:id/ready', authenticate, authorizePerm('community.join_activity'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const out = await getBalootTableService().confirmReady(req.user, Number(req.params.id));
+        res.json({ success: true, ...out });
+    } catch (error) { balootError(res, error, 'فشل في تأكيد الجاهزية'); }
+});
+
+// إغلاق الطاولة — صاحبها فقط، وليس أثناء اللعب
+app.post('/api/baloot/tables/:id/close', authenticate, authorizePerm('community.create_activity'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const tableId = Number(req.params.id);
+        const table = await getBalootStore().getTable(tableId);
+        await getBalootTableService().closeTable(req.user, tableId);
+        if (table && table.room_id) await db.Community.closeRoom(table.room_id, req.user.id);
+        res.json({ success: true, closed: true });
+    } catch (error) { balootError(res, error, 'فشل في إغلاق الطاولة'); }
+});
+
+// الريماچ: لا مباراة ثانية إلا بموافقة الأربعة · رفض واحد يُلغي بهدوء
+app.post('/api/baloot/tables/:id/rematch/accept', authenticate, authorizePerm('community.join_activity'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const out = await getBalootTableService().rematchAccept(req.user, Number(req.params.id));
+        res.json({ success: true, ...out });
+    } catch (error) { balootError(res, error, 'فشل في قبول الريماچ'); }
+});
+
+app.post('/api/baloot/tables/:id/rematch/decline', authenticate, authorizePerm('community.join_activity'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const out = await getBalootTableService().rematchDecline(req.user, Number(req.params.id));
+        res.json({ success: true, ...out });
+    } catch (error) { balootError(res, error, 'فشل في رفض الريماچ'); }
+});
+
+// حالة مباراة — projection حسب دور الطالب: جالس يرى يده، مشاهد بلا أيدٍ (A7)
+app.get('/api/baloot/matches/:id/state', authenticate, authorizePerm('community.view'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const matchId = Number(req.params.id);
+        const store = getBalootStore();
+        const row = await store.getMatch(matchId);
+        if (!row) return res.status(404).json({ error: 'المباراة غير موجودة', code: 'MATCH_NOT_FOUND' });
+        const players = await store.getMatchPlayers(matchId);
+        const councilId = await getBalootCouncilId();
+        const isPlayer = players.some(p => p.user_id === String(req.user.id));
+        if (!isPlayer) {
+            const member = councilId ? await db.Community.getCouncilMember(councilId, req.user.id) : null;
+            if (!member) return res.status(403).json({ error: 'المشاهدة لأعضاء مجلس البلوت', code: 'NOT_A_MEMBER' });
+        }
+        const state = await getBalootMatchService()._load(matchId);
+        const names = await getCommunityIdentityService().resolveMany(players.map(p => p.user_id));
+        const playersBySeat = {};
+        for (const p of players) {
+            const idn = names[String(p.user_id)];
+            playersBySeat[p.seat] = { name: idn ? idn.display_name : null };
+        }
+        const me = players.find(p => p.user_id === String(req.user.id));
+        res.json({
+            success: true,
+            matchId,
+            tableId: row.table_id,
+            paused: !!row.paused,
+            status: row.status,
+            state: me
+                ? balootProjection.forPlayer(state, me.seat, playersBySeat)
+                : balootProjection.forSpectator(state, playersBySeat)
+        });
+    } catch (error) { balootError(res, error, 'فشل في جلب حالة المباراة'); }
+});
+
+// «خياراتي الآن» — الخادم يحسب المسموح بالجسّ على المحرك النقي؛ الواجهة لا تعرف القواعد
+app.get('/api/baloot/matches/:id/options', authenticate, authorizePerm('community.view'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const out = await getBalootMatchService().optionsFor(Number(req.params.id), req.user.id);
+        res.json({ success: true, matchId: Number(req.params.id), ...out });
+    } catch (error) { balootError(res, error, 'فشل في جلب الخيارات'); }
+});
+
+// فعل لعب — Server Authority: المقعد من ربط الخادم، وactionId يضمن Idempotency
+app.post('/api/baloot/matches/:id/action', authenticate, authorizePerm('community.join_activity'), authorizeCommunityAvailable, validateBody({
+    actionId: { required: true, type: 'string', minLength: 6, maxLength: 64 },
+    type: { required: true, type: 'string', maxLength: 20 }
+}), async (req, res) => {
+    try {
+        const payload = (req.body.payload && typeof req.body.payload === 'object') ? req.body.payload : {};
+        const out = await getBalootMatchService().submit(
+            Number(req.params.id), req.user.id, req.body.actionId, req.body.type, payload);
+        res.json({ success: true, ...out });
+    } catch (error) { balootError(res, error, 'فشل في تنفيذ الفعل'); }
+});
+
+// تصويت الإنهاء الودّي — للجالسين المتبقين (2 من 3 تحسم)
+app.post('/api/baloot/matches/:id/vote-abort', authenticate, authorizePerm('community.view'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const out = await getBalootMatchService().voteFriendlyAbort(Number(req.params.id), req.user.id);
+        res.json({ success: true, ...out });
+    } catch (error) { balootError(res, error, 'فشل في التصويت'); }
+});
+
+// استعادة يدوية: انقطاع/عودة صريحة (المسار الطبيعي يبقى عبر WebSocket)
+app.post('/api/baloot/matches/:id/disconnect', authenticate, authorizePerm('community.view'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        await getBalootMatchService().disconnect(Number(req.params.id), req.user.id);
+        res.json({ success: true });
+    } catch (error) { balootError(res, error, 'فشل في تسجيل الانقطاع'); }
+});
+
+app.post('/api/baloot/matches/:id/reconnect', authenticate, authorizePerm('community.view'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        await getBalootMatchService().reconnect(Number(req.params.id), req.user.id);
+        res.json({ success: true });
+    } catch (error) { balootError(res, error, 'فشل في تسجيل العودة'); }
+});
+
+// الترتيب الشرفي — read model مشتق، بلا أثر على أي بيانات تشغيلية
+app.get('/api/baloot/ratings', authenticate, authorizePerm('community.view'), authorizeCommunityAvailable, async (req, res) => {
+    try {
+        const rows = await getBalootStore().getRatings(50);
+        const names = await getCommunityIdentityService().resolveMany(rows.map(r => r.user_id));
+        res.json({
+            success: true,
+            ratings: rows.map(r => ({
+                userId: r.user_id,
+                name: names[String(r.user_id)] ? names[String(r.user_id)].display_name : null,
+                matches: r.matches, wins: r.wins, losses: r.losses, honorPoints: r.honor_points
+            }))
+        });
+    } catch (error) { balootError(res, error, 'فشل في جلب الترتيب'); }
 });
 
 app.post('/api/my/check-session/confirm', authenticate, authorizePerm('ops.my_portal'), async (req, res) => {
@@ -12672,6 +14018,19 @@ app.post('/api/shift-change-request', authenticate, async (req, res) => {
             type: 'shift_change_request',
             payload: { request_id: id, employee_id, status: 'pending' }
         });
+
+        // إشعار المسؤولين: Inbox + Push — نفس منطق طلبات الإجازة، وفشله لا يُفقد الطلب.
+        try {
+            if (db.Notifications) {
+                await notificationService.notifyOperational({
+                    eventKey: 'shift_change.submitted',
+                    title: 'طلب تغيير مناوبة جديد',
+                    message: (req.user.name || req.user.username) + ': تغيير مناوبة ' + shift_date + ' إلى ' + proposed_shift_code,
+                    push: true
+                });
+            }
+        } catch (nErr) { console.error('ShiftChange submit notify error:', nErr.message); }
+
         res.json({ success: true, id, message: 'تم إرسال طلب التغيير' });
     } catch (error) {
         console.error('ShiftChangeRequest error:', error);
@@ -12705,6 +14064,22 @@ app.post('/api/shift-change-request/:id/review', authenticate, authorize(['admin
         }
         await db.ShiftChangeRequests.updateStatus(req.params.id, status, req.user.username || req.user.name);
         const entry = await db.ShiftChangeRequests.getById(req.params.id);
+
+        // إشعار شخصي لصاحب الطلب بنتيجة المراجعة: Inbox + Push (سقوط آمن بلا حساب مربوط).
+        try {
+            if (db.Notifications && entry) {
+                const ownerUserId = await resolveEmployeeUserId(entry.employee_id);
+                if (ownerUserId) {
+                    const label = status === 'approved' ? 'تمت الموافقة على' : (status === 'denied' ? 'تم رفض' : 'تم إلغاء');
+                    await notificationService.notifyPersonal(ownerUserId, {
+                        title: label + ' طلب تغيير المناوبة',
+                        message: 'مناوبة ' + entry.shift_date + ': ' + label + ' طلب التغيير إلى ' + entry.proposed_shift_code,
+                        type: status === 'approved' ? 'success' : (status === 'denied' ? 'warning' : 'info')
+                    });
+                }
+            }
+        } catch (nErr) { console.error('ShiftChange review notify error:', nErr.message); }
+
         broadcast({
             type: 'shift_change_request',
             payload: { request_id: req.params.id, employee_id: entry ? entry.employee_id : null, status }
@@ -13604,6 +14979,19 @@ app.get('/api/staffing-levels', authenticate, async (req, res) => {
 // API: Leave Requests
 // ============================================
 
+// ربط employee_id ← حساب المستخدم لإشعاره شخصيًا: users.username =
+// employees.employee_code (قاعدة my-portal المثبتة). الحساب غير النشط أو
+// غير الموجود = بلا إشعار شخصي (سقوط آمن — الطلب نفسه لا يتأثر أبدًا).
+async function resolveEmployeeUserId(employeeId) {
+    try {
+        const emp = await db.get('SELECT employee_code FROM employees WHERE id = ?', [employeeId]);
+        if (!emp || !emp.employee_code) return null;
+        const users = JSON.parse(await fs.readFile(USERS_PATH, 'utf8'));
+        const u = users.find(x => x.username === emp.employee_code && x.isActive);
+        return u ? u.id.toString() : null;
+    } catch (_) { return null; }
+}
+
 app.get('/api/leave-requests', authenticate, async (req, res) => {
     try {
         const { status, employee_id } = req.query;
@@ -13664,7 +15052,22 @@ app.post('/api/leave-requests', authenticate, validateBody({
             message: 'تم تقديم طلب إجازة جديد',
             requestId: id
         });
-        
+
+        // إشعار المسؤولين: Inbox (صف لكل admin/director) + Push لأجهزتهم.
+        // فشل الإشعار أو Push لا يُفقد الطلب — لهذا هو داخل try منفصل ولا يرمي.
+        try {
+            if (db.Notifications) {
+                const createdReq = await db.LeaveRequests.getById(id); // يحمل employee_name من الـJOIN
+                const empName = (createdReq && createdReq.employee_name) || ('موظف #' + employee_id);
+                await notificationService.notifyOperational({
+                    eventKey: 'leave.submitted',
+                    title: 'طلب إجازة جديد',
+                    message: empName + ': ' + type + ' من ' + start_date + ' إلى ' + end_date,
+                    push: true
+                });
+            }
+        } catch (nErr) { console.error('Leave submit notify error:', nErr.message); }
+
         res.json({ success: true, id });
     } catch (error) {
         console.error('Leave request POST error:', error);
@@ -13742,7 +15145,23 @@ app.post('/api/leave-requests/:id/approve', authenticate, authorize(['admin', 'd
         }
         
         await db.LeaveRequests.updateStatus(req.params.id, status, req.user.id);
-        
+
+        // إشعار شخصي لصاحب الطلب: Inbox + Push (حسابه = users.username بـ employee_code).
+        // بلا حساب مربوط/نشط يُتخطى الإشعار بهدوء ولا يتعطل القرار.
+        try {
+            if (db.Notifications) {
+                const ownerUserId = await resolveEmployeeUserId(existing.employee_id);
+                if (ownerUserId) {
+                    const approved = status === 'approved';
+                    await notificationService.notifyPersonal(ownerUserId, {
+                        title: approved ? 'تمت الموافقة على طلب الإجازة' : 'تم رفض طلب الإجازة',
+                        message: existing.type + ' من ' + existing.start_date + ' إلى ' + existing.end_date,
+                        type: approved ? 'success' : 'warning'
+                    });
+                }
+            }
+        } catch (nErr) { console.error('Leave resolve notify error:', nErr.message); }
+
         broadcast({
             type: 'leave_request_resolved',
             message: `تم ${status === 'approved' ? 'قبول' : 'رفض'} طلب الإجازة`,
@@ -14966,6 +16385,19 @@ server.listen(PORT, async () => {
     
     // Initialize DB after server starts
     await initDatabase();
+
+    // D3: إعادة تسليح مهل البلوت المُدامجة — الفائتة أثناء التوقف تُستهلك فورًا
+    // بترتيبها (كأن التوقف لم يحدث)، والقادمة تُسلَّح بما تبقى (Architecture §6/A6)
+    try {
+        if (db) {
+            const balootBoot = await getBalootTimerService().onBoot();
+            if (balootBoot.fired || balootBoot.armed) {
+                console.log(`🃏 مهل البلوت بعد الإقلاع: استُهلك ${balootBoot.fired} فائت · سُلّح ${balootBoot.armed} قادم`);
+            }
+        }
+    } catch (balootBootErr) {
+        console.error('⚠️ baloot timers onBoot failed:', balootBootErr.message);
+    }
 
     // P1: فحص سلامة مرجع إحداثيات المراكز — صارم بلا فشل صامت (قرار المالك):
     // مركز مستخدم في teams وغير موجود في المرجع = خطأ بيانات نظام يُسمَّى صراحة.

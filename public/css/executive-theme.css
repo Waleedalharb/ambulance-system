@@ -1011,6 +1011,16 @@ body::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.16); }
     background: rgba(11, 18, 32, 0.85); border: 1px solid var(--ex-border-soft);
     border-radius: 6px; padding: 1px 7px; pointer-events: none;
 }
+/* 📍 مؤشر الموقع الحي للفرقة (TL1 — اعتماد المالك 2026-09-22): نقطة صغيرة على
+   شريحة الفرقة — خضراء نابضة = موقع GPS حي (fresh) · كهرمانية = آخر موقع
+   معروف (stale). غيابها = التموضع الحلقي حول المركز (السلوك السابق). */
+.smk-team .smk-team-loc {
+    position: absolute; top: -4px; left: -4px; width: 10px; height: 10px;
+    border-radius: 50%; border: 2px solid rgba(255,255,255,0.9);
+    box-shadow: 0 0 6px rgba(0,0,0,0.6); z-index: 2;
+}
+.smk-team .smk-team-loc.live { background: #22C55E; animation: smkPulse 2s ease-in-out infinite; }
+.smk-team .smk-team-loc.stale { background: #F59E0B; }
 
 /* 🏥 المركز — درع مبنى ثابت باسم المركز دائم الظهور */
 .smk-center { background: transparent !important; border: none !important; }

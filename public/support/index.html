@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#1E3A5F">
+<title>دعم تطبيق EMS Operations – منصة إدارة العمليات الإسعافية</title>
+<meta name="description" content="صفحة الدعم الرسمية لتطبيق EMS Operations — منصة إدارة العمليات الإسعافية، قطاع جنوب الرياض.">
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<style>
+  :root {
+    --bg: #0B1220; --card: #111C2E; --border: #22314A; --accent: #10B586;
+    --accent-2: #1E3A5F; --text: #E2E8F0; --muted: #94A3B8; --faint: #64748B;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Tajawal', system-ui, sans-serif;
+    background: var(--bg); color: var(--text);
+    min-height: 100vh; display: flex; flex-direction: column;
+    -webkit-font-smoothing: antialiased;
+  }
+  header {
+    padding: 28px 20px 22px; text-align: center;
+    background: linear-gradient(160deg, var(--accent-2), #152A45);
+    border-bottom: 1px solid var(--border);
+  }
+  header .logo {
+    width: 64px; height: 64px; margin: 0 auto 14px; border-radius: 18px;
+    background: rgba(16,181,134,0.15); border: 1px solid rgba(16,181,134,0.35);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.7rem; color: var(--accent);
+  }
+  header h1 { font-size: 1.35rem; font-weight: 800; }
+  header p { color: var(--muted); font-size: 0.85rem; margin-top: 6px; }
+  main { flex: 1; width: 100%; max-width: 640px; margin: 0 auto; padding: 26px 18px 40px; }
+  .card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+    padding: 20px 18px; margin-bottom: 16px;
+  }
+  .card h2 {
+    font-size: 1rem; font-weight: 700; margin-bottom: 10px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .card h2 i { color: var(--accent); }
+  .card p { color: var(--muted); font-size: 0.88rem; line-height: 1.9; }
+  .contact-row {
+    display: flex; align-items: center; gap: 12px; margin-top: 12px;
+    background: rgba(16,181,134,0.07); border: 1px solid rgba(16,181,134,0.25);
+    border-radius: 10px; padding: 12px 14px;
+  }
+  .contact-row i { color: var(--accent); font-size: 1.1rem; }
+  .contact-row a { color: var(--text); text-decoration: none; font-weight: 700; font-size: 0.95rem; direction: ltr; }
+  .contact-row a:hover { color: var(--accent); }
+  .contact-row .lbl { display: block; color: var(--faint); font-size: 0.72rem; font-weight: 400; }
+  footer {
+    text-align: center; padding: 16px; color: var(--faint); font-size: 0.72rem;
+    border-top: 1px solid var(--border);
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo"><i class="fas fa-truck-medical"></i></div>
+  <h1>دعم تطبيق EMS Operations</h1>
+  <p>منصة إدارة العمليات الإسعافية – قطاع جنوب الرياض</p>
+</header>
+
+<main>
+  <div class="card">
+    <h2><i class="fas fa-circle-info"></i> عن التطبيق</h2>
+    <p>تطبيق EMS Operations هو منصة تشغيلية مخصصة لإدارة ومتابعة العمليات الإسعافية والموظفين والمناوبات والخدمات التشغيلية وفق الصلاحيات المعتمدة.</p>
+  </div>
+
+  <div class="card">
+    <h2><i class="fas fa-headset"></i> للدعم والمساعدة</h2>
+    <p>في حال وجود مشكلة تقنية أو استفسار متعلق باستخدام التطبيق، يمكن التواصل مع فريق الدعم عبر وسائل التواصل الموضحة أدناه.</p>
+    <!-- وسيلة التواصل الفعلية — تُدار من السطرين التاليين فقط (لا بيانات وهمية) -->
+    <div class="contact-row" id="emailRow" style="display:none">
+      <i class="fas fa-envelope"></i>
+      <span><span class="lbl">البريد الإلكتروني للدعم</span><a id="emailLink" href="#"></a></span>
+    </div>
+    <div class="contact-row" id="phoneRow" style="display:none">
+      <i class="fas fa-phone"></i>
+      <span><span class="lbl">هاتف الدعم</span><a id="phoneLink" href="#"></a></span>
+    </div>
+  </div>
+</main>
+
+<footer>EMS Operations — منصة إدارة العمليات الإسعافية · قطاع جنوب الرياض</footer>
+
+<script>
+  // ══ وسائل التواصل الفعلية للدعم — تُعبَّأ بقيمة حقيقية معتمدة فقط ══
+  var SUPPORT_EMAIL = 'wm1989h@gmail.com'; // البريد الرسمي للدعم — اعتماد المالك 2026-09-22
+  var SUPPORT_PHONE = ''; // لا هاتف دعم حاليًا — يُضاف بقيمة حقيقية معتمدة فقط
+  (function () {
+    if (SUPPORT_EMAIL) {
+      var r = document.getElementById('emailRow');
+      var a = document.getElementById('emailLink');
+      a.textContent = SUPPORT_EMAIL; a.href = 'mailto:' + SUPPORT_EMAIL;
+      r.style.display = 'flex';
+    }
+    if (SUPPORT_PHONE) {
+      var r2 = document.getElementById('phoneRow');
+      var a2 = document.getElementById('phoneLink');
+      a2.textContent = SUPPORT_PHONE; a2.href = 'tel:' + SUPPORT_PHONE;
+      r2.style.display = 'flex';
+    }
+  })();
+</script>
+
+</body>
+</html>

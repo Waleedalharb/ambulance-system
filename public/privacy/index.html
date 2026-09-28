@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#1E3A5F">
+<title>سياسة الخصوصية – تطبيق EMS Operations</title>
+<meta name="description" content="سياسة الخصوصية الرسمية لتطبيق EMS Operations — منصة إدارة العمليات الإسعافية، قطاع جنوب الرياض.">
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<style>
+  :root {
+    --bg: #0B1220; --card: #111C2E; --border: #22314A; --accent: #10B586;
+    --accent-2: #1E3A5F; --text: #E2E8F0; --muted: #94A3B8; --faint: #64748B;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Tajawal', system-ui, sans-serif;
+    background: var(--bg); color: var(--text);
+    min-height: 100vh; display: flex; flex-direction: column;
+    -webkit-font-smoothing: antialiased;
+  }
+  header {
+    padding: 28px 20px 22px; text-align: center;
+    background: linear-gradient(160deg, var(--accent-2), #152A45);
+    border-bottom: 1px solid var(--border);
+  }
+  header .logo {
+    width: 64px; height: 64px; margin: 0 auto 14px; border-radius: 18px;
+    background: rgba(16,181,134,0.15); border: 1px solid rgba(16,181,134,0.35);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.7rem; color: var(--accent);
+  }
+  header h1 { font-size: 1.35rem; font-weight: 800; }
+  header p { color: var(--muted); font-size: 0.85rem; margin-top: 6px; }
+  main { flex: 1; width: 100%; max-width: 680px; margin: 0 auto; padding: 26px 18px 40px; }
+  .card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+    padding: 20px 18px; margin-bottom: 16px;
+  }
+  .card h2 {
+    font-size: 1rem; font-weight: 700; margin-bottom: 10px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .card h2 i { color: var(--accent); }
+  .card p, .card li { color: var(--muted); font-size: 0.88rem; line-height: 1.9; }
+  .card ul { padding-inline-start: 20px; margin-top: 4px; }
+  .card li { margin-bottom: 6px; }
+  .card strong { color: var(--text); }
+  .contact-row {
+    display: flex; align-items: center; gap: 12px; margin-top: 12px;
+    background: rgba(16,181,134,0.07); border: 1px solid rgba(16,181,134,0.25);
+    border-radius: 10px; padding: 12px 14px;
+  }
+  .contact-row i { color: var(--accent); font-size: 1.1rem; }
+  .contact-row a { color: var(--text); text-decoration: none; font-weight: 700; font-size: 0.95rem; direction: ltr; }
+  .contact-row a:hover { color: var(--accent); }
+  .contact-row .lbl { display: block; color: var(--faint); font-size: 0.72rem; font-weight: 400; }
+  .updated { text-align: center; color: var(--faint); font-size: 0.75rem; margin-bottom: 16px; }
+  footer {
+    text-align: center; padding: 16px; color: var(--faint); font-size: 0.72rem;
+    border-top: 1px solid var(--border);
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo"><i class="fas fa-shield-halved"></i></div>
+  <h1>سياسة الخصوصية</h1>
+  <p>تطبيق EMS Operations — منصة إدارة العمليات الإسعافية · قطاع جنوب الرياض</p>
+</header>
+
+<main>
+  <p class="updated">آخر تحديث: 22 سبتمبر 2026</p>
+
+  <div class="card">
+    <h2><i class="fas fa-circle-info"></i> مقدمة</h2>
+    <p>تطبيق EMS Operations هو نظام تشغيلي داخلي مخصص لمنسوبي العمليات الإسعافية، ويُستخدم لإدارة المناوبات والجداول والاستعداد التشغيلي وفق الصلاحيات المعتمدة من جهة العمل. توضح هذه الصفحة البيانات التي يجمعها التطبيق فعليًا، وكيفية استخدامها وحمايتها، وحقوقك تجاهها.</p>
+  </div>
+
+  <div class="card">
+    <h2><i class="fas fa-database"></i> البيانات التي نجمعها</h2>
+    <ul>
+      <li><strong>بيانات الحساب والملف الوظيفي:</strong> اسم المستخدم (وهو الكود الوظيفي)، الاسم، المسمى الوظيفي، وكلمة المرور (تُخزَّن مجزأة بتقنية bcrypt ولا تُحفظ نصًا أبدًا)، والدور والصلاحيات الممنوحة.</li>
+      <li><strong>البيانات التشغيلية المرتبطة بحسابك:</strong> الجداول والمناوبات والتكليفات، وبيانات جاهزية المركبة والمعدات التي تسجّلها أثناء مناوبتك.</li>
+      <li><strong>بيانات الموقع الجغرافي (GPS):</strong> تُجمع <strong>فقط أثناء وجود تكليف ميداني فعلي لك في مناوبة نشطة</strong>، وبهدف عرض موقع الفرقة لغرفة العمليات. يبدأ الجمع مع التكليف ويتوقف بانتهائه، ولا يعمل التتبع في الخلفية. يحتفظ النظام <strong>بآخر موقع معروف للفرقة فقط — دون أي سجل تاريخي للمواقع</strong>.</li>
+      <li><strong>بيانات الاتصال:</strong> رقم الجوال المسجل في ملفك الوظيفي، ويُستخدم في دليل الجوالات الداخلي وفي استعادة كلمة المرور عند تفعيلها.</li>
+      <li><strong>بيانات الدخول والمصادقة:</strong> سجلات تسجيل الدخول، والجلسات النشطة (عنوان IP ونوع الجهاز)، ورموز الجلسة المجزأة — لغرض حماية الحساب وإثبات الأحداث التشغيلية.</li>
+      <li><strong>معرّفات الإشعارات:</strong> معرّف الجهاز الخاص بإشعارات Apple (APNs) لإيصال التنبيهات التشغيلية إلى جهازك.</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2><i class="fas fa-bullseye"></i> كيف نستخدم البيانات</h2>
+    <ul>
+      <li>تشغيل المنصة: الجداول والمناوبات والتكميل وجاهزية الفرق والمركبات.</li>
+      <li>عرض موقع الفرقة الحي لغرفة العمليات أثناء التكليف الميداني فقط.</li>
+      <li>حماية الحسابات ومراجعة الأحداث التشغيلية (سجلات التدقيق).</li>
+    </ul>
+    <p style="margin-top:8px"><strong>لا نستخدم بياناتك في الإعلانات أو التسويق، ولا نبيعها ولا نشاركها مع أي طرف ثالث لأغراض تجارية إطلاقًا.</strong></p>
+  </div>
+
+  <div class="card">
+    <h2><i class="fas fa-lock"></i> الحماية والاحتفاظ</h2>
+    <ul>
+      <li>الوصول للبيانات محكوم بنظام صلاحيات دقيق يفرضه الخادم، وكل مستخدم يرى ما تسمح به صلاحياته المعتمدة فقط.</li>
+      <li>كلمات المرور ورموز الجلسات تُخزَّن مجزأة، والاتصال بالتطبيق مشفّر (HTTPS).</li>
+      <li>الموقع الحي: يُحتفظ بآخر موقع فقط ولا يُبنى أي سجل تاريخي للتنقلات.</li>
+      <li>جلسات الدخول تنتهي تلقائيًا خلال مدة قصيرة، وتُحفظ السجلات التشغيلية وسجلات التدقيق وفق ما تقتضيه المتطلبات التشغيلية والنظامية لجهة العمل.</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2><i class="fas fa-share-nodes"></i> المشاركة مع الأطراف الخارجية</h2>
+    <p>لا تُشارك بياناتك مع أطراف ثالثة إلا في الحدود التشغيلية اللازمة: خرائط العرض (OpenStreetMap/CARTO) عند عرض الخريطة، وخدمة إشعارات Apple (APNs) لإيصال التنبيهات. لا وجود لأي أدوات تحليلات أو تتبع إعلاني في التطبيق.</p>
+  </div>
+
+  <div class="card">
+    <h2><i class="fas fa-user-shield"></i> حقوقك والتواصل</h2>
+    <p>بياناتك الوظيفية والتشغيلية تُدار من جهة عملك عبر المنصة. لأي استفسار أو طلب يتعلق ببياناتك (تصحيح، استفسار عن الاحتفاظ، أو ملاحظة خصوصية) تواصل معنا:</p>
+    <div class="contact-row">
+      <i class="fas fa-envelope"></i>
+      <span><span class="lbl">البريد الإلكتروني للدعم والخصوصية</span><a href="mailto:wm1989h@gmail.com">wm1989h@gmail.com</a></span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2><i class="fas fa-arrows-rotate"></i> التحديثات على هذه السياسة</h2>
+    <p>قد تُحدَّث هذه الصفحة عند تغيّر ما يجمعه التطبيق فعليًا، وسيُشار إلى تاريخ آخر تحديث أعلى الصفحة.</p>
+  </div>
+</main>
+
+<footer>EMS Operations — منصة إدارة العمليات الإسعافية · قطاع جنوب الرياض</footer>
+
+</body>
+</html>
