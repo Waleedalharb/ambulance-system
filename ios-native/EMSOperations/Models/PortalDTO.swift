@@ -118,9 +118,35 @@ struct PortalNotificationsDTO: Decodable {
         let createdAt: String?
         let openedAt: String?
         let acknowledgedAt: String?
+        // تدشين نظام «التمركز» (2026-09-28) — حقول إضافية صرف: المصدر
+        // (log/personal) والعنوان والنوع والحمولة المهيكلة لمهمة التمركز.
+        // العناصر القديمة بلا هذه الحقول تُفك كما كانت (nil).
+        let source: String?
+        let title: String?
+        let type: String?
+        let taskKey: String?
+        let data: PositioningData?
+
+        /// حمولة مهمة التمركز المهيكلة — تُبنى في الخادم من الخطة الفعلية.
+        struct PositioningData: Decodable {
+            let type: String?
+            let kind: String?
+            let team: String?
+            let teams: [String]?
+            let center: String?
+            let location: String?
+            let start_time: String?
+            let end_time: String?
+            let priority: String?
+            let positioning_task_id: String?
+        }
 
         var isRead: Bool { status == "read" || status == "acknowledged" }
-        var isAcked: Bool { status == "acknowledged" }
+        /// الشخصية لا تأكيد استلام لها (لا ack في جدول notifications) —
+        /// تُعامل مؤكدة حتى لا يظهر زر «تأكيد الاستلام» عليها.
+        var isAcked: Bool { status == "acknowledged" || source == "personal" }
+        var isPersonal: Bool { source == "personal" }
+        var isPositioning: Bool { isPersonal && type == "positioning" }
     }
     let notifications: [Item]
     let unreadCount: Int?

@@ -28,7 +28,14 @@ struct NotificationsView: View {
                         EMSEmptyView(icon: "bell.slash", title: "لا توجد إشعارات")
                     } else {
                         ForEach(vm.items) { item in
-                            notificationCard(item)
+                            if item.isPositioning {
+                                // تدشين «التمركز» (2026-09-28): بطاقة مميزة بحدود
+                                // teal وفق المرجع البصري المعتمد — بياناتها من
+                                // الحمولة المهيكلة للخطة الفعلية، لا من تفسير النص.
+                                positioningCard(item)
+                            } else {
+                                notificationCard(item)
+                            }
                         }
                     }
                 }
@@ -98,6 +105,154 @@ struct NotificationsView: View {
         }
         .accessibilityElement(children: .combine)
     }
+
+    // MARK: - تدشين نظام «التمركز» (2026-09-28): بطاقة مهمة التمركز
+
+    /// أولويات تستوجب شارة «مهم» — القيم كما ترد من نموذج خطة الذروة فعلًا.
+    private static let urgentPriorities: Set<String> = ["high", "urgent", "important", "critical", "عالية", "حرجة", "مهم"]
+
+    /// بطاقة إشعار التمركز وفق المرجع البصري المعتمد: أيقونة دبوس teal في
+    /// مربع، عنوان + شارة «مهم» عند الأولوية الحرجة فقط، جملة التوجيه،
+    /// سطر «الفترة/الفريق» من الحقول المهيكلة، وقت + نقطة غير مقروء،
+    /// وسهم يفتح بطاقة التفاصيل. لا قيمة تُخترع: الحقل الغائب لا يظهر.
+    private func positioningCard(_ n: PortalNotificationsDTO.Item) -> some View {
+        let data = n.data
+        let isUrgent = Self.urgentPriorities.contains((data?.priority ?? "").lowercased())
+            || Self.urgentPriorities.contains(data?.priority ?? "")
+        let period: String? = {
+            guard let st = Self.hhmmRiyadh(data?.start_time), let et = Self.hhmmRiyadh(data?.end_time) else { return nil }
+            return "\(st) – \(et)"
+        }()
+        return Button {
+            noticeSheet = PositioningNotice(title: n.title ?? "مهمة تمركز", message: n.message)
+        } label: {
+            HStack(alignment: .top, spacing: 10) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(EMSTheme.Colors.teal.opacity(0.16))
+                    Image(systemName: "mappin.and.ellipse")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(EMSTheme.Colors.teal)
+                }
+                .frame(width: 38, height: 38)
+
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 6) {
+                        Text(n.title ?? "مهمة تمركز")
+                            .font(.subheadline.weight(.bold))
+                            .foregroundStyle(EMSTheme.Colors.textPrimary)
+                        if isUrgent {
+                            Text("مهم")
+                                .font(.caption2.weight(.bold))
+                                .foregroundStyle(EMSTheme.Colors.danger)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 2)
+                                .background(EMSTheme.Colors.danger.opacity(0.15))
+                                .clipShape(Capsule())
+                        }
+                    }
+                    let lead = Self.leadLine(of: n.message)
+                    if !lead.isEmpty {
+                        Text(lead)
+                            .font(.caption)
+                            .foregroundStyle(EMSTheme.Colors.textSecondary)
+                            .multilineTextAlignment(.leading)
+                    }
+                    HStack(spacing: 14) {
+                        if let period {
+                            Label("الفترة: \(period)", systemImage: "clock")
+                                .font(.caption2)
+                                .foregroundStyle(EMSTheme.Colors.teal)
+                        }
+                        if let team = data?.team, !team.isEmpty {
+                            Label("الفريق: \(team)", systemImage: "person.2")
+                                .font(.caption2)
+                                .foregroundStyle(EMSTheme.Colors.textSecondary)
+                        }
+                    }
+                    if !n.isRead {
+                        Button {
+                            Task { await vm.markRead(n, session: session) }
+                        } label: {
+                            Label("ختم القراءة", systemImage: "envelope.open")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(EMSTheme.Colors.teal)
+                        }
+                        .padding(.top, 2)
+                    }
+                }
+
+                Spacer(minLength: 0)
+
+                VStack(alignment: .trailing, spacing: 6) {
+                    HStack(spacing: 5) {
+                        if !n.isRead {
+                            Circle().fill(EMSTheme.Colors.teal).frame(width: 7, height: 7)
+                        }
+                        Text(Self.hhmmRiyadh(n.createdAt) ?? "")
+                            .font(.caption2)
+                            .foregroundStyle(EMSTheme.Colors.textMuted)
+                    }
+                    Image(systemName: "chevron.left")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(EMSTheme.Colors.textMuted)
+                        .frame(maxHeight: .infinity, alignment: .center)
+                }
+            }
+            .padding(EMSTheme.cardPadding)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(EMSTheme.Colors.card)
+            .clipShape(RoundedRectangle(cornerRadius: EMSTheme.cornerRadius, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: EMSTheme.cornerRadius, style: .continuous)
+                    .stroke(EMSTheme.Colors.teal.opacity(0.55), lineWidth: 1.2)
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .combine)
+    }
+
+    /// الجملة الافتتاحية للرسالة (أول سطر ليس مُعرّفًا داخليًا [تمركز #..]).
+    private static func leadLine(of message: String) -> String {
+        message.components(separatedBy: "\n")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .first { !$0.isEmpty && !($0.hasPrefix("[") && $0.hasSuffix("]")) } ?? ""
+    }
+
+    // MARK: - وقت الرياض (أرقام لاتينية — توجيه المالك)
+
+    private static let isoFrac: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }()
+    private static let isoPlain = ISO8601DateFormatter()
+    /// created_at من SQLite (CURRENT_TIMESTAMP) = «yyyy-MM-dd HH:mm:ss» UTC.
+    private static let sqliteParser: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = TimeZone(identifier: "UTC")
+        f.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        return f
+    }()
+    private static let hhmmFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = TimeZone(identifier: "Asia/Riyadh")
+        f.dateFormat = "HH:mm"
+        return f
+    }()
+
+    private static func parseServerDate(_ s: String?) -> Date? {
+        guard let s, !s.isEmpty else { return nil }
+        return isoFrac.date(from: s) ?? isoPlain.date(from: s) ?? sqliteParser.date(from: s)
+    }
+
+    /// HH:MM بتوقيت الرياض — يعيد nil عند غياب القيمة (لا وقت مُخترع).
+    private static func hhmmRiyadh(_ s: String?) -> String? {
+        guard let d = parseServerDate(s) else { return nil }
+        return hhmmFormatter.string(from: d)
+    }
 }
 
 @MainActor
@@ -125,7 +280,13 @@ final class NotificationsViewModel: ObservableObject {
 
     func markRead(_ n: PortalNotificationsDTO.Item, session: SessionStore) async {
         do {
-            let _: MarkStatusResponse = try await api.post("/api/my/notifications/\(n.id)/read", body: Optional<String>.none)
+            if n.isPersonal {
+                // تدشين «التمركز»: ختم قراءة الإشعار الشخصي عبر مفتاح المصدر
+                // الإضافي — الخادم يتحقق أن الإشعار لصاحب الحساب حصرًا.
+                let _: MarkStatusResponse = try await api.post("/api/my/notifications/\(n.id)/read", query: ["source": "personal"])
+            } else {
+                let _: MarkStatusResponse = try await api.post("/api/my/notifications/\(n.id)/read", body: Optional<String>.none)
+            }
             await load(session: session)
         } catch { /* تبقى الحالة — إعادة المحاولة متاحة */ }
     }

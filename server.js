@@ -1588,7 +1588,9 @@ app.get('/api/my/notifications', authenticate, authorizePerm('ops.my_portal'), a
 
 app.post('/api/my/notifications/:id/read', authenticate, authorizePerm('ops.my_portal'), async (req, res) => {
     try {
-        const out = await getMyPortalService().markMyNotificationRead(req.user, req.params.id);
+        // تدشين «التمركز» (2026-09-28): source=personal اختياري إضافي — يختم
+        // إشعارًا شخصيًا (تمركز) من جدول notifications؛ غيابه = السلوك القائم.
+        const out = await getMyPortalService().markMyNotificationRead(req.user, req.params.id, req.query.source);
         if (out.notFound) return res.status(404).json(MY_PORTAL_NO_EMPLOYEE);
         if (out.notOwned) return res.status(404).json({ error: 'الإشعار غير موجود' });
         // v6: تحديث صامت للشارة — بذل قصوى، لا يمس نتيجة الختم

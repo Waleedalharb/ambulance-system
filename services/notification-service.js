@@ -126,11 +126,54 @@ async function notifyOperational({ eventKey, title, message }) {
 // النوع: eventKey يُصنَّف عبر الخريطة إن وُجد، وإلا يُطبَّع type الصريح.
 // pushExtra (بند 11 — تمركزات الذروة): حقول إضافية تُدمج في data الـPush
 // (kind/plan_id) حتى يفتح الضغط على الإشعار وجهة الحدث لا قائمة الإشعارات.
-async function notifyPersonal(userId, { eventKey, title, message, type }, pushExtra) {
+//
+// تدشين نظام «التمركز» (2026-09-28) — taskKey/data اختياريان إضافيان صرف:
+// عند تمرير taskKey (معرّف المهمة، مثل positioning:<planId>) تصبح العملية
+// Idempotent بمعرف المهمة لا بنافذة زمنية:
+//   - لا صف سابق ← إنشاء عادي (مع تخزين الحمولة المهيكلة data_json).
+//   - صف سابق بنفس المحتوى تمامًا (إعادة محاولة/Refresh) ← touch فقط:
+//     لا صف مكرر، لا Push مكرر، وحالة القراءة لا تُمس.
+//   - صف سابق بمحتوى متغيّر (تحديث/إلغاء المهمة = معلومة جديدة) ← تحديث
+//     المحتوى في الصف نفسه ويعود غير مقروء + Push بالمحتوى الجديد.
+// بلا taskKey يبقى السلوك القائم حرفيًا (إنشاء + بث + Push).
+async function notifyPersonal(userId, { eventKey, title, message, type, taskKey, data }, pushExtra) {
     const d = resolveDeps();
     const finalType = eventKey ? classify(eventKey) : normalizeType(type);
     const targetUserId = String(userId);
-    const id = await d.db.Notifications.create({ user_id: targetUserId, title, message: message || '', type: finalType });
+    const dataJson = data != null ? JSON.stringify(data) : null;
+
+    if (taskKey != null && d.db.Notifications && typeof d.db.Notifications.findByTaskKey === 'function') {
+        const existing = await d.db.Notifications.findByTaskKey(targetUserId, taskKey);
+        if (existing) {
+            const unchanged = existing.title === title
+                && (existing.message || '') === (message || '')
+                && (existing.data_json || null) === (dataJson || null);
+            if (unchanged) {
+                // إعادة المحاولة: تقديم الوقت فقط — لا تكرار ولا Push ولا مسّ للقراءة
+                await d.db.Notifications.touch(existing.id);
+                return { id: existing.id, type: finalType, deduped: true, push: null };
+            }
+            // تغيّر فعلي في المهمة: نفس الصف يحمل أحدث محتوى ويعود غير مقروء
+            await d.db.Notifications.updateContent(existing.id, { title, message, data_json: dataJson });
+            if (typeof d.broadcastToUsers === 'function') {
+                d.broadcastToUsers([targetUserId], {
+                    type: 'notification_created',
+                    message: 'تم تحديث إشعار قائم',
+                    notification: { id: existing.id, user_id: targetUserId, title, message: message || '', type: finalType }
+                });
+            }
+            let push = null;
+            if (d.pushGateway && typeof d.pushGateway.sendToUsers === 'function') {
+                push = await d.pushGateway.sendToUsers([targetUserId], {
+                    title, body: message || '', badge: 'auto',
+                    data: { kind: 'notification', notification_id: existing.id, ...(pushExtra || {}) }
+                });
+            }
+            return { id: existing.id, type: finalType, updated: true, push };
+        }
+    }
+
+    const id = await d.db.Notifications.create({ user_id: targetUserId, title, message: message || '', type: finalType, task_key: taskKey != null ? String(taskKey) : null, data_json: dataJson });
     if (typeof d.broadcastToUsers === 'function') {
         d.broadcastToUsers([targetUserId], {
             type: 'notification_created',

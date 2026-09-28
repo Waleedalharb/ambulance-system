@@ -48,6 +48,12 @@ actor APIClient {
         try await send(.post, path, query: [:], body: nil as String?, authorized: true, retried: false)
     }
 
+    /// POST مع query (إضافي صرف — تدشين «التمركز» 2026-09-28): ختم قراءة
+    /// الإشعار الشخصي يمرر source=personal دون لمس عقد الاستدعاءات القائمة.
+    func post<T: Decodable>(_ path: String, query: [String: String]) async throws -> T {
+        try await send(.post, path, query: query, body: nil as String?, authorized: true, retried: false)
+    }
+
     /// طلب بلا مصادقة (login/refresh فقط).
     func postPublic<T: Decodable>(_ path: String, body: some Encodable) async throws -> T {
         try await send(.post, path, query: [:], body: body, authorized: false, retried: false)

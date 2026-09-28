@@ -133,8 +133,10 @@ class PositioningService {
     // ── بند 11 (اعتماد المالك 2026-09-20): إشعار مناوبي الفرق المختارة ──
     // الخادم وحده يحدد المستلمين: فرقة ← shift_roster اليوم (الرياض) ← موظف
     // نشط بكود «دوام» ← حساب users.json بنفس employee_code. لا يُوثق بأي
-    // قائمة مستلمين قادمة من العميل. منع التكرار: العنوان+الرسالة يحملان
-    // [تمركز #id] فتطابق إعادة المحاولة داخل النافذة = touch لا صف جديد.
+    // قائمة مستلمين قادمة من العميل.
+    // تدشين «التمركز» (2026-09-28): منع التكرار بمعرف المهمة positioning:<id>
+    // (task_key في notifications) — إشعار واحد لكل مهمة لكل مستخدم، وإعادة
+    // المحاولة/Refresh = touch بلا صف جديد ولا Push مكرر.
 
     /** أسماء الفرق المستهدفة في الخطة — unit (نص) أو units (مصفوفة) */
     static _unitNamesOf(plan) {
@@ -207,6 +209,12 @@ class PositioningService {
     /**
      * إشعار + Push للمناوبين الحاليين عند إنشاء/تعديل/إلغاء تمركز.
      * لا يرمي أبدًا — فشل الإشعار لا يمس العملية التشغيلية الأصلية.
+     *
+     * تدشين نظام «التمركز» (2026-09-28): الإشعار مرتبط بالمهمة نفسها —
+     * taskKey = positioning:<planId> يجعل لكل مهمة صفًا واحدًا لكل مستخدم
+     * (إعادة المحاولة/Refresh = touch، والتحديث/الإلغاء يحدّث الصف نفسه)،
+     * وdata يحمل الحقول المهيكلة (team/center/start_time/end_time/
+     * positioning_task_id) فلا يعتمد العرض على تفسير النص.
      */
     async _notifyOnDuty(plan, kind, user, before) {
         try {
@@ -218,37 +226,49 @@ class PositioningService {
             const targets = await this._resolveOnDutyRecipients(unitNames);
             if (!targets.length) return;
             const notificationService = require('./notification-service');
-            const title = { created: 'تمركز وقت الذروة', updated: 'تحديث تمركز وقت الذروة', ended: 'إلغاء تمركز وقت الذروة' }[kind]
-                || 'تمركز وقت الذروة';
+            const title = { created: 'مهمة تمركز جديدة', updated: 'تحديث مهمة تمركز', ended: 'إلغاء مهمة تمركز' }[kind]
+                || 'مهمة تمركز';
+            // اسم المركز/الموقع كما ورد من مصدره — لا يُخترع عند غيابه
+            const center = (plan.title && String(plan.title).trim()) || (plan.location && String(plan.location).trim()) || null;
             const lines = [];
             if (kind === 'ended') lines.push('تم إلغاء التمركز الموجه لفرقتك.');
-            else if (kind === 'updated') lines.push('تم تحديث التمركز الموجه لفرقتك.');
-            else lines.push('تم توجيه تمركز وقت الذروة لفرقتك.');
-            if (plan.title) lines.push(`العنوان: ${plan.title}`);
-            lines.push(`الفرقة: ${unitNames.join('، ')}`);
-            if (plan.location) lines.push(`الموقع: ${plan.location}`);
+            else if (kind === 'updated') lines.push(center ? `تم تحديث مهمة التمركز في ${center}.` : 'تم تحديث التمركز الموجه لفرقتك.');
+            else lines.push(center ? `تم توجيهك للتمركز في ${center}` : 'تم توجيه تمركز لفرقتك.');
+            if (plan.location && plan.location !== center) lines.push(`الموقع: ${plan.location}`);
+            lines.push(`الفريق: ${unitNames.join('، ')}`);
             if (kind !== 'ended') {
+                if (plan.startTime && plan.endTime) {
+                    const fmt = iso => { const p = TimeRiyadh.riyadhParts(iso); return p ? `${String(p.hour).padStart(2, '0')}:${String(p.minute).padStart(2, '0')}` : null; };
+                    const st = fmt(plan.startTime), et = fmt(plan.endTime);
+                    if (st && et) lines.push(`الفترة: ${st} – ${et}`);
+                }
                 if (plan.startTime) lines.push(`البداية: ${PositioningService._riyadhDisplay(plan.startTime)}`);
                 if (plan.endTime) lines.push(`النهاية: ${PositioningService._riyadhDisplay(plan.endTime)}`);
-                const s = parseRiyadhWall(plan.startTime), e = parseRiyadhWall(plan.endTime);
-                if (s && e && e > s) {
-                    const mins = Math.round((e - s) / 60000);
-                    const h = Math.floor(mins / 60), m = mins % 60;
-                    lines.push(`المدة: ${h > 0 ? h + ' ساعة' : ''}${h > 0 && m > 0 ? ' و' : ''}${m > 0 ? m + ' دقيقة' : ''}`.trim());
-                }
             }
             const actor = (user && (user.name || user.username)) || plan.createdBy;
             if (actor) lines.push(`المصدر: ${actor}`);
             lines.push(`[تمركز #${plan.id}]`);
             const message = lines.filter(Boolean).join('\n');
+            // الحمولة المهيكلة — الحقول التي طلبتها مواصفة «تدشين التمركز» حرفيًا
+            const data = {
+                type: 'positioning',
+                kind,
+                team: unitNames.join('، '),
+                teams: unitNames,
+                center: center,
+                location: plan.location || null,
+                start_time: kind !== 'ended' ? (plan.startTime || null) : (before && before.startTime) || plan.startTime || null,
+                end_time: kind !== 'ended' ? (plan.endTime || null) : (before && before.endTime) || plan.endTime || null,
+                priority: plan.priority || null,
+                positioning_task_id: String(plan.id)
+            };
+            const taskKey = `positioning:${plan.id}`;
             for (const t of targets) {
-                // منع التكرار: نفس التمركز لنفس الموظف داخل النافذة = تحديث وقت فقط
-                const existing = typeof this.db.Notifications?.findRecentMatch === 'function'
-                    ? await this.db.Notifications.findRecentMatch(t.userId, title, message, 5) : null;
-                if (existing) { await this.db.Notifications.touch(existing.id); continue; }
+                // Idempotent بمعرف المهمة: صف واحد لكل مستخدم لكل مهمة —
+                // إعادة المحاولة = touch، والتحديث/الإلغاء يحدّث الصف نفسه.
                 await notificationService.notifyPersonal(t.userId,
-                    { eventKey: 'positioning.changed', title, message },
-                    { kind: 'positioning', plan_id: String(plan.id) });
+                    { eventKey: 'positioning.changed', title, message, taskKey, data },
+                    { kind: 'positioning', plan_id: String(plan.id), positioning_task_id: String(plan.id) });
             }
         } catch (err) {
             console.warn('[Positioning] on-duty notify failed (' + kind + '):', err.message);

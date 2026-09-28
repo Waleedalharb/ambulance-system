@@ -491,6 +491,8 @@ const TABLE_SCHEMAS = [
     message TEXT,
     type TEXT DEFAULT 'info',
     is_read INTEGER DEFAULT 0,
+    task_key TEXT,
+    data_json TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );`,
 
@@ -1079,6 +1081,16 @@ async function runMigrations() {
   await ensureColumn('employees', 'phone_verified', 'INTEGER NOT NULL DEFAULT 0');
   await ensureColumn('employees', 'phone_verified_at', 'DATETIME');
   await ensureColumn('employees', 'phone_verified_by', 'TEXT');
+  // تدشين نظام «التمركز» للمسعف (2026-09-28): هوية المهمة والحمولة المهيكلة —
+  // additive وnullable: task_key يجعل إشعار المهمة idempotent (صف واحد لكل
+  // مستخدم لكل مهمة)، وdata_json يحمل الحقول المهيكلة (team/center/start/end)
+  // فلا يعتمد العرض على تفسير نص الرسالة. الإشعارات القائمة تبقى NULL وسلوكها
+  // لا يتغير إطلاقًا.
+  await ensureColumn('notifications', 'task_key', 'TEXT');
+  await ensureColumn('notifications', 'data_json', 'TEXT');
+  try {
+    await exec('CREATE INDEX IF NOT EXISTS idx_notifications_task ON notifications(user_id, task_key)');
+  } catch (err) { logger.warn('idx_notifications_task: ' + err.message); }
   // حالة الوحدة في CAD (قرار المالك 2026-08-22 — قاعدة المشاركة الفعلية): حرف
   // unitRequestStatus المطبَّع (A/B/C/R) + علم الوصول/المباشرة الفعلية المشتق من
   // journeys[] بوقت حقيقي — قابلان للتتبع إلى استجابة event-dispatched/detail.
@@ -2959,7 +2971,11 @@ const Notifications = {
     return all('SELECT * FROM notifications WHERE user_id = ? AND is_read = 0 ORDER BY created_at DESC', [userId]);
   },
   async create(data) {
-    const result = await run('INSERT INTO notifications (user_id, title, message, type, is_read) VALUES (?, ?, ?, ?, ?);', [data.user_id, data.title, data.message || '', data.type || 'info', data.is_read ? 1 : 0]);
+    const result = await run(
+      'INSERT INTO notifications (user_id, title, message, type, is_read, task_key, data_json) VALUES (?, ?, ?, ?, ?, ?, ?);',
+      [data.user_id, data.title, data.message || '', data.type || 'info', data.is_read ? 1 : 0,
+       data.task_key != null ? String(data.task_key) : null,
+       data.data_json != null ? String(data.data_json) : null]);
     return result.id;
   },
   // جولة توصيل الأحداث — منع التكرار (إضافي صرف، صفر تعديل على الدوال القائمة):
@@ -2971,6 +2987,19 @@ const Notifications = {
   },
   async touch(id) {
     return run("UPDATE notifications SET created_at = datetime('now') WHERE id = ?", [id]);
+  },
+  // تدشين نظام «التمركز» (2026-09-28) — Idempotency بمعرف المهمة لا بتطابق النص:
+  // findByTaskKey يجد صف المهمة القائم لنفس المستخدم (مفتاح مثل positioning:<planId>)،
+  // وupdateContent يستبدل المحتوى عند تغيّره فعلًا (تحديث/إلغاء = معلومة جديدة ←
+  // تعود غير مقروءة) مع تقديم الوقت؛ التطابق التام (إعادة محاولة/Refresh) يكتفي
+  // بـtouch فلا يتكرر الصف ولا تُمس حالة القراءة. إضافي صرف — لا يمس الدوال القائمة.
+  async findByTaskKey(userId, taskKey) {
+    return get('SELECT * FROM notifications WHERE user_id = ? AND task_key = ? ORDER BY id DESC LIMIT 1', [String(userId), String(taskKey)]);
+  },
+  async updateContent(id, data) {
+    return run(
+      "UPDATE notifications SET title = ?, message = ?, data_json = ?, is_read = 0, created_at = datetime('now') WHERE id = ?",
+      [data.title, data.message || '', data.data_json != null ? String(data.data_json) : null, id]);
   },
   async markAsRead(id) {
     return run('UPDATE notifications SET is_read = 1 WHERE id = ?', [id]);

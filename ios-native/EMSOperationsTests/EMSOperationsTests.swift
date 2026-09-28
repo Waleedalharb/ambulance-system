@@ -59,6 +59,34 @@ final class EMSOperationsTests: XCTestCase {
         XCTAssertEqual(dto.unreadCount, 1)
     }
 
+    // MARK: - تدشين «التمركز» (2026-09-28): الحمولة المهيكلة لمهمة التمركز
+
+    func testPositioningNotificationDecodes() throws {
+        let json = #"{"notifications": [{"id": 9, "source": "personal", "title": "مهمة تمركز جديدة", "message": "تم توجيهك للتمركز في مركز الخالدية\nالفريق: جنوب 2\n[تمركز #123]", "type": "positioning", "status": "pending", "taskKey": "positioning:123", "createdAt": "2026-09-28 05:05:00", "data": {"type": "positioning", "kind": "created", "team": "جنوب 2", "teams": ["جنوب 2"], "center": "مركز الخالدية", "start_time": "2026-09-28T02:00:00.000Z", "end_time": "2026-09-28T14:00:00.000Z", "priority": "high", "positioning_task_id": "123"}}], "unreadCount": 1}"#.data(using: .utf8)!
+        let dto = try JSONDecoder().decode(PortalNotificationsDTO.self, from: json)
+        let item = try XCTUnwrap(dto.notifications.first)
+        XCTAssertTrue(item.isPositioning)
+        XCTAssertTrue(item.isPersonal)
+        XCTAssertFalse(item.isRead)
+        XCTAssertTrue(item.isAcked) // الشخصية لا تأكيد استلام لها
+        XCTAssertEqual(item.taskKey, "positioning:123")
+        XCTAssertEqual(item.data?.center, "مركز الخالدية")
+        XCTAssertEqual(item.data?.team, "جنوب 2")
+        XCTAssertEqual(item.data?.start_time, "2026-09-28T02:00:00.000Z")
+        XCTAssertEqual(item.data?.positioning_task_id, "123")
+    }
+
+    /// إشعارات السجل القديمة (بلا الحقول الجديدة) تُفك كما كانت — صفر كسر.
+    func testLegacyLogNotificationStillDecodes() throws {
+        let json = #"{"notifications": [{"id": 3, "message": "تم تغيير مناوبتك", "status": "read", "shiftDate": "2026-09-27", "revisionId": 5}]}"#.data(using: .utf8)!
+        let dto = try JSONDecoder().decode(PortalNotificationsDTO.self, from: json)
+        let item = try XCTUnwrap(dto.notifications.first)
+        XCTAssertFalse(item.isPositioning)
+        XCTAssertFalse(item.isPersonal)
+        XCTAssertNil(item.data)
+        XCTAssertTrue(item.isRead)
+    }
+
     // MARK: - VehicleDTO: مفاتيح snake_case
 
     func testVehicleDTODecodesSnakeCase() throws {
