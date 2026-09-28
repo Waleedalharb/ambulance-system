@@ -2,8 +2,17 @@
 //  ProfileView.swift
 //  EMSOperations
 //
-//  ملفي (قسم 21): بيانات الموظف + إعدادات الجلسة (Face ID) + تسجيل الخروج.
+//  «المزيد» (قسم 21): بيانات الموظف + الوصول للمحادثات والطلبات والإدارة
+//  + إعدادات الجلسة (Face ID) + تسجيل الخروج.
 //  الخروج يمر عبر AuthService → يفصل جهاز Push خادميًا (D8).
+//
+//  إعادة بناء بصرية (2026-09-28 — اعتماد المرجع البصري للمالك وقراراته
+//  الكتابية أ/ب/ج): Dark Navy/Teal · RTL · بطاقات مجمعة بأقسام.
+//  الوظائف الموجودة فعليًا فقط — قرار المالك: لا Placeholder ولا «قريبًا»
+//  ولا Routes جديدة، فأُخفيت عناصر المرجع التي لا شاشة لها (حسابي المستقلة،
+//  تفضيلات الإشعارات، المساعدة والدعم، حول التطبيق) وسهام البطاقات بلا
+//  وجهة. «طلباتي والإعلانات» و«مركز الإدارة» (للمخوّل فقط) محفوظتان كما
+//  كانتا، ومنطق الأمان والخروج والجلسة لم يُمس إطلاقًا.
 //
 
 import SwiftUI
@@ -18,6 +27,7 @@ struct ProfileView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: EMSTheme.spacing) {
+                headerBlock
                 switch vm.state {
                 case .loading:
                     EMSSkeletonCard()
@@ -26,8 +36,8 @@ struct ProfileView: View {
                 case .loaded:
                     if let p = vm.profile { employeeCard(p) }
                     else if vm.portalUnavailable { accountIdentityCard }
-                    if !vm.portalUnavailable { requestsCard }
-                    if session.permissions.canAccessAdmin { adminCard }
+                    commsSection
+                    accountSection
                     securityCard
                     logoutCard
                     versionFooter
@@ -36,7 +46,8 @@ struct ProfileView: View {
             .padding(EMSTheme.pagePadding)
         }
         .refreshable { await vm.load() }
-        .emsPage("ملفي")
+        .emsPage("المزيد")
+        .navigationBarTitleDisplayMode(.inline)
         .task { await vm.load() }
         .confirmationDialog(
             "تسجيل الخروج",
@@ -55,7 +66,27 @@ struct ProfileView: View {
         }
     }
 
-    // MARK: - بطاقة الموظف
+    // MARK: - الترويسة (لمسة EMS خفيفة كما في المرجع — خط نبض باهت فقط)
+
+    private var headerBlock: some View {
+        HStack(alignment: .center) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("المزيد")
+                    .font(.title2.weight(.bold))
+                    .foregroundStyle(EMSTheme.Colors.textPrimary)
+                Text("خيارات إضافية وإعدادات التطبيق")
+                    .font(.caption)
+                    .foregroundStyle(EMSTheme.Colors.textMuted)
+            }
+            Spacer()
+            Image(systemName: "waveform.path.ecg")
+                .font(.title)
+                .foregroundStyle(EMSTheme.Colors.teal.opacity(0.30))
+                .accessibilityHidden(true)
+        }
+    }
+
+    // MARK: - بطاقة الموظف (البيانات الحقيقية من /api/my/profile — بلا اختراع)
 
     private func employeeCard(_ p: ProfileDTO) -> some View {
         EMSCard {
@@ -78,16 +109,47 @@ struct ProfileView: View {
                     Spacer()
                 }
                 Divider().overlay(EMSTheme.Colors.divider)
-                EMSInfoRow(label: "الرقم الوظيفي", value: p.employee.code ?? "—")
-                if let today = p.today {
-                    EMSInfoRow(label: "الفرقة الحالية", value: today.teamName ?? "—")
-                    EMSInfoRow(label: "المركز", value: today.center ?? "—")
+                // أعمدة المرجع الثلاثة: الرقم الوظيفي / الفرقة الحالية / المركز —
+                // القيمة الغائبة تُعرض «—» كما كان سلوك الشاشة دائمًا (لا قيمة مختلقة).
+                HStack(spacing: 8) {
+                    infoColumn(value: p.employee.code, label: "الرقم الوظيفي",
+                               icon: "person.text.rectangle.fill", tint: EMSTheme.Colors.emerald)
+                    infoColumn(value: p.today?.teamName, label: "الفرقة الحالية",
+                               icon: "person.2.fill", tint: EMSTheme.Colors.teal)
+                    infoColumn(value: p.today?.center, label: "المركز",
+                               icon: "mappin.and.ellipse", tint: EMSTheme.Colors.teal)
                 }
                 if let update = p.lastRosterUpdate {
-                    EMSInfoRow(label: "آخر تحديث للجدول", value: update)
+                    Text("آخر تحديث للجدول: \(update)")
+                        .font(.caption2)
+                        .foregroundStyle(EMSTheme.Colors.textMuted)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
         }
+        .accessibilityElement(children: .contain)
+    }
+
+    private func infoColumn(value: String?, label: String, icon: String, tint: Color) -> some View {
+        VStack(spacing: 5) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(tint.opacity(0.14))
+                Image(systemName: icon)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(tint)
+            }
+            .frame(width: 30, height: 30)
+            Text(value ?? "—")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(EMSTheme.Colors.textPrimary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+            Text(label)
+                .font(.caption2)
+                .foregroundStyle(EMSTheme.Colors.textMuted)
+        }
+        .frame(maxWidth: .infinity)
     }
 
     // MARK: - بطاقة هوية الحساب (بلا بوابة موظف — توجيه المالك 2026-09-19 بند 1/9)
@@ -126,72 +188,127 @@ struct ProfileView: View {
         }
     }
 
-    // MARK: - طلباتي والإعلانات (§23-§25 — لكل مستخدم موثّق)
+    // MARK: - مكونات الأقسام (أسلوب المرجع: عنوان قسم + بطاقة مجمعة بصفوف)
 
-    private var requestsCard: some View {
-        NavigationLink {
-            MyRequestsView()
-        } label: {
-            EMSCard {
-                HStack(spacing: 12) {
-                    Image(systemName: "calendar.badge.clock")
-                        .font(.title3)
-                        .foregroundStyle(EMSTheme.Colors.teal)
-                        .frame(width: 28)
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("طلباتي والإعلانات")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(.white)
-                        Text("طلب إجازة · تغيير مناوبة · الإعلانات والإجازات المجدولة")
-                            .font(.caption)
-                            .foregroundStyle(EMSTheme.Colors.textMuted)
+    private func sectionHeader(_ title: String, icon: String) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.caption)
+                .foregroundStyle(EMSTheme.Colors.teal)
+            Text(title)
+                .font(.subheadline.weight(.bold))
+                .foregroundStyle(EMSTheme.Colors.textPrimary)
+            Spacer()
+        }
+        .padding(.top, 4)
+        .accessibilityAddTraits(.isHeader)
+    }
+
+    private func groupedCard<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        VStack(spacing: 0) { content() }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(EMSTheme.Colors.card)
+            .clipShape(RoundedRectangle(cornerRadius: EMSTheme.cornerRadius, style: .continuous))
+    }
+
+    private func rowDivider() -> some View {
+        Divider().overlay(EMSTheme.Colors.divider).padding(.horizontal, EMSTheme.cardPadding)
+    }
+
+    /// صف قائمة موحد: أيقونة ملونة في مربع + عنوان + وصف + سهم. عرض فقط —
+    /// الوجهة تُمرَّر من الخارج وتبقى Routes القائمة كما هي.
+    private func menuRowLabel(icon: String, tint: Color, title: String, subtitle: String) -> some View {
+        HStack(spacing: 12) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(tint.opacity(0.16))
+                Image(systemName: icon)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(tint)
+            }
+            .frame(width: 38, height: 38)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white)
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(EMSTheme.Colors.textMuted)
+            }
+            Spacer()
+            Image(systemName: "chevron.left")
+                .font(.caption)
+                .foregroundStyle(EMSTheme.Colors.textMuted)
+        }
+        .padding(.horizontal, EMSTheme.cardPadding)
+        .padding(.vertical, 12)
+        .contentShape(Rectangle())
+    }
+
+    // MARK: - التواصل (قرار المالك ب: المحادثات صفًّا يفتح ChatView نفسها)
+
+    private var commsSection: some View {
+        VStack(spacing: 8) {
+            sectionHeader("التواصل", icon: "bubble.left.and.bubble.right.fill")
+            groupedCard {
+                NavigationLink {
+                    ChatView()
+                } label: {
+                    menuRowLabel(icon: "bubble.left.and.bubble.right.fill",
+                                 tint: EMSTheme.Colors.teal,
+                                 title: "المحادثات",
+                                 subtitle: "التواصل مع الزملاء")
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    // MARK: - الحساب والإعدادات (الوظائف الموجودة فعليًا فقط — قرار المالك ج)
+
+    private var accountSection: some View {
+        let showRequests = !vm.portalUnavailable
+        let showAdmin = session.permissions.canAccessAdmin
+        return VStack(spacing: 8) {
+            sectionHeader("الحساب والإعدادات", icon: "gearshape.fill")
+            if showRequests || showAdmin {
+                groupedCard {
+                    if showRequests {
+                        // §23-§25 — لكل مستخدم موثّق (نفس Route القائم)
+                        NavigationLink {
+                            MyRequestsView()
+                        } label: {
+                            menuRowLabel(icon: "calendar.badge.clock",
+                                         tint: EMSTheme.Colors.danger,
+                                         title: "طلباتي والإعلانات",
+                                         subtitle: "طلب إجازة · تغيير مناوبة · الإعلانات والإجازات المجدولة")
+                        }
+                        .buttonStyle(.plain)
                     }
-                    Spacer()
-                    Image(systemName: "chevron.left")
-                        .font(.caption)
-                        .foregroundStyle(EMSTheme.Colors.textMuted)
+                    if showRequests && showAdmin { rowDivider() }
+                    if showAdmin {
+                        // §20 — تظهر فقط لحاملي صلاحياتها (نفس Route القائم)
+                        NavigationLink {
+                            AdminHubView()
+                        } label: {
+                            menuRowLabel(icon: "shield.lefthalf.filled",
+                                         tint: EMSTheme.Colors.teal,
+                                         title: "مركز الإدارة",
+                                         subtitle: "المستخدمون · الموظفون · الفرق والرموز · الإعدادات")
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
             }
         }
-        .buttonStyle(.plain)
     }
 
-    // MARK: - الإدارة (§20 — تظهر فقط لحاملي صلاحياتها)
-
-    private var adminCard: some View {
-        NavigationLink {
-            AdminHubView()
-        } label: {
-            EMSCard {
-                HStack(spacing: 12) {
-                    Image(systemName: "shield.lefthalf.filled")
-                        .font(.title3)
-                        .foregroundStyle(EMSTheme.Colors.teal)
-                        .frame(width: 28)
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("مركز الإدارة")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(.white)
-                        Text("المستخدمون · الموظفون · الفرق والرموز · الإعدادات")
-                            .font(.caption)
-                            .foregroundStyle(EMSTheme.Colors.textMuted)
-                    }
-                    Spacer()
-                    Image(systemName: "chevron.left")
-                        .font(.caption)
-                        .foregroundStyle(EMSTheme.Colors.textMuted)
-                }
-            }
-        }
-        .buttonStyle(.plain)
-    }
-
-    // MARK: - الأمان
+    // MARK: - الأمن والخصوصية (المحتوى القائم نفسه داخل الصفحة — قرار المالك بند 7)
 
     private var securityCard: some View {
         EMSCard {
             VStack(alignment: .leading, spacing: 10) {
-                EMSectionHeader(title: "الأمان", systemImage: "lock.shield")
+                EMSectionHeader(title: "الأمن والخصوصية", systemImage: "lock.shield")
                 if BiometricGate.isAvailable {
                     Toggle(isOn: $faceIDOn) {
                         VStack(alignment: .leading, spacing: 2) {
@@ -231,7 +348,7 @@ struct ProfileView: View {
         }
     }
 
-    // MARK: - الخروج
+    // MARK: - الخروج (إجراء خطِر ببطاقة مستقلة — المنطق كما هو حرفيًا)
 
     private var logoutCard: some View {
         Button { showLogoutConfirm = true } label: {
@@ -250,6 +367,8 @@ struct ProfileView: View {
         .buttonStyle(.plain)
     }
 
+    // MARK: - الإصدار (من Bundle الحقيقي — لا قيمة مكتوبة)
+
     private var versionFooter: some View {
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
         let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
@@ -261,7 +380,7 @@ struct ProfileView: View {
     }
 }
 
-// MARK: - ViewModel
+// MARK: - ViewModel (بلا أي تغيير — نفس المصدر والسلوك المعتمد)
 
 @MainActor
 final class ProfileViewModel: ObservableObject {

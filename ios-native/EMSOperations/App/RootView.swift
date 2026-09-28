@@ -75,6 +75,11 @@ struct MainTabView: View {
 
     /// بند 11: بطاقة تفاصيل التمركز المنبثقة من إشعار Push.
     @State private var positioningNotice: PositioningNotice?
+    /// غطاء «المحادثات» لبلاطة الرئيسية (قرار المالك 2026-09-28 ب): بعد نقل
+    /// المحادثات داخل «المزيد» لا يوجد تبويب بوسم .chat، فتُفتح ChatView
+    /// نفسها كغطاء ويُعاد التحديد لآخر تبويب حقيقي — بلا تعديل على HomeView.
+    @State private var chatCover = false
+    @State private var lastRealTab: AppTab = .home
 
     private var showOperations: Bool { session.permissions.canAccessOperations }
     private var showScheduleOps: Bool { session.permissions.canViewSchedules }
@@ -111,15 +116,34 @@ struct MainTabView: View {
                     .tabItem { Label("البلوت", systemImage: "suit.spade.fill") }
                     .tag(AppTab.baloot)
             }
-            NavigationStack { ChatView() }
-                .tabItem { Label("المحادثات", systemImage: "bubble.left.and.bubble.right.fill") }
-                .tag(AppTab.chat)
+            // قرار المالك (2026-09-28 ب): لا تبويب مستقل للمحادثات — انتقلت
+            // صفًّا داخل «المزيد» وتفتح ChatView نفسها. وسم .chat يبقى في
+            // AppTab لأن بلاطة الرئيسية تطلبه، ويُعترض أدناه ويُفتح كغطاء.
             NavigationStack { ProfileView() }
-                .tabItem { Label("حسابي", systemImage: "person.crop.circle") }
+                .tabItem { Label("المزيد", systemImage: "ellipsis") }
                 .tag(AppTab.account)
         }
         .tint(EMSTeal)
         .environmentObject(tabRouter) // بلاطات الرئيسية تبدّل التبويب عبره
+        .onChange(of: tabRouter.selected) { newValue in
+            if newValue == .chat {
+                // بلاطة «المحادثات» في الرئيسية — فتح الغطاء والعودة لآخر تبويب
+                tabRouter.selected = lastRealTab
+                chatCover = true
+            } else {
+                lastRealTab = newValue
+            }
+        }
+        .fullScreenCover(isPresented: $chatCover) {
+            NavigationStack {
+                ChatView()
+                    .toolbar {
+                        ToolbarItem(placement: .topBarLeading) {
+                            Button("إغلاق") { chatCover = false }.tint(EMSTeal)
+                        }
+                    }
+            }
+        }
         .onAppear {
             #if DEBUG
             AppLogger.ui.info("MainTabView appeared — operations tab: \(showOperations) · portal tabs: \(showPortalTabs)")
