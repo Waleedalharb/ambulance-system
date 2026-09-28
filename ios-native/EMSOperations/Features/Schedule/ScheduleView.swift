@@ -227,7 +227,7 @@ struct ScheduleView: View {
         if let t = vm.times(for: day) {
             let p = t.start.split(separator: ":").compactMap { Int($0) }
             if p.count == 2 {
-                start = cal.date(bySettingHour: p[0], minute: p[1], second: 0, for: date) ?? date
+                start = cal.date(bySettingHour: p[0], minute: p[1], second: 0, of: date) ?? date
             }
         }
         let totalHours = max(0, Int(start.timeIntervalSince(Date()) / 3600))
