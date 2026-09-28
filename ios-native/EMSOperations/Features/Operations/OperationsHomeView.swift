@@ -121,6 +121,8 @@ struct OperationsHomeView: View {
             }
             .padding(.horizontal, pagePad)
             .padding(.top, 6)
+            // هامش سفلي يمنع تداخل قسم «آخر الأحداث» مع شريط التبويبات
+            .padding(.bottom, 12)
         }
         .refreshable { await reloadAll() }
         .emsPage("العمليات")
@@ -413,12 +415,11 @@ struct OperationsHomeView: View {
     }
 
     // MARK: - آخر الأحداث (/api/timeline — أحدث 3)
+    // القسم ظاهر دائمًا كما في المرجع؛ عند غياب الأحداث تُعرض حالة صادقة بلا بيانات مختلقة.
 
-    @ViewBuilder
     private var latestEventsCard: some View {
         let items = Array((eventsVM.data?.data ?? []).prefix(3))
-        if !items.isEmpty {
-            VStack(spacing: 10) {
+        return VStack(spacing: 10) {
                 HStack {
                     Image(systemName: "list.bullet")
                         .font(.system(size: 12))
@@ -438,7 +439,18 @@ struct OperationsHomeView: View {
                     }
                     .buttonStyle(.plain)
                 }
-                ForEach(items) { item in
+                if items.isEmpty {
+                    HStack(spacing: 8) {
+                        Circle()
+                            .fill(EMSTheme.Colors.textMuted)
+                            .frame(width: 7, height: 7)
+                        Text(eventsVM.state == .loading ? "جاري تحميل الأحداث…" : "لا توجد أحداث تشغيلية حاليًا")
+                            .font(.system(size: 11))
+                            .foregroundStyle(EMSTheme.Colors.textMuted)
+                        Spacer(minLength: 0)
+                    }
+                } else {
+                    ForEach(items) { item in
                     HStack(alignment: .top, spacing: 8) {
                         Circle()
                             .fill(eventsVM.tone(for: item.type).color)
@@ -461,6 +473,7 @@ struct OperationsHomeView: View {
                         }
                         Spacer(minLength: 0)
                     }
+                    }
                 }
             }
             .padding(.horizontal, 16)
@@ -468,7 +481,6 @@ struct OperationsHomeView: View {
             .frame(maxWidth: .infinity)
             .background(EMSTheme.Colors.card)
             .clipShape(RoundedRectangle(cornerRadius: EMSTheme.cornerRadius, style: .continuous))
-        }
     }
 
     /// «منذ X دقيقة» من تاريخ/وقت الخادم بتوقيت الرياض — عند تعذّر التحليل
