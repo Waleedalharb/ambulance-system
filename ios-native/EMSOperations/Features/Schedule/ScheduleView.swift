@@ -2,8 +2,11 @@
 //  ScheduleView.swift
 //  EMSOperations
 //
-//  «الجدول» (قسم 13): شبكة شهرية Native — تنقل سابق/التالي/اليوم،
-//  تمييز اليوم والمناوبات. Deep Link «تغيير جدول» يفتح سجل التغييرات.
+//  «مناوبتي» بالمرجع البصري المعتمد (2026-09-28) — إعادة بناء واجهة فقط:
+//  بطاقة المناوبة القادمة + عدّاد، إجمالي الساعات/الأيام، تقويم الشهر
+//  (السبت يمينًا)، المناوبات القادمة، وإحصاءات الشهر.
+//  كل الأرقام من بيانات الخادم (/api/my/schedule × /api/shift-codes) —
+//  لا منطق جديد ولا مصادر موازية. Deep Link «تغيير جدول» محفوظ كما هو.
 //
 
 import SwiftUI
@@ -12,133 +15,393 @@ struct ScheduleView: View {
     @EnvironmentObject private var deepLinks: DeepLinkRouter
     @StateObject private var vm = ScheduleViewModel()
 
-    private let columns = Array(repeating: GridItem(.flexible(), spacing: 6), count: 7)
-    private let weekdays = ["أحد", "اثنين", "ثلاثاء", "أربعاء", "خميس", "جمعة", "سبت"]
+    // ألوان المرجع المحلية (أزرق/بنفسجي) — بقية الألوان من EMSTheme
+    private let refBlue = Color(red: 0.36, green: 0.62, blue: 0.98)
+    private let refPurple = Color(red: 0.67, green: 0.45, blue: 0.95)
+
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: 4), count: 7)
+    // ترويسة الأسبوع يسارًا→يمينًا داخل حاوية LTR: الجمعة … السبت (السبت يمينًا)
+    private let weekdayHeaders = ["جمعة", "خميس", "أربعاء", "ثلاثاء", "اثنين", "أحد", "سبت"]
 
     var body: some View {
         ScrollView {
-            VStack(spacing: EMSTheme.spacing) {
-                monthNavigator
+            VStack(spacing: 9) {
                 switch vm.state {
                 case .loading:
                     EMSSkeletonCard(lines: 5)
+                    EMSSkeletonCard(lines: 4)
                 case .failed(let message):
                     EMSErrorView(message: message) { Task { await vm.load() } }
                 case .loaded:
-                    if let s = vm.schedule {
-                        coverageLine(s)
-                        calendarGrid(s)
-                        monthlyRosterList(s)
-                        NavigationLink {
-                            ScheduleChangesView()
-                        } label: {
-                            EMSCard {
-                                HStack {
-                                    Image(systemName: "arrow.triangle.2.circlepath")
-                                        .foregroundStyle(EMSTheme.Colors.teal)
-                                    Text("سجل تغييرات جدولي")
-                                        .font(.subheadline.weight(.semibold))
-                                        .foregroundStyle(.white)
-                                    Spacer()
-                                    Image(systemName: "chevron.left")
-                                        .foregroundStyle(EMSTheme.Colors.textMuted)
-                                }
-                            }
-                        }
-                        .buttonStyle(.plain)
+                    nextShiftCard
+                    statsRow
+                    if let cov = vm.coverage, cov != "complete" {
+                        coverageNotice(cov)
                     }
+                    calendarCard
+                    upcomingCard
+                    monthStatsSection
                 }
             }
-            .padding(EMSTheme.pagePadding)
+            .padding(.horizontal, 18)
+            .padding(.top, 6)
+            .padding(.bottom, 12)
+            // المرجع مرسوم بمواقع مطلقة مختلطة — نثبّت المواقع يدويًا (مثل الرئيسية)
+            .environment(\.layoutDirection, .leftToRight)
         }
         .refreshable { await vm.load() }
-        .emsPage("مناوباتي")
+        .emsPage("مناوبتي")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                NavigationLink {
+                    ScheduleChangesView()
+                } label: {
+                    Image(systemName: "calendar")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(EMSTheme.Colors.teal)
+                        .frame(width: 32, height: 32)
+                        .background(EMSTheme.Colors.navySoft)
+                        .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+                }
+            }
+        }
         .task { await vm.load() }
-        // Deep Link من إشعار «تغيير جدول» (قسم 18)
+        // Deep Link من إشعار «تغيير جدول» (قسم 18) — محفوظ كما هو
         .navigationDestination(isPresented: $deepLinks.requestScheduleChanges) {
             ScheduleChangesView()
         }
     }
 
-    // MARK: - التنقل بين الأشهر
+    // MARK: - بطاقة المناوبة القادمة
 
-    private var monthNavigator: some View {
-        EMSCard {
-            HStack {
-                Button { Task { await vm.prevMonth() } } label: {
-                    Image(systemName: "chevron.right").frame(width: 36, height: 36)
+    private var nextShiftCard: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: EMSTheme.cornerRadius, style: .continuous)
+                .fill(EMSTheme.Colors.card)
+            if let next = vm.nextShift {
+                HStack(spacing: 0) {
+                    nextShiftContent(next)
+                        .padding(12)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    // صورة الإسعاف الليلية (أصل home_hero الموجود) يمين البطاقة ~45%
+                    Image("home_hero")
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 150, height: 155)
+                        .clipped()
+                        .overlay(countdownPanel(next))
                 }
-                Spacer()
-                VStack(spacing: 2) {
-                    Text("\(monthName(vm.month)) \(String(vm.year))")
-                        .font(.headline.weight(.bold))
-                        .foregroundStyle(.white)
-                    Button("اليوم") { Task { await vm.goToday() } }
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(EMSTheme.Colors.teal)
+            } else {
+                HStack(spacing: 10) {
+                    Image(systemName: "calendar.badge.exclamationmark")
+                        .foregroundStyle(EMSTheme.Colors.textMuted)
+                    Text("لا توجد مناوبة قادمة مسجلة في جدول هذا الشهر.")
+                        .font(.subheadline)
+                        .foregroundStyle(EMSTheme.Colors.textMuted)
                 }
-                Spacer()
-                Button { Task { await vm.nextMonth() } } label: {
-                    Image(systemName: "chevron.left").frame(width: 36, height: 36)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
+        .frame(height: 155)
+        .clipShape(RoundedRectangle(cornerRadius: EMSTheme.cornerRadius, style: .continuous))
+    }
+
+    private func nextShiftContent(_ day: ScheduleDTO.Day) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            HStack(spacing: 7) {
+                Image(systemName: "calendar")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(EMSTheme.Colors.teal)
+                    .frame(width: 26, height: 26)
+                    .background(EMSTheme.Colors.teal.opacity(0.15))
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                Text("مناوبتك القادمة")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white)
+                Image(systemName: "chevron.left")
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(EMSTheme.Colors.teal)
+            }
+            HStack(spacing: 6) {
+                Text(verbatim: vm.dashedDate(day))
+                    .font(.headline.weight(.bold))
+                    .foregroundStyle(.white)
+                Text(vm.weekdayName(day.date))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(EMSTheme.Colors.textSecondary)
+                Image(systemName: vm.kind(for: day) == .night ? "moon.fill" : "sun.max.fill")
+                    .font(.caption)
+                    .foregroundStyle(vm.kind(for: day) == .night ? refBlue : EMSTheme.Colors.warning)
+            }
+            if let t = vm.times(for: day) {
+                HStack(spacing: 7) {
+                    timeTile(time: t.start, label: "وقت البداية", icon: "clock.fill", tint: EMSTheme.Colors.emerald)
+                    timeTile(time: t.end, label: "وقت الانتهاء", icon: "clock.fill", tint: EMSTheme.Colors.danger)
                 }
             }
-            .foregroundStyle(EMSTheme.Colors.textSecondary)
+            HStack(spacing: 7) {
+                placeTile(text: day.center ?? "—", label: "المركز", icon: "mappin.circle.fill", tint: EMSTheme.Colors.warning)
+                placeTile(text: day.teamName ?? "—", label: "الفريق", icon: "person.2.fill", tint: refBlue)
+            }
         }
     }
 
-    private func coverageLine(_ s: ScheduleDTO) -> some View {
-        HStack(spacing: 8) {
-            if s.coverage == "partial" {
-                EMSStatusPill(text: "تغطية جزئية \(s.coveredDays ?? 0)/\(s.elapsedDays ?? 0)", tone: .monitor)
-            } else if s.coverage == "complete" {
-                EMSStatusPill(text: "تغطية مكتملة", tone: .normal)
-            } else if s.coverage == "none" {
-                // نفس لفظ الويب عند غياب بيانات الشهر
-                EMSStatusPill(text: "لا تتوفر بيانات جدول لهذا الشهر", tone: .monitor)
-            }
-            Spacer()
-            if let upd = s.lastUpdate {
-                Text("آخر تحديث: \(upd)")
-                    .font(.caption2)
+    private func timeTile(time: String, label: String, icon: String, tint: Color) -> some View {
+        HStack(spacing: 5) {
+            Image(systemName: icon)
+                .font(.caption2)
+                .foregroundStyle(tint)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(verbatim: time)
+                    .font(.caption.weight(.bold).monospacedDigit())
+                    .foregroundStyle(.white)
+                Text(label)
+                    .font(.system(size: 9))
                     .foregroundStyle(EMSTheme.Colors.textMuted)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background(EMSTheme.Colors.navySoft)
+        .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
     }
 
-    // MARK: - الشبكة
+    private func placeTile(text: String, label: String, icon: String, tint: Color) -> some View {
+        HStack(spacing: 5) {
+            Image(systemName: icon)
+                .font(.caption2)
+                .foregroundStyle(tint)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(text)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                Text(label)
+                    .font(.system(size: 9))
+                    .foregroundStyle(EMSTheme.Colors.textMuted)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background(EMSTheme.Colors.navySoft)
+        .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+    }
 
-    private func calendarGrid(_ s: ScheduleDTO) -> some View {
-        // تسامحًا مع أي تكرار يوم من الخادم — يُحتفظ بأول إدخال بدل الانهيار
-        let daysByDate = Dictionary(
-            s.days.compactMap { d -> (String, ScheduleDTO.Day)? in
-                guard let date = d.date else { return nil }
-                return (date, d)
-            },
-            uniquingKeysWith: { first, _ in first })
-        let cells = monthCells(schedule: s)
+    /// لوحة العدّاد teal الشفافة فوق الصورة: «بعد N يوم · H ساعات» (بيانات فعلية)
+    private func countdownPanel(_ day: ScheduleDTO.Day) -> some View {
+        let parts = countdownParts(for: day)
+        return VStack(spacing: 2) {
+            Text("بعد")
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(.white.opacity(0.9))
+            Text(verbatim: "\(parts.days)")
+                .font(.system(size: 30, weight: .bold))
+                .foregroundStyle(.white)
+            Text(dayWord(parts.days))
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(.white.opacity(0.9))
+            if parts.hours > 0 {
+                Text(verbatim: "\(parts.hours)")
+                    .font(.headline.weight(.bold))
+                    .foregroundStyle(.white)
+                Text("ساعات")
+                    .font(.system(size: 9))
+                    .foregroundStyle(.white.opacity(0.9))
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(EMSTheme.Colors.teal.opacity(0.55))
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .padding(10)
+    }
 
-        return EMSCard {
-            VStack(spacing: 8) {
-                LazyVGrid(columns: columns, spacing: 6) {
-                    ForEach(weekdays, id: \.self) { w in
-                        Text(w)
-                            .font(.caption2)
-                            .foregroundStyle(EMSTheme.Colors.textMuted)
-                            .frame(maxWidth: .infinity)
-                    }
+    private func countdownParts(for day: ScheduleDTO.Day) -> (days: Int, hours: Int) {
+        let cal = vm.riyadhCalendar
+        guard let date = vm.parseDay(day.date) else { return (0, 0) }
+        var start = date
+        if let t = vm.times(for: day) {
+            let p = t.start.split(separator: ":").compactMap { Int($0) }
+            if p.count == 2 {
+                start = cal.date(bySettingHour: p[0], minute: p[1], second: 0, for: date) ?? date
+            }
+        }
+        let totalHours = max(0, Int(start.timeIntervalSince(Date()) / 3600))
+        return (totalHours / 24, totalHours % 24)
+    }
+
+    private func dayWord(_ n: Int) -> String {
+        if n == 1 { return "يوم" }
+        if n == 2 { return "يومان" }
+        if (3...10).contains(n) { return "أيام" }
+        return "يوم"
+    }
+
+    // MARK: - بطاقتا الإحصاء (ساعات الشهر / أيام المناوبات)
+
+    private var statsRow: some View {
+        HStack(spacing: 9) {
+            statCard(
+                title: "إجمالي ساعات الشهر",
+                value: hoursText(vm.monthHours),
+                unit: "ساعة",
+                subtitle: vm.monthTitle,
+                icon: "hourglass",
+                chartIcon: "chart.bar.fill",
+                tint: refPurple
+            )
+            statCard(
+                title: "إجمالي أيام المناوبات",
+                value: "\(vm.totalShiftDays)",
+                unit: "يوم",
+                subtitle: vm.monthTitle,
+                icon: "calendar.badge.clock",
+                chartIcon: "chart.line.uptrend.xyaxis",
+                tint: EMSTheme.Colors.teal
+            )
+        }
+    }
+
+    private func statCard(title: String, value: String, unit: String, subtitle: String,
+                          icon: String, chartIcon: String, tint: Color) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.subheadline)
+                .foregroundStyle(tint)
+                .frame(width: 30, height: 30)
+                .background(tint.opacity(0.15))
+                .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title)
+                    .font(.system(size: 9))
+                    .foregroundStyle(EMSTheme.Colors.textMuted)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                HStack(alignment: .firstTextBaseline, spacing: 3) {
+                    Text(verbatim: value)
+                        .font(.title3.weight(.bold))
+                        .foregroundStyle(.white)
+                    Text(unit)
+                        .font(.caption2)
+                        .foregroundStyle(EMSTheme.Colors.textSecondary)
                 }
-                LazyVGrid(columns: columns, spacing: 6) {
-                    ForEach(cells, id: \.self) { cell in
-                        switch cell {
-                        case .blank:
-                            Color.clear.frame(height: 64)
-                        case .day(let dateStr, let dayNum, let isToday):
-                            dayCell(dateStr: dateStr, dayNum: dayNum, isToday: isToday,
-                                    info: daysByDate[dateStr])
-                        }
+                Text(subtitle)
+                    .font(.system(size: 9))
+                    .foregroundStyle(EMSTheme.Colors.textMuted)
+            }
+            Spacer(minLength: 2)
+            Image(systemName: chartIcon)
+                .font(.caption)
+                .foregroundStyle(tint.opacity(0.8))
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity)
+        .background(EMSTheme.Colors.card)
+        .clipShape(RoundedRectangle(cornerRadius: EMSTheme.cornerRadius, style: .continuous))
+    }
+
+    private func hoursText(_ hours: Double) -> String {
+        if hours == hours.rounded() { return "\(Int(hours))" }
+        return String(format: "%.1f", hours)
+    }
+
+    // MARK: - تنبيه التغطية (يظهر فقط عند عدم اكتمال تغطية الشهر — صدق بيانات)
+
+    private func coverageNotice(_ coverage: String) -> some View {
+        HStack(spacing: 8) {
+            if coverage == "partial" {
+                EMSStatusPill(text: "تغطية جزئية \(vm.coveredDays ?? 0)/\(vm.elapsedDays ?? 0)", tone: .monitor)
+            } else {
+                EMSStatusPill(text: "لا تتوفر بيانات جدول لهذا الشهر", tone: .monitor)
+            }
+            Spacer()
+        }
+    }
+
+    // MARK: - تقويم الشهر
+
+    private var calendarCard: some View {
+        VStack(spacing: 10) {
+            // الترويسة: «اليوم» يسارًا · الشهر + الأسهم يمينًا
+            HStack(spacing: 8) {
+                Button { Task { await vm.goToday() } } label: {
+                    Text("اليوم")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(EMSTheme.Colors.teal)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 7)
+                        .background(EMSTheme.Colors.navySoft)
+                        .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                Spacer()
+                Text(vm.monthTitle)
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(.white)
+                Button { Task { await vm.prevMonth() } } label: {
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(EMSTheme.Colors.textSecondary)
+                        .frame(width: 28, height: 28)
+                        .background(EMSTheme.Colors.navySoft)
+                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                Button { Task { await vm.nextMonth() } } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(EMSTheme.Colors.textSecondary)
+                        .frame(width: 28, height: 28)
+                        .background(EMSTheme.Colors.navySoft)
+                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                }
+                .buttonStyle(.plain)
+            }
+            // ترويسة الأسبوع (السبت يمينًا)
+            LazyVGrid(columns: columns, spacing: 4) {
+                ForEach(weekdayHeaders, id: \.self) { w in
+                    Text(w)
+                        .font(.system(size: 9))
+                        .foregroundStyle(EMSTheme.Colors.textMuted)
+                        .frame(maxWidth: .infinity)
+                }
+            }
+            LazyVGrid(columns: columns, spacing: 4) {
+                ForEach(windowCells(), id: \.self) { cell in
+                    switch cell {
+                    case .blank:
+                        Color.clear.frame(height: 42)
+                    case .day(let dateStr, let dayNum, let isToday):
+                        dayCell(dateStr: dateStr, dayNum: dayNum, isToday: isToday)
                     }
                 }
             }
+            // وسيلة الإيضاح
+            HStack(spacing: 12) {
+                Spacer()
+                legendDot("صباح", color: EMSTheme.Colors.emerald)
+                legendDot("ليل", color: refBlue)
+                legendDot("إجازة", color: EMSTheme.Colors.warning)
+                legendDot("مهمة أخرى", color: refPurple)
+                Spacer()
+            }
+            .padding(.top, 2)
+        }
+        .padding(12)
+        .background(EMSTheme.Colors.card)
+        .clipShape(RoundedRectangle(cornerRadius: EMSTheme.cornerRadius, style: .continuous))
+    }
+
+    private func legendDot(_ label: String, color: Color) -> some View {
+        HStack(spacing: 4) {
+            Circle().fill(color).frame(width: 6, height: 6)
+            Text(label)
+                .font(.system(size: 9))
+                .foregroundStyle(EMSTheme.Colors.textMuted)
         }
     }
 
@@ -147,151 +410,270 @@ struct ScheduleView: View {
         case day(String, Int, Bool)
     }
 
-    private func dayCell(dateStr: String, dayNum: Int, isToday: Bool, info: ScheduleDTO.Day?) -> some View {
-        VStack(spacing: 2) {
-            Text("\(dayNum)")
-                .font(.caption.weight(isToday ? .bold : .regular))
-                .foregroundStyle(isToday ? EMSTheme.Colors.navy : .white)
-            if let code = info?.shiftCode {
-                Text(code)
-                    .font(.system(size: 9, weight: .semibold))
-                    .foregroundStyle(isToday ? EMSTheme.Colors.navy : EMSTheme.Colors.teal)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-            }
-            // الوردية بالاسم الرسمي من قاموس الرموز (دوام 12 صباحاً…) — مواصفة المالك
-            if let name = info?.shiftName, name != info?.shiftCode {
-                Text(name)
-                    .font(.system(size: 8))
-                    .foregroundStyle(isToday ? EMSTheme.Colors.navy.opacity(0.8) : EMSTheme.Colors.textMuted)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-            }
-            // الفريق · المركز عند توفره في بيانات الجدولة
-            let place = [info?.teamName, info?.center].compactMap { $0 }.filter { !$0.isEmpty }
-                .reduce(into: [String]()) { acc, v in if !acc.contains(v) { acc.append(v) } }
-                .joined(separator: " · ")
-            if !place.isEmpty {
-                Text(place)
-                    .font(.system(size: 8))
-                    .foregroundStyle(isToday ? EMSTheme.Colors.navy.opacity(0.8) : EMSTheme.Colors.textMuted)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.6)
+    /// خلايا النافذة — صفّان فقط كما في المرجع (الأسبوع الحالي + التالي).
+    /// windowDates مرتبة سبت→جمعة؛ يُعكَس كل أسبوع ليصبح السبت يمينًا داخل
+    /// الحاوية LTR.
+    private func windowCells() -> [Cell] {
+        let cal = vm.riyadhCalendar
+        let dates = vm.windowDates
+        guard dates.count == 14 else { return [] }
+        var cells: [Cell] = []
+        for week in 0..<2 {
+            let slice = Array(dates[(week * 7)..<(week * 7 + 7)])
+            for date in slice.reversed() {
+                let ds = Self.cellFormatter.string(from: date)
+                cells.append(.day(ds, cal.component(.day, from: date), ds == vm.todayStr))
             }
         }
+        return cells
+    }
+
+    private static let cellFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.calendar = Calendar(identifier: .gregorian)
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = TimeZone(identifier: "Asia/Riyadh")
+        f.dateFormat = "yyyy-MM-dd"
+        return f
+    }()
+
+    private func dayCell(dateStr: String, dayNum: Int, isToday: Bool) -> some View {
+        let info = vm.day(for: dateStr)
+        let kind = info.map { vm.kind(for: $0) }
+        return VStack(spacing: 3) {
+            Text(verbatim: "\(dayNum)")
+                .font(.subheadline.weight(isToday ? .bold : .regular))
+                .foregroundStyle(isToday ? EMSTheme.Colors.navy : .white)
+            Circle()
+                .fill(kind.map { dotColor($0) } ?? Color.clear)
+                .frame(width: 5, height: 5)
+        }
         .frame(maxWidth: .infinity)
-        .frame(height: 64)
-        .background(isToday ? EMSTheme.Colors.teal : (info?.shiftCode != nil ? Color.white.opacity(0.07) : Color.clear))
+        .frame(height: 42)
+        .background(isToday ? EMSTheme.Colors.teal : Color.clear)
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         .accessibilityLabel("\(dateStr) \(info?.shiftName ?? "")")
     }
 
-    // MARK: - قائمة المناوبات الشهرية (صفّية: اليوم · التاريخ · المناوبة · الفريق · المركز)
-    // مواصفة المالك 2026-09-20 بند 2: جدول الموظف يعرض مناوباته الرسمية من
-    // shift_roster بصيغة مقروءة — لا يعتمد على الشبكة وحدها.
-    private func monthlyRosterList(_ s: ScheduleDTO) -> some View {
-        let days = s.days
-            .filter { $0.shiftCode != nil }
-            .sorted { ($0.date ?? "") < ($1.date ?? "") }
-        let fmt = DateFormatter()
-        fmt.dateFormat = "yyyy-MM-dd"
-        fmt.timeZone = TimeZone(identifier: "Asia/Riyadh") ?? .current
-        let todayStr = fmt.string(from: Date())
+    private func dotColor(_ kind: ScheduleViewModel.ShiftKind) -> Color {
+        switch kind {
+        case .morning: return EMSTheme.Colors.emerald
+        case .night: return refBlue
+        case .vacation: return EMSTheme.Colors.warning
+        case .other: return refPurple
+        }
+    }
 
-        return EMSCard {
-            VStack(alignment: .leading, spacing: 0) {
-                EMSectionHeader(title: "مناوباتي هذا الشهر", systemImage: "list.bullet.rectangle")
-                    .padding(.bottom, 8)
-                if days.isEmpty {
-                    Text("لا توجد مناوبات مسجلة لهذا الشهر.")
-                        .font(.caption)
-                        .foregroundStyle(EMSTheme.Colors.textMuted)
-                } else {
-                    ForEach(days, id: \.date) { d in
-                        let isToday = d.date == todayStr
-                        HStack(spacing: 8) {
-                            Text(weekdayName(d.date))
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(isToday ? EMSTheme.Colors.teal : EMSTheme.Colors.textSecondary)
-                                .frame(width: 44, alignment: .leading)
-                            Text(dayNumber(d.date))
-                                .font(.caption.monospacedDigit())
-                                .foregroundStyle(isToday ? EMSTheme.Colors.teal : EMSTheme.Colors.textPrimary)
-                                .frame(width: 24, alignment: .leading)
-                                .environment(\.layoutDirection, .leftToRight)
-                            Text(d.shiftName ?? d.shiftCode ?? "—")
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(EMSTheme.Colors.textPrimary)
-                                .lineLimit(1)
-                            Spacer(minLength: 4)
-                            let place = [d.teamName, d.center].compactMap { $0 }.filter { !$0.isEmpty }
-                                .reduce(into: [String]()) { acc, v in if !acc.contains(v) { acc.append(v) } }
-                                .joined(separator: " · ")
-                            if !place.isEmpty {
-                                Text(place)
-                                    .font(.caption2)
-                                    .foregroundStyle(EMSTheme.Colors.textMuted)
-                                    .lineLimit(1)
-                            }
-                        }
-                        .padding(.vertical, 7)
-                        .padding(.horizontal, 6)
-                        .background(isToday ? EMSTheme.Colors.teal.opacity(0.12) : Color.clear)
-                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                        if d.date != days.last?.date {
-                            Divider().background(Color.white.opacity(0.06))
+    // MARK: - المناوبات القادمة
+
+    private var upcomingCard: some View {
+        let rows = Array(vm.upcomingShifts.prefix(4))
+        return VStack(spacing: 8) {
+            HStack {
+                NavigationLink {
+                    UpcomingShiftsListView()
+                        .environmentObject(deepLinks)
+                } label: {
+                    HStack(spacing: 3) {
+                        Text("عرض الكل")
+                            .font(.caption.weight(.semibold))
+                        Image(systemName: "chevron.left")
+                            .font(.caption2.weight(.bold))
+                    }
+                    .foregroundStyle(EMSTheme.Colors.teal)
+                }
+                .buttonStyle(.plain)
+                Spacer()
+                Text("المناوبات القادمة")
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(.white)
+            }
+            if rows.isEmpty {
+                Text("لا توجد مناوبات قادمة مسجلة.")
+                    .font(.caption)
+                    .foregroundStyle(EMSTheme.Colors.textMuted)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, 10)
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(rows, id: \.date) { day in
+                        upcomingRow(day)
+                        if day.date != rows.last?.date {
+                            Divider().background(EMSTheme.Colors.divider)
                         }
                     }
                 }
             }
         }
-        .accessibilityLabel("قائمة مناوبات الموظف للشهر")
+        .padding(12)
+        .background(EMSTheme.Colors.card)
+        .clipShape(RoundedRectangle(cornerRadius: EMSTheme.cornerRadius, style: .continuous))
     }
 
-    private func weekdayName(_ dateStr: String?) -> String {
-        guard let dateStr else { return "—" }
-        let fmt = DateFormatter()
-        fmt.dateFormat = "yyyy-MM-dd"
-        fmt.timeZone = TimeZone(identifier: "Asia/Riyadh") ?? .current
-        guard let date = fmt.date(from: dateStr) else { return "—" }
-        var cal = Calendar(identifier: .gregorian)
-        cal.timeZone = fmt.timeZone
-        let names = ["أحد", "اثنين", "ثلاثاء", "أربعاء", "خميس", "جمعة", "سبت"]
-        return names[max(0, min(6, cal.component(.weekday, from: date) - 1))]
-    }
-
-    private func dayNumber(_ dateStr: String?) -> String {
-        guard let dateStr, dateStr.count >= 10 else { return "—" }
-        let day = String(dateStr.suffix(2))
-        return String(Int(day) ?? 0)
-    }
-
-    /// خلايا الشهر: فراغات المحاذاة (الأحد أولًا) ثم الأيام.
-    private func monthCells(schedule s: ScheduleDTO) -> [Cell] {
-        var cal = Calendar(identifier: .gregorian)
-        cal.timeZone = TimeZone(identifier: "Asia/Riyadh") ?? .current
-        var comps = DateComponents(); comps.year = s.year; comps.month = s.month; comps.day = 1
-        guard let first = cal.date(from: comps),
-              let range = cal.range(of: .day, in: .month, for: first) else { return [] }
-        // weekday: 1=أحد … 7=سبت — الأحد أول العمود
-        let lead = cal.component(.weekday, from: first) - 1
-        let fmt = DateFormatter()
-        fmt.dateFormat = "yyyy-MM-dd"
-        fmt.timeZone = cal.timeZone
-        let todayStr = fmt.string(from: Date())
-
-        var cells: [Cell] = (0..<lead).map { _ in .blank() }
-        for d in range {
-            var dc = DateComponents(); dc.year = s.year; dc.month = s.month; dc.day = d
-            guard let date = cal.date(from: dc) else { continue }
-            let ds = fmt.string(from: date)
-            cells.append(.day(ds, d, ds == todayStr))
+    private func upcomingRow(_ day: ScheduleDTO.Day) -> some View {
+        HStack(spacing: 10) {
+            // يسارًا: العدّ التنازلي
+            VStack(spacing: 1) {
+                Text("بعد")
+                    .font(.system(size: 9))
+                    .foregroundStyle(EMSTheme.Colors.textMuted)
+                Text(dayWord(vm.daysUntil(day)))
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(EMSTheme.Colors.teal)
+            }
+            .frame(width: 44)
+            // وسطًا: اليوم والتاريخ ثم الوقت
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 5) {
+                    Text("\(vm.weekdayName(day.date)) \(vm.dashedDate(day))")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(.white)
+                        .environment(\.locale, Locale(identifier: "en_US_POSIX"))
+                    Image(systemName: vm.kind(for: day) == .night ? "moon.fill" : "sun.max.fill")
+                        .font(.system(size: 9))
+                        .foregroundStyle(vm.kind(for: day) == .night ? refBlue : EMSTheme.Colors.warning)
+                }
+                if let t = vm.times(for: day) {
+                    Text(verbatim: "\(t.start) - \(t.end)")
+                        .font(.system(size: 10).monospacedDigit())
+                        .foregroundStyle(EMSTheme.Colors.textMuted)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Rectangle()
+                .fill(EMSTheme.Colors.divider)
+                .frame(width: 1, height: 30)
+            // يمينًا: الفريق والمركز
+            VStack(alignment: .trailing, spacing: 2) {
+                HStack(spacing: 4) {
+                    Text(day.teamName ?? "—")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                    Image(systemName: "person.2.fill")
+                        .font(.system(size: 9))
+                        .foregroundStyle(refBlue)
+                }
+                HStack(spacing: 4) {
+                    Text(day.center ?? "—")
+                        .font(.system(size: 10))
+                        .foregroundStyle(EMSTheme.Colors.textMuted)
+                        .lineLimit(1)
+                    Image(systemName: "mappin.circle.fill")
+                        .font(.system(size: 9))
+                        .foregroundStyle(refBlue)
+                }
+            }
+            Image(systemName: "chevron.left")
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(EMSTheme.Colors.textMuted)
         }
-        return cells
+        .padding(.vertical, 8)
     }
 
-    private func monthName(_ m: Int) -> String {
-        ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
-         "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"][max(0, min(11, m - 1))]
+    // MARK: - إحصاءات الشهر
+
+    private var monthStatsSection: some View {
+        VStack(spacing: 8) {
+            HStack {
+                Spacer()
+                Text("إحصاءات الشهر")
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(.white)
+            }
+            HStack(spacing: 8) {
+                monthStatTile(value: vm.vacationCount, label: "إجازات", icon: "airplane", tint: refPurple)
+                monthStatTile(value: vm.nightCount, label: "مناوبات ليلية", icon: "moon.fill", tint: refBlue)
+                monthStatTile(value: vm.morningCount, label: "مناوبات صباحية", icon: "sun.max.fill", tint: EMSTheme.Colors.warning)
+                monthStatTile(value: vm.totalShiftDays, label: "إجمالي الأيام", icon: "calendar", tint: EMSTheme.Colors.teal)
+            }
+        }
+    }
+
+    private func monthStatTile(value: Int, label: String, icon: String, tint: Color) -> some View {
+        VStack(spacing: 4) {
+            Image(systemName: icon)
+                .font(.caption)
+                .foregroundStyle(tint)
+            Text(verbatim: "\(value)")
+                .font(.headline.weight(.bold))
+                .foregroundStyle(.white)
+            Text(label)
+                .font(.system(size: 9))
+                .foregroundStyle(EMSTheme.Colors.textMuted)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 10)
+        .background(tint.opacity(0.12))
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+}
+
+// MARK: - قائمة «عرض الكل»: كل المناوبات القادمة (نفس بيانات الشاشة — عرض فقط)
+
+private struct UpcomingShiftsListView: View {
+    @StateObject private var vm = ScheduleViewModel()
+    private let refBlue = Color(red: 0.36, green: 0.62, blue: 0.98)
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 0) {
+                if vm.upcomingShifts.isEmpty && vm.state == .loaded {
+                    Text("لا توجد مناوبات قادمة مسجلة.")
+                        .font(.caption)
+                        .foregroundStyle(EMSTheme.Colors.textMuted)
+                        .padding(.vertical, 20)
+                } else {
+                    ForEach(vm.upcomingShifts, id: \.date) { day in
+                        HStack(spacing: 10) {
+                            VStack(spacing: 1) {
+                                Text("بعد")
+                                    .font(.system(size: 9))
+                                    .foregroundStyle(EMSTheme.Colors.textMuted)
+                                Text("\(vm.daysUntil(day))")
+                                    .font(.caption.weight(.bold))
+                                    .foregroundStyle(EMSTheme.Colors.teal)
+                                    .environment(\.locale, Locale(identifier: "en_US_POSIX"))
+                            }
+                            .frame(width: 40)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("\(vm.weekdayName(day.date)) \(vm.dashedDate(day))")
+                                    .font(.caption.weight(.bold))
+                                    .foregroundStyle(.white)
+                                    .environment(\.locale, Locale(identifier: "en_US_POSIX"))
+                                if let t = vm.times(for: day) {
+                                    Text(verbatim: "\(t.start) - \(t.end)")
+                                        .font(.system(size: 10).monospacedDigit())
+                                        .foregroundStyle(EMSTheme.Colors.textMuted)
+                                }
+                            }
+                            Spacer()
+                            VStack(alignment: .trailing, spacing: 2) {
+                                Text(day.teamName ?? "—")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(.white)
+                                    .lineLimit(1)
+                                Text(day.center ?? "—")
+                                    .font(.system(size: 10))
+                                    .foregroundStyle(EMSTheme.Colors.textMuted)
+                                    .lineLimit(1)
+                            }
+                        }
+                        .padding(.vertical, 9)
+                        if day.date != vm.upcomingShifts.last?.date {
+                            Divider().background(EMSTheme.Colors.divider)
+                        }
+                    }
+                }
+            }
+            .padding(12)
+            .background(EMSTheme.Colors.card)
+            .clipShape(RoundedRectangle(cornerRadius: EMSTheme.cornerRadius, style: .continuous))
+            .padding(EMSTheme.pagePadding)
+        }
+        .emsPage("المناوبات القادمة")
+        .task { await vm.load() }
     }
 }
