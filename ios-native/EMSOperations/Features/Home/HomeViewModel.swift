@@ -190,11 +190,12 @@ final class HomeViewModel: ObservableObject {
         return (5..<12).contains(hour) ? "صباح الخير" : "مساء الخير"
     }
 
-    /// تنسيق عربي لتاريخ المناوبة: «الثلاثاء 28 سبتمبر 2026».
+    /// تنسيق عربي لتاريخ المناوبة: «الثلاثاء 28 سبتمبر 2026» — أسماء عربية
+    /// بأرقام لاتينية (numbers=latn؛ توجيه المالك 2026-09-28).
     func arabicDateLabel(_ date: Date) -> String {
         let f = DateFormatter()
         f.calendar = Calendar(identifier: .gregorian)
-        f.locale = Locale(identifier: "ar_SA")
+        f.locale = Locale(identifier: "ar_SA@numbers=latn")
         f.timeZone = TimeZone(identifier: "Asia/Riyadh")
         f.dateFormat = "EEEE d MMMM yyyy"
         return f.string(from: date)

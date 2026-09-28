@@ -2,11 +2,16 @@
 //  ScheduleView.swift
 //  EMSOperations
 //
-//  «مناوبتي» بالمرجع البصري المعتمد (2026-09-28) — إعادة بناء واجهة فقط:
-//  بطاقة المناوبة القادمة + عدّاد، إجمالي الساعات/الأيام، تقويم الشهر
-//  (السبت يمينًا)، المناوبات القادمة، وإحصاءات الشهر.
+//  «مناوبتي» بالمرجع البصري المعتمد (2026-09-28) — واجهة فقط:
+//  بطاقة المناوبة القادمة + عدّاد، إجمالي الساعات/الأيام، تقويم نافذة
+//  أسبوعين (السبت يمينًا)، المناوبات القادمة، وإحصاءات الشهر.
 //  كل الأرقام من بيانات الخادم (/api/my/schedule × /api/shift-codes) —
 //  لا منطق جديد ولا مصادر موازية. Deep Link «تغيير جدول» محفوظ كما هو.
+//
+//  الاتجاه (توجيه المالك 2026-09-28): الشاشة RTL طبيعية بالكامل —
+//  ترتيب العناصر والمحاذاة والأسهم عربية، مع بقاء الأرقام والتواريخ
+//  والأوقات لاتينية مقروءة (verbatim / سلاسل رقمية لا تنقلب).
+//  ترتيب أبناء كل HStack مكتوب بترتيب القراءة العربية (الأول = الأيمن).
 //
 
 import SwiftUI
@@ -20,8 +25,8 @@ struct ScheduleView: View {
     private let refPurple = Color(red: 0.67, green: 0.45, blue: 0.95)
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 4), count: 7)
-    // ترويسة الأسبوع يسارًا→يمينًا داخل حاوية LTR: الجمعة … السبت (السبت يمينًا)
-    private let weekdayHeaders = ["جمعة", "خميس", "أربعاء", "ثلاثاء", "اثنين", "أحد", "سبت"]
+    // ترويسة الأسبوع بترتيب القراءة العربية: السبت يمينًا … الجمعة يسارًا
+    private let weekdayHeaders = ["سبت", "أحد", "اثنين", "ثلاثاء", "أربعاء", "خميس", "جمعة"]
 
     var body: some View {
         ScrollView {
@@ -46,13 +51,12 @@ struct ScheduleView: View {
             .padding(.horizontal, 18)
             .padding(.top, 6)
             .padding(.bottom, 12)
-            // المرجع مرسوم بمواقع مطلقة مختلطة — نثبّت المواقع يدويًا (مثل الرئيسية)
-            .environment(\.layoutDirection, .leftToRight)
         }
         .refreshable { await vm.load() }
         .emsPage("مناوبتي")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            // navigationBarLeading تحت RTL العام = يمين الشاشة (كما في المرجع)
             ToolbarItem(placement: .navigationBarLeading) {
                 NavigationLink {
                     ScheduleChangesView()
@@ -81,18 +85,19 @@ struct ScheduleView: View {
                 .fill(EMSTheme.Colors.card)
             if let next = vm.nextShift {
                 HStack(spacing: 0) {
+                    // الصورة يمين البطاقة (الأول في الترتيب = الأيمن تحت RTL).
+                    // أصل shift_hero مقصوص مسبقًا بنسبة الإطار نفسها (150×155) من
+                    // home_hero المعتمد — scaledToFill يملأ المساحة بلا قصّ علوي/سفلي
+                    // ولا أشرطة فارغة ولا تشويه لنسبة الأبعاد.
+                    Image("shift_hero")
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 150, height: 155)
+                        .clipped()
+                        .overlay(countdownPanel(next))
                     nextShiftContent(next)
                         .padding(12)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                    // صورة الإسعاف الليلية (أصل home_hero الموجود) يمين البطاقة ~45%
-                    // scaledToFit: الصورة تظهر كاملة داخل المساحة دون قص (توجيه المالك)
-                    Image("home_hero")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 150, height: 155)
-                        .background(EMSTheme.Colors.navySoft)
-                        .clipped()
-                        .overlay(countdownPanel(next))
                 }
             } else {
                 HStack(spacing: 10) {
@@ -110,6 +115,7 @@ struct ScheduleView: View {
     }
 
     private func nextShiftContent(_ day: ScheduleDTO.Day) -> some View {
+        // alignment: .leading تحت RTL = محاذاة يمين عربية طبيعية
         VStack(alignment: .leading, spacing: 7) {
             HStack(spacing: 7) {
                 Image(systemName: "calendar")
@@ -137,14 +143,16 @@ struct ScheduleView: View {
                     .foregroundStyle(vm.kind(for: day) == .night ? refBlue : EMSTheme.Colors.warning)
             }
             if let t = vm.times(for: day) {
+                // البداية يمينًا ثم الانتهاء يسارًا — ترتيب القراءة العربية (كالمرجع)
                 HStack(spacing: 7) {
                     timeTile(time: t.start, label: "وقت البداية", icon: "clock.fill", tint: EMSTheme.Colors.emerald)
                     timeTile(time: t.end, label: "وقت الانتهاء", icon: "clock.fill", tint: EMSTheme.Colors.danger)
                 }
             }
+            // الفريق يمينًا ثم المركز يسارًا — كما في المرجع
             HStack(spacing: 7) {
-                placeTile(text: day.center ?? "—", label: "المركز", icon: "mappin.circle.fill", tint: EMSTheme.Colors.warning)
                 placeTile(text: day.teamName ?? "—", label: "الفريق", icon: "person.2.fill", tint: refBlue)
+                placeTile(text: day.center ?? "—", label: "المركز", icon: "mappin.circle.fill", tint: EMSTheme.Colors.warning)
             }
         }
     }
@@ -246,16 +254,8 @@ struct ScheduleView: View {
     // MARK: - بطاقتا الإحصاء (ساعات الشهر / أيام المناوبات)
 
     private var statsRow: some View {
+        // المرجع: «إجمالي أيام المناوبات» يمينًا · «إجمالي ساعات الشهر» يسارًا
         HStack(spacing: 9) {
-            statCard(
-                title: "إجمالي ساعات الشهر",
-                value: hoursText(vm.monthHours),
-                unit: "ساعة",
-                subtitle: vm.monthTitle,
-                icon: "hourglass",
-                chartIcon: "chart.bar.fill",
-                tint: refPurple
-            )
             statCard(
                 title: "إجمالي أيام المناوبات",
                 value: "\(vm.totalShiftDays)",
@@ -265,11 +265,21 @@ struct ScheduleView: View {
                 chartIcon: "chart.line.uptrend.xyaxis",
                 tint: EMSTheme.Colors.teal
             )
+            statCard(
+                title: "إجمالي ساعات الشهر",
+                value: hoursText(vm.monthHours),
+                unit: "ساعة",
+                subtitle: vm.monthTitle,
+                icon: "hourglass",
+                chartIcon: "chart.bar.fill",
+                tint: refPurple
+            )
         }
     }
 
     private func statCard(title: String, value: String, unit: String, subtitle: String,
                           icon: String, chartIcon: String, tint: Color) -> some View {
+        // الأيقونة يمينًا (أول عنصر RTL) · النص · أيقونة الرسم يسارًا — كالمرجع
         HStack(spacing: 8) {
             Image(systemName: icon)
                 .font(.subheadline)
@@ -324,26 +334,12 @@ struct ScheduleView: View {
         }
     }
 
-    // MARK: - تقويم الشهر
+    // MARK: - تقويم نافذة الأسبوعين
 
     private var calendarCard: some View {
         VStack(spacing: 10) {
-            // الترويسة: «اليوم» يسارًا · الشهر + الأسهم يمينًا
+            // الترويسة (RTL): الأسهم ثم الشهر يمينًا · «اليوم» يسارًا — كالمرجع
             HStack(spacing: 8) {
-                Button { Task { await vm.goToday() } } label: {
-                    Text("اليوم")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(EMSTheme.Colors.teal)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 7)
-                        .background(EMSTheme.Colors.navySoft)
-                        .clipShape(Capsule())
-                }
-                .buttonStyle(.plain)
-                Spacer()
-                Text(vm.monthTitle)
-                    .font(.subheadline.weight(.bold))
-                    .foregroundStyle(.white)
                 Button { Task { await vm.prevMonth() } } label: {
                     Image(systemName: "chevron.right")
                         .font(.caption.weight(.bold))
@@ -360,6 +356,20 @@ struct ScheduleView: View {
                         .frame(width: 28, height: 28)
                         .background(EMSTheme.Colors.navySoft)
                         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                Text(vm.monthTitle)
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(.white)
+                Spacer()
+                Button { Task { await vm.goToday() } } label: {
+                    Text("اليوم")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(EMSTheme.Colors.teal)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 7)
+                        .background(EMSTheme.Colors.navySoft)
+                        .clipShape(Capsule())
                 }
                 .buttonStyle(.plain)
             }
@@ -382,7 +392,7 @@ struct ScheduleView: View {
                     }
                 }
             }
-            // وسيلة الإيضاح
+            // وسيلة الإيضاح (RTL: صباح يمينًا … مهمة أخرى يسارًا)
             HStack(spacing: 12) {
                 Spacer()
                 legendDot("صباح", color: EMSTheme.Colors.emerald)
@@ -413,8 +423,8 @@ struct ScheduleView: View {
     }
 
     /// خلايا النافذة — صفّان فقط كما في المرجع (الأسبوع الحالي + التالي).
-    /// windowDates مرتبة سبت→جمعة؛ يُعكَس كل أسبوع ليصبح السبت يمينًا داخل
-    /// الحاوية LTR.
+    /// windowDates مرتبة سبت→جمعة، وتحت RTL تنسيق الشبكة يمين→يسار طبيعيًا
+    /// فيقع السبت يمينًا دون أي عكس يدوي.
     private func windowCells() -> [Cell] {
         let cal = vm.riyadhCalendar
         let dates = vm.windowDates
@@ -422,7 +432,7 @@ struct ScheduleView: View {
         var cells: [Cell] = []
         for week in 0..<2 {
             let slice = Array(dates[(week * 7)..<(week * 7 + 7)])
-            for date in slice.reversed() {
+            for date in slice {
                 let ds = Self.cellFormatter.string(from: date)
                 cells.append(.day(ds, cal.component(.day, from: date), ds == vm.todayStr))
             }
@@ -471,13 +481,14 @@ struct ScheduleView: View {
     private var upcomingCard: some View {
         let rows = Array(vm.upcomingShifts.prefix(4))
         return VStack(spacing: 8) {
+            // الترويسة (RTL): العنوان يمينًا · «عرض الكل» يسارًا — كالمرجع
             HStack {
+                Text("المناوبات القادمة")
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(.white)
+                Spacer()
                 NavigationLink {
-                    // استعادة RTL صراحة: الوجهة تُبنى داخل حاوية LTR فتورث
-                    // اتجاهها، ما يشوّه انتقال الدفع تحت RTL العام (RootView).
-                    // نفس سبب استخدام navigationDestination(for:) في العمليات.
                     UpcomingShiftsListView()
-                        .environment(\.layoutDirection, .rightToLeft)
                 } label: {
                     HStack(spacing: 3) {
                         Text("عرض الكل")
@@ -488,10 +499,6 @@ struct ScheduleView: View {
                     .foregroundStyle(EMSTheme.Colors.teal)
                 }
                 .buttonStyle(.plain)
-                Spacer()
-                Text("المناوبات القادمة")
-                    .font(.subheadline.weight(.bold))
-                    .foregroundStyle(.white)
             }
             if rows.isEmpty {
                 Text("لا توجد مناوبات قادمة مسجلة.")
@@ -515,18 +522,34 @@ struct ScheduleView: View {
         .clipShape(RoundedRectangle(cornerRadius: EMSTheme.cornerRadius, style: .continuous))
     }
 
+    /// صف مناوبة (RTL): الفريق/المركز يمينًا · فاصل · اليوم والتاريخ والوقت ·
+    /// «بعد N» يسارًا · سهم التقدم أقصى اليسار.
     private func upcomingRow(_ day: ScheduleDTO.Day) -> some View {
         HStack(spacing: 10) {
-            // يسارًا: العدّ التنازلي
-            VStack(spacing: 1) {
-                Text("بعد")
-                    .font(.system(size: 9))
-                    .foregroundStyle(EMSTheme.Colors.textMuted)
-                Text(dayWord(vm.daysUntil(day)))
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(EMSTheme.Colors.teal)
+            // يمينًا: الفريق والمركز (الأيقونة عند الحافة اليمنى)
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 4) {
+                    Image(systemName: "person.2.fill")
+                        .font(.system(size: 9))
+                        .foregroundStyle(refBlue)
+                    Text(day.teamName ?? "—")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                }
+                HStack(spacing: 4) {
+                    Image(systemName: "mappin.circle.fill")
+                        .font(.system(size: 9))
+                        .foregroundStyle(refBlue)
+                    Text(day.center ?? "—")
+                        .font(.system(size: 10))
+                        .foregroundStyle(EMSTheme.Colors.textMuted)
+                        .lineLimit(1)
+                }
             }
-            .frame(width: 44)
+            Rectangle()
+                .fill(EMSTheme.Colors.divider)
+                .frame(width: 1, height: 30)
             // وسطًا: اليوم والتاريخ ثم الوقت
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 5) {
@@ -545,29 +568,14 @@ struct ScheduleView: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            Rectangle()
-                .fill(EMSTheme.Colors.divider)
-                .frame(width: 1, height: 30)
-            // يمينًا: الفريق والمركز
-            VStack(alignment: .trailing, spacing: 2) {
-                HStack(spacing: 4) {
-                    Text(day.teamName ?? "—")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.white)
-                        .lineLimit(1)
-                    Image(systemName: "person.2.fill")
-                        .font(.system(size: 9))
-                        .foregroundStyle(refBlue)
-                }
-                HStack(spacing: 4) {
-                    Text(day.center ?? "—")
-                        .font(.system(size: 10))
-                        .foregroundStyle(EMSTheme.Colors.textMuted)
-                        .lineLimit(1)
-                    Image(systemName: "mappin.circle.fill")
-                        .font(.system(size: 9))
-                        .foregroundStyle(refBlue)
-                }
+            // يسارًا: العدّ التنازلي
+            VStack(spacing: 1) {
+                Text("بعد")
+                    .font(.system(size: 9))
+                    .foregroundStyle(EMSTheme.Colors.textMuted)
+                Text(dayWord(vm.daysUntil(day)))
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(EMSTheme.Colors.teal)
             }
             Image(systemName: "chevron.left")
                 .font(.caption2.weight(.bold))
@@ -581,16 +589,17 @@ struct ScheduleView: View {
     private var monthStatsSection: some View {
         VStack(spacing: 8) {
             HStack {
-                Spacer()
                 Text("إحصاءات الشهر")
                     .font(.subheadline.weight(.bold))
                     .foregroundStyle(.white)
+                Spacer()
             }
+            // المرجع: «إجمالي الأيام» يمينًا … «إجازات» يسارًا
             HStack(spacing: 8) {
-                monthStatTile(value: vm.vacationCount, label: "إجازات", icon: "airplane", tint: refPurple)
-                monthStatTile(value: vm.nightCount, label: "مناوبات ليلية", icon: "moon.fill", tint: refBlue)
-                monthStatTile(value: vm.morningCount, label: "مناوبات صباحية", icon: "sun.max.fill", tint: EMSTheme.Colors.warning)
                 monthStatTile(value: vm.totalShiftDays, label: "إجمالي الأيام", icon: "calendar", tint: EMSTheme.Colors.teal)
+                monthStatTile(value: vm.morningCount, label: "مناوبات صباحية", icon: "sun.max.fill", tint: EMSTheme.Colors.warning)
+                monthStatTile(value: vm.nightCount, label: "مناوبات ليلية", icon: "moon.fill", tint: refBlue)
+                monthStatTile(value: vm.vacationCount, label: "إجازات", icon: "airplane", tint: refPurple)
             }
         }
     }
@@ -620,7 +629,6 @@ struct ScheduleView: View {
 
 private struct UpcomingShiftsListView: View {
     @StateObject private var vm = ScheduleViewModel()
-    private let refBlue = Color(red: 0.36, green: 0.62, blue: 0.98)
 
     var body: some View {
         ScrollView {
@@ -639,17 +647,19 @@ private struct UpcomingShiftsListView: View {
                             .padding(.vertical, 20)
                     } else {
                         ForEach(vm.upcomingShifts, id: \.date) { day in
+                        // RTL: الفريق/المركز يمينًا · التاريخ والوقت · «بعد N» يسارًا
                         HStack(spacing: 10) {
-                            VStack(spacing: 1) {
-                                Text("بعد")
-                                    .font(.system(size: 9))
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(day.teamName ?? "—")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(.white)
+                                    .lineLimit(1)
+                                Text(day.center ?? "—")
+                                    .font(.system(size: 10))
                                     .foregroundStyle(EMSTheme.Colors.textMuted)
-                                Text("\(vm.daysUntil(day))")
-                                    .font(.caption.weight(.bold))
-                                    .foregroundStyle(EMSTheme.Colors.teal)
-                                    .environment(\.locale, Locale(identifier: "en_US_POSIX"))
+                                    .lineLimit(1)
                             }
-                            .frame(width: 40)
+                            Spacer()
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("\(vm.weekdayName(day.date)) \(vm.dashedDate(day))")
                                     .font(.caption.weight(.bold))
@@ -661,17 +671,16 @@ private struct UpcomingShiftsListView: View {
                                         .foregroundStyle(EMSTheme.Colors.textMuted)
                                 }
                             }
-                            Spacer()
-                            VStack(alignment: .trailing, spacing: 2) {
-                                Text(day.teamName ?? "—")
-                                    .font(.caption.weight(.semibold))
-                                    .foregroundStyle(.white)
-                                    .lineLimit(1)
-                                Text(day.center ?? "—")
-                                    .font(.system(size: 10))
+                            VStack(spacing: 1) {
+                                Text("بعد")
+                                    .font(.system(size: 9))
                                     .foregroundStyle(EMSTheme.Colors.textMuted)
-                                    .lineLimit(1)
+                                Text("\(vm.daysUntil(day))")
+                                    .font(.caption.weight(.bold))
+                                    .foregroundStyle(EMSTheme.Colors.teal)
+                                    .environment(\.locale, Locale(identifier: "en_US_POSIX"))
                             }
+                            .frame(width: 40)
                         }
                         .padding(.vertical, 9)
                         if day.date != vm.upcomingShifts.last?.date {

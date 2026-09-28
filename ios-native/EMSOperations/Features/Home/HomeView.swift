@@ -343,7 +343,8 @@ struct HomeView: View {
                         .foregroundStyle(.white)
                     Spacer()
                     Button { tabRouter.selected = .schedule } label: {
-                        Image(systemName: "chevron.right")
+                        // سهم التقدم عربيًا يشير يسارًا (البطاقة RTL)
+                        Image(systemName: "chevron.left")
                             .font(.system(size: 10, weight: .semibold))
                             .foregroundStyle(EMSTheme.Colors.textMuted)
                             .frame(width: 25, height: 25)
@@ -404,6 +405,9 @@ struct HomeView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(EMSTheme.Colors.card)
             .clipShape(RoundedRectangle(cornerRadius: EMSTheme.cornerRadius, style: .continuous))
+            // بطاقة المناوبة RTL عربية (توجيه المالك 2026-09-28): ترتيب العناصر
+            // والمحاذاة يمين→يسار داخل البطاقة فقط، مع بقاء الأرقام لاتينية.
+            .environment(\.layoutDirection, .rightToLeft)
     }
 
     /// شريحة الوردية الذهبية (صباحية ☀️ في المرجع — الأيقونة تتبع الاسم الفعلي).
@@ -525,6 +529,15 @@ struct HomeView: View {
                 quickTile("الجداول", icon: "calendar.badge.clock", color: refBlue) {
                     tabRouter.selected = .scheduleOps
                 }
+            }
+            // «التكميل» — إعادة الوصول لوظيفة التشييك الموجودة أصلًا (توجيه المالك
+            // 2026-09-28): نفس Destination.completion المسجّلة في جذر الشاشة،
+            // مقيّدة بقسم check من /api/my/sections كما كانت في التصميم السابق.
+            if session.permissions.canAccessEmployeePortal, vm.sections?.check == true {
+                NavigationLink(value: Destination.completion) {
+                    quickTileLabel("التكميل", icon: "checklist.checked", color: EMSTheme.Colors.teal)
+                }
+                .buttonStyle(.plain)
             }
             if session.permissions.canAccessOperations {
                 quickTile("العمليات", icon: "point.3.connected.trianglepath.dotted", color: EMSTheme.Colors.emerald) {
