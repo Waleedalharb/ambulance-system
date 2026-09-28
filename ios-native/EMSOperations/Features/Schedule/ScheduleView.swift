@@ -85,10 +85,12 @@ struct ScheduleView: View {
                         .padding(12)
                         .frame(maxWidth: .infinity, alignment: .leading)
                     // صورة الإسعاف الليلية (أصل home_hero الموجود) يمين البطاقة ~45%
+                    // scaledToFit: الصورة تظهر كاملة داخل المساحة دون قص (توجيه المالك)
                     Image("home_hero")
                         .resizable()
-                        .scaledToFill()
+                        .scaledToFit()
                         .frame(width: 150, height: 155)
+                        .background(EMSTheme.Colors.navySoft)
                         .clipped()
                         .overlay(countdownPanel(next))
                 }
@@ -471,8 +473,11 @@ struct ScheduleView: View {
         return VStack(spacing: 8) {
             HStack {
                 NavigationLink {
+                    // استعادة RTL صراحة: الوجهة تُبنى داخل حاوية LTR فتورث
+                    // اتجاهها، ما يشوّه انتقال الدفع تحت RTL العام (RootView).
+                    // نفس سبب استخدام navigationDestination(for:) في العمليات.
                     UpcomingShiftsListView()
-                        .environmentObject(deepLinks)
+                        .environment(\.layoutDirection, .rightToLeft)
                 } label: {
                     HStack(spacing: 3) {
                         Text("عرض الكل")
@@ -620,13 +625,20 @@ private struct UpcomingShiftsListView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 0) {
-                if vm.upcomingShifts.isEmpty && vm.state == .loaded {
-                    Text("لا توجد مناوبات قادمة مسجلة.")
-                        .font(.caption)
-                        .foregroundStyle(EMSTheme.Colors.textMuted)
-                        .padding(.vertical, 20)
-                } else {
-                    ForEach(vm.upcomingShifts, id: \.date) { day in
+                switch vm.state {
+                case .loading:
+                    // حالة تحميل صادقة بدل بطاقة فارغة منهارة (مساحة سوداء)
+                    EMSSkeletonCard(lines: 4)
+                case .failed(let message):
+                    EMSErrorView(message: message) { Task { await vm.load() } }
+                case .loaded:
+                    if vm.upcomingShifts.isEmpty {
+                        Text("لا توجد مناوبات قادمة مسجلة.")
+                            .font(.caption)
+                            .foregroundStyle(EMSTheme.Colors.textMuted)
+                            .padding(.vertical, 20)
+                    } else {
+                        ForEach(vm.upcomingShifts, id: \.date) { day in
                         HStack(spacing: 10) {
                             VStack(spacing: 1) {
                                 Text("بعد")
@@ -665,6 +677,7 @@ private struct UpcomingShiftsListView: View {
                         if day.date != vm.upcomingShifts.last?.date {
                             Divider().background(EMSTheme.Colors.divider)
                         }
+                    }
                     }
                 }
             }
