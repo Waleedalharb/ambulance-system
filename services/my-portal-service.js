@@ -400,9 +400,15 @@ class MyPortalService {
     // v5: من معي في المناوبة + إشعارات تغيير جدولي + سجل التغييرات
     // ════════════════════════════════════════════════════════════════════
 
-    /** التصنيف التشغيلي بمطابقة تامة فقط (قرار المالك — لا مطابقة جزئية). */
-    static LEADERSHIP_TITLES = ['كبير مسعفين', 'مساعد كبير المسعفين'];
-    static OPS_TITLES = ['تحكم عملياتي', 'تنسيق الاستجابة'];
+    /**
+     * التصنيف التشغيلي بمطابقة تامة فقط (قرار المالك — لا مطابقة جزئية).
+     * قرار المالك 2026-09-19 (الخيار 2): إضافة الصيغ المخزنة فعليًا في قاعدة
+     * البيانات بجانب الصيغ الرسمية — «مساعد كبير مسعفين» و«تنسيق استجابة»
+     * مخزنتان بلا «ال» لعشرة موظفين نشطين. دعم الصيغتين هنا بدل تعديل
+     * بيانات الموظفين (تبقى كما هي)، وبلا أي تغيير في الصلاحيات أو shift_roster.
+     */
+    static LEADERSHIP_TITLES = ['كبير مسعفين', 'مساعد كبير المسعفين', 'مساعد كبير مسعفين'];
+    static OPS_TITLES = ['تحكم عملياتي', 'تنسيق الاستجابة', 'تنسيق استجابة'];
 
     /**
      * «المناوبة الحالية» بوقت الرياض الفعلي — الليلية الممتدة محسوبة:
@@ -554,25 +560,72 @@ class MyPortalService {
         };
     }
 
-    /** إشعاراتي (تغييرات الجدول) — الأحدث أولًا + عداد غير المقروء. */
+    /**
+     * إشعاراتي — الأحدث أولًا + عداد غير المقروء.
+     * تدشين نظام «التمركز» (2026-09-28): الدمج إضافي صرف — إشعارات
+     * notification_log (تغييرات الجدول، بدورة read/ack) تُعاد كما هي مع
+     * source:'log'، وتُدمج معها الإشعارات الشخصية من notifications
+     * (user_id = الحساب، source:'personal') التي تشمل مهام التمركز بحقولها
+     * المهيكلة (data: team/center/start_time/end_time/positioning_task_id).
+     * الفرز بالزمن desc عبر المصدرين؛ لا يظهر للموظف إلا ما يخصه (السجل
+     * مقيّد بـemp.id والشخصي بـuser.id) — لا كشف لمهام فرق أخرى.
+     */
     async getMyNotifications(user) {
         const emp = await this.resolveEmployee(user);
         if (!emp) return { notFound: true };
         const rows = await this.db.NotificationLog.getByRecipient(emp.id, 50);
-        const notifications = rows.map(r => ({
-            id: r.id, message: r.message, status: r.status,
+        const logItems = rows.map(r => ({
+            id: r.id, source: 'log', message: r.message, status: r.status,
             shiftDate: r.shift_date, revisionId: r.revision_id,
             createdAt: r.created_at, openedAt: r.opened_at, acknowledgedAt: r.acknowledged_at
         }));
+        // الإشعارات الشخصية (تمركز/نظام) — نفس تحديد الهوية القائم في
+        // GET /api/notifications: req.user.id ثم userId ثم username.
+        const accountId = String(user.id != null ? user.id : (user.userId != null ? user.userId : user.username));
+        let personalItems = [];
+        try {
+            const personal = await this.db.Notifications.getByUser(accountId, 50);
+            personalItems = (personal || []).map(n => {
+                let data = null;
+                try { data = n.data_json ? JSON.parse(n.data_json) : null; } catch (_) { data = null; }
+                return {
+                    id: n.id, source: 'personal',
+                    title: n.title || null, message: n.message || '',
+                    type: (data && data.type) || n.type || 'info',
+                    status: n.is_read ? 'read' : 'pending',
+                    taskKey: n.task_key || null, data,
+                    createdAt: n.created_at
+                };
+            });
+        } catch (err) {
+            // فشل قراءة الشخصية لا يُسقط القائمة الأصلية — تُعاد إشعارات السجل كما كانت
+            console.warn('[my-portal] personal notifications merge failed:', err.message);
+        }
+        const ts = v => { const t = v ? new Date(String(v).replace(' ', 'T') + (String(v).includes('Z') || String(v).includes('+') ? '' : 'Z')).getTime() : 0; return isNaN(t) ? 0 : t; };
+        const notifications = [...logItems, ...personalItems]
+            .sort((a, b) => ts(b.createdAt) - ts(a.createdAt))
+            .slice(0, 50);
         const unreadCount = notifications.filter(n => ['read', 'acknowledged'].indexOf(n.status) === -1).length;
-        const unackedCount = notifications.filter(n => n.status !== 'acknowledged').length;
+        const unackedCount = logItems.filter(n => n.status !== 'acknowledged').length;
         return { notifications, unreadCount, unackedCount };
     }
 
-    /** ختم القراءة — على إشعارات صاحب الحساب حصرًا، انتقال أحادي بلا تكرار. */
-    async markMyNotificationRead(user, id) {
+    /**
+     * ختم القراءة — على إشعارات صاحب الحساب حصرًا، انتقال أحادي بلا تكرار.
+     * تدشين «التمركز» (2026-09-28): source='personal' (اختياري إضافي) يختم
+     * إشعارًا شخصيًا من notifications بعد تحقق الملكية (user_id = الحساب)؛
+     * غيابه = سلوك notification_log القائم حرفيًا.
+     */
+    async markMyNotificationRead(user, id, source) {
         const emp = await this.resolveEmployee(user);
         if (!emp) return { notFound: true };
+        if (source === 'personal') {
+            const accountId = String(user.id != null ? user.id : (user.userId != null ? user.userId : user.username));
+            const row = await this.db.Notifications.getById(id);
+            if (!row || String(row.user_id) !== accountId) return { notOwned: true };
+            if (!row.is_read) await this.db.Notifications.markAsRead(row.id);
+            return { status: 'read' };
+        }
         const row = await this.db.NotificationLog.getById(id);
         if (!row || row.recipient_id !== emp.id) return { notOwned: true };
         if (['read', 'acknowledged'].indexOf(row.status) === -1) {

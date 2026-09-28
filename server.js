@@ -2934,7 +2934,9 @@ app.get('/api/my/notifications', authenticate, authorizePerm('ops.my_portal'), a
 
 app.post('/api/my/notifications/:id/read', authenticate, authorizePerm('ops.my_portal'), async (req, res) => {
     try {
-        const out = await getMyPortalService().markMyNotificationRead(req.user, req.params.id);
+        // تدشين «التمركز» (2026-09-28): source=personal اختياري إضافي — يختم
+        // إشعارًا شخصيًا (تمركز) من جدول notifications؛ غيابه = السلوك القائم.
+        const out = await getMyPortalService().markMyNotificationRead(req.user, req.params.id, req.query.source);
         if (out.notFound) return res.status(404).json(MY_PORTAL_NO_EMPLOYEE);
         if (out.notOwned) return res.status(404).json({ error: 'الإشعار غير موجود' });
         // v6: تحديث صامت للشارة — بذل قصوى، لا يمس نتيجة الختم
@@ -3581,18 +3583,9 @@ const uploadChat = multer({
 // ============================================
 // بيانات قطاع الجنوب
 // ============================================
-let centersData = {
-    "المنصورة": ["جنوب 1", "جنوب 11", "جنوب 12", "سريع 3"],
-    "الخالدية": ["جنوب 2"],
-    "منفوحة": ["جنوب 3"],
-    "الدار البيضاء": ["جنوب 4", "جنوب 5", "سريع 1"],
-    "الإسكان": ["جنوب 6"],
-    "الحائر": ["جنوب 7"],
-    "ديراب": ["جنوب 10"],
-    "عكاظ": ["جنوب 9"],
-    "الشفاء": ["جنوب 8", "سريع 2"],
-    "الفرق الإضافية": ["سريع 4", "جنوب 13", "جنوب 14", "جنوب 15", "جنوب 16", "جنوب 17", "جنوب 18", "جنوب 19"]
-};
+// P3 (اعتماد المالك 2026-09-21): حُذف جدول centersData الثابت نهائيًا.
+// ربط الفريق بالمركز يُشتق من DB (teams.center) عبر CentersGeoService.getTeamCenters
+// — نفس مصدر teamCenters في GET /api/ops/centers. لا نسخة ثابتة هنا ولا في أي عميل.
 
 // ============================================
 // دوال قراءة وكتابة البيانات
@@ -4292,22 +4285,25 @@ app.get('/api/data', authenticate, async (req, res) => {
             }
         } catch (e) { /* ignore — يبقى null */ }
         
-        // Ensure centersData is never empty — protects dispatch display on new shifts
-        var safeCentersData = centersData;
-        if (!safeCentersData || Object.keys(safeCentersData).length === 0) {
-            safeCentersData = {
-                "المنصورة": ["جنوب 1", "جنوب 11", "جنوب 12", "سريع 3"],
-                "الخالدية": ["جنوب 2"],
-                "منفوحة": ["جنوب 3"],
-                "الدار البيضاء": ["جنوب 4", "جنوب 5", "سريع 1"],
-                "الإسكان": ["جنوب 6"],
-                "الحائر": ["جنوب 7"],
-                "ديراب": ["جنوب 10"],
-                "عكاظ": ["جنوب 9"],
-                "الشفاء": ["جنوب 8", "سريع 2"],
-                "الفرق الإضافية": ["سريع 4", "جنوب 13", "جنوب 14", "جنوب 15", "جنوب 16", "جنوب 17", "جنوب 18", "جنوب 19"]
-            };
-        }
+        // P3: centers يُشتق من DB (teams.center) عبر نفس خدمة SSOT — لا جدول ثابت
+        // ولا fallback مضمّن. فشل الاشتقاق = {} صادقة (العميل لا يكتب فوق الموجود بفارغ).
+        var safeCentersData = {};
+        try {
+            const cgSvc = getCentersGeoService();
+            if (cgSvc) {
+                const tc = await cgSvc.getTeamCenters();
+                const grouped = {};
+                for (const team of Object.keys(tc)) {
+                    const c = tc[team];
+                    if (!grouped[c]) grouped[c] = [];
+                    grouped[c].push(team);
+                }
+                for (const c of Object.keys(grouped)) {
+                    grouped[c].sort((a, b) => a.localeCompare(b, 'ar', { numeric: true }));
+                }
+                safeCentersData = grouped;
+            }
+        } catch (e) { console.warn('[centers-geo] اشتقاق centers لـ /api/data فشل:', e.message); }
         
         res.json({
             data,
@@ -8847,6 +8843,17 @@ async function resolveEventsShiftId(req) {
     return { shiftId: active ? active.id : null };
 }
 
+// بوابة كشف الجوالات في قراءات التكميل (اعتماد المالك 2026-09-20): الجوال لا
+// يُرسل إلا لحامل عضوية صريحة staff.phone_view أو admin.users_manage — نفس
+// صيغة مسار shift-mates حرفيًا (نمط employeeColumnsFor). بلا المنحة يُرجَع
+// phone=null مع بقاء المفتاح (ثبات الشكل مع الويب وiOS).
+async function _canViewPhones(req) {
+    try {
+        const eff = await getPermissionService().getEffective(req.user.id, req.user.role);
+        return holdsExplicitPerm(eff, 'admin.users_manage') || holdsExplicitPerm(eff, 'staff.phone_view');
+    } catch (_) { return false; }
+}
+
 app.get('/api/staffing/state', authenticate, async (req, res) => {
     try {
         if (!opsEngine || !staffingEventsService) return res.status(503).json({ error: 'Engine unavailable' });
@@ -8867,7 +8874,7 @@ app.get('/api/staffing/state', authenticate, async (req, res) => {
             if (resolved.error) return res.status(400).json({ error: resolved.error });
             shiftId = resolved.shiftId;
         }
-        const state = await staffingEventsService.getState(shiftId);
+        const state = await staffingEventsService.getState(shiftId, { canPhone: await _canViewPhones(req) });
         res.json({ success: true, ...state });
     } catch (error) {
         console.error('[API] Error staffing state:', error);
@@ -8907,7 +8914,7 @@ app.get('/api/staffing/available-support', authenticate, async (req, res) => {
         if (!opsEngine || !staffingEventsService) return res.status(503).json({ error: 'Engine unavailable' });
         const resolved = await resolveEventsShiftId(req);
         if (resolved.error) return res.status(400).json({ error: resolved.error });
-        const avail = await staffingEventsService.getAvailableSupport(resolved.shiftId);
+        const avail = await staffingEventsService.getAvailableSupport(resolved.shiftId, { canPhone: await _canViewPhones(req) });
         res.json({ success: true, ...avail });
     } catch (error) {
         console.error('[API] Error available support:', error);
@@ -8964,7 +8971,7 @@ app.get('/api/staffing/volunteer-candidates', authenticate, async (req, res) => 
         if (!opsEngine || !staffingEventsService) return res.status(503).json({ error: 'Engine unavailable' });
         const resolved = await resolveEventsShiftId(req);
         if (resolved.error) return res.status(400).json({ error: resolved.error });
-        const result = await staffingEventsService.getVolunteerCandidates(resolved.shiftId, req.query.q);
+        const result = await staffingEventsService.getVolunteerCandidates(resolved.shiftId, req.query.q, { canPhone: await _canViewPhones(req) });
         res.json({ success: true, ...result });
     } catch (error) {
         if (error && error.statusCode) return res.status(error.statusCode).json({ error: error.message });

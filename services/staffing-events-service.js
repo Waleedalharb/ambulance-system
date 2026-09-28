@@ -532,12 +532,12 @@ class StaffingEventsService {
     }
 
     /** الحالة الحالية المشتقة لكل كيان في المناوبة (طيّ الأحداث). */
-    async getState(shiftId) {
+    async getState(shiftId, opts) {
         const events = await this._attendanceEvents(shiftId);
         const base = { shiftId, domain: DOMAIN, entities: foldEvents(events, DOMAIN) };
         // VA: إثراء إضافي — جاهزية الفرق المشتقة + مجاميع القوى (نفس الاشتقاق الوحيد)
         try {
-            const derived = await this.deriveTeamReadiness(shiftId);
+            const derived = await this.deriveTeamReadiness(shiftId, opts);
             base.teams = derived.teams;
             base.workforce = derived.workforce;
         } catch (e) {
@@ -1171,7 +1171,13 @@ class StaffingEventsService {
     //                     (الفرق الجاهزة ÷ الفرق المطلوبة) × 100 — مقياس فرق
     //                     صرف لا علاقة له بعدد الأفراد. (readinessRate الأصلي
     //                     = جاهزة ÷ مقرَّرة ويبقى كما هو للتوافق الخلفي.)
-    async deriveTeamReadiness(shiftId) {
+    async deriveTeamReadiness(shiftId, opts) {
+        // بوابة الجوال (اعتماد المالك 2026-09-20): phone لا يُرسل إلا لحامل
+        // staff.phone_view أو admin.users_manage — يحسبها المسار ويمررها هنا.
+        // الافتراضي false: كل مستدعٍ داخلي (لقطة المشغّل الذكي/فرق CAD/الحوض)
+        // يحصل على الشكل نفسه بلا أرقام. المفتاح يبقى بقيمة null حفاظًا على
+        // ثبات الشكل مع الويب وiOS (يفحصان m.phone ? … : '—').
+        const canPhone = !!(opts && opts.canPhone);
         const emptyWf = {
             totalStaff: 0, totalRequired: 0, totalCars: 0,
             readyTeams: 0, missingTeams: 0, offlineTeams: 0, pendingTeams: 0,
@@ -1320,17 +1326,17 @@ class StaffingEventsService {
                 const openAway = open.find(o => o.event_type === 'assignment' && canonicalTeamId(o.team_id) !== t.name);
                 if (openAbs) {
                     absentees.push({
-                        name: c.name, jobTitle: c.jobTitle, code: c.code, phone: c.phone,
+                        name: c.name, jobTitle: c.jobTitle, code: c.code, phone: canPhone ? (c.phone || null) : null,
                         reason: openAbs.reason || null,
                         since: openAbs.created_at, recordedBy: openAbs.actor_name || null,
                         type: openAbs.event_type
                     });
-                    members.push({ name: c.name, jobTitle: c.jobTitle, code: c.code, phone: c.phone, role: 'base', state: openAbs.event_type });
+                    members.push({ name: c.name, jobTitle: c.jobTitle, code: c.code, phone: canPhone ? (c.phone || null) : null, role: 'base', state: openAbs.event_type });
                 } else if (openAway) {
-                    members.push({ name: c.name, jobTitle: c.jobTitle, code: c.code, phone: c.phone, role: 'base', state: 'assignment' });
+                    members.push({ name: c.name, jobTitle: c.jobTitle, code: c.code, phone: canPhone ? (c.phone || null) : null, role: 'base', state: 'assignment' });
                 } else {
                     activeCount++;
-                    members.push({ name: c.name, jobTitle: c.jobTitle, code: c.code, phone: c.phone, role: 'base', state: 'active' });
+                    members.push({ name: c.name, jobTitle: c.jobTitle, code: c.code, phone: canPhone ? (c.phone || null) : null, role: 'base', state: 'active' });
                 }
             }
 
@@ -1350,13 +1356,13 @@ class StaffingEventsService {
                         seenSupport.add(f.entityId);
                         const pi = personInfo[f.entityId] || {};
                         const pl = payloadOf(o) || {};
-                        supporters.push({ name: f.entityId, jobTitle: pi.jobTitle || pl.jobTitle || null, code: pi.code || pl.employeeNumber || null, role: 'support', state: 'external_support', supportType: o.event_type, coverageType: pl.coverageType || null, since: o.created_at, recordedBy: o.actor_name || null, fromCenter: o.center || null });
+                        supporters.push({ name: f.entityId, jobTitle: pi.jobTitle || pl.jobTitle || null, code: pi.code || pl.employeeNumber || null, phone: canPhone ? (pi.phone || null) : null, role: 'support', state: 'external_support', supportType: o.event_type, coverageType: pl.coverageType || null, since: o.created_at, recordedBy: o.actor_name || null, fromCenter: o.center || null });
                     } else if (o.event_type === 'assignment' && canonicalTeamId(o.team_id) === t.name && !crewNames.has(f.entityId)) {
                         if (seenSupport.has(f.entityId)) continue;
                         seenSupport.add(f.entityId);
                         const pi = personInfo[f.entityId] || {};
                         const pl = payloadOf(o) || {};
-                        supporters.push({ name: f.entityId, jobTitle: pi.jobTitle || pl.jobTitle || null, code: pi.code || pl.employeeNumber || null, role: 'support', state: 'assignment', supportType: 'assignment', coverageType: pl.coverageType || null, since: o.created_at, recordedBy: o.actor_name || null, fromCenter: o.center || null });
+                        supporters.push({ name: f.entityId, jobTitle: pi.jobTitle || pl.jobTitle || null, code: pi.code || pl.employeeNumber || null, phone: canPhone ? (pi.phone || null) : null, role: 'support', state: 'assignment', supportType: 'assignment', coverageType: pl.coverageType || null, since: o.created_at, recordedBy: o.actor_name || null, fromCenter: o.center || null });
                     }
                 }
             }
@@ -1392,7 +1398,7 @@ class StaffingEventsService {
                         name: a.entityId,
                         jobTitle: pi.jobTitle || pl.jobTitle || null,
                         code: pi.code || pl.employeeNumber || null,
-                        phone: pi.phone || null,
+                        phone: canPhone ? (pi.phone || null) : null,
                         reason: openAbs.reason || null,
                         since: openAbs.created_at, recordedBy: openAbs.actor_name || null,
                         type: openAbs.event_type
@@ -1401,6 +1407,7 @@ class StaffingEventsService {
                         name: a.entityId,
                         jobTitle: pi.jobTitle || pl.jobTitle || null,
                         code: pi.code || pl.employeeNumber || null,
+                        phone: canPhone ? (pi.phone || null) : null,
                         role: 'activation', state: openAbs.event_type,
                         activationKind, // تمييز عرضي: متطوع/أوفرلاب — بلا أثر منطقي
                         since: a.event.created_at, recordedBy: a.event.actor_name || null
@@ -1411,6 +1418,7 @@ class StaffingEventsService {
                     name: a.entityId,
                     jobTitle: pi.jobTitle || pl.jobTitle || null,
                     code: pi.code || pl.employeeNumber || null,
+                    phone: canPhone ? (pi.phone || null) : null,
                     role: 'activation', state: 'activation',
                     activationKind, // تمييز عرضي: متطوع/أوفرلاب — بلا أثر منطقي
                     since: a.event.created_at, recordedBy: a.event.actor_name || null
@@ -1526,7 +1534,10 @@ class StaffingEventsService {
      * كل مرشح يُوسم بمصدره (sourceUnit/kind) حتى تعرض الواجهة «المركز
      * القادم منه» بلا لبس — حقول إضافية فقط، لا يُحذف أي حقل قائم.
      */
-    async getAvailableSupport(shiftId) {
+    async getAvailableSupport(shiftId, opts) {
+        // بوابة الجوال: phone لحامل staff.phone_view / admin.users_manage فقط
+        // (نفس حكم deriveTeamReadiness — يحسبها المسار ويمررها، الافتراضي حجب).
+        const canPhone = !!(opts && opts.canPhone);
         if (!shiftId) return { shiftId: shiftId || null, supporters: [] };
         const shift = await this.storage.getShiftById(shiftId);
         if (!shift) return { shiftId, supporters: [] };
@@ -1536,7 +1547,7 @@ class StaffingEventsService {
         let scheduled = [];
         try {
             scheduled = await this.storage.all(
-                `SELECT e.id AS employee_id, e.employee_code, e.name, e.job_title, e.symbol, sr.team_id, sr.shift_code, t.name AS team_name
+                `SELECT e.id AS employee_id, e.employee_code, e.name, e.job_title, e.symbol, e.phone, sr.team_id, sr.shift_code, t.name AS team_name
                  FROM shift_roster sr
                  JOIN employees e ON e.id = sr.employee_id
                  LEFT JOIN teams t ON t.id = sr.team_id
@@ -1545,7 +1556,12 @@ class StaffingEventsService {
         } catch (_) { scheduled = []; }
         // رمز اليوم لكل اسم (قبل الفلترة — يشمل الإجازات/WO) لوسم عناصر الحوض
         const rosterCodeByName = {};
-        for (const r of scheduled) if (!(r.name in rosterCodeByName)) rosterCodeByName[r.name] = r.shift_code || null;
+        // جوال لكل اسم (قبل الفلترة — يشمل متطوعي الحوض المجدولين بإجازة/WO)
+        const phoneByName = {};
+        for (const r of scheduled) {
+            if (!(r.name in rosterCodeByName)) rosterCodeByName[r.name] = r.shift_code || null;
+            if (!(r.name in phoneByName)) phoneByName[r.name] = r.phone || null;
+        }
         scheduled = scheduled.filter(r => {
             if (isWorkDayCode(r.shift_code, isNight)) return true; // التطبيع المركزي — لا مطابقة حرفية
             // مرحلة الأوفرلاب 4 (التفعيل): الأكواد التشغيلية الملحقة (O12-09/
@@ -1586,6 +1602,7 @@ class StaffingEventsService {
                 name: s.name,
                 employeeCode: s.employee_code || null,
                 jobTitle: s.job_title || null,
+                phone: canPhone ? (s.phone || null) : null, // بوابة staff.phone_view
                 team: s.team_name || null,
                 // W-تكامل ③: رمز المناوبة (إضافي فقط) — يميّز الأوفرلاب (O12…)
                 // في عرض الحوض حين لا يكون للموظف فريق مجدول (team=null).
@@ -1609,10 +1626,26 @@ class StaffingEventsService {
             if (busy.has(f.entityId)) continue; // مفعَّل/منشغل — ليس في الحوض
             if (supporters.some(s => s.name === f.entityId)) continue; // حارس ازدواج
             const pl = parsePayload(openVol[openVol.length - 1].payload);
+            // جوال المتطوع (بوابة staff.phone_view): من كادر اليوم إن وُجد،
+            // وإلا استرجاع بالكود الوظيفي المسجل في حدث التطوع — المتطوعون
+            // غالبًا خارج الجدولة الفعلية (WO/إجازة) فلا يكفي كادر اليوم وحده.
+            let volPhone = null;
+            if (canPhone) {
+                volPhone = phoneByName[f.entityId] || null;
+                if (!volPhone && pl.employeeNumber) {
+                    try {
+                        const pr = await this.storage.get(
+                            'SELECT phone FROM employees WHERE employee_code = ? AND is_active = 1',
+                            [String(pl.employeeNumber)]);
+                        volPhone = (pr && pr.phone) || null;
+                    } catch (_) { /* بلا جوال */ }
+                }
+            }
             supporters.push({
                 name: f.entityId,
                 employeeCode: pl.employeeNumber ? String(pl.employeeNumber) : null,
                 jobTitle: pl.jobTitle || null,
+                phone: volPhone,
                 team: null,
                 shiftCode: rosterCodeByName[f.entityId] || null, // رمز اليوم إن وجد (V/WO/…)
                 sourceUnit: null,
@@ -1813,7 +1846,9 @@ class StaffingEventsService {
      * ومن عليه تطوع/دعم/تفعيل/تكليف مفتوح في هذه المناوبة (طيّ الأحداث).
      * dayCode إرشادي للعرض فقط (رمز الكادر المجدول أو null — بلا سجل).
      */
-    async getVolunteerCandidates(shiftId, q) {
+    async getVolunteerCandidates(shiftId, q, opts) {
+        // بوابة الجوال: phone لحامل staff.phone_view / admin.users_manage فقط.
+        const canPhone = !!(opts && opts.canPhone);
         if (!shiftId) return { shiftId: shiftId || null, candidates: [] };
         const shift = await this.storage.getShiftById(shiftId);
         if (!shift) return { shiftId, candidates: [] };
@@ -1829,7 +1864,7 @@ class StaffingEventsService {
         let rows = [];
         try {
             rows = await this.storage.all(
-                `SELECT e.employee_code, e.name, e.job_title
+                `SELECT e.employee_code, e.name, e.job_title, e.phone
                  FROM employees e
                  WHERE e.is_active = 1 AND (? = '' OR e.name LIKE ? OR e.employee_code LIKE ?)
                  ORDER BY e.name LIMIT 40`, [query, like, like]);
@@ -1862,6 +1897,7 @@ class StaffingEventsService {
                 name: r.name,
                 employeeCode: r.employee_code || null,
                 jobTitle: r.job_title || null,
+                phone: canPhone ? (r.phone || null) : null, // بوابة staff.phone_view
                 dayCode
             });
             if (candidates.length >= 15) break;

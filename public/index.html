@@ -1602,6 +1602,9 @@ window.addEventListener('load', function() {
                     <button type="button" class="smap-chip active" id="smapLayerTeams" title="فرق المناوبة وحالة جاهزيتها"><i class="fas fa-truck-medical"></i> الفرق</button>
                     <button type="button" class="smap-chip active" id="smapLayerCenters" title="المراكز التشغيلية التسعة"><i class="fas fa-hospital"></i> المراكز</button>
                 </div>
+                <!-- P3 (اعتماد المالك 2026-09-21): حالة مرجع المراكز من SSOT —
+                     تحميل/فشل/نقص integrity · راية غير حاجبة فوق الخريطة -->
+                <div class="smap-refbanner" id="smapRefBanner" style="display:none"></div>
                 <!-- ذاكرة الخريطة — شريط الوضع التاريخي (اعتماد المالك 2026-08-24): يظهر فقط في الوضع التاريخي -->
                 <div class="smap-histbar" id="smapHistBar">
                     <span class="smap-layerbar-lbl"><i class="fas fa-clock-rotate-left"></i> النطاق:</span>
@@ -2789,7 +2792,7 @@ window.addEventListener('load', function() {
 <script src="/js/time-riyadh.js"></script>
 <script src="js/table-sort.js?v=1" defer></script>
 <script src="js/incident-lookup.js?v=1" defer></script>
-<script src="js/app.js?v=53" defer></script><!-- v=53 (L-5، 2026-09-02): قائمة فرقة الجوي من /api/cad-reports/south-teams مع fallback للقائمة الثابتة -->
+<script src="js/app.js?v=54" defer></script><!-- v=54 (P3، 2026-09-21): مرجع المراكز من /api/ops/centers (SSOT) — حذف الجداول الثابتة operationalCenters/teamCenterMap -->
 <script src="js/crew-batch-cancel.js?v=1" defer></script><!-- الاختيار الجماعي لفرق البلاغ في توزيع البلاغات — بعد app.js (خطافات عرض فقط) -->
 <script src="js/place-suggestion.js?v=2" defer></script><!-- PI-7: عرض «هوية الموقع» (اقتراح خارجي غير معتمد) — قراءة فقط، بعد app.js — v=2: PI-10 حالات pending/paused/incomplete -->
 <script src="js/alert-rules.js?v=1" defer></script><!-- قواعد التنبيه التشغيلي النقية — قبل smart-map.js -->
@@ -2798,7 +2801,7 @@ window.addEventListener('load', function() {
 <script src="js/map-config.local.js?v=1" defer onerror="void 0"></script><!-- اختياري محلي خارج Git: مفتاح Mapbox العام المقيّد — غيابه طبيعي -->
 <script src="js/map-config.runtime.js" defer></script><!-- إعداد الإنتاج من متغير البيئة MAPBOX_PUBLIC_TOKEN (المسار «ب» — اعتماد المالك 2026-08-28): لا توكن في Git، وغياب المتغير = no-op -->
 <script src="js/map-adapter.js?v=3" defer></script><!-- MapAdapter: طبقة الرسم الموحدة — قبل smart-map.js وmap-history.js · v=3: pointsLayer المجمّعة القابلة للتوسع (RC-6، اعتماد المالك 2026-09-01) -->
-<script src="js/smart-map.js?v=8" defer></script><!-- الخريطة التشغيلية الذكية — بعد app.js (تقرأ جداوله الثابتة) · v=8 (L-6، 2026-09-02): قسم «النماذج المرتبطة بالبلاغ» في بطاقة البلاغ — جلب كسول عرض فقط -->
+<script src="js/smart-map.js?v=9" defer></script><!-- الخريطة التشغيلية الذكية — بعد app.js · v=9 (P3، 2026-09-21): المراكز/الربط من مرجع SSOT في runtime + راية حالة المرجع غير الحاجبة -->
 <script src="js/map-history.js?v=3" defer></script><!-- ذاكرة الخريطة — الوضع التاريخي التحليلي (H1–H4) داخل نفس الخريطة؛ عرض فقط · v=3: نقاط مجمّعة + بطاقة كسولة (RC-6) -->
 <script src="js/map-guide.js?v=2" defer></script><!-- 📖 دليل استخدام الخريطة التشغيلية داخل المنصة (اعتماد المالك 2026-08-25) — محتوى ثابت يشرح، لا يلمس بيانات · v=2: حدّ بطاقة الشرح يخصم القائمة المفتوحة (اعتماد المالك 2026-08-31) -->
 <script src="js/crew-achievement-board.js?v=1" defer></script><!-- Phase D: لوحة إنجاز الفرق — بعد app.js حتى يسبقها تعريف AuthGate -->
@@ -3210,6 +3213,15 @@ input[type="search"], textarea, select {
 .smap-layerbar-lbl { color: var(--ex-text-3); }
 .smap-empty { color: var(--ex-text-4); }
 .smap-kpi-l { font-size: 0.68rem; }
+
+/* P3: راية حالة مرجع المراكز (SSOT) — غير حاجبة، من لوحة الهوية فقط */
+.smap-refbanner { padding: 6px 12px; font-size: 0.75rem; border-radius: 8px; margin: 4px 0; display: flex; align-items: center; gap: 8px; background: var(--ex-surface-2, rgba(148,163,184,0.08)); border: 1px solid var(--ex-border-soft, rgba(148,163,184,0.25)); color: var(--ex-text-2, #cbd5e1); }
+.smap-refbanner.is-loading i { color: var(--teal); }
+.smap-refbanner.is-failed { border-color: rgba(239,68,68,0.4); }
+.smap-refbanner.is-failed i { color: var(--red, #EF4444); }
+.smap-refbanner.is-incomplete { border-color: rgba(245,158,11,0.4); }
+.smap-refbanner.is-incomplete i { color: var(--amber, #F59E0B); }
+.smap-refbanner-btn { background: none; border: 1px solid currentColor; border-radius: 6px; color: inherit; font-size: 0.72rem; padding: 2px 8px; cursor: pointer; }
 
 /* RC-4: إيقاع موحد لأزرار الخريطة الثلاثة — نفس الأزرار والأماكن، حاوية ومحاذاة فقط */
 .smap-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }

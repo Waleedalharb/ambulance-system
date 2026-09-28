@@ -30,6 +30,10 @@
  *    silent on no-op deletes remains the correct, side-effect-free choice.
  */
 
+const fs = require('fs').promises;
+const path = require('path');
+const TimeRiyadh = require('../public/js/time-riyadh.js'); // الطبقة المركزية للوقت (TIME-POLICY)
+
 // تفويض «المرحلة الأخيرة قبل الاعتماد الرسمي» (2026-08): توحيد التوقيت — السيرفر
 // (Asia/Riyadh) مرجع وحيد. startTime/endTime القادمان من حقول datetime-local
 // أوقات جدارية بتوقيت الرياض (naive بلا إزاحة)؛ تفسيرها بمنطقة الخادم المحلية
@@ -126,6 +130,151 @@ class PositioningService {
         return Object.keys(changed).length ? changed : null;
     }
 
+    // ── بند 11 (اعتماد المالك 2026-09-20): إشعار مناوبي الفرق المختارة ──
+    // الخادم وحده يحدد المستلمين: فرقة ← shift_roster اليوم (الرياض) ← موظف
+    // نشط بكود «دوام» ← حساب users.json بنفس employee_code. لا يُوثق بأي
+    // قائمة مستلمين قادمة من العميل.
+    // تدشين «التمركز» (2026-09-28): منع التكرار بمعرف المهمة positioning:<id>
+    // (task_key في notifications) — إشعار واحد لكل مهمة لكل مستخدم، وإعادة
+    // المحاولة/Refresh = touch بلا صف جديد ولا Push مكرر.
+
+    /** أسماء الفرق المستهدفة في الخطة — unit (نص) أو units (مصفوفة) */
+    static _unitNamesOf(plan) {
+        if (!plan || typeof plan !== 'object') return [];
+        const out = [];
+        if (Array.isArray(plan.units)) out.push(...plan.units);
+        if (plan.unit != null) out.push(plan.unit);
+        return [...new Set(out.map(u => String(u || '').trim()).filter(Boolean))];
+    }
+
+    /** تاريخ الرياض اليوم YYYY-MM-DD من الطبقة المركزية */
+    static _riyadhToday() {
+        const p = TimeRiyadh.riyadhParts(new Date());
+        return p ? `${p.year}-${String(p.month).padStart(2, '0')}-${String(p.day).padStart(2, '0')}` : null;
+    }
+
+    /** عرض لحظة UTC ISO بتوقيت الرياض: «HH:MM · YYYY-MM-DD» */
+    static _riyadhDisplay(iso) {
+        const p = TimeRiyadh.riyadhParts(iso);
+        if (!p) return iso ? String(iso) : '—';
+        const pad = v => String(v).padStart(2, '0');
+        return `${pad(p.hour)}:${pad(p.minute)} · ${p.year}-${pad(p.month)}-${pad(p.day)}`;
+    }
+
+    /**
+     * يحل أسماء الفرق إلى حسابات الموظفين المناوبين عليها اليوم فعليًا.
+     * يعيد [{ userId, employeeName, teamName }] — بلا تكرار موظف.
+     */
+    async _resolveOnDutyRecipients(unitNames) {
+        if (!unitNames.length) return [];
+        const teams = await this.db.all('SELECT id, name FROM teams');
+        const teamIds = teams.filter(t => unitNames.includes(String(t.name))).map(t => t.id);
+        if (!teamIds.length) return [];
+        const today = PositioningService._riyadhToday();
+        if (!today) return [];
+        const ph = teamIds.map(() => '?').join(',');
+        const rows = await this.db.all(
+            `SELECT employee_id, shift_code FROM shift_roster WHERE team_id IN (${ph}) AND shift_date = ?`,
+            [...teamIds, today]);
+        if (!rows.length) return [];
+        // «مناوب حاليًا» = له رمز مناوبة اليوم وحالة الرمز «دوام»؛ الرمز غير
+        // المسجل يُعامل دوامًا (الافتراضي القانوني في shift_codes.status)،
+        // والإجازة/الراحة والصفوف بلا رمز تُستبعد — لا مناوبة بلا رمز.
+        const codes = await this.db.all('SELECT code, status FROM shift_codes');
+        const statusBy = new Map(codes.map(c => [String(c.code), c.status || 'دوام']));
+        const dutyEmpIds = [...new Set(rows
+            .filter(r => r.shift_code != null && statusBy.get(String(r.shift_code), 'دوام') === 'دوام')
+            .map(r => r.employee_id))];
+        if (!dutyEmpIds.length) return [];
+        const ph2 = dutyEmpIds.map(() => '?').join(',');
+        const emps = await this.db.all(
+            `SELECT id, employee_code, name FROM employees WHERE id IN (${ph2}) AND COALESCE(is_active, 1) = 1`,
+            dutyEmpIds);
+        if (!emps.length) return [];
+        const usersPath = path.join(
+            process.env.RENDER_DISK_PATH || process.env.DATA_DIR || path.join(__dirname, '..', 'data'),
+            'users.json');
+        let users = [];
+        try { users = JSON.parse(await fs.readFile(usersPath, 'utf8')); } catch (_) { return []; }
+        const activeByUsername = new Map(
+            (Array.isArray(users) ? users : []).filter(u => u && u.isActive).map(u => [String(u.username), u]));
+        return emps
+            .map(e => {
+                const u = activeByUsername.get(String(e.employee_code));
+                return u ? { userId: String(u.id), employeeName: e.name } : null;
+            })
+            .filter(Boolean);
+    }
+
+    /**
+     * إشعار + Push للمناوبين الحاليين عند إنشاء/تعديل/إلغاء تمركز.
+     * لا يرمي أبدًا — فشل الإشعار لا يمس العملية التشغيلية الأصلية.
+     *
+     * تدشين نظام «التمركز» (2026-09-28): الإشعار مرتبط بالمهمة نفسها —
+     * taskKey = positioning:<planId> يجعل لكل مهمة صفًا واحدًا لكل مستخدم
+     * (إعادة المحاولة/Refresh = touch، والتحديث/الإلغاء يحدّث الصف نفسه)،
+     * وdata يحمل الحقول المهيكلة (team/center/start_time/end_time/
+     * positioning_task_id) فلا يعتمد العرض على تفسير النص.
+     */
+    async _notifyOnDuty(plan, kind, user, before) {
+        try {
+            const unitNames = [...new Set([
+                ...PositioningService._unitNamesOf(plan),
+                ...(before ? PositioningService._unitNamesOf(before) : [])
+            ])];
+            if (!unitNames.length || !plan || plan.id == null) return;
+            const targets = await this._resolveOnDutyRecipients(unitNames);
+            if (!targets.length) return;
+            const notificationService = require('./notification-service');
+            const title = { created: 'مهمة تمركز جديدة', updated: 'تحديث مهمة تمركز', ended: 'إلغاء مهمة تمركز' }[kind]
+                || 'مهمة تمركز';
+            // اسم المركز/الموقع كما ورد من مصدره — لا يُخترع عند غيابه
+            const center = (plan.title && String(plan.title).trim()) || (plan.location && String(plan.location).trim()) || null;
+            const lines = [];
+            if (kind === 'ended') lines.push('تم إلغاء التمركز الموجه لفرقتك.');
+            else if (kind === 'updated') lines.push(center ? `تم تحديث مهمة التمركز في ${center}.` : 'تم تحديث التمركز الموجه لفرقتك.');
+            else lines.push(center ? `تم توجيهك للتمركز في ${center}` : 'تم توجيه تمركز لفرقتك.');
+            if (plan.location && plan.location !== center) lines.push(`الموقع: ${plan.location}`);
+            lines.push(`الفريق: ${unitNames.join('، ')}`);
+            if (kind !== 'ended') {
+                if (plan.startTime && plan.endTime) {
+                    const fmt = iso => { const p = TimeRiyadh.riyadhParts(iso); return p ? `${String(p.hour).padStart(2, '0')}:${String(p.minute).padStart(2, '0')}` : null; };
+                    const st = fmt(plan.startTime), et = fmt(plan.endTime);
+                    if (st && et) lines.push(`الفترة: ${st} – ${et}`);
+                }
+                if (plan.startTime) lines.push(`البداية: ${PositioningService._riyadhDisplay(plan.startTime)}`);
+                if (plan.endTime) lines.push(`النهاية: ${PositioningService._riyadhDisplay(plan.endTime)}`);
+            }
+            const actor = (user && (user.name || user.username)) || plan.createdBy;
+            if (actor) lines.push(`المصدر: ${actor}`);
+            lines.push(`[تمركز #${plan.id}]`);
+            const message = lines.filter(Boolean).join('\n');
+            // الحمولة المهيكلة — الحقول التي طلبتها مواصفة «تدشين التمركز» حرفيًا
+            const data = {
+                type: 'positioning',
+                kind,
+                team: unitNames.join('، '),
+                teams: unitNames,
+                center: center,
+                location: plan.location || null,
+                start_time: kind !== 'ended' ? (plan.startTime || null) : (before && before.startTime) || plan.startTime || null,
+                end_time: kind !== 'ended' ? (plan.endTime || null) : (before && before.endTime) || plan.endTime || null,
+                priority: plan.priority || null,
+                positioning_task_id: String(plan.id)
+            };
+            const taskKey = `positioning:${plan.id}`;
+            for (const t of targets) {
+                // Idempotent بمعرف المهمة: صف واحد لكل مستخدم لكل مهمة —
+                // إعادة المحاولة = touch، والتحديث/الإلغاء يحدّث الصف نفسه.
+                await notificationService.notifyPersonal(t.userId,
+                    { eventKey: 'positioning.changed', title, message, taskKey, data },
+                    { kind: 'positioning', plan_id: String(plan.id), positioning_task_id: String(plan.id) });
+            }
+        } catch (err) {
+            console.warn('[Positioning] on-duty notify failed (' + kind + '):', err.message);
+        }
+    }
+
     /**
      * قائمة خطط التمركز (نفس ترتيب المسار القديم).
      * قبل القراءة: كنس الخطط المنتهية — نسخة حرفية من cleanupPeakPlans في الواجهة:
@@ -173,6 +322,8 @@ class PositioningService {
         this.bus.emit('PositioningStarted', { plan_id: plan.id, shift_id: shiftId, title: plan.title, plan });
         // المرحلة أ: ختم حدث الإنشاء في سجل المناوبة
         await this._recordEvent(plan.id, shiftId, 'created', null, plan, user);
+        // بند 11: إشعار المناوبين الحاليين على الفرق المختارة (لا يرمي أبدًا)
+        await this._notifyOnDuty(plan, 'created', user);
         return plan;
     }
 
@@ -212,6 +363,8 @@ class PositioningService {
         this.bus.emit('PositioningUpdated', { plan_id: row.id, shift_id: shiftId, plan });
         // المرحلة أ: ختم حدث التعديل مع ما تغيّر فعلًا (before/after لكل حقل)
         await this._recordEvent(row.id, shiftId, 'updated', this._diffFields(before, plan), plan, user || null);
+        // بند 11: المتأثرون = مناوبو الفرق قبل/بعد التعديل (لا يرمي أبدًا)
+        await this._notifyOnDuty(plan, 'updated', user, before);
         return plan;
     }
 
@@ -220,9 +373,12 @@ class PositioningService {
         const row = await this.db.get('SELECT * FROM peak_plans WHERE id = ?', [id]);
         await this.db.run('DELETE FROM peak_plans WHERE id = ?', [id]);
         if (row) {
+            const removedPlan = this._rowToJson(row);
             this.bus.emit('PositioningEnded', { plan_id: id, shift_id: row.shift_id });
             // المرحلة أ: الحذف إنهاء موثق — الحمولة الأخيرة تُحفظ في السجل قبل فقدها
-            await this._recordEvent(id, row.shift_id, 'ended', null, this._rowToJson(row), user || null);
+            await this._recordEvent(id, row.shift_id, 'ended', null, removedPlan, user || null);
+            // بند 11: إشعار الإلغاء لمناوبي فرق الخطة الملغاة (لا يرمي أبدًا)
+            await this._notifyOnDuty(removedPlan, 'ended', user);
         }
         return true;
     }
