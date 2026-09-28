@@ -18,6 +18,7 @@
 
 import Foundation
 import AVFoundation
+import UIKit
 
 @MainActor
 final class BalootSoundService: ObservableObject {
@@ -57,11 +58,14 @@ final class BalootSoundService: ObservableObject {
     private var players: [Effect: AVAudioPlayer] = [:]
     /// عدد المؤثرات التي وُجدت فعلًا في الحزمة — للتشخيص على الجهاز.
     private(set) var loadedCount = 0
+    /// مراقبات النظام التي تُبقي الجلسة حية (مقاطعة/خلفية/تغيير مخرج الصوت).
+    private var observers: [NSObjectProtocol] = []
 
     private init() {
         isMuted = UserDefaults.standard.bool(forKey: Self.muteKey)
         configureSession()
         preload()
+        observeSessionLifecycle()
     }
 
     /// جلسة تشغيل مستقلة عن مفتاح الصمت — الكتم من داخل التطبيق فقط.
@@ -69,6 +73,39 @@ final class BalootSoundService: ObservableObject {
         let session = AVAudioSession.sharedInstance()
         try? session.setCategory(.playback, mode: .default, options: [.mixWithOthers])
         try? session.setActive(true)
+    }
+
+    /// الجلسة كانت تُهيَّأ مرة واحدة عند الإقلاع فقط، فإذا عطّلها النظام
+    /// (خروج للخلفية، مكالمة/منبّه/Siri، فصل سماعة) ماتت كل الأصوات صامتًا
+    /// حتى إعادة تشغيل التطبيق — رغم أن isMuted تبقى false. هنا نعيد
+    /// تفعيلها عند انتهاء المقاطعة وعند العودة للواجهة وعند تغيير المخرج.
+    private func observeSessionLifecycle() {
+        let center = NotificationCenter.default
+        let interrupt = center.addObserver(forName: AVAudioSession.interruptionNotification, object: nil, queue: .main) { [weak self] note in
+            guard let info = note.userInfo,
+                  let raw = info[AVAudioSessionInterruptionTypeKey] as? UInt,
+                  AVAudioSession.InterruptionType(rawValue: raw) == .ended else { return }
+            Task { @MainActor in self?.configureSession() }
+        }
+        let foreground = center.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor in self?.configureSession() }
+        }
+        let routeChange = center.addObserver(forName: AVAudioSession.routeChangeNotification, object: nil, queue: .main) { [weak self] note in
+            guard let info = note.userInfo,
+                  let raw = info[AVAudioSessionRouteChangeReasonKey] as? UInt,
+                  AVAudioSession.RouteChangeReason(rawValue: raw) == .oldDeviceUnavailable else { return }
+            Task { @MainActor in self?.configureSession() }
+        }
+        observers = [interrupt, foreground, routeChange]
+    }
+
+    /// تفعيل دفاعي قبل التشغيل — setActive على جلسة نشطة لا يفعل شيئًا.
+    private func ensureSessionActive() {
+        try? AVAudioSession.sharedInstance().setActive(true)
+    }
+
+    deinit {
+        observers.forEach { NotificationCenter.default.removeObserver($0) }
     }
 
     private func preload() {
@@ -87,6 +124,7 @@ final class BalootSoundService: ObservableObject {
     /// تشغيل مؤثر — يُعيد المؤشر للبداية حتى يعمل مع الأحداث المتتالية السريعة.
     func play(_ fx: Effect) {
         guard !isMuted, let player = players[fx] else { return }
+        ensureSessionActive()
         player.currentTime = 0
         player.play()
     }
