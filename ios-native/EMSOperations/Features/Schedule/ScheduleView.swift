@@ -86,15 +86,18 @@ struct ScheduleView: View {
             if let next = vm.nextShift {
                 HStack(spacing: 0) {
                     // الصورة يمين البطاقة (الأول في الترتيب = الأيمن تحت RTL).
-                    // نفس أصل home_hero المعتمد من الرئيسية — بلا صورة جديدة وبلا
-                    // تعديل على الأصل. الارتفاع هو البُعد الحاكم (155pt من 1184px)
-                    // فلا قصّ علوي/سفلي إطلاقًا؛ الفيض أفقي فقط، وبمحاذاة .trailing
-                    // تُعرض النافذة اليمنى من المشهد: برج المملكة + الإسعاف كاملًا.
+                    // نفس أصل home_hero المعتمد — بلا صورة جديدة وبلا تعديل على
+                    // الأصل. الارتفاع هو البُعد الحاكم (155pt من 1184px) فلا قصّ
+                    // علوي/سفلي إطلاقًا؛ الفيض أفقي فقط. النافذة المطلوبة هي يمين
+                    // المشهد (برج المملكة + الإسعاف كاملًا) — ولأن alignment يتبع
+                    // اتجاه الواجهة (trailing = يسار بصريًا تحت RTL!) نثبّت LTR
+                    // على الصورة وحدها ليبقى .trailing = اليمين البصري دائمًا.
                     Image("home_hero")
                         .resizable()
                         .scaledToFill()
                         .frame(width: 150, height: 155, alignment: .trailing)
                         .clipped()
+                        .environment(\.layoutDirection, .leftToRight)
                         .overlay(countdownPanel(next))
                     nextShiftContent(next)
                         .padding(12)
