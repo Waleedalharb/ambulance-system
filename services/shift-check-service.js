@@ -44,10 +44,12 @@ const MECH_TEMPLATE = [
 ];
 
 class ShiftCheckService {
-    constructor({ db, getVehicleEventsService }) {
+    constructor({ db, getVehicleEventsService, getActiveShiftId }) {
         if (!db) throw new Error('ShiftCheckService: db مطلوب');
         this.db = db;
         this.getVehicleEventsService = typeof getVehicleEventsService === 'function' ? getVehicleEventsService : null;
+        // المناوبة النشطة لختم الجلسة بمالكها (ربط الجاهزية التاريخية بالأرشيف)
+        this.getActiveShiftId = typeof getActiveShiftId === 'function' ? getActiveShiftId : null;
         // تركيب (لا نسخ): الهوية والتكليف والفرق من خدمة البوابة نفسها
         this.portal = new MyPortalService({ db, getVehicleEventsService });
     }
@@ -91,16 +93,48 @@ class ShiftCheckService {
     async _findOrCreateSession(ctx) {
         const vehicle = await this._currentVehicle(ctx.team.id);
         const vehId = vehicle ? String(vehicle.vehicleId) : '';
-        let session = await this.db.get(
+        // المناوبة النشطة مالكة الجلسة — الجاهزية تُحفظ مع مناوبتها تاريخيًا
+        const activeShiftId = this.getActiveShiftId ? await this.getActiveShiftId() : null;
+        // الجلسة الصحيحة = المختومة بهذه المناوبة، أو جلسة قديمة بلا ختم (تُتبنى مرة واحدة).
+        // جلسة مختومة بمناوبة سابقة لا تُفتح مجددًا — تُنشأ جلسة جديدة للمناوبة الحالية
+        // حتى تبقى جاهزية كل مناوبة محفوظة مع سجلها التاريخي.
+        let session = activeShiftId != null ? await this.db.get(
+            `SELECT * FROM shift_check_sessions WHERE shift_date = ? AND team_id = ? AND vehicle_id = ?
+             AND (shift_id = ? OR shift_id IS NULL)
+             ORDER BY (shift_id IS NULL), id DESC LIMIT 1`,
+            [ctx.today, ctx.team.id, vehId, activeShiftId]) : await this.db.get(
             'SELECT * FROM shift_check_sessions WHERE shift_date = ? AND team_id = ? AND vehicle_id = ?',
             [ctx.today, ctx.team.id, vehId]);
-        if (session) return { session, vehicle, created: false };
+        if (session) {
+            // تبنّي الجلسة القديمة (shift_id NULL) بختم المناوبة النشطة — مرة واحدة فقط
+            if (session.shift_id == null && activeShiftId != null) {
+                try {
+                    await this.db.run('UPDATE shift_check_sessions SET shift_id = ? WHERE id = ? AND shift_id IS NULL',
+                        [activeShiftId, session.id]);
+                    session.shift_id = activeShiftId;
+                } catch (_) { /* عمود shift_id غير موجود بعد (بيئة قديمة) — لا كسر للجلسة */ }
+            }
+            return { session, vehicle, created: false };
+        }
 
         const ins = await this.db.run(
             `INSERT INTO shift_check_sessions (shift_date, team_id, team_name, vehicle_id, vehicle_name, center, created_by, schema_version)
              VALUES (?, ?, ?, ?, ?, ?, ?, 2)`,
             [ctx.today, ctx.team.id, ctx.team.name, vehId, vehicle ? vehicle.name : null, ctx.team.center || null, String(ctx.emp.employee_code)]);
         session = await this.db.get('SELECT * FROM shift_check_sessions WHERE id = ?', [ins.id]);
+        // اسم منشئ الجلسة نصًا وقت الحدث (اعتماد المالك 2026-09-29) — منفصل
+        // عن الإدراج حتى لا تنكسر البيئات بلا العمود الجديد
+        try {
+            await this.db.run('UPDATE shift_check_sessions SET created_by_name = ? WHERE id = ?', [ctx.emp.name, session.id]);
+            session.created_by_name = ctx.emp.name;
+        } catch (_) { /* بيئة بلا العمود — الجلسة تعمل كما كان */ }
+        // ختم المناوبة المالكة منفصل عن الإدراج حتى لا تنكسر البيئات بلا العمود الجديد
+        if (activeShiftId != null) {
+            try {
+                await this.db.run('UPDATE shift_check_sessions SET shift_id = ? WHERE id = ?', [activeShiftId, session.id]);
+                session.shift_id = activeShiftId;
+            } catch (_) { /* بيئة بلا العمود — الجلسة تعمل بلا ختم كما كان */ }
+        }
 
         // v4.2 — لقطة البنود من القالب المركزي:
         // الطبي = 4 مجموعات بكميات مطلوبة (ALS فقط لمركبات ALS من سجل النظام)
@@ -626,6 +660,14 @@ class ShiftCheckService {
                     await this.db.run(
                         "UPDATE shift_check_sessions SET status = 'completed', completed_at = datetime('now') WHERE id = ? AND status = 'open'",
                         [session.id]);
+                    // هوية خاتم الجلسة نصًا وقت الختم (اعتماد المالك 2026-09-29):
+                    // آخر مؤكد تسليم هو من أتمّها فعلًا — الجاهزية نفسها
+                    // محسوبة نظاميًا ولا «خاتم بشري» مستقل لها.
+                    try {
+                        await this.db.run(
+                            'UPDATE shift_check_sessions SET completed_by = ?, completed_by_name = ? WHERE id = ?',
+                            [String(ctx.emp.employee_code), ctx.emp.name, session.id]);
+                    } catch (_) { /* بيئة بلا العمودين — الاكتمال تم ولا كسر */ }
                     completed = true;
                 }
             }
