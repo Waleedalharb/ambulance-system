@@ -206,6 +206,9 @@ struct OpsCentersDTO: Decodable {
     let version: Int?
     let data: [String: Center]?
     let integrity: Integrity?
+    /// ربط الفريق بمركزه من teams.center (P3) — قيمه = أسماء المراكز المعتمدة
+    /// فعليًا بما فيها غير الجغرافية («العمليات»/«الفرق الإضافية»).
+    let teamCenters: [String: String]?
 }
 
 // MARK: - /api/current-shift — سياق المناوبة الحالية

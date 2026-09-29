@@ -1439,7 +1439,15 @@ let shiftCheckService = null;
 function getShiftCheckService() {
     if (!shiftCheckService && db) {
         const ShiftCheckService = require('./services/shift-check-service');
-        shiftCheckService = new ShiftCheckService({ db, getVehicleEventsService: () => vehicleEventsService });
+        shiftCheckService = new ShiftCheckService({
+            db,
+            getVehicleEventsService: () => vehicleEventsService,
+            // ختم جلسة التشييك بالمناوبة النشطة مالكة الجاهزية (ربط الأرشيف التاريخي)
+            getActiveShiftId: async () => {
+                const active = opsEngine && opsEngine.shifts ? await opsEngine.shifts.getActiveShift() : null;
+                return active ? active.id : null;
+            }
+        });
     }
     return shiftCheckService;
 }
@@ -4460,8 +4468,26 @@ app.get('/api/shifts/:id(\\d+)', authenticate, async (req, res) => {
             timeline: [],
             positioning: [],
             positioning_events: [],
-            signouts: []
+            signouts: [],
+            readiness: []
         };
+
+        // ── 0. جاهزية الفرق التاريخية لهذه المناوبة (اعتماد المالك 2026-09-29) ──
+        // سجلات shift_check_sessions المختومة بهذه المناوبة (shift_id) + الجلسات
+        // القديمة بلا ختم لنفس التاريخ (ما قبل الربط) — سجلات حقيقية محفوظة أثناء
+        // المناوبة، لا قيمة مشتقة من الوضع الحالي ولا قراءة لجاهزية اليوم.
+        try {
+            if (dbAvailable()) {
+                response.readiness = await db.all(
+                    `SELECT id, shift_date, shift_id, team_id, team_name, vehicle_id, vehicle_name,
+                            center, status, check_mode, readiness, readiness_reason, readiness_at,
+                            completed_at, created_at
+                     FROM shift_check_sessions
+                     WHERE shift_id = ? OR (shift_id IS NULL AND shift_date = ?)
+                     ORDER BY team_name, id`,
+                    [shiftId, normalizedShift.shiftDate || '']);
+            }
+        } catch (_) { /* جدول/عمود غير موجود في بيئة قديمة ← readiness تبقى [] بصدق */ }
 
         // ── 1. Query related data from SQLite (new data) ──
         try {
@@ -10621,6 +10647,32 @@ app.post('/api/unit-locations', authenticate, authorizePerm('ops.deployments'), 
         const { center, unit, lat, lng, address } = req.body;
         if (!center || !unit || lat === undefined || lng === undefined) {
             return res.status(400).json({ error: 'بيانات ناقصة: center, unit, lat, lng مطلوبة' });
+        }
+        // ── صرامة مصدر الحقيقة (اعتماد المالك 2026-09-29): اسم المركز يجب أن
+        // يكون من مراكز قطاع جنوب الرياض المعتمدة — المرجع الرسمي
+        // (config/operational-centers.json: الجغرافية + المعلنة غير الجغرافية)
+        // ∪ مراكز الفرق الميدانية النشطة الفعلية (teams.center). أي اسم آخر
+        // (قديم/مختصر/خارج القطاع) يُرفض ولا يدخل المخزن أصلًا — بدل أن يظهر
+        // لاحقًا في شاشات التمركز/الذروة كأنه مركز نظامي.
+        try {
+            const cg = getCentersGeoService();
+            if (cg && cg.getData()) {
+                const ref = cg.getData();
+                const allowed = new Set(
+                    Object.keys(ref.centers || {}).concat(Object.keys(ref.nonGeographic || {})));
+                const teamCenters = await cg.getTeamCenters();
+                Object.values(teamCenters || {}).forEach(c => allowed.add(c));
+                if (!allowed.has(center)) {
+                    return res.status(400).json({
+                        error: 'المركز «' + center + '» غير موجود في مرجع مراكز قطاع جنوب الرياض المعتمد — اختر مركزًا من القائمة الرسمية',
+                        code: 'CENTER_NOT_IN_SSOT'
+                    });
+                }
+            } else {
+                console.error('❌ [unit-locations] مرجع المراكز غير متاح — قبول الاسم كما ورد (راجع /api/ops/centers integrity)');
+            }
+        } catch (refErr) {
+            console.error('❌ [unit-locations] فشل فحص مرجع المراكز:', refErr.message);
         }
         const locations = await readUnitLocations();
         // Remove unit from any other center first (to avoid duplicates)

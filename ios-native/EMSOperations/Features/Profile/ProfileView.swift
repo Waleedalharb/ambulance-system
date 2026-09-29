@@ -36,7 +36,6 @@ struct ProfileView: View {
                 case .loaded:
                     if let p = vm.profile { employeeCard(p) }
                     else if vm.portalUnavailable { accountIdentityCard }
-                    commsSection
                     accountSection
                     securityCard
                     logoutCard
@@ -245,26 +244,10 @@ struct ProfileView: View {
         .contentShape(Rectangle())
     }
 
-    // MARK: - التواصل (قرار المالك ب: المحادثات صفًّا يفتح ChatView نفسها)
-
-    private var commsSection: some View {
-        VStack(spacing: 8) {
-            sectionHeader("التواصل", icon: "bubble.left.and.bubble.right.fill")
-            groupedCard {
-                NavigationLink {
-                    ChatView()
-                } label: {
-                    menuRowLabel(icon: "bubble.left.and.bubble.right.fill",
-                                 tint: EMSTheme.Colors.teal,
-                                 title: "المحادثات",
-                                 subtitle: "التواصل مع الزملاء")
-                }
-                .buttonStyle(.plain)
-            }
-        }
-    }
-
     // MARK: - الحساب والإعدادات (الوظائف الموجودة فعليًا فقط — قرار المالك ج)
+
+    // قرار المالك 2026-09-29: قسم «التواصل» (المحادثات) أُزيل من «المزيد» —
+    // نظام المحادثات لم يعد متاحًا من تطبيق iOS (الواجهة فقط؛ الـBackend كما هو).
 
     private var accountSection: some View {
         let showRequests = !vm.portalUnavailable

@@ -1926,11 +1926,16 @@ function showPeakAlert(alertData) {
 function initPeakAlertMap(alertData) {
     var container = document.getElementById('peakAlertMap');
     if (!container) return;
-    if (typeof L === 'undefined') { setTimeout(function() { initPeakAlertMap(alertData); }, 500); return; }
+    // نفس طبقة الرسم الموحدة للمنصة (MapAdapter ← Mapbox/Leaflet) — لا خريطة بديلة للذروة
+    var PeakL = (window.MapAdapter && window.MapAdapter.L) || window.L;
+    if (!PeakL || typeof PeakL.map !== 'function') { setTimeout(function() { initPeakAlertMap(alertData); }, 500); return; }
     
     // IMPORTANT: دائماً ندمر الخريطة القديمة وننشئ واحدة جديدة
     if (peakAlertMap) {
-        peakAlertMap.remove();
+        try {
+            if (typeof peakAlertMap.remove === 'function') peakAlertMap.remove();
+            else if (peakAlertMap.__inner && typeof peakAlertMap.__inner.remove === 'function') peakAlertMap.__inner.remove();
+        } catch (e) { }
         peakAlertMap = null;
         container.innerHTML = '';
     }
@@ -1939,16 +1944,18 @@ function initPeakAlertMap(alertData) {
         var centerLat = parseFloat(alertData.lat) || 24.7136;
         var centerLng = parseFloat(alertData.lng) || 46.6753;
         
-        peakAlertMap = L.map('peakAlertMap').setView([centerLat, centerLng], 13);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        peakAlertMap = PeakL.map('peakAlertMap').setView([centerLat, centerLng], 13);
+        PeakL.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '© OpenStreetMap'
         }).addTo(peakAlertMap);
         
-        var marker = L.marker([centerLat, centerLng]).addTo(peakAlertMap);
-        marker.bindPopup('<b>' + escapeHtml(alertData.unit) + '</b><br>' + escapeHtml(alertData.location) + '<br>⏰ ' + (alertData.startTime || '')).openPopup();
+        PeakL.marker([centerLat, centerLng]).addTo(peakAlertMap);
+        PeakL.popup().setLatLng([centerLat, centerLng])
+            .setContent('<b>' + escapeHtml(alertData.unit) + '</b><br>' + escapeHtml(alertData.location) + '<br>⏰ ' + (alertData.startTime || ''))
+            .openOn(peakAlertMap);
         
         if (alertData.radius) {
-            L.circle([centerLat, centerLng], {
+            PeakL.circle([centerLat, centerLng], {
                 radius: alertData.radius,
                 color: '#EF4444',
                 fillColor: '#EF4444',
@@ -1970,7 +1977,10 @@ function closePeakAlert() {
         peakCountdownInterval = null;
     }
     if (peakAlertMap) {
-        peakAlertMap.remove();
+        try {
+            if (typeof peakAlertMap.remove === 'function') peakAlertMap.remove();
+            else if (peakAlertMap.__inner && typeof peakAlertMap.__inner.remove === 'function') peakAlertMap.__inner.remove();
+        } catch (e) { }
         peakAlertMap = null;
         var container = document.getElementById('peakAlertMap');
         if (container) container.innerHTML = '';
@@ -2020,17 +2030,22 @@ function closePeakMap() {
 function initPeakMap() {
     var container = document.getElementById('peakMap');
     if (!container) return;
-    if (typeof L === 'undefined') { setTimeout(initPeakMap, 500); return; }
+    // نفس طبقة الرسم الموحدة للمنصة (MapAdapter ← Mapbox/Leaflet) — لا خريطة بديلة للذروة
+    var PeakL = (window.MapAdapter && window.MapAdapter.L) || window.L;
+    if (!PeakL || typeof PeakL.map !== 'function') { setTimeout(initPeakMap, 500); return; }
     if (peakMap) { setTimeout(function() { peakMap.invalidateSize(); }, 300); return; }
     try {
-        peakMap = L.map('peakMap').setView([24.7136, 46.6753], 13);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(peakMap);
+        peakMap = PeakL.map('peakMap').setView([24.7136, 46.6753], 13);
+        PeakL.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(peakMap);
         var marker = null;
         peakMap.on('click', function(e) {
-            var lat = e.latlng.lat;
-            var lng = e.latlng.lng;
+            // Leaflet يمرر e.latlng وMapbox يمرر e.lngLat — نفس الحدث، شكلان
+            var ll = e.latlng || (e.lngLat ? { lat: e.lngLat.lat, lng: e.lngLat.lng } : null);
+            if (!ll) return;
+            var lat = ll.lat;
+            var lng = ll.lng;
             if (marker) peakMap.removeLayer(marker);
-            marker = L.marker([lat, lng]).addTo(peakMap);
+            marker = PeakL.marker([lat, lng]).addTo(peakMap);
             var el_peakSelectedLocation_h2 = document.getElementById('peakSelectedLocation'); if (el_peakSelectedLocation_h2) el_peakSelectedLocation_h2.innerHTML = '<strong>' + lat.toFixed(6) + ', ' + lng.toFixed(6) + '</strong>';
             selectedPeakLocation = { lat: lat, lng: lng };
         });
@@ -3304,7 +3319,7 @@ function switchArchiveTab(tabName) {
     
     switch(tabName) {
         case 'summary':
-            renderArchiveSummaryTab(container, shift, totalReports);
+            renderArchiveSummaryTab(container, shift, totalReports, data.readiness);
             break;
         case 'reports':
             renderArchiveReportsTab(container, data.reports, totalReports);
@@ -3324,13 +3339,13 @@ function switchArchiveTab(tabName) {
     }
 }
 
-function renderArchiveSummaryTab(container, shift, totalReports) {
+function renderArchiveSummaryTab(container, shift, totalReports, readiness) {
     var typeLabel = (shift.shiftType === 'صباح' || shift.shiftType === 'morning' || shift.shiftType === 'صباحية') ? 'صباحي' : 'ليلي';
     var date = shift.shiftDate || '-';
     var createdAt = shift.createdAt ? TimeRiyadh.formatDateTimeSec(shift.createdAt) : '-';
     var updatedAt = shift.updatedAt ? TimeRiyadh.formatDateTimeSec(shift.updatedAt) : '-';
-    
-    container.innerHTML = 
+
+    container.innerHTML =
         '<div class="archive-tab-content">' +
             '<div class="archive-summary-grid">' +
                 '<div class="archive-summary-card">' +
@@ -3354,10 +3369,44 @@ function renderArchiveSummaryTab(container, shift, totalReports) {
                     '<div class="archive-summary-label">تاريخ الإنشاء</div>' +
                 '</div>' +
             '</div>' +
+            renderArchiveReadinessSection(readiness) +
             '<div class="archive-section">' +
                 '<h4><i class="fas fa-sticky-note"></i> ملاحظات المناوبة</h4>' +
                 '<div class="archive-notes-box">' + (shift.generalNotes || 'لا توجد ملاحظات') + '</div>' +
             '</div>' +
+        '</div>';
+}
+
+/// جاهزية الفرق المحفوظة أثناء هذه المناوبة (سجلات shift_check_sessions التاريخية —
+/// تُقرأ من بيانات المناوبة نفسها، لا من جاهزية اليوم الحالية).
+function renderArchiveReadinessSection(readiness) {
+    var sessions = Array.isArray(readiness) ? readiness : [];
+    var RDY = {
+        green:  ['🟢', 'جاهزة'],
+        yellow: ['🟡', 'جاهزة مع ملاحظات'],
+        red:    ['🔴', 'غير جاهزة']
+    };
+    var rows = '';
+    sessions.forEach(function(s) {
+        var r = RDY[s.readiness] || ['⏳', 'لم تُستكمل الجاهزية'];
+        var at = s.readiness_at ? TimeRiyadh.formatDateTimeSec(s.readiness_at) : '—';
+        rows +=
+            '<tr>' +
+                '<td>' + (s.team_name || '—') + '</td>' +
+                '<td>' + (s.vehicle_name || '—') + '</td>' +
+                '<td><span class="archive-badge archive-badge-primary">' + r[0] + ' ' + r[1] + '</span></td>' +
+                '<td>' + (s.readiness_reason || '—') + '</td>' +
+                '<td>' + at + '</td>' +
+            '</tr>';
+    });
+    var body = sessions.length === 0
+        ? '<div class="archive-empty"><i class="fas fa-clipboard-check"></i><p>لا توجد سجلات جاهزية محفوظة لهذه المناوبة</p></div>'
+        : '<div class="archive-table-wrapper"><table class="archive-table">' +
+            '<thead><tr><th>الفرقة</th><th>المركبة</th><th>الجاهزية</th><th>السبب</th><th>وقت التسجيل</th></tr></thead>' +
+            '<tbody>' + rows + '</tbody></table></div>';
+    return '<div class="archive-section">' +
+        '<h4><i class="fas fa-clipboard-check"></i> جاهزية الفرق أثناء المناوبة</h4>' +
+        body +
         '</div>';
 }
 

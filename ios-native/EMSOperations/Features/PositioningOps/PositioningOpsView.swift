@@ -128,7 +128,7 @@ struct PositioningOpsView: View {
                 Spacer()
                 if canDeploy {
                     Button {
-                        locCenter = vm.centers.first ?? ""
+                        locCenter = vm.centerOptions.first ?? ""
                         locUnit = ""; locLat = ""; locLng = ""; locAddress = ""
                         sheet = .unitLocation
                     } label: {
@@ -456,11 +456,13 @@ struct PositioningOpsView: View {
 
     private var unitLocationSheet: some View {
         formShell("تمركز وحدة") {
-            if vm.centers.isEmpty {
+            // قائمة الاختيار من مصدر الحقيقة فقط (centerOptions ← /api/ops/centers) —
+            // النص الحر احتياط عند تعذر تحميل المرجع، والخادم يرفض أي اسم خارج المرجع.
+            if vm.centerOptions.isEmpty {
                 formField("المركز", text: $locCenter)
             } else {
                 Menu {
-                    ForEach(vm.centers, id: \.self) { center in
+                    ForEach(vm.centerOptions, id: \.self) { center in
                         Button(center) { locCenter = center }
                     }
                 } label: {

@@ -5059,6 +5059,10 @@ async function migrateAssetRegistry() {
   await ensureColumn('shift_check_sessions', 'master_key', 'INTEGER');
   await ensureColumn('shift_check_sessions', 'fuel_card', 'INTEGER');
   await ensureColumn('shift_check_sessions', 'readiness_at', 'TEXT');
+  // ربط جلسة التشييك بالمناوبة المالكة (اعتماد المالك 2026-09-29): حتى تبقى
+  // «جاهزية الفرقة» التاريخية محفوظة مع مناوبتها في الأرشيف ولا تُستبدل
+  // بقيمة مناوبة لاحقة في نفس اليوم. NULL = جلسات ما قبل الربط (تاريخية).
+  await ensureColumn('shift_check_sessions', 'shift_id', 'INTEGER');
   await ensureColumn('shift_check_items', 'group_key', 'TEXT');
   await ensureColumn('shift_check_items', 'qty_required', 'TEXT');
   await ensureColumn('shift_check_items', 'qty_available', 'TEXT');

@@ -30,7 +30,6 @@ struct HomeView: View {
 
     /// ألوان البلاطات الملوّنة في المرجع (غير موجودة في الهوية — محلية لهذه الشاشة)
     private let refBlue = Color(red: 0.36, green: 0.62, blue: 0.98)
-    private let refPurple = Color(red: 0.67, green: 0.45, blue: 0.95)
     private let chipText = Color(red: 0.24, green: 0.15, blue: 0.03)
 
     var body: some View {
@@ -504,7 +503,9 @@ struct HomeView: View {
         return f.string(from: date)
     }
 
-    // MARK: - الإجراءات السريعة (ترتيب المرجع يسار→يمين: محادثات/طلباتي/جدول/عمليات)
+    // MARK: - الإجراءات السريعة (ترتيب المرجع: طلباتي/جدول/عمليات)
+    // قرار المالك 2026-09-29: أُزيلت بلاطة «المحادثات» — نظام المحادثات لم يعد
+    // متاحًا من تطبيق iOS (الواجهة فقط؛ الـBackend والـAPI وقاعدة البيانات كما هي).
 
     enum Destination: Hashable {
         case shift, mates, completion, incidents, vehicle, inventory, changes, assignments, operations, requests
@@ -512,9 +513,6 @@ struct HomeView: View {
 
     private var quickActionsRow: some View {
         HStack(spacing: 10) {
-            quickTile("المحادثات", icon: "text.bubble.fill", color: refPurple) {
-                tabRouter.selected = .chat
-            }
             if session.permissions.canAccessEmployeePortal {
                 NavigationLink(value: Destination.requests) {
                     quickTileLabel("طلباتي", icon: "doc.text.fill", color: EMSTheme.Colors.danger)

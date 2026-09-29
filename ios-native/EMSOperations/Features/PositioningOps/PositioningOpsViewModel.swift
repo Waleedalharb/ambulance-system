@@ -36,6 +36,11 @@ final class PositioningOpsViewModel: ObservableObject {
     @Published private(set) var missions: [PeakDataDTO.Mission] = []
     @Published private(set) var alerts: [PeakDataDTO.Alert] = []
     @Published private(set) var logs: [PeakDataDTO.Log] = []
+    /// أسماء المراكز المعتمدة من مصدر الحقيقة (/api/ops/centers: المراكز
+    /// الجغرافية المعتمدة ∪ مراكز الفرق النشطة من teams.center) — قائمة
+    /// الاختيار الوحيدة لحفظ التمركز. اعتماد المالك 2026-09-29: لا يُشتق
+    /// الاختيار من مفاتيح unit-locations المخزنة (قد تحمل أسماء قديمة).
+    @Published private(set) var centerOptions: [String] = []
 
     private let api = APIClient.shared
 
@@ -48,6 +53,7 @@ final class PositioningOpsViewModel: ObservableObject {
         return f
     }()
 
+    /// أقسام العرض = السجلات المخزنة الفعلية (بيانات حقيقية — لا تُخفى ولا تُشتق).
     var centers: [String] { locations.keys.sorted() }
 
     func load() async {
@@ -61,7 +67,10 @@ final class PositioningOpsViewModel: ObservableObject {
             async let locCall: UnitLocationsDTO = api.get("/api/unit-locations")
             async let peakCall: PeakDataDTO = api.get("/api/peak-data")
             async let plansCall: Any = api.getRaw("/api/peak-plans")
-            let (loc, peak, plansRaw) = try await (locCall, peakCall, plansCall)
+            // مرجع المراكز مستقل الفشل — تعثره لا يُسقط شاشة التمركز؛ عند غيابه
+            // يبقى الاختيار نصيًا حرًا والخادم يحسم الصحة (CENTER_NOT_IN_SSOT).
+            async let centersCall: OpsCentersDTO? = try? api.get("/api/ops/centers")
+            let (loc, peak, plansRaw, centersRef) = try await (locCall, peakCall, plansCall, centersCall)
             locations = loc.locations ?? [:]
             addresses = loc.addresses ?? [:]
             missions = peak.data?.missions ?? []
@@ -69,6 +78,11 @@ final class PositioningOpsViewModel: ObservableObject {
             logs = peak.data?.logs ?? []
             if let dict = plansRaw as? [String: Any], let list = dict["plans"] as? [[String: Any]] {
                 plans = list.map { planItem($0) }
+            }
+            if let ref = centersRef {
+                var names = Set((ref.data ?? [:]).keys)
+                (ref.teamCenters ?? [:]).values.forEach { names.insert($0) }
+                centerOptions = names.sorted()
             }
             state = .loaded
         } catch let e as APIError {
