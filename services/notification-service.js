@@ -92,12 +92,15 @@ function resolveDeps() {
             usersPath: _deps.usersPath,
             db: typeof _deps.getDb === 'function' ? _deps.getDb() : _deps.db,
             broadcastToUsers: _deps.broadcastToUsers,
+            // requests.review (2026-09-29): فحص صلاحية اختياري يُحقن من server.js
+            // عبر getPermissionService — يُستخدم فقط عند تمرير permKey صراحة.
+            hasPermission: typeof _deps.hasPermission === 'function' ? _deps.hasPermission : null,
             // v6: بوابة APNs الاختيارية — غيابها = بلا Push وبلا أي تغيير سلوك
             pushGateway: _deps.pushGateway || null
         };
     }
     const storage = process.env.RENDER_DISK_PATH || process.env.DATA_DIR || path.join(__dirname, '..', 'data');
-    return { usersPath: path.join(storage, 'users.json'), db: require('../db.js'), broadcastToUsers: null };
+    return { usersPath: path.join(storage, 'users.json'), db: require('../db.js'), broadcastToUsers: null, hasPermission: null };
 }
 
 // إشعار تشغيلي: صف لكل admin/director نشط (fan-out — النمط القائم حرفيًا)
@@ -107,11 +110,32 @@ function resolveDeps() {
 // للمستخدمين الذين أُنشئ لهم صف فعلًا فقط — التكرار داخل النافذة (touch)
 // لا يُزعج الجهاز مرة ثانية. البوابة لا ترمي أبدًا (وضع معطَّل آمن بلا مفاتيح)،
 // وفشلها لا يمس الصفوف المنشأة ولا البث — الطلب لا يُفقد حتى لو فشل Push.
-async function notifyOperational({ eventKey, title, message, push }) {
+//
+// permKey (2026-09-29 — معتمد): عند تمريره يُحدَّد المستلمون بالصلاحية عبر
+// hasPermission المحقونة (افتراضي الدور + المنح/السحب الفردية، والنجمة تمر
+// بحكم السياسة) بدل فلتر الدور القديم. يُستخدم حاليًا من leave.submitted و
+// shift_change.submitted فقط ('requests.review') — بقية الأحداث التشغيلية
+// تبقى على الفلتر القديم حرفيًا حتى تعتمد مصفوفة استهدافها بقرار منفصل.
+// سقوط آمن: permKey بلا hasPermission محقونة ← تحذير + الفلتر القديم،
+// فالإشعار لا يُفقد بسبب حقن ناقص.
+async function notifyOperational({ eventKey, title, message, push, permKey }) {
     const d = resolveDeps();
     const type = classify(eventKey);
     const users = JSON.parse(await fs.readFile(d.usersPath, 'utf8'));
-    const targets = users.filter(u => (u.role === 'admin' || u.role === 'director') && u.isActive);
+    const byPermission = permKey && typeof d.hasPermission === 'function';
+    if (permKey && !byPermission) {
+        console.warn('notifyOperational: permKey بدون hasPermission محقونة — رجوع لفلتر الدور القديم:', eventKey);
+    }
+    const targets = [];
+    for (const u of users) {
+        if (!u.isActive) continue;
+        if (byPermission) {
+            const uid = u.id != null ? u.id.toString() : '';
+            if (uid && await d.hasPermission(uid, u.role, permKey)) targets.push(u);
+        } else if (u.role === 'admin' || u.role === 'director') {
+            targets.push(u);
+        }
+    }
     let created = 0, deduped = 0;
     const createdUserIds = [];
     for (const t of targets) {
