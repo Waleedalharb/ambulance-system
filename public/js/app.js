@@ -3304,7 +3304,7 @@ function switchArchiveTab(tabName) {
     
     switch(tabName) {
         case 'summary':
-            renderArchiveSummaryTab(container, shift, totalReports);
+            renderArchiveSummaryTab(container, shift, totalReports, data.readiness);
             break;
         case 'reports':
             renderArchiveReportsTab(container, data.reports, totalReports);
@@ -3324,13 +3324,13 @@ function switchArchiveTab(tabName) {
     }
 }
 
-function renderArchiveSummaryTab(container, shift, totalReports) {
+function renderArchiveSummaryTab(container, shift, totalReports, readiness) {
     var typeLabel = (shift.shiftType === 'صباح' || shift.shiftType === 'morning' || shift.shiftType === 'صباحية') ? 'صباحي' : 'ليلي';
     var date = shift.shiftDate || '-';
     var createdAt = shift.createdAt ? TimeRiyadh.formatDateTimeSec(shift.createdAt) : '-';
     var updatedAt = shift.updatedAt ? TimeRiyadh.formatDateTimeSec(shift.updatedAt) : '-';
-    
-    container.innerHTML = 
+
+    container.innerHTML =
         '<div class="archive-tab-content">' +
             '<div class="archive-summary-grid">' +
                 '<div class="archive-summary-card">' +
@@ -3354,10 +3354,44 @@ function renderArchiveSummaryTab(container, shift, totalReports) {
                     '<div class="archive-summary-label">تاريخ الإنشاء</div>' +
                 '</div>' +
             '</div>' +
+            renderArchiveReadinessSection(readiness) +
             '<div class="archive-section">' +
                 '<h4><i class="fas fa-sticky-note"></i> ملاحظات المناوبة</h4>' +
                 '<div class="archive-notes-box">' + (shift.generalNotes || 'لا توجد ملاحظات') + '</div>' +
             '</div>' +
+        '</div>';
+}
+
+/// جاهزية الفرق المحفوظة أثناء هذه المناوبة (سجلات shift_check_sessions التاريخية —
+/// تُقرأ من بيانات المناوبة نفسها، لا من جاهزية اليوم الحالية).
+function renderArchiveReadinessSection(readiness) {
+    var sessions = Array.isArray(readiness) ? readiness : [];
+    var RDY = {
+        green:  ['🟢', 'جاهزة'],
+        yellow: ['🟡', 'جاهزة مع ملاحظات'],
+        red:    ['🔴', 'غير جاهزة']
+    };
+    var rows = '';
+    sessions.forEach(function(s) {
+        var r = RDY[s.readiness] || ['⏳', 'لم تُستكمل الجاهزية'];
+        var at = s.readiness_at ? TimeRiyadh.formatDateTimeSec(s.readiness_at) : '—';
+        rows +=
+            '<tr>' +
+                '<td>' + (s.team_name || '—') + '</td>' +
+                '<td>' + (s.vehicle_name || '—') + '</td>' +
+                '<td><span class="archive-badge archive-badge-primary">' + r[0] + ' ' + r[1] + '</span></td>' +
+                '<td>' + (s.readiness_reason || '—') + '</td>' +
+                '<td>' + at + '</td>' +
+            '</tr>';
+    });
+    var body = sessions.length === 0
+        ? '<div class="archive-empty"><i class="fas fa-clipboard-check"></i><p>لا توجد سجلات جاهزية محفوظة لهذه المناوبة</p></div>'
+        : '<div class="archive-table-wrapper"><table class="archive-table">' +
+            '<thead><tr><th>الفرقة</th><th>المركبة</th><th>الجاهزية</th><th>السبب</th><th>وقت التسجيل</th></tr></thead>' +
+            '<tbody>' + rows + '</tbody></table></div>';
+    return '<div class="archive-section">' +
+        '<h4><i class="fas fa-clipboard-check"></i> جاهزية الفرق أثناء المناوبة</h4>' +
+        body +
         '</div>';
 }
 
