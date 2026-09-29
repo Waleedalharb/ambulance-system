@@ -4415,9 +4415,10 @@ app.get('/api/shifts/archive', authenticate, async (req, res) => {
     }
 });
 
-// ── جاهزية الفرق (اعتماد المالك 2026-09-29): تجميع بنود التشييك مع جلستها ──
-// البنود من shift_check_items الحقيقية فقط — لا اختراع حقول ولا قيم مشتقة.
-function groupShiftCheckItems(sessions, items) {
+// ── جاهزية الفرق (اعتماد المالك 2026-09-29): تجميع بنود التشييك وتأكيدات
+// الموظفين مع جلستها — من shift_check_items/shift_check_confirmations
+// الحقيقيين فقط، لا اختراع حقول ولا قيم مشتقة.
+function groupShiftCheckItems(sessions, items, confirmations) {
     const bySession = {};
     (Array.isArray(items) ? items : []).forEach(it => {
         const k = it.session_id != null ? it.session_id : it.sessionId;
@@ -4425,7 +4426,18 @@ function groupShiftCheckItems(sessions, items) {
         if (!bySession[k]) bySession[k] = [];
         bySession[k].push(it);
     });
-    return (Array.isArray(sessions) ? sessions : []).map(s => ({ ...s, items: bySession[s.id] || [] }));
+    const confBySession = {};
+    (Array.isArray(confirmations) ? confirmations : []).forEach(c => {
+        const k = c.session_id != null ? c.session_id : c.sessionId;
+        if (k == null) return;
+        if (!confBySession[k]) confBySession[k] = [];
+        confBySession[k].push(c);
+    });
+    return (Array.isArray(sessions) ? sessions : []).map(s => ({
+        ...s,
+        items: bySession[s.id] || [],
+        confirmations: confBySession[s.id] || []
+    }));
 }
 
 // القراءة الحية لجاهزية الفرق: للمناوبة النشطة/بلا لقطة، ولأرشيف ما قبل ختم
@@ -4440,6 +4452,7 @@ async function loadShiftReadinessLive(shiftId, shiftDate) {
     if (!Array.isArray(sessions) || sessions.length === 0) return [];
     const ids = sessions.map(s => s.id);
     let items = [];
+    let confirmations = [];
     try {
         items = await db.all(
             `SELECT * FROM shift_check_items
@@ -4447,7 +4460,14 @@ async function loadShiftReadinessLive(shiftId, shiftDate) {
              ORDER BY session_id, id`,
             ids);
     } catch (_) { items = []; }
-    return groupShiftCheckItems(sessions, items);
+    try {
+        confirmations = await db.all(
+            `SELECT * FROM shift_check_confirmations
+             WHERE session_id IN (${ids.map(() => '?').join(',')})
+             ORDER BY session_id, id`,
+            ids);
+    } catch (_) { confirmations = []; }
+    return groupShiftCheckItems(sessions, items, confirmations);
 }
 
 app.get('/api/shifts/:id(\\d+)', authenticate, async (req, res) => {
@@ -4643,7 +4663,7 @@ app.get('/api/shifts/:id(\\d+)', authenticate, async (req, res) => {
                         // تغيّرت سجلات التشييك الحية بعد الختم. أرشيف ما قبل
                         // الختم (بلا قسم) يسقط للقراءة الحية أدناه بصدق.
                         if (sealed.readiness && Array.isArray(sealed.readiness.sessions)) {
-                            response.readiness = groupShiftCheckItems(sealed.readiness.sessions, sealed.readiness.items);
+                            response.readiness = groupShiftCheckItems(sealed.readiness.sessions, sealed.readiness.items, sealed.readiness.confirmations);
                             response.readinessSource = 'sealed';
                         }
                     } else {

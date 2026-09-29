@@ -770,7 +770,7 @@ class ShiftArchiveSnapshot {
     // تُقرأ لنفس تاريخ المناوبة فقط — سجلات حقيقية، لا اختراع ولا قراءة للوضع الحالي.
     async _getReadiness(shiftId, shift) {
         try {
-            if (!this.db || !this.db.all) return { sessions: [], items: [] };
+            if (!this.db || !this.db.all) return { sessions: [], items: [], confirmations: [] };
             const shiftDate = (shift && (shift.shiftDate || shift.shift_date)) || '';
             const sessions = await this.db.all(
                 `SELECT * FROM shift_check_sessions
@@ -780,6 +780,7 @@ class ShiftArchiveSnapshot {
             );
             const list = Array.isArray(sessions) ? sessions : [];
             let items = [];
+            let confirmations = [];
             if (list.length) {
                 const ids = list.map(s => s.id);
                 items = await this.db.all(
@@ -788,11 +789,25 @@ class ShiftArchiveSnapshot {
                      ORDER BY session_id, id`,
                     ids
                 );
+                // تأكيدات الموظفين (اعتماد المالك 2026-09-29): اطلاع/استلام/تسليم
+                // بأسمائهم كما حدثت فعلًا — تُختم مع اللقطة بنفس ربط الجلسة.
+                try {
+                    confirmations = await this.db.all(
+                        `SELECT * FROM shift_check_confirmations
+                         WHERE session_id IN (${ids.map(() => '?').join(',')})
+                         ORDER BY session_id, id`,
+                        ids
+                    );
+                } catch (_) { confirmations = []; /* جدول غير موجود في بيئة قديمة */ }
             }
-            return { sessions: list, items: Array.isArray(items) ? items : [] };
+            return {
+                sessions: list,
+                items: Array.isArray(items) ? items : [],
+                confirmations: Array.isArray(confirmations) ? confirmations : []
+            };
         } catch (err) {
             console.error('[Snapshot] Error getting readiness:', err.message);
-            return { sessions: [], items: [] };
+            return { sessions: [], items: [], confirmations: [] };
         }
     }
 

@@ -122,6 +122,12 @@ class ShiftCheckService {
              VALUES (?, ?, ?, ?, ?, ?, ?, 2)`,
             [ctx.today, ctx.team.id, ctx.team.name, vehId, vehicle ? vehicle.name : null, ctx.team.center || null, String(ctx.emp.employee_code)]);
         session = await this.db.get('SELECT * FROM shift_check_sessions WHERE id = ?', [ins.id]);
+        // اسم منشئ الجلسة نصًا وقت الحدث (اعتماد المالك 2026-09-29) — منفصل
+        // عن الإدراج حتى لا تنكسر البيئات بلا العمود الجديد
+        try {
+            await this.db.run('UPDATE shift_check_sessions SET created_by_name = ? WHERE id = ?', [ctx.emp.name, session.id]);
+            session.created_by_name = ctx.emp.name;
+        } catch (_) { /* بيئة بلا العمود — الجلسة تعمل كما كان */ }
         // ختم المناوبة المالكة منفصل عن الإدراج حتى لا تنكسر البيئات بلا العمود الجديد
         if (activeShiftId != null) {
             try {
@@ -654,6 +660,14 @@ class ShiftCheckService {
                     await this.db.run(
                         "UPDATE shift_check_sessions SET status = 'completed', completed_at = datetime('now') WHERE id = ? AND status = 'open'",
                         [session.id]);
+                    // هوية خاتم الجلسة نصًا وقت الختم (اعتماد المالك 2026-09-29):
+                    // آخر مؤكد تسليم هو من أتمّها فعلًا — الجاهزية نفسها
+                    // محسوبة نظاميًا ولا «خاتم بشري» مستقل لها.
+                    try {
+                        await this.db.run(
+                            'UPDATE shift_check_sessions SET completed_by = ?, completed_by_name = ? WHERE id = ?',
+                            [String(ctx.emp.employee_code), ctx.emp.name, session.id]);
+                    } catch (_) { /* بيئة بلا العمودين — الاكتمال تم ولا كسر */ }
                     completed = true;
                 }
             }

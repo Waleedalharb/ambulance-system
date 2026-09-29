@@ -2099,6 +2099,15 @@ function renderReadinessTab(data) {
     };
     var DOMAIN = { medical: 'طبي', mechanical: 'ميكانيكي' };
     var DETAIL = { complete: 'مكتمل', shortage: 'نقص', damaged: 'تالف', unavailable: 'غير متوفر', follow_up: 'متابعة' };
+    var KIND = { ack: 'اطلاع', checkin: 'استلام', checkout: 'تسليم' };
+    // اسم تاريخي محفوظ نصًا وقت الحدث — غيابه في السجلات القديمة يُعرض بصدق
+    // «غير مسجل تاريخيًا» مع إبقاء الرقم الوظيفي إن كان محفوظًا (ممنوع
+    // الجلب من جدول الموظفين الحالي أو التخمين — قرار المالك 2026-09-29).
+    var personCell = function (name, code) {
+        if (name) return esc(name) + (code ? ' <span style="color:var(--text-muted);font-size:0.75rem">(' + esc(code) + ')</span>' : '');
+        if (code) return '<span style="color:var(--text-muted)">غير مسجل تاريخيًا</span> <span style="font-size:0.75rem">(' + esc(code) + ')</span>';
+        return '—';
+    };
 
     var html = '<div id="mtab-readiness" class="modal-tab-panel">';
     html += '<div class="hosp-head"><h3><i class="fas fa-ambulance"></i> جاهزية الفرق / تشييك الفرق</h3>' +
@@ -2113,10 +2122,15 @@ function renderReadinessTab(data) {
         body.insertAdjacentHTML('beforeend', html);
         return;
     }
-    html += '<table class="data-table"><thead><tr><th>الفرقة</th><th>المركبة</th><th>المركز</th><th>حالة الجاهزية</th><th>السبب</th><th>وقت التشييك</th><th>بنود الفحص</th></tr></thead><tbody>';
+    html += '<table class="data-table"><thead><tr><th>الفرقة</th><th>المركبة</th><th>المركز</th><th>حالة الجاهزية</th><th>السبب</th><th>وقت التشييك</th><th>منشئ/خاتم التشييك</th><th>بنود الفحص</th><th>تأكيدات الموظفين</th></tr></thead><tbody>';
     sessions.forEach(function (s, i) {
         var r = RDY[s.readiness] || ['⏳', 'لم تُستكمل الجاهزية', 'badge-muted'];
         var items = Array.isArray(s.items) ? s.items : [];
+        var confs = Array.isArray(s.confirmations) ? s.confirmations : [];
+        var people = '<div style="font-size:0.78rem">أنشأها: ' + personCell(s.created_by_name, s.created_by) + '</div>';
+        if (s.status === 'completed' || s.completed_by || s.completed_by_name || s.completed_at) {
+            people += '<div style="font-size:0.78rem;margin-top:2px">أتمّها: ' + personCell(s.completed_by_name, s.completed_by) + '</div>';
+        }
         html += '<tr>' +
             '<td style="font-weight:600">' + (esc(s.team_name) || '—') + '</td>' +
             '<td>' + (esc(s.vehicle_name) || '—') + '</td>' +
@@ -2124,13 +2138,17 @@ function renderReadinessTab(data) {
             '<td><span class="badge ' + r[2] + '">' + r[0] + ' ' + r[1] + '</span></td>' +
             '<td>' + (esc(s.readiness_reason) || '—') + '</td>' +
             '<td style="font-size:0.75rem;color:var(--text-muted);white-space:nowrap">' + (s.readiness_at ? fmtDT(s.readiness_at) : '—') + '</td>' +
+            '<td>' + people + '</td>' +
             '<td>' + (items.length
                 ? '<button class="btn btn-sm" onclick="rdyItemsToggle(\'rdy-items-' + i + '\')">▸ البنود (' + items.length + ')</button>'
                 : '—') + '</td>' +
+            '<td>' + (confs.length
+                ? '<button class="btn btn-sm" onclick="rdyItemsToggle(\'rdy-conf-' + i + '\')">▸ التأكيدات (' + confs.length + ')</button>'
+                : '—') + '</td>' +
         '</tr>';
         if (items.length) {
-            html += '<tr id="rdy-items-' + i + '" style="display:none"><td colspan="7" style="background:var(--bg);padding:0.6rem 1rem">' +
-                '<table class="data-table"><thead><tr><th>البند</th><th>النطاق</th><th>النتيجة</th><th>التفصيل</th><th>الكمية</th><th>ملاحظة</th><th>فحصه</th><th>وقت الفحص</th></tr></thead><tbody>';
+            html += '<tr id="rdy-items-' + i + '" style="display:none"><td colspan="9" style="background:var(--bg);padding:0.6rem 1rem">' +
+                '<table class="data-table"><thead><tr><th>البند</th><th>النطاق</th><th>النتيجة</th><th>التفصيل</th><th>الكمية</th><th>ملاحظة</th><th>فحصه</th><th>الرقم الوظيفي</th><th>وقت الفحص</th></tr></thead><tbody>';
             items.forEach(function (it) {
                 var res = it.result === 'ok'
                     ? '<span class="badge badge-success">✔ سليم</span>'
@@ -2146,8 +2164,22 @@ function renderReadinessTab(data) {
                     '<td>' + (DETAIL[it.status_detail] || '—') + '</td>' +
                     '<td style="direction:ltr;unicode-bidi:embed">' + qty + '</td>' +
                     '<td>' + (esc(it.note) || '—') + '</td>' +
-                    '<td>' + (esc(it.checked_by_name) || '—') + '</td>' +
+                    '<td>' + (it.checked_by_name ? esc(it.checked_by_name) : '<span style="color:var(--text-muted)">غير مسجل تاريخيًا</span>') + '</td>' +
+                    '<td style="direction:ltr;unicode-bidi:embed">' + (esc(it.checked_by) || '—') + '</td>' +
                     '<td style="font-size:0.75rem;color:var(--text-muted);white-space:nowrap">' + (it.checked_at ? fmtDT(it.checked_at) : '—') + '</td>' +
+                '</tr>';
+            });
+            html += '</tbody></table></td></tr>';
+        }
+        if (confs.length) {
+            html += '<tr id="rdy-conf-' + i + '" style="display:none"><td colspan="9" style="background:var(--bg);padding:0.6rem 1rem">' +
+                '<table class="data-table"><thead><tr><th>الموظف</th><th>الرقم/ID</th><th>نوع التأكيد</th><th>وقت التأكيد</th></tr></thead><tbody>';
+            confs.forEach(function (c) {
+                html += '<tr>' +
+                    '<td style="font-weight:600">' + (c.employee_name ? esc(c.employee_name) : '<span style="color:var(--text-muted)">غير مسجل تاريخيًا</span>') + '</td>' +
+                    '<td style="direction:ltr;unicode-bidi:embed">' + (esc(c.employee_id) || '—') + '</td>' +
+                    '<td><span class="badge badge-info">' + (KIND[c.kind] || esc(c.kind) || '—') + '</span></td>' +
+                    '<td style="font-size:0.75rem;color:var(--text-muted);white-space:nowrap">' + (c.confirmed_at ? fmtDT(c.confirmed_at) : '—') + '</td>' +
                 '</tr>';
             });
             html += '</tbody></table></td></tr>';

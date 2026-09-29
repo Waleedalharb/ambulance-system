@@ -5063,6 +5063,13 @@ async function migrateAssetRegistry() {
   // «جاهزية الفرقة» التاريخية محفوظة مع مناوبتها في الأرشيف ولا تُستبدل
   // بقيمة مناوبة لاحقة في نفس اليوم. NULL = جلسات ما قبل الربط (تاريخية).
   await ensureColumn('shift_check_sessions', 'shift_id', 'INTEGER');
+  // هوية موظف التشييك نصيًا وقت الحدث (اعتماد المالك 2026-09-29): الاسم يُحفظ
+  // تاريخيًا مع الجلسة حتى لا يعتمد الأرشيف على جدول الموظفين الحالي إن تغيّر
+  // لاحقًا. NULL في الصفوف القديمة = «غير مسجل تاريخيًا» — ممنوع التعبئة
+  // بأثر رجعي من بيانات حالية.
+  await ensureColumn('shift_check_sessions', 'created_by_name', 'TEXT');
+  await ensureColumn('shift_check_sessions', 'completed_by', 'TEXT');
+  await ensureColumn('shift_check_sessions', 'completed_by_name', 'TEXT');
   await ensureColumn('shift_check_items', 'group_key', 'TEXT');
   await ensureColumn('shift_check_items', 'qty_required', 'TEXT');
   await ensureColumn('shift_check_items', 'qty_available', 'TEXT');
