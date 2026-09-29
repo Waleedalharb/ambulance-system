@@ -116,20 +116,23 @@ function resolveDeps() {
 // بحكم السياسة) بدل فلتر الدور القديم. يُستخدم حاليًا من leave.submitted و
 // shift_change.submitted فقط ('requests.review') — بقية الأحداث التشغيلية
 // تبقى على الفلتر القديم حرفيًا حتى تعتمد مصفوفة استهدافها بقرار منفصل.
-// سقوط آمن: permKey بلا hasPermission محقونة ← تحذير + الفلتر القديم،
-// فالإشعار لا يُفقد بسبب حقن ناقص.
+// حسم صارم (تعديل معتمد 2026-09-29): permKey موجود + hasPermission غير محقونة
+// ← صفر مستلمين وتحذير واضح — ممنوع الرجوع لفلتر admin/director القديم مع
+// permKey كي لا يصل الإشعار لغير المخوَّلين بسبب حقن ناقص. وبلا permKey
+// أصلًا يبقى الفلتر القديم كما هو تمامًا.
 async function notifyOperational({ eventKey, title, message, push, permKey }) {
     const d = resolveDeps();
     const type = classify(eventKey);
     const users = JSON.parse(await fs.readFile(d.usersPath, 'utf8'));
-    const byPermission = permKey && typeof d.hasPermission === 'function';
-    if (permKey && !byPermission) {
-        console.warn('notifyOperational: permKey بدون hasPermission محقونة — رجوع لفلتر الدور القديم:', eventKey);
+    const byPermission = Boolean(permKey);
+    if (byPermission && typeof d.hasPermission !== 'function') {
+        console.error('notifyOperational: permKey=' + permKey + ' لكن PermissionService غير محقون (hasPermission مفقودة) — صفر مستلمين، لا رجوع للفلتر القديم:', eventKey);
     }
     const targets = [];
     for (const u of users) {
         if (!u.isActive) continue;
         if (byPermission) {
+            if (typeof d.hasPermission !== 'function') continue; // حقن ناقص — لا مستلمين مع permKey
             const uid = u.id != null ? u.id.toString() : '';
             if (uid && await d.hasPermission(uid, u.role, permKey)) targets.push(u);
         } else if (u.role === 'admin' || u.role === 'director') {

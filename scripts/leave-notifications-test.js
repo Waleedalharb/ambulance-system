@@ -9,7 +9,7 @@
  *   3ب) permKey='requests.review' (2026-09-29): المستلمون يُحدَّدون بالصلاحية عبر
  *      PermissionService الحقيقي — ops_supervisor/director/sysadmin(نجمة) يستلمون،
  *      operator/viewer لا يستلمون، وغير النشط يُستبعد. وبلا hasPermission محقونة
- *      يسقط للفلتر القديم بأمان (الإشعار لا يُفقد).
+ *      ← صفر مستلمين بحسم صارم — ممنوع الرجوع لفلتر admin/director القديم مع permKey.
  *
  * الجزء B — مساريّ (سيرفر معزول: VACUUM INTO + DATA_DIR مؤقت + بورت 3135):
  *   4) تقديم طلب إجازة ← صف «طلب إجازة جديد» في Inbox المسؤول (يحمل اسم الموظف).
@@ -188,10 +188,12 @@ async function partA() {
     const rC2 = await notificationService.notifyOperational({ eventKey: 'shift_change.submitted', title: 'طلب تغيير مناوبة جديد', message: 'موظف اختبار: تغيير مناوبة 2027-05-05 إلى N', push: true, permKey: 'requests.review' });
     check('A10) shift_change.submitted بنفس المصفوفة (3 مستلمين)', rC2.created === 3, JSON.stringify(rC2));
 
-    // سقوط آمن: permKey بلا hasPermission محقونة ← الفلتر القديم (admin/director) ولا يُفقد الإشعار
+    // حسم صارم (معتمد 2026-09-29): permKey بلا hasPermission محقونة ← صفر مستلمين — ممنوع الفلتر القديم
     notificationService.init({ usersPath: usersPathB, getDb: () => db, broadcastToUsers: null, pushGateway: stubGateway });
-    const rF = await notificationService.notifyOperational({ eventKey: 'leave.submitted', title: 'طلب إجازة جديد', message: msgC + ' — سقوط آمن', permKey: 'requests.review' });
-    check('A11) permKey بلا hasPermission ← سقوط آمن للفلتر القديم (b-admin-1 + b-dir-1)', rF.created === 2, JSON.stringify(rF));
+    const beforeF = pushCalls.length;
+    const rF = await notificationService.notifyOperational({ eventKey: 'leave.submitted', title: 'طلب إجازة جديد', message: msgC + ' — حقن ناقص', push: true, permKey: 'requests.review' });
+    check('A11أ) permKey بلا hasPermission ← صفر مستلمين (لا إنشاء ولا دمج)', rF.created === 0 && rF.deduped === 0, JSON.stringify(rF));
+    check('A11ب) admin/director لا يستقبلان عبر fallback القديم — ولا Push', pushCalls.length === beforeF, 'pushCalls=' + pushCalls.length);
 
     await db.closeDb().catch(() => { });
 }
