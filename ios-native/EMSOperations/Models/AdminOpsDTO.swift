@@ -567,3 +567,50 @@ struct NotificationSendRequestDTO: Encodable {
         case recipientId = "recipient_id"
     }
 }
+
+// MARK: - وارد إشعارات المستخدم الحالي (قسم «الوارد» — 2026-09-29)
+
+/// GET /api/notifications (authenticate، server.js:12494) — Inbox المستخدم
+/// الحالي من جدول notifications (db.js:487): تهبط هنا إشعارات requests.review
+/// (leave.submitted / shift_change.submitted) لحاملي الصلاحية. مخزن مستقل عن
+/// notification_log — سجل الإرسال أدناه/أعلاه يبقى على مصدره كما هو.
+struct AdminInboxResponseDTO: Decodable {
+    let success: Bool?
+    let notifications: [AdminInboxItemDTO]?
+}
+
+struct AdminInboxItemDTO: Decodable {
+    let id: Int?
+    let title: String?
+    let message: String?
+    let type: String?
+    let createdAt: String?
+    private let isReadRaw: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case id, title, message, type
+        case createdAt = "created_at"
+        case isReadRaw = "is_read"
+    }
+
+    var stableId: Int { id ?? 0 }
+    var isRead: Bool { (isReadRaw ?? 0) != 0 }
+
+    var typeTitle: String {
+        switch type {
+        case "success": return "تم"
+        case "warning": return "تنبيه"
+        case "danger": return "عاجل"
+        default: return "عام"
+        }
+    }
+
+    var typeTone: EMSTheme.StatusTone {
+        switch type {
+        case "success": return .normal
+        case "warning": return .monitor
+        case "danger": return .danger
+        default: return .neutral
+        }
+    }
+}
