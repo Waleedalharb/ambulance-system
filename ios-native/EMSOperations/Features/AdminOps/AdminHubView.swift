@@ -67,7 +67,12 @@ struct AdminHubView: View {
         if p.isAdminOrDirector { list.append(.employees) }
         if p.isAdmin { list.append(.refs) }
         if p.canManageSymbols { list.append(.symbols) }
-        if p.isAdminOrDirector { list.append(.notifications); list.append(.system); list.append(.requests) }
+        // إشعارات النظام (2026-09-29): البوابة بمفهوم الصلاحية المعتمدة لمسارات
+        // مراجعة الطلبات — requests.review (PR #20) أو النجمة — بدل الدور الحرفي
+        // الذي كان يخفي البطاقة عن sysadmin والمخوَّلين بالأدوار الجديدة.
+        // system وrequests يبقيان على شرطهما القديم كما هو.
+        if p.isStar || p.permissions.contains("requests.review") { list.append(.notifications) }
+        if p.isAdminOrDirector { list.append(.system); list.append(.requests) }
         return list
     }
 
