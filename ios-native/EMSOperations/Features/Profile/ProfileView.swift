@@ -48,6 +48,13 @@ struct ProfileView: View {
         .refreshable { await vm.load() }
         .emsPage("المزيد")
         .navigationBarTitleDisplayMode(.inline)
+        .navigationDestination(for: AdminHubView.AdminModule.self) { module in
+            // وجهات مركز الإدارة تُسجَّل هنا في جذر NavigationStack الخاص
+            // بـ«المزيد» (إصلاح Navigation — 2026-09-29): التسجيل كان داخل
+            // AdminHubView وهي شاشة مدفوعة، وكان مصدر فشل الفتح المتقطع لكل
+            // عناصر المركز. البطاقات والروابط والتصميم لم تتغير إطلاقًا.
+            AdminHubView.destination(for: module)
+        }
         .task { await vm.load() }
         .confirmationDialog(
             "تسجيل الخروج",

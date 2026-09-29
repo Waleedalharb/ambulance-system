@@ -584,17 +584,47 @@ struct AdminInboxItemDTO: Decodable {
     let title: String?
     let message: String?
     let type: String?
+    let taskKey: String?
     let createdAt: String?
     private let isReadRaw: Int?
 
     enum CodingKeys: String, CodingKey {
         case id, title, message, type
+        case taskKey = "task_key"
         case createdAt = "created_at"
         case isReadRaw = "is_read"
     }
 
     var stableId: Int { id ?? 0 }
     var isRead: Bool { (isReadRaw ?? 0) != 0 }
+
+    /// تصنيف الوارد (2026-09-29): مشتق من بيانات الصف الفعلية فقط — مطابقة
+    /// تامة لعناوين الخادم الثابتة (طلب إجازة جديد server.js:15064 · طلب
+    /// تغيير مناوبة جديد server.js:14027) وبادئة task_key للتمركز
+    /// (notification-service.js — positioning:<planId>). بلا مطابقة جزئية
+    /// واسعة ولا أنواع مخترعة، وما لا يُعرف يبقى «عام» — نفس منهج تصنيف
+    /// «إشعاراتي» المعتمد.
+    enum InboxCategory: String {
+        case leaveRequest, shiftChange, positioning, general
+
+        var title: String {
+            switch self {
+            case .leaveRequest: return "طلب إجازة"
+            case .shiftChange: return "تغيير مناوبة"
+            case .positioning: return "تمركز"
+            case .general: return "عام"
+            }
+        }
+    }
+
+    var category: InboxCategory {
+        if let key = taskKey, key.hasPrefix("positioning:") { return .positioning }
+        switch title {
+        case "طلب إجازة جديد": return .leaveRequest
+        case "طلب تغيير مناوبة جديد": return .shiftChange
+        default: return .general
+        }
+    }
 
     var typeTitle: String {
         switch type {

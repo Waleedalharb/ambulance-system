@@ -13,7 +13,7 @@ import SwiftUI
 struct AdminHubView: View {
     @EnvironmentObject private var session: SessionStore
 
-    private enum AdminModule: Hashable, Identifiable {
+    enum AdminModule: Hashable, Identifiable {
         case users, employees, refs, symbols, notifications, system, requests, permissions
         var id: Self { self }
 
@@ -126,17 +126,25 @@ struct AdminHubView: View {
             .padding(EMSTheme.pagePadding)
         }
         .emsPage("الإدارة")
-        .navigationDestination(for: AdminModule.self) { module in
-            switch module {
-            case .users: AdminUsersView()
-            case .employees: AdminEmployeesView()
-            case .refs: AdminRefsView()
-            case .symbols: AdminSymbolsView()
-            case .notifications: AdminNotificationsView()
-            case .system: AdminSystemView()
-            case .requests: RequestsAdminView()
-            case .permissions: AdminPermissionsView()
-            }
+    }
+
+    /// وجهات الموديولات — يُسجَّل نوعها في جذر NavigationStack الخاص بـ«المزيد»
+    /// (ProfileView) لا هنا (إصلاح Navigation — 2026-09-29): AdminHubView شاشة
+    /// مدفوعة داخل ستاك «المزيد»، وتسجيل الوجهات داخل شاشة مدفوعة كان يفشل
+    /// بشكل متقطع (ضغطة أولى تدفع ثم ترتد / شاشة فارغة / نجاح بعد الرجوع).
+    /// كل المحاور العاملة في التطبيق تسجّل وجهاتها في جذر ستاكها — هذا النقل
+    /// يوحّد النمط بلا أي تغيير بصري: الروابط هنا تبقى NavigationLink(value:)
+    /// كما هي حرفيًا.
+    @ViewBuilder static func destination(for module: AdminModule) -> some View {
+        switch module {
+        case .users: AdminUsersView()
+        case .employees: AdminEmployeesView()
+        case .refs: AdminRefsView()
+        case .symbols: AdminSymbolsView()
+        case .notifications: AdminNotificationsView()
+        case .system: AdminSystemView()
+        case .requests: RequestsAdminView()
+        case .permissions: AdminPermissionsView()
         }
     }
 }

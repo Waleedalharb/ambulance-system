@@ -151,6 +151,15 @@ struct AdminNotificationsView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             HStack(spacing: 10) {
+                // نوع الإشعار الحقيقي (طلب إجازة/تغيير مناوبة/تمركز/عام) —
+                // من بيانات الصف نفسها، لا اختراع ولا مصدر جديد.
+                Text(item.category.title)
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(EMSTheme.Colors.teal)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 2)
+                    .background(EMSTheme.Colors.teal.opacity(0.14))
+                    .clipShape(Capsule())
                 Text(item.isRead ? "مقروء" : "غير مقروء")
                     .font(.caption2)
                     .foregroundStyle(item.isRead ? EMSTheme.Colors.textMuted : EMSTheme.Colors.teal)
