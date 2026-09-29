@@ -2,10 +2,14 @@
  * ═══ اختبار إشعارات الإجازات/تغيير المناوبة (Inbox + Push) — اعتماد المالك 2026-09-22 ═══
  *
  * الجزء A — وحدوي (قاعدة مؤقتة + بوابة Push مزيّفة):
- *   1) notifyOperational({push:true}) ينشئ صفًا لكل admin/director نشط فقط
- *      ويرسل Push لمن أُنشئ لهم صف حصرًا (kind=notification + badge:auto).
+ *   1) notifyOperational({push:true}) بلا permKey ينشئ صفًا لكل admin/director نشط فقط
+ *      (الفلتر القديم — الأحداث الـ13 الأخرى لم تتغير) ويرسل Push لمن أُنشئ لهم صف حصرًا.
  *   2) التكرار داخل نافذة 5 دقائق = touch بلا صف جديد **وبلا Push ثانٍ**.
  *   3) تصنيف الحدثين الجديدين: leave.submitted / shift_change.submitted ← warning.
+ *   3ب) permKey='requests.review' (2026-09-29): المستلمون يُحدَّدون بالصلاحية عبر
+ *      PermissionService الحقيقي — ops_supervisor/director/sysadmin(نجمة) يستلمون،
+ *      operator/viewer لا يستلمون، وغير النشط يُستبعد. وبلا hasPermission محقونة
+ *      ← صفر مستلمين بحسم صارم — ممنوع الرجوع لفلتر admin/director القديم مع permKey.
  *
  * الجزء B — مساريّ (سيرفر معزول: VACUUM INTO + DATA_DIR مؤقت + بورت 3135):
  *   4) تقديم طلب إجازة ← صف «طلب إجازة جديد» في Inbox المسؤول (يحمل اسم الموظف).
@@ -17,6 +21,9 @@
  *   9) مراجعته ← إشعار شخصي لصاحبه «تمت الموافقة على طلب تغيير المناوبة».
  *  10) الحراسة: بلا توكن 401. وكل المسارات نجحت بلا مفاتيح APNs (وضع معطَّل آمن —
  *      الطلب لا يُفقد حتى لو Push غير مفعّل).
+ *  11-17) مصفوفة requests.review عبر المسارات (2026-09-29):
+ *      ops_supervisor يفتح قائمة تغيير المناوبات ويعتمد/يراجع؛ director وsysadmin كذلك؛
+ *      operator/viewer مرفوضان 403؛ وإشعار الطلب الجديد يصل للمخوَّلين ولا يصل لغيرهم.
  *
  * التشغيل: node scripts/leave-notifications-test.js
  */
@@ -80,6 +87,12 @@ function makeIsolated() {
         .filter(u => u.username !== 'LNADMIN' && u.username !== EMP.employee_code);
     users.push({ id: 'ln-admin-1', username: 'LNADMIN', name: 'مسؤول اختبار الإشعارات', password: hash, role: 'admin', isActive: true });
     users.push({ id: 'ln-emp-1', username: EMP.employee_code, name: EMP.name, password: hash, role: 'user', isActive: true });
+    // مصفوفة requests.review (2026-09-29): أدوار جديدة وقديمة لتغطية الاستهداف والحراسة
+    users.push({ id: 'ln-sup-1', username: 'LNSUP', name: 'مشرف عمليات اختبار', password: hash, role: 'ops_supervisor', isActive: true });
+    users.push({ id: 'ln-dir-1', username: 'LNDIR', name: 'مدير قديم اختبار', password: hash, role: 'director', isActive: true });
+    users.push({ id: 'ln-sys-1', username: 'LNSYS', name: 'مدير نظام اختبار', password: hash, role: 'sysadmin', isActive: true });
+    users.push({ id: 'ln-op-1', username: 'LNOP', name: 'مشغل اختبار', password: hash, role: 'operator', isActive: true });
+    users.push({ id: 'ln-view-1', username: 'LNVIEW', name: 'قارئ اختبار', password: hash, role: 'viewer', isActive: true });
     fs.writeFileSync(usersPath, JSON.stringify(users, null, 2));
 }
 
@@ -146,6 +159,42 @@ async function partA() {
         return pushCalls.length === before;
     })());
 
+    // ── A9-A11) permKey='requests.review': الاستهداف بالصلاحية عبر PermissionService الحقيقي ──
+    const PermissionService = require('../services/permission-service');
+    const permSvc = new PermissionService({ db });
+    const usersC = [
+        { id: 'c-sup-1', username: 'CS1', role: 'ops_supervisor', isActive: true },   // يستلم
+        { id: 'c-sup-2', username: 'CS2', role: 'ops_supervisor', isActive: false },  // غير نشط — يُستبعد
+        { id: 'c-dir-1', username: 'CD1', role: 'director', isActive: true },         // يستلم
+        { id: 'c-sys-1', username: 'CSY1', role: 'sysadmin', isActive: true },        // نجمة — يستلم
+        { id: 'c-op-1', username: 'CO1', role: 'operator', isActive: true },          // لا يستلم
+        { id: 'c-view-1', username: 'CV1', role: 'viewer', isActive: true }           // لا يستلم
+    ];
+    const usersPathC = path.join(TMP_DIR_B, 'users-permkey.json');
+    fs.writeFileSync(usersPathC, JSON.stringify(usersC));
+    const pushCallsC = [];
+    const stubGatewayC = { sendToUsers: async (ids, payload) => { pushCallsC.push({ ids: ids.slice(), payload }); return { sent: ids.length }; } };
+    notificationService.init({
+        usersPath: usersPathC, getDb: () => db, broadcastToUsers: null, pushGateway: stubGatewayC,
+        hasPermission: (uid, role, key) => permSvc.hasPermission(uid, role, key)
+    });
+
+    const msgC = 'موظف اختبار: إجازة استثنائية من 2027-05-01 إلى 2027-05-02';
+    const rC = await notificationService.notifyOperational({ eventKey: 'leave.submitted', title: 'طلب إجازة جديد', message: msgC, push: true, permKey: 'requests.review' });
+    check('A9أ) permKey: المستلمون = supervisor + director + sysadmin فقط (3 لا 6)', rC.created === 3, JSON.stringify(rC));
+    check('A9ب) Push للمخوَّلين حصرًا وبهويات users.json نفسها', pushCallsC.length === 1 && pushCallsC[0].ids.sort().join(',') === 'c-dir-1,c-sup-1,c-sys-1', JSON.stringify(pushCallsC.map(c => c.ids)));
+    check('A9ج) operator/viewer لا يستلمان — تطابق الهوية لم يُفرّغ القائمة خطأً', rC.created === 3 && rC.deduped === 0, JSON.stringify(rC));
+
+    const rC2 = await notificationService.notifyOperational({ eventKey: 'shift_change.submitted', title: 'طلب تغيير مناوبة جديد', message: 'موظف اختبار: تغيير مناوبة 2027-05-05 إلى N', push: true, permKey: 'requests.review' });
+    check('A10) shift_change.submitted بنفس المصفوفة (3 مستلمين)', rC2.created === 3, JSON.stringify(rC2));
+
+    // حسم صارم (معتمد 2026-09-29): permKey بلا hasPermission محقونة ← صفر مستلمين — ممنوع الفلتر القديم
+    notificationService.init({ usersPath: usersPathB, getDb: () => db, broadcastToUsers: null, pushGateway: stubGateway });
+    const beforeF = pushCalls.length;
+    const rF = await notificationService.notifyOperational({ eventKey: 'leave.submitted', title: 'طلب إجازة جديد', message: msgC + ' — حقن ناقص', push: true, permKey: 'requests.review' });
+    check('A11أ) permKey بلا hasPermission ← صفر مستلمين (لا إنشاء ولا دمج)', rF.created === 0 && rF.deduped === 0, JSON.stringify(rF));
+    check('A11ب) admin/director لا يستقبلان عبر fallback القديم — ولا Push', pushCalls.length === beforeF, 'pushCalls=' + pushCalls.length);
+
     await db.closeDb().catch(() => { });
 }
 
@@ -204,6 +253,62 @@ async function partB() {
         check('B9أ) المراجعة تنجح', revR.ok);
         empTitles = await notifTitles(empTok);
         check('B9ب) صاحب الطلب يستلم «تمت الموافقة على طلب تغيير المناوبة»', empTitles.some(t => t.includes('تمت الموافقة على طلب تغيير المناوبة') && t.includes('2027-02-05')), empTitles.slice(-3).join(' || '));
+
+        // ═══ 11-17) مصفوفة requests.review عبر المسارات (2026-09-29) ═══
+        const supTok = await login('LNSUP');
+        const dirTok = await login('LNDIR');
+        const sysTok = await login('LNSYS');
+        const opTok = await login('LNOP');
+        const viewTok = await login('LNVIEW');
+
+        // 11) فتح قائمة طلبات تغيير المناوبات
+        const supList = await fetch(BASE + '/api/shift-change-request', { headers: auth(supTok) });
+        check('B11أ) ops_supervisor يفتح قائمة shift-change (كان 403)', supList.ok, 'status=' + supList.status);
+        const dirList = await fetch(BASE + '/api/shift-change-request', { headers: auth(dirTok) });
+        check('B11ب) director يفتح القائمة', dirList.ok, 'status=' + dirList.status);
+        const sysList = await fetch(BASE + '/api/shift-change-request', { headers: auth(sysTok) });
+        check('B11ج) sysadmin (نجمة) يفتح القائمة', sysList.ok, 'status=' + sysList.status);
+
+        // 12) المرفوضون
+        const opList = await fetch(BASE + '/api/shift-change-request', { headers: auth(opTok) });
+        check('B12أ) operator مرفوض 403 على القائمة', opList.status === 403, 'status=' + opList.status);
+        const viewList = await fetch(BASE + '/api/shift-change-request', { headers: auth(viewTok) });
+        check('B12ب) viewer مرفوض 403 على القائمة', viewList.status === 403, 'status=' + viewList.status);
+
+        // 13) ops_supervisor يعتمد طلب إجازة
+        const c13 = await fetch(BASE + '/api/leave-requests', { method: 'POST', headers: auth(empTok), body: JSON.stringify({ employee_id: EMP.id, start_date: '2027-04-01', end_date: '2027-04-02', type: 'إجازة' }) });
+        const c13D = await c13.json();
+        const supAppr = await fetch(BASE + '/api/leave-requests/' + c13D.id + '/approve', { method: 'POST', headers: auth(supTok), body: JSON.stringify({ status: 'approved' }) });
+        check('B13) ops_supervisor يعتمد طلب إجازة (كان 403)', supAppr.ok, 'status=' + supAppr.status);
+
+        // 14) المرفوضون على الاعتماد/المراجعة
+        const c14 = await fetch(BASE + '/api/leave-requests', { method: 'POST', headers: auth(empTok), body: JSON.stringify({ employee_id: EMP.id, start_date: '2027-04-10', end_date: '2027-04-11', type: 'إجازة' }) });
+        const c14D = await c14.json();
+        const opAppr = await fetch(BASE + '/api/leave-requests/' + c14D.id + '/approve', { method: 'POST', headers: auth(opTok), body: JSON.stringify({ status: 'approved' }) });
+        check('B14أ) operator مرفوض 403 على اعتماد الإجازة', opAppr.status === 403, 'status=' + opAppr.status);
+        const sc14 = await fetch(BASE + '/api/shift-change-request', { method: 'POST', headers: auth(empTok), body: JSON.stringify({ employee_id: EMP.id, shift_date: '2027-04-15', proposed_shift_code: 'N', old_shift_code: 'M', reason: 'اختبار رفض' }) });
+        const sc14D = await sc14.json();
+        const viewRev = await fetch(BASE + '/api/shift-change-request/' + sc14D.id + '/review', { method: 'POST', headers: auth(viewTok), body: JSON.stringify({ status: 'approved' }) });
+        check('B14ب) viewer مرفوض 403 على مراجعة تغيير المناوبة', viewRev.status === 403, 'status=' + viewRev.status);
+
+        // 15) director يراجع طلب تغيير مناوبة
+        const dirRev = await fetch(BASE + '/api/shift-change-request/' + sc14D.id + '/review', { method: 'POST', headers: auth(dirTok), body: JSON.stringify({ status: 'approved' }) });
+        check('B15) director يراجع طلب تغيير المناوبة', dirRev.ok, 'status=' + dirRev.status);
+
+        // 16) sysadmin (نجمة) يعتمد طلب إجازة
+        const sysAppr = await fetch(BASE + '/api/leave-requests/' + c14D.id + '/approve', { method: 'POST', headers: auth(sysTok), body: JSON.stringify({ status: 'approved' }) });
+        check('B16) sysadmin (نجمة) يعتمد طلب إجازة', sysAppr.ok, 'status=' + sysAppr.status);
+
+        // 17) استهداف الإشعار: طلب جديد يصل للمخوَّلين ولا يصل لغيرهم
+        const c17 = await fetch(BASE + '/api/leave-requests', { method: 'POST', headers: auth(empTok), body: JSON.stringify({ employee_id: EMP.id, start_date: '2027-06-01', end_date: '2027-06-02', type: 'استثنائية' }) });
+        check('B17أ) تقديم طلب الاستهداف ينجح', c17.ok);
+        const target = t => t.includes('طلب إجازة جديد') && t.includes('2027-06-01');
+        check('B17ب) ops_supervisor يستلم إشعار الطلب', (await notifTitles(supTok)).some(target));
+        check('B17ج) director يستلم إشعار الطلب', (await notifTitles(dirTok)).some(target));
+        check('B17د) sysadmin (نجمة) يستلم إشعار الطلب', (await notifTitles(sysTok)).some(target));
+        check('B17هـ) admin القديم يستلم إشعار الطلب', (await notifTitles(adminTok)).some(target));
+        check('B17و) operator لا يستلم إشعار الطلب', !(await notifTitles(opTok)).some(target));
+        check('B17ز) viewer لا يستلم إشعار الطلب', !(await notifTitles(viewTok)).some(target));
     } finally {
         server.kill();
     }

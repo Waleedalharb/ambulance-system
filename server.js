@@ -606,7 +606,12 @@ const USERS_PATH = path.join(STORAGE_PATH, 'users.json');
 // البوابة معطّلة بأمان ({disabled:true}) ولا يتغيّر أي سلوك قائم.
 const PushGateway = require('./services/push-gateway');
 const pushGateway = new PushGateway({ getDb: () => db });
-notificationService.init({ usersPath: USERS_PATH, getDb: () => db, broadcastToUsers, pushGateway });
+notificationService.init({
+    usersPath: USERS_PATH, getDb: () => db, broadcastToUsers, pushGateway,
+    // requests.review (2026-09-29): فحص الصلاحية كسولًا — getPermissionService
+    // مُعرَّفة لاحقًا لكنها مرفوعة (function declaration) ولا تُستدعى إلا وقت الحدث
+    hasPermission: (userId, role, key) => getPermissionService().hasPermission(userId, role, key)
+});
 const SHIFT_EVENTS_PATH = path.join(STORAGE_PATH, 'shift-events.json');
 const SHIFT_ABSENCES_PATH = path.join(STORAGE_PATH, 'shift-absences.json');
 const SHIFT_NOTES_PATH = path.join(STORAGE_PATH, 'shift-notes.json');
@@ -14115,7 +14120,8 @@ app.post('/api/shift-change-request', authenticate, async (req, res) => {
                     eventKey: 'shift_change.submitted',
                     title: 'طلب تغيير مناوبة جديد',
                     message: (req.user.name || req.user.username) + ': تغيير مناوبة ' + shift_date + ' إلى ' + proposed_shift_code,
-                    push: true
+                    push: true,
+                    permKey: 'requests.review'
                 });
             }
         } catch (nErr) { console.error('ShiftChange submit notify error:', nErr.message); }
@@ -14127,7 +14133,7 @@ app.post('/api/shift-change-request', authenticate, async (req, res) => {
     }
 });
 
-app.get('/api/shift-change-request', authenticate, authorize(['admin', 'director']), async (req, res) => {
+app.get('/api/shift-change-request', authenticate, authorizePerm('requests.review'), async (req, res) => {
     try {
         if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
         const { status, limit = 50 } = req.query;
@@ -14144,7 +14150,7 @@ app.get('/api/shift-change-request', authenticate, authorize(['admin', 'director
     }
 });
 
-app.post('/api/shift-change-request/:id/review', authenticate, authorize(['admin', 'director']), async (req, res) => {
+app.post('/api/shift-change-request/:id/review', authenticate, authorizePerm('requests.review'), async (req, res) => {
     try {
         if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
         const { status } = req.body;
@@ -15152,7 +15158,8 @@ app.post('/api/leave-requests', authenticate, validateBody({
                     eventKey: 'leave.submitted',
                     title: 'طلب إجازة جديد',
                     message: empName + ': ' + type + ' من ' + start_date + ' إلى ' + end_date,
-                    push: true
+                    push: true,
+                    permKey: 'requests.review'
                 });
             }
         } catch (nErr) { console.error('Leave submit notify error:', nErr.message); }
@@ -15198,8 +15205,12 @@ app.delete('/api/leave-requests/:id', authenticate, async (req, res) => {
             return res.status(404).json({ error: 'الطلب غير موجود' });
         }
         
-        if (existing.status === 'approved' && req.user.role !== 'admin' && req.user.role !== 'director') {
-            return res.status(403).json({ error: 'لا يمكن إلغاء إجازة معتمدة' });
+        if (existing.status === 'approved') {
+            // requests.review (2026-09-29): إلغاء إجازة معتمدة = فعل مراجعة — صلاحية لا دور
+            const canReview = await getPermissionService().hasPermission(req.user.id, req.user.role, 'requests.review');
+            if (!canReview) {
+                return res.status(403).json({ error: 'لا يمكن إلغاء إجازة معتمدة' });
+            }
         }
         
         await db.LeaveRequests.delete(req.params.id);
@@ -15217,7 +15228,7 @@ app.delete('/api/leave-requests/:id', authenticate, async (req, res) => {
     }
 });
 
-app.post('/api/leave-requests/:id/approve', authenticate, authorize(['admin', 'director']), async (req, res) => {
+app.post('/api/leave-requests/:id/approve', authenticate, authorizePerm('requests.review'), async (req, res) => {
     try {
         const { status } = req.body;
         if (!status || !['approved', 'denied'].includes(status)) {

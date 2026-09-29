@@ -65,6 +65,11 @@ const PERMISSIONS = {
     'workflow.view':        { label: 'مشاهدة سير العمل', domain: 'workflow' },
     'workflow.manage':      { label: 'إدارة سير العمل (إعداد/تعديل/إعادة إصدار)', domain: 'workflow' },
     'workflow.approve':     { label: 'اعتماد سير العمل', domain: 'workflow' },
+    // مراجعة طلبات الموظفين (معتمدة 2026-09-29): مفتاح موحد لاستقبال ومراجعة
+    // طلبات الإجازات وطلبات تغيير المناوبات — يحرس endpoints الاعتماد/المراجعة
+    // ويحدد مستلمي إشعاري leave.submitted / shift_change.submitted. الفصل إلى
+    // leave.review / shift_change.review تحسين مستقبلي عند الحاجة فقط.
+    'requests.review':      { label: 'مراجعة طلبات الموظفين (إجازات/تغيير مناوبات)', domain: 'admin' },
     // المؤشرات
     'indicators.contribution': { label: 'مؤشرات مساهمة الموظفين', domain: 'indicators' },
     // الإدارة
@@ -127,6 +132,7 @@ const ROLES_PERMISSIONS = {
         ...OPS_ALL,
         'shift.lifecycle', 'shift.approve',
         'workflow.view', 'workflow.manage', 'workflow.approve',
+        'requests.review',          // مراجعة طلبات الموظفين (2026-09-29): المخوَّل الأساسي بالأدوار الجديدة
         'indicators.contribution',
         'employees.manage',
         'archive.sensitive',
@@ -148,6 +154,7 @@ const ROLES_PERMISSIONS = {
         ...OPS_ALL,
         'shift.lifecycle', 'shift.approve',
         'workflow.view', 'workflow.manage', 'workflow.approve',
+        'requests.review',          // مراجعة طلبات الموظفين (2026-09-29): استمرارية دور director القائم
         'indicators.contribution',
         'employees.manage',
         'archive.sensitive',
