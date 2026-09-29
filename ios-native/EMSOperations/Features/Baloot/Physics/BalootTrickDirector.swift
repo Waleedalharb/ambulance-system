@@ -43,6 +43,9 @@ final class BalootTrickDirector: ObservableObject {
     /// طوال هذه الفترة لا يظهر أي نص/حالة قديمة مكان العنقود.
     @Published private(set) var isCollecting = false
     private var tasks: [Task<Void, Never>] = []
+    /// موضع انطلاق ورقتي الحقيقي داخل المروحة (slotX/slotY) — تُسجَّل من
+    /// الشاشة لحظة اللعب وتُستهلك عند عرض الرمية الواردة (§2: من الـFan).
+    private var myPlayOrigins: [String: CGPoint] = [:]
 
     private struct SyncInput {
         var currentTrick: [BalootTrickPlayDTO]?
@@ -102,13 +105,24 @@ final class BalootTrickDirector: ObservableObject {
         lastSync = nil
     }
 
+    /// تسجيل موضع ورقتي داخل المروحة لحظة لعبها — حتى تنطلق الرمية من
+    /// موضعها الحقيقي وليس من أسفل الساحة (§2/§3).
+    func noteMyPlayOrigin(card: String, origin: CGPoint) {
+        myPlayOrigins[card] = origin
+    }
+
     // MARK: - عرض ورقة واردة (رمية لاعب/خصم)
 
     private func presentInbound(_ play: BalootTrickPlayDTO, input: SyncInput) {
         let rel = relative(play.seat, mySeat: input.mySeat)
+        // ورقتي: تنطلق من موضعها الحقيقي في المروحة إن سُجِّل، وإلا
+        // (عودة اتصال/متفرج) من موضع مقعدي الافتراضي — ورق الخصوم كما كان.
+        let origin: CGPoint = (rel == 0)
+            ? (myPlayOrigins.removeValue(forKey: play.card.code) ?? input.geo.seatOrigin(relative: rel))
+            : input.geo.seatOrigin(relative: rel)
         let flight = BalootFlightCard(
             card: play.card, seat: play.seat,
-            from: input.geo.seatOrigin(relative: rel),
+            from: origin,
             to: input.geo.clusterSlot(relative: rel),
             // ورقتي تغادر اليد مكبّرة (§1)؛ ورق الخصوم يطير بحجم الطاولة
             fromScale: rel == 0 ? BalootPhysics.liftScale : 1.0,
@@ -194,6 +208,7 @@ final class BalootTrickDirector: ObservableObject {
         settled = []
         flights = []
         presentedCodes = []
+        myPlayOrigins = [:]
         isCollecting = false
     }
 

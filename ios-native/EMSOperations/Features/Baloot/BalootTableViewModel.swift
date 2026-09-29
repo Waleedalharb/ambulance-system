@@ -167,8 +167,13 @@ final class BalootTableViewModel: ObservableObject {
             case "hand_scored":
                 handScore = ev.detail
                 handScoreToken += 1
-            case "hand_started", "redeal":
-                handScore = nil // صفقة جديدة تُسقط لوحة الحسبة (§8)
+            case "redeal":
+                handScore = nil // إعادة توزيع تُسقط لوحة الحسبة (§8)
+            // ⚠️ إصلاح 5: "hand_started" لم يعد يمسح handScore — الخادم
+            // يطلق START_HAND فور hand_scored (setImmediate) فكان يمحو
+            // detail قبل ظهور اللوحة. تُغلق اللوحة يدويًا أو ببدء صفقة
+            // أخرى. توقيت المرجع (طاولة خالية 1.1ث قبل الصفقة) مستحيل مع
+            // START_HAND الفوري = Backend follow-up مسجّل، لا workaround.
             case "baloot_announced":
                 balootFlashToken += 1
             default:

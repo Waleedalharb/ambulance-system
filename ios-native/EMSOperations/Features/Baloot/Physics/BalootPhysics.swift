@@ -145,6 +145,8 @@ struct BalootGestureTuning {
     var returnDuration: Double = 0.25
     /// بقاء tap-to-play بجانب السحب — مؤقت (P-P1).
     var tapToPlayEnabled = true
+    /// مدة الرفع التدريجي (تكبير + استواء الميلان) عند بدء السحب (ث) — مؤقت (P-P1).
+    var liftDuration: Double = 0.15
     /// مدة بقاء نص «بلوت» الذهبي (ث) — مؤقت (P-P8).
     var balootTextLifetime: Double = 0.90
 }

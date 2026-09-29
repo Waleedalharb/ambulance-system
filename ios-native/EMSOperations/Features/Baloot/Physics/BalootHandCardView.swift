@@ -28,11 +28,17 @@ struct BalootHandCardView: View {
     let dealDelta: CGSize
     /// مسار اللعب القائم حرفيًا: true = الورقة تدعم بلوت (حوار التأكيد)، false = لعب عادي.
     let onPlay: (Bool) -> Void
+    /// ورقة لُعبت محليًا بانتظار صدى الخادم — تُخفى حتى لا يُقرأ بقاؤها
+    /// ثم طيرانها كحدثين منفصلين (إصلاح 4: الاختفاء = بداية الرمي).
+    var hidden: Bool = false
 
     @State private var drag: CGSize = .zero
     @State private var dragging = false
     @State private var arrived = true
     @State private var seenDeal = -1
+    /// اتجاه الواجهة — إحداثيات إيماءة السحب تتأثر به (RTL يقلب X) بينما
+    /// .offset مطلق؛ نبطل قلب X فقط عند RTL (إصلاح 1-A — لا Double Inversion).
+    @Environment(\.layoutDirection) private var layoutDirection
 
     /// ⚠️ TEMPORARY (P-P1) — عتبات الإيماءة غير مثبتة؛ معزولة وقابلة للضبط.
     private let tuning = BalootGestureTuning()
@@ -42,7 +48,8 @@ struct BalootHandCardView: View {
 
     var body: some View {
         BalootCardFace(card: card, size: .hand, dimmed: playing && !allowed)
-            .rotationEffect(.degrees(fanAngle), anchor: .bottom)
+            // ميلان المروحة يُصفَّر أثناء الرفع (إصلاح 2 — الورقة تستوي في الإصبع)
+            .rotationEffect(.degrees(dragging ? 0 : fanAngle), anchor: .bottom)
             .offset(y: allowed ? -12 : 0)
             .shadow(color: allowed ? EMSTheme.Colors.teal.opacity(0.55) : .clear,
                     radius: allowed ? 10 : 0)
@@ -54,8 +61,10 @@ struct BalootHandCardView: View {
             .scaleEffect(dragging ? BalootPhysics.liftScale : 1)
             .zIndex(dragging ? 100 : 0)
             .animation(.spring(response: 0.3, dampingFraction: 0.7), value: allowed)
+            // رفع تدريجي (تكبير + استواء) بدل القفزة اللحظية — ⚠️ TEMPORARY (إصلاح 2)
+            .animation(.easeOut(duration: tuning.liftDuration), value: dragging)
             .onTapGesture {
-                guard tuning.tapToPlayEnabled, allowed else { return }
+                guard tuning.tapToPlayEnabled, allowed, !hidden else { return }
                 onPlay(canBaloot)
             }
             .gesture(dragGesture)
@@ -66,6 +75,7 @@ struct BalootHandCardView: View {
                         .offset(y: -14)
                 }
             }
+            .opacity(hidden ? 0 : 1)
             .onAppear { seenDeal = dealToken; arrived = true }
             .onChange(of: dealToken) { newValue in
                 guard newValue != seenDeal, newValue > 0 else { return }
@@ -78,10 +88,12 @@ struct BalootHandCardView: View {
     private var dragGesture: some Gesture {
         DragGesture(minimumDistance: tuning.dragStartThreshold)
             .onChanged { value in
-                guard allowed else { return }
+                guard allowed, !hidden else { return }
                 dragging = true
+                let rawX = value.translation.width * tuning.trackingRatio
                 drag = CGSize(
-                    width: value.translation.width * tuning.trackingRatio,
+                    // RTL يقلب إشارة X من الإيماءة — نبطلها هنا فقط؛ Y كما هو
+                    width: layoutDirection == .rightToLeft ? -rawX : rawX,
                     height: value.translation.height * tuning.trackingRatio
                 )
             }

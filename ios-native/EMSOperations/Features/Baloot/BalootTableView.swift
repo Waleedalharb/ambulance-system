@@ -37,6 +37,16 @@ struct BalootTableView: View {
     @State private var showBalootText = false
     @State private var scorePanelSeen = 0
     @State private var showScorePanel = false
+    /// ورقة لعبتُها محليًا بانتظار صدى الخادم — تُخفى من المروحة فورًا
+    /// (الاختفاء = بداية الرمي، إصلاح 4/8) وتعود فقط عند إلغاء حوار
+    /// البلوت أو رفض الخادم.
+    @State private var locallyPlayedCode: String? = nil
+    // توزيع الخصوم ظهرًا لأعلى (§5 / المرجع 21.0) — رحلات ظهر أزرق من
+    // المركز إلى مقاعدهم فوق عدّادات الخادم، عرض صرف بلا أي منطق لعب.
+    @State private var dealBacks: [BalootFlightCard] = []
+    @State private var dealBacksHand = 0
+    @State private var dealCounts: [Int: Int] = [:]
+    @State private var dealGen = 0
 
     private let tableId: Int
 
@@ -322,6 +332,10 @@ struct BalootTableView: View {
                 BalootFlightOverlay(flights: director.flights)
                     .frame(width: geo.size.width, height: geo.size.height)
 
+                // توزيع الخصوم: أوراق ظهر زرقاء من المركز لمقاعدهم (§5)
+                BalootFlightOverlay(flights: dealBacks)
+                    .frame(width: geo.size.width, height: geo.size.height)
+
                 // نص «بلوت» الذهبي فوق منطقة اللعب (§7)
                 if showBalootText {
                     BalootGoldenEventText(text: "بلوت",
@@ -336,8 +350,14 @@ struct BalootTableView: View {
                     }
                 }
             }
-            .onAppear { syncDirector(arena: arena) }
-            .onChange(of: vm.matchState?.hand) { _ in syncDirector(arena: arena) }
+            .onAppear {
+                syncDirector(arena: arena)
+                syncDealBacks(arena: arena)
+            }
+            .onChange(of: vm.matchState?.hand) { _ in
+                syncDirector(arena: arena)
+                syncDealBacks(arena: arena)
+            }
             .onChange(of: vm.balootFlashToken) { token in
                 guard token != balootFlashSeen else { return }
                 balootFlashSeen = token
@@ -361,6 +381,17 @@ struct BalootTableView: View {
             .onChange(of: vm.handScore != nil) { hasScore in
                 if !hasScore { withAnimation(.easeInOut(duration: 0.25)) { showScorePanel = false } }
             }
+            // صدى الخادم: الورقة غادرت يدي فعلًا → أنهِ الإخفاء المحلي
+            .onChange(of: vm.matchState?.hand?.myHand) { newHand in
+                if let code = locallyPlayedCode,
+                   !(newHand?.contains(where: { $0.code == code }) ?? false) {
+                    locallyPlayedCode = nil
+                }
+            }
+            // رفض الخادم للعب → أعد إظهار الورقة في المروحة
+            .onChange(of: vm.actionError) { err in
+                if err != nil { locallyPlayedCode = nil }
+            }
             .onDisappear { director.stop() }
         }
         .ignoresSafeArea()
@@ -375,6 +406,57 @@ struct BalootTableView: View {
                       handNumber: vm.matchState?.handNumber,
                       mySeat: vm.mySeat,
                       geo: arena)
+    }
+
+    /// توزيع الخصوم ظهرًا لأعلى (§5 / المرجع 21.0): مع بداية الصفقة تطير
+    /// أوراق زرقاء الظهر من مركز الطاولة إلى مقاعد الخصوم بنفس إيقاع توزيع
+    /// يد اللاعب — بلا Flip وبلا Assets جديدة (نفس تدرج miniCardBacks).
+    /// عرض صرف فوق عدّادات الخادم (handCounts) — لا يغيّر أي حالة لعب.
+    private func syncDealBacks(arena: BalootArenaGeometry) {
+        guard let match = vm.matchState, let hand = match.hand,
+              let hn = match.handNumber, hn > 0 else { return }
+        // صفقة جديدة: صفّر المتتبع
+        if hn != dealBacksHand {
+            dealBacksHand = hn
+            dealCounts = [:]
+        }
+        // التوزيع يُعرض فقط قبل أول أكلة من الصفقة
+        guard (hand.tricksCount ?? 0) == 0, (hand.currentTrick?.isEmpty ?? true) else { return }
+
+        var added = 0
+        var seq = dealCounts.values.reduce(0, +)
+        for seat in 0..<4 where seat != vm.mySeat {
+            let count = hand.handCounts?[String(seat)] ?? 0
+            let prev = dealCounts[seat] ?? 0
+            guard count > prev else { continue }
+            for i in prev..<count {
+                let tilt: Double = (i % 2 == 0 ? 1 : -1) * BalootPhysics.dealTilt
+                dealBacks.append(BalootFlightCard(
+                    // ورقة placeholder — لا تُعرض إطلاقًا (faceDown = ظهر أزرق)
+                    card: BalootCardDTO(code: "S7", suit: nil, rank: nil),
+                    seat: seat,
+                    from: arena.clusterCenter,
+                    to: arena.seatOrigin(relative: relativeIndex(of: seat)),
+                    fromScale: 1.0, toScale: 1.0,
+                    fromAngle: tilt, toAngle: 0,
+                    duration: BalootPhysics.dealFlightDuration,
+                    delay: Double(seq) * BalootPhysics.dealStagger,
+                    fadeOut: true, faceDown: true))
+                seq += 1
+                added += 1
+            }
+            dealCounts[seat] = count
+        }
+        guard added > 0 else { return }
+        // نظّف الرحلات بعد اكتمال آخر طيران (آخر تأخير + المدة + هامش)
+        let lifetime = Double(seq) * BalootPhysics.dealStagger + BalootPhysics.dealFlightDuration + 0.2
+        dealGen += 1
+        let gen = dealGen
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: UInt64(lifetime * 1_000_000_000))
+            guard gen == dealGen else { return }
+            dealBacks = []
+        }
     }
 
     /// فريقي من حالة المباراة — لعرض أعمدة لوحة الحسبة (لنا/لهم).
@@ -928,7 +1010,8 @@ struct BalootTableView: View {
                 if let card = pendingCard {
                     Button("العب مع بلوت 🌟") { Task { await vm.playCard(card.code, baloot: true) } }
                     Button("العب عادي") { Task { await vm.playCard(card.code, baloot: false) } }
-                    Button("إلغاء", role: .cancel) {}
+                    // إلغاء الحوار = لم تُلعب الورقة → أعد إظهارها في المروحة
+                    Button("إلغاء", role: .cancel) { locallyPlayedCode = nil }
                 }
             }
         }
@@ -960,7 +1043,13 @@ struct BalootTableView: View {
         return BalootHandCardView(card: card, index: index, total: total,
                                   allowed: allowed, canBaloot: canBaloot, playing: playing,
                                   dealToken: vm.matchState?.handNumber ?? 0,
-                                  dealDelta: dealDelta) { viaBalootDialog in
+                                  dealDelta: dealDelta,
+                                  hidden: card.code == locallyPlayedCode) { viaBalootDialog in
+            // إصلاح 4/8: سجّل موضع الانطلاق الحقيقي داخل المروحة + أخفِ
+            // الورقة فورًا — الاختفاء = بداية الرمي، والمروحة تنزلق بالتزامن.
+            locallyPlayedCode = card.code
+            director.noteMyPlayOrigin(card: card.code,
+                                      origin: CGPoint(x: slotX, y: slotY))
             if viaBalootDialog { pendingCard = card }
             else { Task { await vm.playCard(card.code, baloot: false) } }
         }
