@@ -80,7 +80,10 @@ struct BalootHandCardView: View {
             .onChanged { value in
                 guard allowed else { return }
                 dragging = true
-                drag = value.translation * tuning.trackingRatio
+                drag = CGSize(
+                    width: value.translation.width * tuning.trackingRatio,
+                    height: value.translation.height * tuning.trackingRatio
+                )
             }
             .onEnded { value in
                 guard allowed else { drag = .zero; dragging = false; return }
