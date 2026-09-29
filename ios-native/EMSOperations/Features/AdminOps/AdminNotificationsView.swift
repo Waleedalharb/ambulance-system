@@ -47,6 +47,7 @@ struct AdminNotificationsView: View {
         ScrollView {
             VStack(spacing: EMSTheme.spacing) {
                 if canSend { sendCard }
+                inboxSection
                 filtersCard
                 if vm.entries.isEmpty {
                     EMSEmptyView(icon: "bell.badge", title: "السجل فارغ",
@@ -111,6 +112,54 @@ struct AdminNotificationsView: View {
                 }
             }
         }
+    }
+
+    // MARK: - الوارد (Inbox المستخدم الحالي — 2026-09-29)
+
+    /// إشعارات المستخدم الحالي من GET /api/notifications — تهبط هنا إشعارات
+    /// طلبات الموظفين (leave.submitted / shift_change.submitted) لحاملي
+    /// requests.review. مصدر مستقل عن سجل الإرسال أدناه ولا يغيّر شيئًا فيه.
+    private var inboxSection: some View {
+        EMSCard {
+            VStack(alignment: .leading, spacing: 10) {
+                EMSectionHeader(title: "الوارد", systemImage: "tray.and.arrow.down.fill")
+                if vm.inbox.isEmpty {
+                    Text("لا توجد إشعارات واردة.")
+                        .font(.caption)
+                        .foregroundStyle(EMSTheme.Colors.textMuted)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                } else {
+                    ForEach(vm.inbox, id: \.stableId) { item in inboxRow(item) }
+                }
+            }
+        }
+    }
+
+    private func inboxRow(_ item: AdminInboxItemDTO) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text(item.title ?? "إشعار")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(EMSTheme.Colors.textPrimary)
+                Spacer()
+                EMSStatusPill(text: item.typeTitle, tone: item.typeTone)
+            }
+            if let message = item.message, !message.isEmpty {
+                Text(message)
+                    .font(.caption)
+                    .foregroundStyle(EMSTheme.Colors.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            HStack(spacing: 10) {
+                Text(item.isRead ? "مقروء" : "غير مقروء")
+                    .font(.caption2)
+                    .foregroundStyle(item.isRead ? EMSTheme.Colors.textMuted : EMSTheme.Colors.teal)
+                if let at = item.createdAt {
+                    Text(at).font(.caption2).foregroundStyle(EMSTheme.Colors.textMuted)
+                }
+            }
+        }
+        .padding(.vertical, 4)
     }
 
     // MARK: - الفلاتر والسجل
@@ -184,6 +233,7 @@ final class AdminNotificationsViewModel: ObservableObject {
 
     @Published private(set) var state: LoadState = .loading
     @Published private(set) var entries: [NotificationLogEntryDTO] = []
+    @Published private(set) var inbox: [AdminInboxItemDTO] = []
     @Published var statusFilter = ""
 
     private let api = APIClient.shared
@@ -195,6 +245,10 @@ final class AdminNotificationsViewModel: ObservableObject {
 
     func reload(showLoading: Bool = false) async {
         if showLoading { state = .loading }
+        // الوارد: جلب مستقل — فشله لا يكسر سجل الإرسال ولا يُخفي محتواه
+        if let res: AdminInboxResponseDTO = try? await api.get("/api/notifications") {
+            inbox = res.notifications ?? []
+        }
         var query: [String: String] = ["limit": "50"]
         if !statusFilter.isEmpty { query["status"] = statusFilter }
         do {
