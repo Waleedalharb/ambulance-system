@@ -126,6 +126,12 @@
 		5E40000000000000000000B6 /* BalootTableViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000B6 /* BalootTableViewModel.swift */; };
 		5E40000000000000000000B7 /* BalootTableView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000B7 /* BalootTableView.swift */; };
 		5E40000000000000000000B8 /* BalootSoundService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000B8 /* BalootSoundService.swift */; };
+		5E40000000000000000000D2 /* BalootPhysics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000D2 /* BalootPhysics.swift */; };
+		5E40000000000000000000D3 /* BalootCardFace.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000D3 /* BalootCardFace.swift */; };
+		5E40000000000000000000D4 /* BalootFlightOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000D4 /* BalootFlightOverlay.swift */; };
+		5E40000000000000000000D5 /* BalootTrickDirector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000D5 /* BalootTrickDirector.swift */; };
+		5E40000000000000000000D6 /* BalootHandCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000D6 /* BalootHandCardView.swift */; };
+		5E40000000000000000000D7 /* BalootScorePanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000D7 /* BalootScorePanelView.swift */; };
 		5E40000000000000000000C1 /* deal.wav in Resources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000C1 /* deal.wav */; };
 		5E40000000000000000000C2 /* card.wav in Resources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000C2 /* card.wav */; };
 		5E40000000000000000000C3 /* select.wav in Resources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000C3 /* select.wav */; };
@@ -282,6 +288,12 @@
 		5E30000000000000000000B6 /* BalootTableViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalootTableViewModel.swift; sourceTree = "<group>"; };
 		5E30000000000000000000B7 /* BalootTableView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalootTableView.swift; sourceTree = "<group>"; };
 		5E30000000000000000000B8 /* BalootSoundService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalootSoundService.swift; sourceTree = "<group>"; };
+		5E30000000000000000000D2 /* BalootPhysics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalootPhysics.swift; sourceTree = "<group>"; };
+		5E30000000000000000000D3 /* BalootCardFace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalootCardFace.swift; sourceTree = "<group>"; };
+		5E30000000000000000000D4 /* BalootFlightOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalootFlightOverlay.swift; sourceTree = "<group>"; };
+		5E30000000000000000000D5 /* BalootTrickDirector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalootTrickDirector.swift; sourceTree = "<group>"; };
+		5E30000000000000000000D6 /* BalootHandCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalootHandCardView.swift; sourceTree = "<group>"; };
+		5E30000000000000000000D7 /* BalootScorePanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalootScorePanelView.swift; sourceTree = "<group>"; };
 		5E30000000000000000000C1 /* deal.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = deal.wav; sourceTree = "<group>"; };
 		5E30000000000000000000C2 /* card.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = card.wav; sourceTree = "<group>"; };
 		5E30000000000000000000C3 /* select.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = select.wav; sourceTree = "<group>"; };
@@ -554,8 +566,22 @@
 				5E30000000000000000000B6 /* BalootTableViewModel.swift */,
 				5E30000000000000000000B7 /* BalootTableView.swift */,
 				5E30000000000000000000B8 /* BalootSoundService.swift */,
+				5E200000000000000000006A /* Physics */,
 			);
 			path = Baloot;
+			sourceTree = "<group>";
+		};
+		5E200000000000000000006A /* Physics */ = {
+			isa = PBXGroup;
+			children = (
+				5E30000000000000000000D2 /* BalootPhysics.swift */,
+				5E30000000000000000000D3 /* BalootCardFace.swift */,
+				5E30000000000000000000D4 /* BalootFlightOverlay.swift */,
+				5E30000000000000000000D5 /* BalootTrickDirector.swift */,
+				5E30000000000000000000D6 /* BalootHandCardView.swift */,
+				5E30000000000000000000D7 /* BalootScorePanelView.swift */,
+			);
+			path = Physics;
 			sourceTree = "<group>";
 		};
 		5E2000000000000000000059 /* CompletionOps */ = {
@@ -1103,6 +1129,12 @@
 				5E40000000000000000000B6 /* BalootTableViewModel.swift in Sources */,
 				5E40000000000000000000B7 /* BalootTableView.swift in Sources */,
 				5E40000000000000000000B8 /* BalootSoundService.swift in Sources */,
+				5E40000000000000000000D2 /* BalootPhysics.swift in Sources */,
+				5E40000000000000000000D3 /* BalootCardFace.swift in Sources */,
+				5E40000000000000000000D4 /* BalootFlightOverlay.swift in Sources */,
+				5E40000000000000000000D5 /* BalootTrickDirector.swift in Sources */,
+				5E40000000000000000000D6 /* BalootHandCardView.swift in Sources */,
+				5E40000000000000000000D7 /* BalootScorePanelView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -343,6 +343,38 @@ enum BalootWSMessage: Decodable {
     }
 }
 
+// MARK: - حسبة الصفقة (hand_scored.detail) — فكّ عميلي لبيانات يبثها الخادم أصلًا
+
+/// زوج نقاط فريقين {A, B} كما يرسله المحرك.
+struct BalootTeamPointsDTO: Decodable, Equatable {
+    let A: Int
+    let B: Int
+}
+
+/// مشروع داخل تفصيل الحسبة: {team, seat, project, base, multiplied}.
+struct BalootProjectScoreDTO: Decodable, Equatable {
+    let team: String?
+    let seat: Int?
+    let project: String?
+    let base: Int?
+    let multiplied: Int?
+}
+
+/// تفصيل حسبة الصفقة كما يبثه الخادم في hand_scored (engine/scoring.js) —
+/// عرض فقط؛ لا يُشتق منه أي رقم عميليًا (A7).
+struct BalootHandScoreDetailDTO: Decodable, Equatable {
+    let outcome: String?
+    let note: String?
+    let raw: BalootTeamPointsDTO?
+    let tricksWon: BalootTeamPointsDTO?
+    let cardAbnat: BalootTeamPointsDTO?
+    let projects: [BalootProjectScoreDTO]?
+    let balootPts: BalootTeamPointsDTO?
+    let delta: BalootTeamPointsDTO?
+    let handWinnerTeam: String?
+    let multiplier: Int?
+}
+
 /// حدث خام داخل رسائل البث — حقول حرة (نوع + مقعد/تفاصيل حسب النوع).
 struct BalootWSEvent: Decodable, Equatable {
     let type: String
@@ -351,6 +383,14 @@ struct BalootWSEvent: Decodable, Equatable {
     let kind: String?
     let project: String? // نوع المشروع في declaration_announced (sara/khamsin/miya/arba)
     let contract: BalootContractDTO?
+    /// رقم الأكلة المحسومة في trick_won (عرض فقط).
+    let trickNo: Int?
+    /// مقعد الفائز بالأكلة في trick_won (عرض فقط).
+    let winnerSeat: Int?
+    /// قيمة نقاط الأكلة — إن أرسلها الخادم مستقبلًا (PENDING: لا تُرسل حاليًا).
+    let points: Int?
+    /// تفصيل الحسبة في hand_scored.
+    let detail: BalootHandScoreDetailDTO?
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: DynamicKey.self)
@@ -360,6 +400,10 @@ struct BalootWSEvent: Decodable, Equatable {
         kind = try? c.decode(String.self, forKey: DynamicKey("kind"))
         project = try? c.decode(String.self, forKey: DynamicKey("project"))
         contract = try? c.decode(BalootContractDTO.self, forKey: DynamicKey("contract"))
+        trickNo = try? c.decode(Int.self, forKey: DynamicKey("trickNo"))
+        winnerSeat = try? c.decode(Int.self, forKey: DynamicKey("winnerSeat"))
+        points = try? c.decode(Int.self, forKey: DynamicKey("points"))
+        detail = try? c.decode(BalootHandScoreDetailDTO.self, forKey: DynamicKey("detail"))
     }
 
     struct DynamicKey: CodingKey {

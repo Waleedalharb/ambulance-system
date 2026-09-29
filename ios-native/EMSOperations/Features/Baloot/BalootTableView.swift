@@ -31,6 +31,12 @@ struct BalootTableView: View {
     @State private var confirmClose = false
     @State private var confirmAbort = false
     @State private var pendingCard: BalootCardDTO?
+    // طبقة الفيزياء (المرحلة 03) — عرض صرف فوق حالة الخادم
+    @StateObject private var director = BalootTrickDirector()
+    @State private var balootFlashSeen = 0
+    @State private var showBalootText = false
+    @State private var scorePanelSeen = 0
+    @State private var showScorePanel = false
 
     private let tableId: Int
 
@@ -50,7 +56,6 @@ struct BalootTableView: View {
 
     private let gold = Color(red: 0.82, green: 0.66, blue: 0.32)
     private let podColor = Color(red: 0.05, green: 0.09, blue: 0.08)
-    private let cream = Color(red: 0.98, green: 0.965, blue: 0.92)
 
     var body: some View {
         content
@@ -264,6 +269,7 @@ struct BalootTableView: View {
     private func matchScreen(_ table: BalootLobbyTableDTO) -> some View {
         GeometryReader { geo in
             let felt = feltRect(in: geo.size)
+            let arena = BalootArenaGeometry(felt: felt)
             ZStack {
                 // خلفية المجلس: الأصل المرسوم كما هو — لا إطار ولا لباد مكرر فوقه
                 majlisBackdrop
@@ -300,7 +306,7 @@ struct BalootTableView: View {
                 VStack(spacing: 6) {
                     Spacer()
                     actionChips
-                    handFan
+                    handFan(felt: felt, containerWidth: geo.size.width)
                 }
                 .padding(.bottom, max(0, geo.size.height - felt.maxY - 14))
 
@@ -311,9 +317,69 @@ struct BalootTableView: View {
                 }
                 .padding(.horizontal, 14)
                 .padding(.bottom, 6)
+
+                // طبقة الفيزياء: كل الأوراق الطائرة فوق المشهد كله (§2/§4/§5)
+                BalootFlightOverlay(flights: director.flights)
+                    .frame(width: geo.size.width, height: geo.size.height)
+
+                // نص «بلوت» الذهبي فوق منطقة اللعب (§7)
+                if showBalootText {
+                    BalootGoldenEventText(text: "بلوت",
+                                          lifetime: BalootGestureTuning().balootTextLifetime)
+                        .position(arena.clusterCenter)
+                }
+
+                // لوحة الحسبة بعد فجوة مسح الطاولة (§8)
+                if showScorePanel, let detail = vm.handScore {
+                    BalootScorePanelView(detail: detail, myTeam: myTeam) {
+                        withAnimation(.easeInOut(duration: 0.25)) { showScorePanel = false }
+                    }
+                }
             }
+            .onAppear { syncDirector(arena: arena) }
+            .onChange(of: vm.matchState?.hand) { _ in syncDirector(arena: arena) }
+            .onChange(of: vm.balootFlashToken) { token in
+                guard token != balootFlashSeen else { return }
+                balootFlashSeen = token
+                showBalootText = true
+                // إزالة العنصر بعد انتهاء ظهوره (المدة TEMPORARY — P-P8)
+                Task { @MainActor in
+                    try? await Task.sleep(nanoseconds: UInt64((BalootGestureTuning().balootTextLifetime + 0.5) * 1_000_000_000))
+                    showBalootText = false
+                }
+            }
+            .onChange(of: vm.handScoreToken) { token in
+                guard token != scorePanelSeen else { return }
+                scorePanelSeen = token
+                // فجوة مسح الطاولة ≈1.1ث ثم تظهر اللوحة (§8)
+                Task { @MainActor in
+                    try? await Task.sleep(nanoseconds: UInt64(BalootPhysics.scorePanelDelay * 1_000_000_000))
+                    guard vm.handScore != nil else { return }
+                    withAnimation(.easeInOut(duration: 0.3)) { showScorePanel = true }
+                }
+            }
+            .onChange(of: vm.handScore != nil) { hasScore in
+                if !hasScore { withAnimation(.easeInOut(duration: 0.25)) { showScorePanel = false } }
+            }
+            .onDisappear { director.stop() }
         }
         .ignoresSafeArea()
+    }
+
+    /// مزامنة موجّه الأكلة مع حالة الخادم — عرض صرف بلا منطق.
+    private func syncDirector(arena: BalootArenaGeometry) {
+        let hand = vm.matchState?.hand
+        director.sync(currentTrick: hand?.currentTrick,
+                      lastTrick: hand?.lastTrick,
+                      tricksCount: hand?.tricksCount,
+                      handNumber: vm.matchState?.handNumber,
+                      mySeat: vm.mySeat,
+                      geo: arena)
+    }
+
+    /// فريقي من حالة المباراة — لعرض أعمدة لوحة الحسبة (لنا/لهم).
+    private var myTeam: String? {
+        vm.matchState?.seats?.first(where: { $0.seat == vm.mySeat })?.team
     }
 
     /// حدود اللباد المرسوم داخل الصورة (1024×2048) محسوبة على الشاشة مع
@@ -547,15 +613,22 @@ struct BalootTableView: View {
                         .shadow(color: .black.opacity(0.5), radius: 8, y: 4)
                         .transition(.scale(scale: 0.7).combined(with: .opacity))
                 }
-            } else if let trick = hand?.currentTrick, !trick.isEmpty {
-                // كل ورقة تنزاح نحو جهة صاحبها — كأنها سقطت من يده على اللباد
-                ForEach(trick, id: \.seat) { play in
+            } else if !director.settled.isEmpty {
+                // عنقود الأكلة (§3): تداخل غير منتظم — انحراف ضيق نحو جهة
+                // صاحبها + ميلان استقرار ثابت ±5°–15°، z-order بترتيب اللعب.
+                // الوصول/المغادرة عبر طبقة الطيران (الموجّه) لا عبر transitions.
+                ForEach(Array(director.settled.enumerated()), id: \.offset) { index, play in
                     cardView(play.card, size: .medium, dimmed: false)
                         .shadow(color: .black.opacity(0.5), radius: 5, y: 3)
-                        .offset(trickOffset(for: play.seat))
-                        .transition(.scale(scale: 0.6).combined(with: .opacity))
+                        .rotationEffect(.degrees(BalootPhysics.steadyTilt(card: play.card.code,
+                                                                          seat: play.seat,
+                                                                          range: BalootPhysics.restTilt)))
+                        .offset(BalootArenaGeometry.clusterOffset(relative: relativeIndex(of: play.seat)))
+                        .zIndex(Double(index))
                 }
-            } else if let last = hand?.lastTrick {
+            } else if !director.isCollecting, let last = hand?.lastTrick {
+                // نص اللفة السابقة يُخفى طوال انتقال الجمع (ورقة رابعة → فجوة
+                // التقييم → جمع) حتى يكون الانتقال نظيفًا بلا أي حالة قديمة.
                 Text("اللفة السابقة: \(seatShortName(last.winnerSeat))")
                     .font(.caption2)
                     .foregroundStyle(Color.white.opacity(0.55))
@@ -567,7 +640,6 @@ struct BalootTableView: View {
                 centerBadges(hand)
             }
         }
-        .animation(.spring(response: 0.35, dampingFraction: 0.75), value: hand?.currentTrick?.count)
         .animation(.easeInOut(duration: 0.25), value: hand?.faceUpCard?.code)
     }
 
@@ -623,16 +695,6 @@ struct BalootTableView: View {
                 .background(Color.black.opacity(0.3))
                 .clipShape(Capsule())
                 .padding(.bottom, 4)
-        }
-    }
-
-    /// إزاحة ورقة اللفة نحو جهة صاحبها مني (0=أسفل/أنا، 1=يمين، 2=أعلى/شريك، 3=يسار).
-    private func trickOffset(for seat: Int) -> CGSize {
-        switch relativeIndex(of: seat) {
-        case 0: return CGSize(width: 0, height: 52)
-        case 1: return CGSize(width: 62, height: 0)
-        case 2: return CGSize(width: 0, height: -52)
-        default: return CGSize(width: -62, height: 0)
         }
     }
 
@@ -846,14 +908,20 @@ struct BalootTableView: View {
     // MARK: - يدي (مروحة كبيرة أسفل الطاولة)
 
     @ViewBuilder
-    private var handFan: some View {
+    private func handFan(felt: CGRect, containerWidth: CGFloat) -> some View {
         if vm.isSeated, let hand = vm.matchState?.hand, let myHand = hand.myHand {
-            HStack(spacing: handSpacing(for: myHand.count)) {
+            let arena = BalootArenaGeometry(felt: felt)
+            let spacing = handSpacing(for: myHand.count)
+            HStack(spacing: spacing) {
                 ForEach(Array(myHand.enumerated()), id: \.offset) { index, card in
-                    cardButton(card, index: index, total: myHand.count)
+                    handCard(card, index: index, total: myHand.count,
+                             spacing: spacing, felt: felt,
+                             containerWidth: containerWidth, arena: arena)
                 }
             }
             .padding(.top, 10)
+            // إعادة ترتيب المروحة بعد كل رمية ≈0.3ث (§6)
+            .animation(.easeInOut(duration: BalootPhysics.fanReflow), value: myHand.count)
             .confirmationDialog("بلوت مع هذه الورقة؟", isPresented: Binding(
                 get: { pendingCard != nil }, set: { if !$0 { pendingCard = nil } }
             ), titleVisibility: .visible) {
@@ -873,85 +941,37 @@ struct BalootTableView: View {
         return count <= 5 ? 8 : (count <= 7 ? -20 : -28)
     }
 
-    /// ورقة في يدي — قابلة للضغط فقط إن سمح الخادم؛ المسموح مرفوع ومتوهج.
-    private func cardButton(_ card: BalootCardDTO, index: Int, total: Int) -> some View {
+    /// ورقة في يدي — المظهر القائم حرفيًا + طبقة الفيزياء (سحب/رفع/توزيع).
+    /// قابلية اللعب من /options فقط كما كانت؛ الرمية بالسحب أو اللمس تسلك
+    /// نفس مسار اللعب القائم (حوار بلوت عند الحاجة) — لا قرار لعب هنا.
+    private func handCard(_ card: BalootCardDTO, index: Int, total: Int,
+                          spacing: CGFloat, felt: CGRect, containerWidth: CGFloat,
+                          arena: BalootArenaGeometry) -> some View {
         let opts = vm.options
         let playing = opts?.phase == "playing" && opts?.myTurn == true
         let allowed = playing && (opts?.cards.contains(card.code) ?? false)
         let canBaloot = allowed && (opts?.balootCards.contains(card.code) ?? false)
-        let fanAngle = Double(index - (total - 1) / 2) * 3.5
-        return Button {
-            if canBaloot { pendingCard = card }
-            else if allowed { Task { await vm.playCard(card.code, baloot: false) } }
-        } label: {
-            cardView(card, size: .hand, dimmed: playing && !allowed)
-                .rotationEffect(.degrees(fanAngle), anchor: .bottom)
-                .offset(y: allowed ? -12 : 0)
-                .shadow(color: allowed ? EMSTheme.Colors.teal.opacity(0.55) : .clear,
-                        radius: allowed ? 10 : 0)
-                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: allowed)
-        }
-        .disabled(!allowed)
-        .overlay(alignment: .top) {
-            if canBaloot {
-                Text("🌟")
-                    .font(.caption)
-                    .offset(y: -14)
-            }
+        // موضع الورقة في المروحة → إزاحة انطلاق التوزيع من مركز الطاولة
+        let cardW: CGFloat = 66
+        let slotX = containerWidth / 2 + (CGFloat(index) - CGFloat(total - 1) / 2) * (cardW + spacing)
+        let slotY = felt.maxY + 35
+        let dealDelta = CGSize(width: arena.clusterCenter.x - slotX,
+                               height: arena.clusterCenter.y - slotY)
+        return BalootHandCardView(card: card, index: index, total: total,
+                                  allowed: allowed, canBaloot: canBaloot, playing: playing,
+                                  dealToken: vm.matchState?.handNumber ?? 0,
+                                  dealDelta: dealDelta) { viaBalootDialog in
+            if viaBalootDialog { pendingCard = card }
+            else { Task { await vm.playCard(card.code, baloot: false) } }
         }
     }
 
     // MARK: - بطاقة الورقة
 
-    private enum CardSize {
-        case medium, hand
-        var dims: (CGFloat, CGFloat) {
-            switch self {
-            case .medium: return (56, 80) // ورقة المركز واللفة
-            case .hand: return (66, 96)   // يد اللاعب — كبيرة ومريحة للمس
-            }
-        }
-        var font: Font {
-            switch self {
-            case .medium: return .body.weight(.bold)
-            case .hand: return .headline.weight(.bold)
-            }
-        }
-    }
-
-    /// ورقة كريمية معتمة 100% بحدود واضحة وظل — كأنها ورقة حقيقية على اللباد.
-    /// `dimmed` يخفت ورق اليد الممنوع فقط؛ ورق المركز يبقى معتمًا دائمًا.
-    private func cardView(_ card: BalootCardDTO, size: CardSize, dimmed: Bool) -> some View {
-        let (w, h) = size.dims
-        return VStack(spacing: 2) {
-            Text(rankDisplay(card))
-                .font(size.font)
-            Text(card.suitSymbol)
-                .font(size.font)
-        }
-        .foregroundStyle(card.isRed ? Color(red: 0.78, green: 0.16, blue: 0.16) : Color(red: 0.13, green: 0.13, blue: 0.16))
-        .frame(width: w, height: h)
-        .background(cream)
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .stroke(Color(red: 0.35, green: 0.30, blue: 0.22).opacity(0.45), lineWidth: 1)
-        )
-        .opacity(dimmed ? 0.35 : 1)
-        .shadow(color: .black.opacity(0.45), radius: 4, y: 3)
-    }
-
-    /// أسماء الرتب البلوتية للعرض — شايب/بنت/ولد/إكّه، والأرقام كما هي (T تعرض 10).
-    /// عرض فقط؛ قيمة الورقة الحقيقية (code) لا تُمس وتبقى من الخادم.
-    private func rankDisplay(_ card: BalootCardDTO) -> String {
-        switch card.rankLabel {
-        case "A": return "إكّه"
-        case "K": return "شايب"
-        case "Q": return "بنت"
-        case "J": return "ولد"
-        case "T": return "10"
-        default: return card.rankLabel
-        }
+    /// المُصيّر الواحد المشترك مع طبقة الفيزياء — نفس المظهر القائم حرفيًا
+    /// (نُقل كما هو إلى Physics/BalootCardFace.swift).
+    private func cardView(_ card: BalootCardDTO, size: BalootCardSize, dimmed: Bool) -> some View {
+        BalootCardFace(card: card, size: size, dimmed: dimmed)
     }
 
     // MARK: - أسماء مختصرة

@@ -36,6 +36,15 @@ final class BalootTableViewModel: ObservableObject {
     @Published var actionError: String?
     @Published private(set) var busy = false
 
+    // MARK: - مشغّلات طبقة الفيزياء (عرض فقط — المرحلة 03، لا منطق لعب)
+
+    /// تفصيل حسبة الصفقة المعروض في اللوحة — يُمسح عند بدء صفقة جديدة.
+    @Published private(set) var handScore: BalootHandScoreDetailDTO?
+    /// يتزايد مع كل hand_scored — مشغّل ظهور اللوحة بعد الفجوة المعتمدة (≈1.1ث).
+    @Published private(set) var handScoreToken = 0
+    /// يتزايد مع كل baloot_announced — مشغّل نص «بلوت» الذهبي.
+    @Published private(set) var balootFlashToken = 0
+
     let tableId: Int
     private let socket: BalootSocket
     private let service = BalootService.shared
@@ -132,6 +141,7 @@ final class BalootTableViewModel: ObservableObject {
             guard mid == activeMatchId else { return }
             applyMatch(state, paused: paused, status: status, spectators: spectators)
             appendFeed(events)
+            capturePhysicsEvents(events)
             playSounds(events: events, state: state)
             refreshOptionsIfNeeded()
         case .error(_, let code, let message):
@@ -148,6 +158,23 @@ final class BalootTableViewModel: ObservableObject {
         self.paused = paused
         if let status { matchStatus = status }
         if let spectators { self.spectators = spectators }
+    }
+
+    /// التقاط أحداث الفيزياء من البث — عرض صرف: لا قرار ولا قاعدة هنا.
+    private func capturePhysicsEvents(_ events: [BalootWSEvent]) {
+        for ev in events {
+            switch ev.type {
+            case "hand_scored":
+                handScore = ev.detail
+                handScoreToken += 1
+            case "hand_started", "redeal":
+                handScore = nil // صفقة جديدة تُسقط لوحة الحسبة (§8)
+            case "baloot_announced":
+                balootFlashToken += 1
+            default:
+                break
+            }
+        }
     }
 
     // MARK: - الأصوات (خفيفة — BalootSoundService، وكتم من إعدادات الطاولة)
