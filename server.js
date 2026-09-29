@@ -4415,6 +4415,41 @@ app.get('/api/shifts/archive', authenticate, async (req, res) => {
     }
 });
 
+// ── جاهزية الفرق (اعتماد المالك 2026-09-29): تجميع بنود التشييك مع جلستها ──
+// البنود من shift_check_items الحقيقية فقط — لا اختراع حقول ولا قيم مشتقة.
+function groupShiftCheckItems(sessions, items) {
+    const bySession = {};
+    (Array.isArray(items) ? items : []).forEach(it => {
+        const k = it.session_id != null ? it.session_id : it.sessionId;
+        if (k == null) return;
+        if (!bySession[k]) bySession[k] = [];
+        bySession[k].push(it);
+    });
+    return (Array.isArray(sessions) ? sessions : []).map(s => ({ ...s, items: bySession[s.id] || [] }));
+}
+
+// القراءة الحية لجاهزية الفرق: للمناوبة النشطة/بلا لقطة، ولأرشيف ما قبل ختم
+// الجاهزية (لقطات قديمة بلا قسم readiness) — الجلسات المختومة بهذه المناوبة
+// (shift_id) + الجلسات القديمة بلا ختم لنفس التاريخ، مع بنود كل جلسة.
+async function loadShiftReadinessLive(shiftId, shiftDate) {
+    const sessions = await db.all(
+        `SELECT * FROM shift_check_sessions
+         WHERE shift_id = ? OR (shift_id IS NULL AND shift_date = ?)
+         ORDER BY team_name, id`,
+        [shiftId, shiftDate || '']);
+    if (!Array.isArray(sessions) || sessions.length === 0) return [];
+    const ids = sessions.map(s => s.id);
+    let items = [];
+    try {
+        items = await db.all(
+            `SELECT * FROM shift_check_items
+             WHERE session_id IN (${ids.map(() => '?').join(',')})
+             ORDER BY session_id, id`,
+            ids);
+    } catch (_) { items = []; }
+    return groupShiftCheckItems(sessions, items);
+}
+
 app.get('/api/shifts/:id(\\d+)', authenticate, async (req, res) => {
     // Phase 2+3: Read from SQLite directly (not JSON)
     try {
@@ -4469,25 +4504,13 @@ app.get('/api/shifts/:id(\\d+)', authenticate, async (req, res) => {
             positioning: [],
             positioning_events: [],
             signouts: [],
-            readiness: []
+            readiness: [],
+            readinessSource: null
         };
 
-        // ── 0. جاهزية الفرق التاريخية لهذه المناوبة (اعتماد المالك 2026-09-29) ──
-        // سجلات shift_check_sessions المختومة بهذه المناوبة (shift_id) + الجلسات
-        // القديمة بلا ختم لنفس التاريخ (ما قبل الربط) — سجلات حقيقية محفوظة أثناء
-        // المناوبة، لا قيمة مشتقة من الوضع الحالي ولا قراءة لجاهزية اليوم.
-        try {
-            if (dbAvailable()) {
-                response.readiness = await db.all(
-                    `SELECT id, shift_date, shift_id, team_id, team_name, vehicle_id, vehicle_name,
-                            center, status, check_mode, readiness, readiness_reason, readiness_at,
-                            completed_at, created_at
-                     FROM shift_check_sessions
-                     WHERE shift_id = ? OR (shift_id IS NULL AND shift_date = ?)
-                     ORDER BY team_name, id`,
-                    [shiftId, normalizedShift.shiftDate || '']);
-            }
-        } catch (_) { /* جدول/عمود غير موجود في بيئة قديمة ← readiness تبقى [] بصدق */ }
+        // ── 0. جاهزية الفرق: تُحسم أدناه مع مصدرها — اللقطة المختومة للمؤرشفة
+        // (اعتماد المالك 2026-09-29: الأرشيف Snapshot تاريخي مستقل، لا قراءة
+        // لحالة التشييك الحالية)، والقراءة الحية للنشطة/الأرشيف القديم فقط.
 
         // ── 1. Query related data from SQLite (new data) ──
         try {
@@ -4614,6 +4637,15 @@ app.get('/api/shifts/:id(\\d+)', authenticate, async (req, res) => {
                         // المختومة هي المرجع التاريخي الوحيد — لا استعلام حي ولا
                         // إعادة حسم هنا. أرشيف ما قبل PI-3 (بلا قسم) ← null بصدق.
                         response.places = sealed.places || null;
+                        // جاهزية الفرق (اعتماد المالك 2026-09-29): قسم readiness
+                        // المختوم داخل اللقطة (جلسات + بنود) هو المرجع التاريخي
+                        // الثابت للمؤرشفة — لا يتغير لو بدأت مناوبة جديدة أو
+                        // تغيّرت سجلات التشييك الحية بعد الختم. أرشيف ما قبل
+                        // الختم (بلا قسم) يسقط للقراءة الحية أدناه بصدق.
+                        if (sealed.readiness && Array.isArray(sealed.readiness.sessions)) {
+                            response.readiness = groupShiftCheckItems(sealed.readiness.sessions, sealed.readiness.items);
+                            response.readinessSource = 'sealed';
+                        }
                     } else {
                         const PositioningService = require('./services/positioning-service');
                         const planRows = await db.all('SELECT * FROM peak_plans WHERE shift_id = ? ORDER BY created_at ASC, id ASC', [shiftId]);
@@ -4654,6 +4686,17 @@ app.get('/api/shifts/:id(\\d+)', authenticate, async (req, res) => {
                         } catch (hErr) {
                             console.warn('[ShiftDetail] hospital live read failed:', hErr.message);
                             response.hospital = null;
+                        }
+                    }
+                    // جاهزية الفرق — القراءة الحية: للمناوبة النشطة/بلا لقطة،
+                    // وللأرشيف القديم الذي يسبق ختم الجاهزية في اللقطة (بلا قسم
+                    // readiness). المؤرشفة المختومة تجاوزت هذا الفرع أصلًا.
+                    if (response.readinessSource !== 'sealed') {
+                        try {
+                            response.readiness = await loadShiftReadinessLive(shiftId, normalizedShift.shiftDate || '');
+                            response.readinessSource = 'live';
+                        } catch (rErr) {
+                            console.warn('[ShiftDetail] readiness live read failed:', rErr.message);
                         }
                     }
                 } catch (posErr) {

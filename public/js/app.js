@@ -1945,11 +1945,13 @@ function initPeakAlertMap(alertData) {
         var centerLng = parseFloat(alertData.lng) || 46.6753;
         
         peakAlertMap = PeakL.map('peakAlertMap').setView([centerLat, centerLng], 13);
-        PeakL.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap'
-        }).addTo(peakAlertMap);
-        
-        PeakL.marker([centerLat, centerLng]).addTo(peakAlertMap);
+        // لا بلاطات OSM في مسار التمركز/الذروة إطلاقًا (اعتماد المالك 2026-09-29):
+        // الخريطة الأساسية تأتي من نمط المزود النشط عبر MapAdapter (Mapbox في
+        // الإنتاج) — لا tileLayer ولا fallback إلى OpenStreetMap هنا.
+        var alertMarkerIcon = (typeof PeakL.divIcon === 'function')
+            ? PeakL.divIcon({ className: '', html: '<div style="font-size:24px;filter:drop-shadow(0 1px 2px rgba(0,0,0,.45))">📍</div>', iconAnchor: [12, 12] })
+            : undefined;
+        PeakL.marker([centerLat, centerLng], alertMarkerIcon ? { icon: alertMarkerIcon } : {}).addTo(peakAlertMap);
         PeakL.popup().setLatLng([centerLat, centerLng])
             .setContent('<b>' + escapeHtml(alertData.unit) + '</b><br>' + escapeHtml(alertData.location) + '<br>⏰ ' + (alertData.startTime || ''))
             .openOn(peakAlertMap);
@@ -2036,7 +2038,11 @@ function initPeakMap() {
     if (peakMap) { setTimeout(function() { peakMap.invalidateSize(); }, 300); return; }
     try {
         peakMap = PeakL.map('peakMap').setView([24.7136, 46.6753], 13);
-        PeakL.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(peakMap);
+        // لا بلاطات OSM في مسار التمركز/الذروة إطلاقًا (اعتماد المالك 2026-09-29):
+        // الخريطة الأساسية من نمط المزود النشط عبر MapAdapter (Mapbox في الإنتاج).
+        var peakPinIcon = (typeof PeakL.divIcon === 'function')
+            ? PeakL.divIcon({ className: '', html: '<div style="font-size:24px;filter:drop-shadow(0 1px 2px rgba(0,0,0,.45))">📍</div>', iconAnchor: [12, 12] })
+            : undefined;
         var marker = null;
         peakMap.on('click', function(e) {
             // Leaflet يمرر e.latlng وMapbox يمرر e.lngLat — نفس الحدث، شكلان
@@ -2045,7 +2051,7 @@ function initPeakMap() {
             var lat = ll.lat;
             var lng = ll.lng;
             if (marker) peakMap.removeLayer(marker);
-            marker = PeakL.marker([lat, lng]).addTo(peakMap);
+            marker = PeakL.marker([lat, lng], peakPinIcon ? { icon: peakPinIcon } : {}).addTo(peakMap);
             var el_peakSelectedLocation_h2 = document.getElementById('peakSelectedLocation'); if (el_peakSelectedLocation_h2) el_peakSelectedLocation_h2.innerHTML = '<strong>' + lat.toFixed(6) + ', ' + lng.toFixed(6) + '</strong>';
             selectedPeakLocation = { lat: lat, lng: lng };
         });
@@ -2799,6 +2805,11 @@ function openMapPreview(unit, location) {
 
 function initLeafletMap(focusUnit) {
     if (!centersRefReady()) { centersRefNotReadyNotice('معاينة الموقع'); return; }
+    // نفس طبقة الرسم الموحدة للمنصة (MapAdapter ← Mapbox/Leaflet) — اعتماد
+    // المالك 2026-09-29: لا OSM في مسار التمركز إطلاقًا؛ الخريطة الأساسية من
+    // نمط المزود النشط فقط، ولا tileLayer ولا fallback إلى OpenStreetMap هنا.
+    var MapL = (window.MapAdapter && window.MapAdapter.L) || window.L;
+    if (!MapL || typeof MapL.map !== 'function') { setTimeout(function() { initLeafletMap(focusUnit); }, 500); return; }
     var mapFrame = document.getElementById('mapFrame');
     var mapLeaflet = document.getElementById('mapLeaflet');
 
@@ -2808,15 +2819,17 @@ function initLeafletMap(focusUnit) {
         mapLeaflet.style.width = '100%';
         mapLeaflet.style.height = '350px';
 
-        map = L.map('mapLeaflet').setView([24.7136, 46.6753], 11);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap'
-        }).addTo(map);
+        map = MapL.map('mapLeaflet').setView([24.7136, 46.6753], 11);
     }
 
     // مسح العلامات القديمة
     mapMarkers.forEach(function(m) { map.removeLayer(m); });
     mapMarkers = [];
+
+    // علامة إيموجي موحدة تعمل في المزودين (علامة Mapbox بلا divIcon تكون فارغة)
+    var unitIcon = (typeof MapL.divIcon === 'function')
+        ? MapL.divIcon({ className: '', html: '<div style="font-size:22px;filter:drop-shadow(0 1px 2px rgba(0,0,0,.45))">🚑</div>', iconAnchor: [11, 11] })
+        : undefined;
 
     // إضافة علامات لكل الفرق
     var bounds = [];
@@ -2824,13 +2837,24 @@ function initLeafletMap(focusUnit) {
         for (var unit in unitLocations[center]) {
             var loc = unitLocations[center][unit];
             if (loc && loc[0] && loc[1]) {
-                var marker = L.marker(loc).addTo(map);
-                marker.bindPopup('<b>' + unit + '</b><br>' + center);
+                var popupHtml = '<b>' + unit + '</b><br>' + center;
+                var marker = MapL.marker(loc, unitIcon ? { icon: unitIcon } : {}).addTo(map);
+                // Leaflet: bindPopup أصلية · Mapbox (واجهة MapAdapter): popup عند النقر
+                if (typeof marker.bindPopup === 'function') {
+                    marker.bindPopup(popupHtml);
+                } else if (typeof marker.on === 'function') {
+                    (function(mk, ll, html) {
+                        mk.on('click', function() {
+                            MapL.popup().setLatLng(ll).setContent(html).openOn(map);
+                        });
+                    })(marker, loc, popupHtml);
+                }
                 mapMarkers.push(marker);
                 bounds.push(loc);
 
                 if (focusUnit && unit === focusUnit) {
-                    marker.openPopup();
+                    if (typeof marker.openPopup === 'function') marker.openPopup();
+                    else MapL.popup().setLatLng(loc).setContent(popupHtml).openOn(map);
                     map.setView(loc, 14);
                 }
             }
