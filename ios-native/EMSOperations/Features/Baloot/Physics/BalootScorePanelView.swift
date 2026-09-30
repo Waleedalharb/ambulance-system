@@ -22,7 +22,9 @@ struct BalootScorePanelView: View {
     /// فريقي ("A"/"B") — nil للمشاهد (تُعرض A/B كما في شريط النقاط).
     let myTeam: String?
     /// مجموع نقاط الصكة من match.scores الخادمي — لصف «النتيجة» (v1.1).
-    let scores: BalootTeamPointsDTO?
+    /// النوع الحقيقي لحقل matchState.scores هو BalootScoresDTO (إصلاح
+    /// type mismatch — نفس البيانات والمصدر، بلا أي تحويل).
+    let scores: BalootScoresDTO?
     let onDismiss: () -> Void
 
     private let gold = Color(red: 0.82, green: 0.66, blue: 0.32)
@@ -42,6 +44,12 @@ struct BalootScorePanelView: View {
 
     private func points(_ p: BalootTeamPointsDTO?, _ key: String) -> Int {
         key == "A" ? (p?.A ?? 0) : (p?.B ?? 0)
+    }
+
+    /// قراءة مجموع فريق من BalootScoresDTO الخادمي — حقلا A/B الموجودان
+    /// أصلًا في النوع، بلا إنشاء تحويل أو منطق نقاط جديد.
+    private func matchTotal(_ s: BalootScoresDTO, _ key: String) -> Int {
+        key == "A" ? s.A : s.B
     }
 
     private func projectPoints(_ key: String) -> Int {
@@ -80,8 +88,8 @@ struct BalootScorePanelView: View {
 
             // صف «النتيجة»: مجموع الصكة من match.scores الخادمي كما هو (v1.1)
             if let scores {
-                let theirsTotal = points(scores, theirsKey)
-                let oursTotal = points(scores, oursKey)
+                let theirsTotal = matchTotal(scores, theirsKey)
+                let oursTotal = matchTotal(scores, oursKey)
                 let theirsTotalColor = Color(red: 0.78, green: 0.16, blue: 0.16)
                 let oursTotalColor = Color(red: 0.10, green: 0.38, blue: 0.24)
                 HStack(spacing: 10) {
