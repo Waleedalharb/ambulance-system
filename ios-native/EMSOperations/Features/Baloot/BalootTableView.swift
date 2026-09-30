@@ -2,13 +2,12 @@
 //  BalootTableView.swift
 //  EMSOperations
 //
-//  شاشة الطاولة — «مجلس سعودي فاخر + طاولة بلوت حقيقية + هوية قطاع جنوب الرياض»:
+//  شاشة الطاولة — «مجلس سعودي فاخر + طاولة بلوت حقيقية + هوية قطاع الجنوب»:
 //   أثناء المباراة تصبح الشاشة مشهد مجلس حقيقيًا: الأصل المرسوم (سدو ودلة
 //   وفانوس وشنطة إسعاف ولاسلكي وطاولة لباد بإطار خشبي ذهبي — baloot_majlis_bg)
 //   هو المسرح، وعناصر اللعب (مقاعد/أوراق/يد) مكونات SwiftUI حقيقية تجلس داخل
 //   حدود اللباد المرسوم نفسه عبر feltRect — لا طبقات خضراء ولا إطارات مكررة.
-//   علامة «قطاع جنوب الرياض · EMS» المائية فوق اللباد (تُستبدل لاحقًا برمز
-//   القطاع الرسمي). صاحب الدور يتوهج بتوهج ذهبي ناعم واحد (vm.activeTurnSeat —
+//   صاحب الدور يتوهج بتوهج ذهبي ناعم واحد (vm.activeTurnSeat —
 //   مصدر authoritative وحيد). الأوراق كريمية معتمة 100% كأنها ورق حقيقي،
 //   والرتب بأسمائها البلوتية (شايب/بنت/ولد/إكّه).
 //
@@ -536,7 +535,7 @@ struct BalootTableView: View {
         let originX = (size.width - drawnW) / 2
         let originY = (size.height - drawnH) / 2
         // نِسب اللباد داخل الصورة: يسار/يمين/أعلى/أسفل (مقاسة آليًا من الأصل)
-        let l: CGFloat = 0.155, r: CGFloat = 0.845, t: CGFloat = 0.215, b: CGFloat = 0.845
+        let l: CGFloat = 0.160, r: CGFloat = 0.851, t: CGFloat = 0.313, b: CGFloat = 0.845
         return CGRect(x: originX + l * drawnW,
                       y: originY + t * drawnH,
                       width: (r - l) * drawnW,
@@ -604,15 +603,9 @@ struct BalootTableView: View {
     // MARK: - ساحة الطاولة (المقاعد + المركز داخل اللباد)
 
     /// اللاعبان الجانبان والمركز داخل اللباد بإحداثياته — الشريك العلوي في
-    /// تدفق الـHUD. العلامة المائية/شعار القطاع أسفل المركز بحيث لا تغطيها
-    /// أوراق اللعب أبدًا (مكان رمز قطاع جنوب الرياض الرسمي عند وصوله).
+    /// تدفق الـHUD.
     private func tableArena(felt: CGRect) -> some View {
         ZStack {
-            // هوية القطاع: جزء من اللباد في منطقة واضحة — لا ورقة فوقها
-            sectorWatermark
-                .frame(width: felt.width * 0.58)
-                .position(x: felt.midX, y: felt.midY + felt.height * 0.17)
-
             centerStage
                 .frame(width: felt.width * 0.62, height: felt.height * 0.45)
                 .position(x: felt.midX, y: felt.midY - felt.height * 0.03)
@@ -829,35 +822,6 @@ struct BalootTableView: View {
             }
         }
         .animation(.easeInOut(duration: 0.25), value: hand?.faceUpCard?.code)
-    }
-
-    /// علامة مائية خفيفة داخل اللباد: نبض ECG يعبر مركز الطاولة + اسم القطاع.
-    /// باهتة عمدًا (لا تنافس الأوراق) — ومكانها جاهز لرمز قطاع جنوب الرياض الرسمي.
-    private var sectorWatermark: some View {
-        VStack(spacing: 6) {
-            GeometryReader { g in
-                let w = g.size.width, h = g.size.height, mid = h / 2
-                Path { p in
-                    p.move(to: CGPoint(x: w * 0.08, y: mid))
-                    p.addLine(to: CGPoint(x: w * 0.34, y: mid))
-                    p.addLine(to: CGPoint(x: w * 0.38, y: mid - h * 0.20))
-                    p.addLine(to: CGPoint(x: w * 0.42, y: mid + h * 0.22))
-                    p.addLine(to: CGPoint(x: w * 0.46, y: mid - h * 0.34))
-                    p.addLine(to: CGPoint(x: w * 0.50, y: mid))
-                    p.addLine(to: CGPoint(x: w * 0.92, y: mid))
-                }
-                .stroke(Color.white.opacity(0.07), style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
-            }
-            .frame(height: 60)
-            Text("قطاع جنوب الرياض")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(Color.white.opacity(0.08))
-            Text("EMS")
-                .font(.caption2.weight(.bold))
-                .tracking(4)
-                .foregroundStyle(Color.white.opacity(0.07))
-        }
-        .allowsHitTesting(false)
     }
 
     @ViewBuilder
