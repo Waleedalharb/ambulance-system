@@ -80,11 +80,13 @@ struct BalootScorePanelView: View {
 
             // صف «النتيجة»: مجموع الصكة من match.scores الخادمي كما هو (v1.1)
             if let scores {
+                let theirsTotal = points(scores, theirsKey)
+                let oursTotal = points(scores, oursKey)
+                let theirsTotalColor = Color(red: 0.78, green: 0.16, blue: 0.16)
+                let oursTotalColor = Color(red: 0.10, green: 0.38, blue: 0.24)
                 HStack(spacing: 10) {
-                    resultButton(label: theirsLabel, value: points(scores, theirsKey),
-                                 valueColor: Color(red: 0.78, green: 0.16, blue: 0.16))
-                    resultButton(label: oursLabel, value: points(scores, oursKey),
-                                 valueColor: Color(red: 0.10, green: 0.38, blue: 0.24))
+                    resultButton(label: theirsLabel, value: theirsTotal, valueColor: theirsTotalColor)
+                    resultButton(label: oursLabel, value: oursTotal, valueColor: oursTotalColor)
                 }
                 .padding(.top, 4)
             }
@@ -113,7 +115,9 @@ struct BalootScorePanelView: View {
             if !projects.isEmpty {
                 VStack(alignment: .trailing, spacing: 4) {
                     ForEach(Array(projects.enumerated()), id: \.offset) { _, p in
-                        Text("\(BalootLabels.project[p.project ?? ""] ?? (p.project ?? "")) +\(p.multiplied ?? p.base ?? 0)")
+                        let projectName = BalootLabels.project[p.project ?? ""] ?? (p.project ?? "")
+                        let projectValue = p.multiplied ?? p.base ?? 0
+                        Text("\(projectName) +\(projectValue)")
                             .font(.caption2.weight(.bold))
                             .foregroundStyle(Color(red: 0.20, green: 0.17, blue: 0.13))
                             .padding(.horizontal, 8).padding(.vertical, 3)

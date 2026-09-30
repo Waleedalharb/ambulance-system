@@ -346,21 +346,24 @@ struct BalootTableView: View {
 
                 // نص «بلوت» الذهبي فوق منطقة اللعب (§7)
                 if showBalootText {
-                    BalootGoldenEventText(text: "بلوت",
-                                          lifetime: BalootGestureTuning().balootTextLifetime)
+                    let balootLifetime = BalootGestureTuning().balootTextLifetime
+                    BalootGoldenEventText(text: "بلوت", lifetime: balootLifetime)
                         .position(arena.clusterCenter)
                 }
 
                 // إعلان العقد الذهبي فوق يدي (v1.1 §6) — مدة TEMPORARY (P-P8)
                 if showContractText, let c = vm.matchState?.hand?.contract {
-                    BalootGoldenEventText(text: BalootLabels.contract(c),
-                                          lifetime: BalootGestureTuning().balootTextLifetime)
-                        .position(x: felt.midX, y: felt.maxY - 70)
+                    let contractText = BalootLabels.contract(c)
+                    let contractLifetime = BalootGestureTuning().balootTextLifetime
+                    let contractPos = CGPoint(x: felt.midX, y: felt.maxY - 70)
+                    BalootGoldenEventText(text: contractText, lifetime: contractLifetime)
+                        .position(contractPos)
                 }
 
                 // انفجار زات الحكم الذهبي وسط الطاولة (v1.1 §5) — TEMPORARY (P-P8)
                 if showTrumpBurst, let ts = vm.matchState?.hand?.contract?.trumpSuit {
-                    Text(BalootLabels.suitSymbol[ts] ?? "")
+                    let trumpSymbol = BalootLabels.suitSymbol[ts] ?? ""
+                    Text(trumpSymbol)
                         .font(.system(size: 96, weight: .heavy))
                         .foregroundStyle(gold)
                         .shadow(color: gold.opacity(0.8), radius: 24)
@@ -370,8 +373,8 @@ struct BalootTableView: View {
 
                 // لوحة الحسبة بعد فجوة مسح الطاولة (§8)
                 if showScorePanel, let detail = vm.handScore {
-                    BalootScorePanelView(detail: detail, myTeam: myTeam,
-                                         scores: vm.matchState?.scores) {
+                    let panelScores = vm.matchState?.scores
+                    BalootScorePanelView(detail: detail, myTeam: myTeam, scores: panelScores) {
                         withAnimation(.easeInOut(duration: 0.25)) { showScorePanel = false }
                     }
                 }
@@ -389,8 +392,12 @@ struct BalootTableView: View {
                 balootFlashSeen = token
                 showBalootText = true
                 // إزالة العنصر بعد انتهاء ظهوره (المدة TEMPORARY — P-P8)
+                // (تفكيك الحساب لخطوات — إصلاح type-check فقط، نفس المدة حرفيًا)
+                let lifetime = BalootGestureTuning().balootTextLifetime
+                let delay = lifetime + 0.5
+                let nanoseconds = UInt64(delay * 1_000_000_000)
                 Task { @MainActor in
-                    try? await Task.sleep(nanoseconds: UInt64((BalootGestureTuning().balootTextLifetime + 0.5) * 1_000_000_000))
+                    try? await Task.sleep(nanoseconds: nanoseconds)
                     showBalootText = false
                 }
             }
@@ -398,8 +405,11 @@ struct BalootTableView: View {
                 guard token != scorePanelSeen else { return }
                 scorePanelSeen = token
                 // فجوة مسح الطاولة ≈1.1ث ثم تظهر اللوحة (§8)
+                // (تفكيك الحساب لخطوات — إصلاح type-check فقط، نفس المدة حرفيًا)
+                let scorePanelDelay = BalootPhysics.scorePanelDelay
+                let scorePanelNanoseconds = UInt64(scorePanelDelay * 1_000_000_000)
                 Task { @MainActor in
-                    try? await Task.sleep(nanoseconds: UInt64(BalootPhysics.scorePanelDelay * 1_000_000_000))
+                    try? await Task.sleep(nanoseconds: scorePanelNanoseconds)
                     guard vm.handScore != nil else { return }
                     withAnimation(.easeInOut(duration: 0.3)) { showScorePanel = true }
                 }
@@ -424,8 +434,12 @@ struct BalootTableView: View {
                 showContractText = true
                 let burst = vm.matchState?.hand?.contract?.trumpSuit != nil
                 if burst { showTrumpBurst = true }
+                // (تفكيك الحساب لخطوات — إصلاح type-check فقط، نفس المدة حرفيًا)
+                let contractLifetime = BalootGestureTuning().balootTextLifetime
+                let contractDelay = contractLifetime + 0.5
+                let contractNanoseconds = UInt64(contractDelay * 1_000_000_000)
                 Task { @MainActor in
-                    try? await Task.sleep(nanoseconds: UInt64((BalootGestureTuning().balootTextLifetime + 0.5) * 1_000_000_000))
+                    try? await Task.sleep(nanoseconds: contractNanoseconds)
                     showContractText = false
                 }
                 if burst {
@@ -497,10 +511,11 @@ struct BalootTableView: View {
         guard added > 0 else { return }
         // نظّف الرحلات بعد اكتمال آخر طيران (آخر تأخير + المدة + هامش)
         let lifetime = Double(seq) * BalootPhysics.dealStagger + BalootPhysics.dealFlightDuration + 0.2
+        let lifetimeNanoseconds = UInt64(lifetime * 1_000_000_000)
         dealGen += 1
         let gen = dealGen
         Task { @MainActor in
-            try? await Task.sleep(nanoseconds: UInt64(lifetime * 1_000_000_000))
+            try? await Task.sleep(nanoseconds: lifetimeNanoseconds)
             guard gen == dealGen else { return }
             dealBacks = []
         }
@@ -551,19 +566,21 @@ struct BalootTableView: View {
         let scoreB = vm.matchState?.scores?.B ?? 0
         let ours = myTeam == "B" ? scoreB : scoreA
         let theirs = myTeam == "B" ? scoreA : scoreB
+        let shownTheirs = myTeam == nil ? scoreB : theirs
+        let shownOurs = myTeam == nil ? scoreA : ours
         return HStack {
             // «لهم X : X لنا» — أول عنصر في يمين الشريط في RTL كما في المرجع
             HStack(spacing: 5) {
                 Text("لهم")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(EMSTheme.Colors.danger)
-                Text("\(myTeam == nil ? scoreB : theirs)")
+                Text("\(shownTheirs)")
                     .font(.headline.weight(.heavy))
                     .foregroundStyle(EMSTheme.Colors.danger)
                 Text(":")
                     .font(.subheadline.weight(.bold))
                     .foregroundStyle(Color.white.opacity(0.65))
-                Text("\(myTeam == nil ? scoreA : ours)")
+                Text("\(shownOurs)")
                     .font(.headline.weight(.heavy))
                     .foregroundStyle(EMSTheme.Colors.emerald)
                 Text("لنا")
@@ -630,7 +647,8 @@ struct BalootTableView: View {
                     .lineLimit(1)
                 // علامة الحكم الذهبية بجانب المشتري طوال الصفقة (v1.1 §5)
                 if hand?.contract?.buyerSeat == seat, let ts = hand?.contract?.trumpSuit {
-                    Text(BalootLabels.suitSymbol[ts] ?? "")
+                    let buyerSymbol = BalootLabels.suitSymbol[ts] ?? ""
+                    Text(buyerSymbol)
                         .font(.caption2.weight(.bold))
                         .foregroundStyle(gold)
                 }
@@ -660,7 +678,8 @@ struct BalootTableView: View {
     private func bidBubble(seat: Int, hand: BalootHandDTO?) -> some View {
         if let hand, hand.phase.hasPrefix("bidding"),
            let bid = hand.bids?.last(where: { $0.seat == seat }) {
-            Text(bubbleLabel(bid))
+            let bubbleText = bubbleLabel(bid)
+            Text(bubbleText)
                 .font(.caption2.weight(.bold))
                 .foregroundStyle(Color(red: 0.25, green: 0.20, blue: 0.14))
                 .padding(.horizontal, 10).padding(.vertical, 4)
@@ -794,9 +813,11 @@ struct BalootTableView: View {
             // علامة الحكم الصغيرة تحت المركز طوال الصفقة (v1.1 §5) —
             // من contract.trumpSuit؛ حمراء للزات الحمراء كما في المرجع.
             if hand?.phase == "playing", let ts = hand?.contract?.trumpSuit {
-                Text(BalootLabels.suitSymbol[ts] ?? "")
+                let centerTrumpSymbol = BalootLabels.suitSymbol[ts] ?? ""
+                let centerTrumpTint = suitColor(ts, light: true)
+                Text(centerTrumpSymbol)
                     .font(.callout.weight(.bold))
-                    .foregroundStyle(suitColor(ts, light: true))
+                    .foregroundStyle(centerTrumpTint)
                     .shadow(color: .black.opacity(0.5), radius: 3, y: 1)
                     .offset(y: 62)
             }
@@ -844,7 +865,9 @@ struct BalootTableView: View {
         if let decl = hand?.declarations, decl.resolved, let projects = decl.projects, !projects.isEmpty {
             HStack(spacing: 4) {
                 ForEach(Array(projects.enumerated()), id: \.offset) { _, p in
-                    Text("\(seatShortName(p.seat)): \(BalootLabels.project[p.type] ?? p.type)")
+                    let projectWho = seatShortName(p.seat)
+                    let projectKind = BalootLabels.project[p.type] ?? p.type
+                    Text("\(projectWho): \(projectKind)")
                         .font(.caption2.weight(.semibold))
                         .foregroundStyle(EMSTheme.Colors.emerald)
                         .padding(.horizontal, 8).padding(.vertical, 3)
@@ -855,7 +878,8 @@ struct BalootTableView: View {
             .padding(.bottom, 4)
         }
         if let balootSeats = hand?.declarations?.baloot, !balootSeats.isEmpty {
-            Text("🌟 بلوت: \(balootSeats.map(seatShortName).joined(separator: "، "))")
+            let balootNames = balootSeats.map(seatShortName).joined(separator: "، ")
+            Text("🌟 بلوت: \(balootNames)")
                 .font(.caption2.weight(.bold))
                 .foregroundStyle(gold)
                 .padding(.horizontal, 8).padding(.vertical, 3)
@@ -1051,7 +1075,8 @@ struct BalootTableView: View {
                 if opts.phase == "playing" && (!opts.projects.isEmpty || !opts.doubles.isEmpty) {
                     HStack(spacing: 6) {
                         ForEach(opts.projects, id: \.self) { p in
-                            Button(BalootLabels.project[p.type] ?? p.type) {
+                            let projectTitle = BalootLabels.project[p.type] ?? p.type
+                            Button(projectTitle) {
                                 Task { await vm.declare(p) }
                             }
                             .font(.caption.weight(.bold))
@@ -1061,7 +1086,8 @@ struct BalootTableView: View {
                             .clipShape(Capsule())
                         }
                         ForEach(opts.doubles, id: \.self) { d in
-                            Button(BalootLabels.double[d] ?? d) {
+                            let doubleTitle = BalootLabels.double[d] ?? d
+                            Button(doubleTitle) {
                                 Task { await vm.callDouble(d) }
                             }
                             .font(.caption.weight(.bold))
@@ -1107,21 +1133,26 @@ struct BalootTableView: View {
         let enabled = kind == "hokum"
             ? opts.bids.contains { $0.kind == "hokum" }
             : opts.bids.contains { $0.kind == kind }
+        let bidTitle = canonicalBidLabel(kind, phase: opts.phase)
+        let bidTitleColor: Color = enabled ? Color(red: 0.22, green: 0.15, blue: 0.05)
+                                           : Color.white.opacity(0.55)
+        let bidFill: AnyShapeStyle = enabled ? AnyShapeStyle(goldButtonFill)
+                                             : AnyShapeStyle(Color.gray.opacity(0.45))
+        let bidStroke: Color = enabled ? gold.opacity(0.6) : Color.white.opacity(0.15)
         Button {
             if kind == "hokum" { suitPickMode = true }
             else { Task { await vm.bid(kind: kind, trumpSuit: nil) } }
         } label: {
-            Text(canonicalBidLabel(kind, phase: opts.phase))
+            Text(bidTitle)
                 .font(.subheadline.weight(.bold))
-                .foregroundStyle(enabled ? Color(red: 0.22, green: 0.15, blue: 0.05) : Color.white.opacity(0.55))
+                .foregroundStyle(bidTitleColor)
                 .padding(.horizontal, 16).frame(height: 40)
                 .background(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(enabled ? AnyShapeStyle(goldButtonFill) : AnyShapeStyle(Color.gray.opacity(0.45)))
+                    RoundedRectangle(cornerRadius: 12, style: .continuous).fill(bidFill)
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .stroke(enabled ? gold.opacity(0.6) : Color.white.opacity(0.15), lineWidth: 1)
+                        .stroke(bidStroke, lineWidth: 1)
                 )
         }
         .disabled(!enabled)
@@ -1131,21 +1162,25 @@ struct BalootTableView: View {
     @ViewBuilder
     private func suitBidButton(_ suit: String, opts: BalootOptionsResponse) -> some View {
         let enabled = opts.bids.contains { $0.kind == "hokum" && $0.trumpSuit == suit }
+        let suitSymbolText = BalootLabels.suitSymbol[suit] ?? suit
+        let suitTint: Color = enabled ? suitColor(suit) : Color.white.opacity(0.4)
+        let suitFill: AnyShapeStyle = enabled ? AnyShapeStyle(goldButtonFill)
+                                              : AnyShapeStyle(Color.gray.opacity(0.45))
+        let suitStroke: Color = enabled ? gold.opacity(0.6) : Color.white.opacity(0.15)
         Button {
             suitPickMode = false
             Task { await vm.bid(kind: "hokum", trumpSuit: suit) }
         } label: {
-            Text(BalootLabels.suitSymbol[suit] ?? suit)
+            Text(suitSymbolText)
                 .font(.title3.weight(.bold))
-                .foregroundStyle(enabled ? suitColor(suit) : Color.white.opacity(0.4))
+                .foregroundStyle(suitTint)
                 .frame(width: 52, height: 40)
                 .background(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(enabled ? AnyShapeStyle(goldButtonFill) : AnyShapeStyle(Color.gray.opacity(0.45)))
+                    RoundedRectangle(cornerRadius: 12, style: .continuous).fill(suitFill)
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .stroke(enabled ? gold.opacity(0.6) : Color.white.opacity(0.15), lineWidth: 1)
+                        .stroke(suitStroke, lineWidth: 1)
                 )
         }
         .disabled(!enabled)
@@ -1160,24 +1195,25 @@ struct BalootTableView: View {
         HStack(spacing: 6) {
             ForEach(["sara", "khamsin", "miya"], id: \.self) { type in
                 let count = mine.filter { $0.type == type }.count
+                let chipTitle = BalootLabels.project[type] ?? type
+                let chipTextColor: Color = count > 0 ? Color(red: 0.22, green: 0.15, blue: 0.05)
+                                                     : Color.black.opacity(0.45)
+                let chipFill: AnyShapeStyle = count > 0
+                    ? AnyShapeStyle(goldButtonFill)
+                    : AnyShapeStyle(Color(red: 0.98, green: 0.94, blue: 0.84).opacity(0.55))
+                let chipStroke: Color = count > 0 ? gold.opacity(0.6) : Color.white.opacity(0.15)
                 HStack(spacing: 4) {
-                    Text(BalootLabels.project[type] ?? type)
+                    Text(chipTitle)
                     if count > 0 {
                         Text("×\(count)")
                             .foregroundStyle(.white.opacity(0.9))
                     }
                 }
                 .font(.caption.weight(.bold))
-                .foregroundStyle(count > 0 ? Color(red: 0.22, green: 0.15, blue: 0.05)
-                                           : Color.black.opacity(0.45))
+                .foregroundStyle(chipTextColor)
                 .padding(.horizontal, 12).frame(height: 28)
-                .background(
-                    Capsule().fill(count > 0
-                        ? AnyShapeStyle(goldButtonFill)
-                        : AnyShapeStyle(Color(red: 0.98, green: 0.94, blue: 0.84).opacity(0.55)))
-                )
-                .overlay(Capsule().stroke(count > 0 ? gold.opacity(0.6)
-                                                    : Color.white.opacity(0.15), lineWidth: 1))
+                .background(Capsule().fill(chipFill))
+                .overlay(Capsule().stroke(chipStroke, lineWidth: 1))
             }
         }
     }
@@ -1199,9 +1235,10 @@ struct BalootTableView: View {
             .padding(.top, 10)
             // علامة زات الحكم بجانبي عندما أكون المشتري (v1.1 §5)
             .overlay(alignment: .topLeading) {
-                if vm.matchState?.hand?.contract?.buyerSeat == vm.mySeat,
-                   let ts = vm.matchState?.hand?.contract?.trumpSuit {
-                    Text(BalootLabels.suitSymbol[ts] ?? "")
+                if hand.contract?.buyerSeat == vm.mySeat,
+                   let ts = hand.contract?.trumpSuit {
+                    let myTrumpSymbol = BalootLabels.suitSymbol[ts] ?? ""
+                    Text(myTrumpSymbol)
                         .font(.callout.weight(.bold))
                         .foregroundStyle(gold)
                         .shadow(color: gold.opacity(0.6), radius: 6)
