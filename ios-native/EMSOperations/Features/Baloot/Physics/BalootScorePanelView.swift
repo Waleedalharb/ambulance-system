@@ -2,17 +2,17 @@
 //  BalootScorePanelView.swift
 //  EMSOperations
 //
-//  لوحة الحسبة — المرحلة 03 (§8):
+//  لوحة الحسبة — المرحلة 03 (§8) + تخطيط المرجع المكتمل في مرحلة HUD (04):
 //   · تظهر بعد فجوة ≈1.1ث من مسح الطاولة (scorePanelDelay).
 //   · الخلفية تُعتَّم خلفها، وجزيئات لمعان ذهبية حول أطرافها عند الظهور.
 //   · تبقى ثابتة؛ الإغلاق: بداية صفقة جديدة (يمسحها الـViewModel) أو
-//     لمس الخلفية — ⚠️ آلية الإغلاق TEMPORARY (P-P7: زر/تلقائي غير محسوم).
+//     لمس الخلفية — ⚠️ آلية الإغلاق TEMPORARY (P-P7/P-H9: إغلاق يدوي مؤقت).
 //
 //  المحتوى من حدث hand_scored الخادمي فقط (raw/المشاريع/البلوت/delta) —
-//  بلا أي حساب عميلي (A7).
-//  ⚠️ صف «الأرض» غير معروض: الخادم يضمّن مكافأة آخر أكلة داخل raw ولا
-//  يفصلها بحقل مستقل، وفصلها عميليًا يخالف A7 — PENDING بقرار المالك.
-//  التصميم النهائي للوحة (تخطيط المرجع الكامل) يُستكمل في مرحلة HUD (04).
+//  بلا أي حساب عميلي (A7). صف «النتيجة» يعرض مجموع الصكة من match.scores
+//  الخادمي كما هو.
+//  ⚠️ صف «الأرض» غير معروض (P-H3 / PENDING v1.1): الخادم يضمّن مكافأة
+//  آخر أكلة داخل raw ولا يفصلها بحقل مستقل، وفصلها عميليًا يخالف A7.
 //
 
 import SwiftUI
@@ -21,10 +21,19 @@ struct BalootScorePanelView: View {
     let detail: BalootHandScoreDetailDTO
     /// فريقي ("A"/"B") — nil للمشاهد (تُعرض A/B كما في شريط النقاط).
     let myTeam: String?
+    /// مجموع نقاط الصكة من match.scores الخادمي — لصف «النتيجة» (v1.1).
+    let scores: BalootTeamPointsDTO?
     let onDismiss: () -> Void
 
     private let gold = Color(red: 0.82, green: 0.66, blue: 0.32)
     private let cream = Color(red: 0.98, green: 0.965, blue: 0.92)
+
+    /// تدرج ذهبي لأزرار النتيجة (مطابق لتدرج أزرار السوق في v1.1 §4).
+    private var goldButtonFill: LinearGradient {
+        LinearGradient(colors: [Color(red: 0.95, green: 0.78, blue: 0.38),
+                                Color(red: 0.78, green: 0.58, blue: 0.20)],
+                       startPoint: .top, endPoint: .bottom)
+    }
 
     private var oursKey: String { myTeam == "B" ? "B" : "A" }
     private var theirsKey: String { myTeam == "B" ? "A" : "B" }
@@ -69,6 +78,17 @@ struct BalootScorePanelView: View {
             }
             scoreRow("النقاط", ours: points(detail.delta, oursKey), theirs: points(detail.delta, theirsKey), highlight: true)
 
+            // صف «النتيجة»: مجموع الصكة من match.scores الخادمي كما هو (v1.1)
+            if let scores {
+                HStack(spacing: 10) {
+                    resultButton(label: theirsLabel, value: points(scores, theirsKey),
+                                 valueColor: Color(red: 0.78, green: 0.16, blue: 0.16))
+                    resultButton(label: oursLabel, value: points(scores, oursKey),
+                                 valueColor: Color(red: 0.10, green: 0.38, blue: 0.24))
+                }
+                .padding(.top, 4)
+            }
+
             if let note = detail.note, !note.isEmpty {
                 Text(note)
                     .font(.caption)
@@ -86,7 +106,47 @@ struct BalootScorePanelView: View {
                 .stroke(gold, lineWidth: 2)
         )
         .shadow(color: .black.opacity(0.5), radius: 18, y: 8)
+        // رقاقة تفصيل المشاريع أعلى يمين اللوحة (v1.1): كل مشروع مسجّل في
+        // hand_scored باسمه وقيمته النهائية الخادمية (multiplied) كما وردت
+        .overlay(alignment: .topTrailing) {
+            let projects = detail.projects ?? []
+            if !projects.isEmpty {
+                VStack(alignment: .trailing, spacing: 4) {
+                    ForEach(Array(projects.enumerated()), id: \.offset) { _, p in
+                        Text("\(BalootLabels.project[p.project ?? ""] ?? (p.project ?? "")) +\(p.multiplied ?? p.base ?? 0)")
+                            .font(.caption2.weight(.bold))
+                            .foregroundStyle(Color(red: 0.20, green: 0.17, blue: 0.13))
+                            .padding(.horizontal, 8).padding(.vertical, 3)
+                            .background(Color.white.opacity(0.85))
+                            .clipShape(Capsule())
+                            .overlay(Capsule().stroke(gold.opacity(0.7), lineWidth: 1))
+                    }
+                }
+                .padding(10)
+            }
+        }
         .onTapGesture { /* اللوحة نفسها لا تُغلق باللمس — الخلفية فقط */ }
+    }
+
+    /// زر نتيجة ذهبي متدرج: التسمية + القيمة (v1.1 — صف «النتيجة»).
+    private func resultButton(label: String, value: Int, valueColor: Color) -> some View {
+        HStack(spacing: 6) {
+            Text(label)
+                .font(.caption.weight(.bold))
+                .foregroundStyle(Color(red: 0.28, green: 0.20, blue: 0.08))
+            Text("\(value)")
+                .font(.subheadline.weight(.heavy))
+                .foregroundStyle(valueColor)
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: 34)
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous).fill(goldButtonFill)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(gold.opacity(0.6), lineWidth: 1)
+        )
     }
 
     private func scoreRow(_ title: String, ours: Int, theirs: Int, highlight: Bool = false) -> some View {

@@ -47,6 +47,11 @@ struct BalootTableView: View {
     @State private var dealBacksHand = 0
     @State private var dealCounts: [Int: Int] = [:]
     @State private var dealGen = 0
+    // HUD (المرحلة 04 — v1.1): إعلان العقد الذهبي + انفجار زات الحكم +
+    // وضع اختيار الزات (خطوة عرض محلية بلا أي منطق قواعد)
+    @State private var showContractText = false
+    @State private var showTrumpBurst = false
+    @State private var suitPickMode = false
 
     private let tableId: Int
 
@@ -66,6 +71,8 @@ struct BalootTableView: View {
 
     private let gold = Color(red: 0.82, green: 0.66, blue: 0.32)
     private let podColor = Color(red: 0.05, green: 0.09, blue: 0.08)
+    /// أخضر مؤشر الدور وشارة «الموزع» (v1.1 §2 — الحلقة الخضراء من turnSeat).
+    private let turnGreen = Color(red: 0.20, green: 0.78, blue: 0.42)
 
     var body: some View {
         content
@@ -302,7 +309,8 @@ struct BalootTableView: View {
                     }
                     if vm.paused { pausedCapsule }
                     if vm.isSpectator { spectatorCapsule }
-                    lastEventLine
+                    // (v1.1 / P-H11) lastEventLine أُزيل — المزايدات تظهر
+                    // فقاعاتٍ بجانب كل مقعد من hand.bids بدل سطر الأحداث.
                     // اللاعب العلوي أسفل الـHUD بمسافة مريحة — لا تداخل أبدًا
                     seatPod(relative: 2)
                         .padding(.top, 6)
@@ -343,9 +351,27 @@ struct BalootTableView: View {
                         .position(arena.clusterCenter)
                 }
 
+                // إعلان العقد الذهبي فوق يدي (v1.1 §6) — مدة TEMPORARY (P-P8)
+                if showContractText, let c = vm.matchState?.hand?.contract {
+                    BalootGoldenEventText(text: BalootLabels.contract(c),
+                                          lifetime: BalootGestureTuning().balootTextLifetime)
+                        .position(x: felt.midX, y: felt.maxY - 70)
+                }
+
+                // انفجار زات الحكم الذهبي وسط الطاولة (v1.1 §5) — TEMPORARY (P-P8)
+                if showTrumpBurst, let ts = vm.matchState?.hand?.contract?.trumpSuit {
+                    Text(BalootLabels.suitSymbol[ts] ?? "")
+                        .font(.system(size: 96, weight: .heavy))
+                        .foregroundStyle(gold)
+                        .shadow(color: gold.opacity(0.8), radius: 24)
+                        .shadow(color: .black.opacity(0.6), radius: 8, y: 3)
+                        .position(arena.clusterCenter)
+                }
+
                 // لوحة الحسبة بعد فجوة مسح الطاولة (§8)
                 if showScorePanel, let detail = vm.handScore {
-                    BalootScorePanelView(detail: detail, myTeam: myTeam) {
+                    BalootScorePanelView(detail: detail, myTeam: myTeam,
+                                         scores: vm.matchState?.scores) {
                         withAnimation(.easeInOut(duration: 0.25)) { showScorePanel = false }
                     }
                 }
@@ -392,6 +418,27 @@ struct BalootTableView: View {
             .onChange(of: vm.actionError) { err in
                 if err != nil { locallyPlayedCode = nil }
             }
+            // ظهور العقد (nil→قيمة): إعلان ذهبي فوق يدي + انفجار الزات إن كان حكمًا
+            .onChange(of: vm.matchState?.hand?.contract == nil) { isNil in
+                guard !isNil else { return }
+                showContractText = true
+                let burst = vm.matchState?.hand?.contract?.trumpSuit != nil
+                if burst { showTrumpBurst = true }
+                Task { @MainActor in
+                    try? await Task.sleep(nanoseconds: UInt64((BalootGestureTuning().balootTextLifetime + 0.5) * 1_000_000_000))
+                    showContractText = false
+                }
+                if burst {
+                    Task { @MainActor in
+                        // ⚠️ TEMPORARY (P-P8) — مدة انفجار الزات ≈1.5–2ث مرصودة (0:17.7→0:19.6)
+                        try? await Task.sleep(nanoseconds: 1_900_000_000)
+                        withAnimation(.easeInOut(duration: 0.3)) { showTrumpBurst = false }
+                    }
+                }
+            }
+            // تغيّر مرحلة السوق أو انتهاء دوري → اخرج من وضع اختيار الزات
+            .onChange(of: vm.options?.phase) { _ in suitPickMode = false }
+            .onChange(of: vm.options?.myTurn) { turn in if turn != true { suitPickMode = false } }
             .onDisappear { director.stop() }
         }
         .ignoresSafeArea()
@@ -495,9 +542,9 @@ struct BalootTableView: View {
         }
     }
 
-    /// شريط النقاط حسب المرجع: «لنا» يمينًا (تسمية صغيرة فوق رقم كبير أخضر)،
-    /// العقد والصفقة في الوسط، «لهم» يسارًا (أحمر) — شريط داكن بإطار ذهبي
-    /// بعرض الشاشة وpadding واضح حتى لا يقصّ أي نص.
+    /// شريط النتيجة حسب المرجع (v1.1 §1): «لهم X : X لنا» بسطر واحد يمينًا —
+    /// لهم أحمر / لنا أخضر. لا عناصر إضافية (بقرار المالك في المراجعة
+    /// النهائية قبل الرفع). نقاط الصفقة الجارية لا تُعرض — P-H2 PENDING.
     private var scoreStrip: some View {
         let myTeam = vm.matchState?.seats?.first(where: { $0.seat == vm.mySeat })?.team
         let scoreA = vm.matchState?.scores?.A ?? 0
@@ -505,39 +552,24 @@ struct BalootTableView: View {
         let ours = myTeam == "B" ? scoreB : scoreA
         let theirs = myTeam == "B" ? scoreA : scoreB
         return HStack {
-            // لنا — يمين
-            VStack(spacing: 1) {
-                Text(myTeam == nil ? "A" : "لنا")
-                    .font(.caption2)
-                Text("\(myTeam == nil ? scoreA : ours)")
-                    .font(.title3.weight(.bold))
-            }
-            .foregroundStyle(EMSTheme.Colors.emerald)
-
-            Spacer()
-
-            // العقد + الصفقة — الوسط
-            VStack(spacing: 1) {
-                if let c = vm.matchState?.hand?.contract {
-                    Text(BalootLabels.contract(c) + (vm.matchState?.hand?.double != nil ? " ×\(vm.matchState?.hand?.double?.multiplier ?? 2)" : ""))
-                        .font(.subheadline.weight(.bold))
-                        .foregroundStyle(gold)
-                }
-                Text("صفقة \(vm.matchState?.handNumber ?? 1) · الهدف \(vm.matchState?.targetScore ?? 152)")
-                    .font(.caption2)
-                    .foregroundStyle(Color.white.opacity(0.6))
-            }
-
-            Spacer()
-
-            // لهم — يسار
-            VStack(spacing: 1) {
-                Text(myTeam == nil ? "B" : "لهم")
-                    .font(.caption2)
+            // «لهم X : X لنا» — أول عنصر في يمين الشريط في RTL كما في المرجع
+            HStack(spacing: 5) {
+                Text("لهم")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(EMSTheme.Colors.danger)
                 Text("\(myTeam == nil ? scoreB : theirs)")
-                    .font(.title3.weight(.bold))
+                    .font(.headline.weight(.heavy))
+                    .foregroundStyle(EMSTheme.Colors.danger)
+                Text(":")
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(Color.white.opacity(0.65))
+                Text("\(myTeam == nil ? scoreA : ours)")
+                    .font(.headline.weight(.heavy))
+                    .foregroundStyle(EMSTheme.Colors.emerald)
+                Text("لنا")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(EMSTheme.Colors.emerald)
             }
-            .foregroundStyle(EMSTheme.Colors.danger)
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 7)
@@ -550,23 +582,7 @@ struct BalootTableView: View {
         .frame(maxWidth: .infinity)
     }
 
-    /// آخر حدث في كبسولة صغيرة تحت شريط النقاط — كما في المرجع.
-    @ViewBuilder
-    private var lastEventLine: some View {
-        if let line = vm.feedLines.last {
-            Text(line)
-                .font(.caption2.weight(.medium))
-                .foregroundStyle(Color.white.opacity(0.85))
-                .lineLimit(1)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 5)
-                .background(Color.black.opacity(0.5))
-                .clipShape(Capsule())
-                .overlay(Capsule().stroke(gold.opacity(0.2), lineWidth: 1))
-                .id(line) // انتقال ناعم مع كل حدث جديد
-                .transition(.opacity)
-        }
-    }
+    /// (أُزيل lastEventLine في المرحلة 04 — v1.1 / P-H11.)
 
     // MARK: - ساحة الطاولة (المقاعد + المركز داخل اللباد)
 
@@ -592,25 +608,83 @@ struct BalootTableView: View {
         }
     }
 
-    /// مقعد لاعب: صورة الموظف (أو حرف اسمه كـfallback) + اسم قصير + ظهور
-    /// أوراقه، وتوهّج ذهبي ناعم واحد لصاحب الدور (لا يضيء مقعدان أبدًا).
+    /// مقعد لاعب (v1.1 §2): أفاتار + اسم + ظهور أوراقه + شارة «الموزع»
+    /// الخضراء (dealerSeat) + علامة حكم ذهبية للمشتري (contract) + فقاعة
+    /// مزايدته الأخيرة أثناء السوق (hand.bids) — وحلقة خضراء لصاحب الدور
+    /// (turnSeat فقط؛ لا عدّ رقمي — P-H4).
     private func seatPod(relative: Int) -> some View {
         let seat = vm.displaySeat(relative: relative)
         let isTurn = vm.activeTurnSeat == seat
-        let count = vm.matchState?.hand?.handCounts?[String(seat)] ?? 0
+        let hand = vm.matchState?.hand
+        let count = hand?.handCounts?[String(seat)] ?? 0
         let name = podName(seat)
         return VStack(spacing: 2) {
             seatAvatar(seat: seat, name: name, isTurn: isTurn)
-            Text(name)
-                .font(.caption2.weight(isTurn ? .bold : .medium))
-                .foregroundStyle(isTurn ? gold : Color.white.opacity(0.85))
-                .lineLimit(1)
-                .frame(width: 64)
+                .overlay(alignment: .top) {
+                    bidBubble(seat: seat, hand: hand).offset(y: -28)
+                }
+            HStack(spacing: 4) {
+                Text(name)
+                    .font(.caption2.weight(isTurn ? .bold : .medium))
+                    .foregroundStyle(isTurn ? turnGreen : Color.white.opacity(0.85))
+                    .lineLimit(1)
+                // علامة الحكم الذهبية بجانب المشتري طوال الصفقة (v1.1 §5)
+                if hand?.contract?.buyerSeat == seat, let ts = hand?.contract?.trumpSuit {
+                    Text(BalootLabels.suitSymbol[ts] ?? "")
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(gold)
+                }
+            }
+            .frame(width: 76)
+            // شارة «الموزع» الخضراء (v1.1 §2) — من dealerSeat
+            if hand?.dealerSeat == seat {
+                Text("الموزع")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 7).padding(.vertical, 2)
+                    .background(turnGreen)
+                    .clipShape(Capsule())
+            }
             if count > 0 {
                 miniCardBacks(count: count)
             }
         }
         .animation(.easeInOut(duration: 0.3), value: isTurn)
+    }
+
+    /// فقاعة مزايدة اللاعب الأخيرة أثناء السوق (v1.1 §3 / P-H11): كريمية
+    /// بجانب الأفاتار — من hand.bids الموجودة فعليًا فقط، وتختفي مع بدء
+    /// اللعب. التسمية بمعنى الحدث الأصلي فقط — بلا إعادة تسمية حسب الجولة
+    /// الجارية (بقرار المالك في المراجعة النهائية).
+    @ViewBuilder
+    private func bidBubble(seat: Int, hand: BalootHandDTO?) -> some View {
+        if let hand, hand.phase.hasPrefix("bidding"),
+           let bid = hand.bids?.last(where: { $0.seat == seat }) {
+            Text(bubbleLabel(bid))
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(Color(red: 0.25, green: 0.20, blue: 0.14))
+                .padding(.horizontal, 10).padding(.vertical, 4)
+                .background(Color(red: 0.98, green: 0.94, blue: 0.84))
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .shadow(color: .black.opacity(0.35), radius: 3, y: 2)
+                .fixedSize()
+        }
+    }
+
+    /// تسمية المزايدة داخل الفقاعة — معنى الحدث كما ورد من الخادم فقط.
+    /// ⚠️ Data Gap موثقة: BalootBidDTO لا يحمل round metadata، لذا التمييز
+    /// بين «بس/ولا» و«حكم/حكم ثاني» حسب جولة الحدث غير ممكن بلا تخمين —
+    /// تُعرض التسمية القياسية دائمًا (PENDING بقرار المالك).
+    private func bubbleLabel(_ bid: BalootBidDTO) -> String {
+        switch bid.kind {
+        case "pass": return "بس"
+        case "sun": return "صن"
+        case "ashkal": return "أشكل"
+        case "hokum":
+            let sym = bid.trumpSuit.flatMap { BalootLabels.suitSymbol[$0] } ?? ""
+            return "حكم" + (sym.isEmpty ? "" : " \(sym)")
+        default: return bid.kind
+        }
     }
 
     /// صورة اللاعب: صورة الموظف إن وُجدت (AsyncImage) وإلا حرف اسمه —
@@ -633,18 +707,19 @@ struct BalootTableView: View {
         .frame(width: 46, height: 46)
         .background(podColor.opacity(0.9))
         .clipShape(Circle())
+        // حلقة الدور الخضراء (v1.1 §2/P-H4) — من turnSeat فقط، بلا عدّ رقمي
         .overlay(
             Circle()
-                .stroke(isTurn ? gold : gold.opacity(0.45), lineWidth: isTurn ? 2.5 : 1.5)
+                .stroke(isTurn ? turnGreen : gold.opacity(0.45), lineWidth: isTurn ? 2.5 : 1.5)
         )
-        .shadow(color: isTurn ? gold.opacity(0.5) : .clear, radius: isTurn ? 9 : 0)
+        .shadow(color: isTurn ? turnGreen.opacity(0.55) : .clear, radius: isTurn ? 9 : 0)
     }
 
     /// حرف الاسم — شكل الـfallback والحالة الحالية حتى يوفر الخادم الصور.
     private func avatarLetter(_ name: String, isTurn: Bool) -> some View {
         Text(String(name.prefix(1)))
             .font(.headline.weight(.bold))
-            .foregroundStyle(isTurn ? gold : Color.white.opacity(0.9))
+            .foregroundStyle(isTurn ? turnGreen : Color.white.opacity(0.9))
     }
 
     /// رابط صورة المقعد من حالة المباراة ثم بطاقة اللوبي — المسارات النسبية
@@ -714,6 +789,16 @@ struct BalootTableView: View {
                 Text("اللفة السابقة: \(seatShortName(last.winnerSeat))")
                     .font(.caption2)
                     .foregroundStyle(Color.white.opacity(0.55))
+            }
+
+            // علامة الحكم الصغيرة تحت المركز طوال الصفقة (v1.1 §5) —
+            // من contract.trumpSuit؛ حمراء للزات الحمراء كما في المرجع.
+            if hand?.phase == "playing", let ts = hand?.contract?.trumpSuit {
+                Text(BalootLabels.suitSymbol[ts] ?? "")
+                    .font(.callout.weight(.bold))
+                    .foregroundStyle(suitColor(ts, light: true))
+                    .shadow(color: .black.opacity(0.5), radius: 3, y: 1)
+                    .offset(y: 62)
             }
 
             // المشاريع والبلوت أسفل المركز
@@ -928,26 +1013,38 @@ struct BalootTableView: View {
     private var actionChips: some View {
         if let opts = vm.options, vm.isSeated, !vm.paused {
             VStack(spacing: 6) {
-                // السوق — شرائح أفقية
-                if opts.myTurn && (opts.phase == "bidding1" || opts.phase == "bidding2") && !opts.bids.isEmpty {
-                    ScrollView(.horizontal, showsIndicators: false) {
+                // السوق (v1.1 §4 / P-H12): صف الأزرار الأربعة القياسي —
+                // غير المتاح يبقى ظاهرًا رماديًا Disabled بدل الاختفاء،
+                // والإتاحة من /options فقط. «حكم» يفتح صف الزوات (خطوة عرض
+                // محلية؛ الإرسال يتم بزات عرضها الخادم).
+                if opts.myTurn && (opts.phase == "bidding1" || opts.phase == "bidding2") {
+                    if suitPickMode {
+                        // اختيار زات الحكم (v1.1 §5): الزات غير المعروضة من
+                        // الخادم (كزات الورقة المكشوفة) تظهر رمادية معطّلة
                         HStack(spacing: 8) {
-                            ForEach(opts.bids, id: \.self) { bid in
-                                Button {
-                                    Task { await vm.bid(kind: bid.kind, trumpSuit: bid.trumpSuit) }
-                                } label: {
-                                    Text(bidLabel(bid))
-                                        .font(.subheadline.weight(.bold))
-                                        .padding(.horizontal, 16).frame(height: 40)
-                                        .background(bid.kind == "pass" ? Color.black.opacity(0.4) : EMSTheme.Colors.teal)
-                                        .foregroundStyle(.white)
-                                        .clipShape(Capsule())
-                                        .overlay(Capsule().stroke(gold.opacity(bid.kind == "pass" ? 0.35 : 0), lineWidth: 1))
-                                }
+                            ForEach(["S", "H", "D", "C"], id: \.self) { s in
+                                suitBidButton(s, opts: opts)
+                            }
+                        }
+                        .padding(.horizontal, 6)
+                    } else {
+                        HStack(spacing: 8) {
+                            ForEach(["pass", "ashkal", "hokum", "sun"], id: \.self) { kind in
+                                canonicalBidButton(kind, opts: opts)
                             }
                         }
                         .padding(.horizontal, 6)
                     }
+                }
+
+                // رقائق مشاريعي المثبتة فوق يدي (v1.1 §9): ثلاث رقائق ثابتة
+                // بمعجمنا (سيرا/خمسين/مية) مع عدّاد = عدد مشاريعي المؤكدة من
+                // كل نوع — تصفية بيانات خادم (declarations.projects) فقط،
+                // لا اشتقاق قواعد. صف الورق المصغّر لكل مشروع لا يُعرض:
+                // قوائم الأوراق غير متوفرة في BalootPublicProjectDTO وتحديدها
+                // من يدي = اشتقاق قواعد ممنوع (فجوة بيانات موثقة).
+                if opts.phase == "playing" {
+                    projectChips
                 }
 
                 // المشاريع والدبلات أثناء اللعب
@@ -980,11 +1077,109 @@ struct BalootTableView: View {
         }
     }
 
-    private func bidLabel(_ bid: BalootBidOptionDTO) -> String {
-        if bid.kind == "hokum", let s = bid.trumpSuit {
-            return "حكم \(BalootLabels.suitSymbol[s] ?? "")"
+    /// تدرج ذهبي لأزرار السوق الفعّالة (v1.1 §4).
+    private var goldButtonFill: LinearGradient {
+        LinearGradient(colors: [Color(red: 0.95, green: 0.78, blue: 0.38),
+                                Color(red: 0.78, green: 0.58, blue: 0.20)],
+                       startPoint: .top, endPoint: .bottom)
+    }
+
+    /// لون الزات — light=true فوق اللباد الداكن (السوداء تصبح بيضاء).
+    private func suitColor(_ s: String, light: Bool = false) -> Color {
+        if s == "H" || s == "D" { return Color(red: 0.78, green: 0.16, blue: 0.16) }
+        return light ? Color.white.opacity(0.9) : Color(red: 0.15, green: 0.13, blue: 0.16)
+    }
+
+    /// تسميات صف السوق القياسي حسب الجولة (v1.1 §4).
+    private func canonicalBidLabel(_ kind: String, phase: String) -> String {
+        let round2 = phase == "bidding2"
+        switch kind {
+        case "pass": return round2 ? "ولا" : "بس"
+        case "ashkal": return "أشكل"
+        case "hokum": return round2 ? "حكم ثاني" : "حكم"
+        default: return "صن"
         }
-        return BalootLabels.bidKind[bid.kind] ?? bid.kind
+    }
+
+    /// زر مزايدة قياسي — ذهبي عند الإتاحة، رمادي معطّل عند عدمها (P-H12).
+    @ViewBuilder
+    private func canonicalBidButton(_ kind: String, opts: BalootOptionsResponse) -> some View {
+        let enabled = kind == "hokum"
+            ? opts.bids.contains { $0.kind == "hokum" }
+            : opts.bids.contains { $0.kind == kind }
+        Button {
+            if kind == "hokum" { suitPickMode = true }
+            else { Task { await vm.bid(kind: kind, trumpSuit: nil) } }
+        } label: {
+            Text(canonicalBidLabel(kind, phase: opts.phase))
+                .font(.subheadline.weight(.bold))
+                .foregroundStyle(enabled ? Color(red: 0.22, green: 0.15, blue: 0.05) : Color.white.opacity(0.55))
+                .padding(.horizontal, 16).frame(height: 40)
+                .background(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(enabled ? AnyShapeStyle(goldButtonFill) : AnyShapeStyle(Color.gray.opacity(0.45)))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .stroke(enabled ? gold.opacity(0.6) : Color.white.opacity(0.15), lineWidth: 1)
+                )
+        }
+        .disabled(!enabled)
+    }
+
+    /// زر زات حكم — فعّال فقط إن عرضه الخادم في /options (v1.1 §5).
+    @ViewBuilder
+    private func suitBidButton(_ suit: String, opts: BalootOptionsResponse) -> some View {
+        let enabled = opts.bids.contains { $0.kind == "hokum" && $0.trumpSuit == suit }
+        Button {
+            suitPickMode = false
+            Task { await vm.bid(kind: "hokum", trumpSuit: suit) }
+        } label: {
+            Text(BalootLabels.suitSymbol[suit] ?? suit)
+                .font(.title3.weight(.bold))
+                .foregroundStyle(enabled ? suitColor(suit) : Color.white.opacity(0.4))
+                .frame(width: 52, height: 40)
+                .background(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(enabled ? AnyShapeStyle(goldButtonFill) : AnyShapeStyle(Color.gray.opacity(0.45)))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .stroke(enabled ? gold.opacity(0.6) : Color.white.opacity(0.15), lineWidth: 1)
+                )
+        }
+        .disabled(!enabled)
+    }
+
+    /// رقائق مشاريعي المثبتة (سيرا/خمسين/مية) — ذهبية إن لديّ من النوع،
+    /// كريمية باهتة إن صفر (v1.1 §9). العدّاد من declarations.projects فقط.
+    @ViewBuilder
+    private var projectChips: some View {
+        let mine = (vm.matchState?.hand?.declarations?.projects ?? [])
+            .filter { $0.seat == vm.mySeat }
+        HStack(spacing: 6) {
+            ForEach(["sara", "khamsin", "miya"], id: \.self) { type in
+                let count = mine.filter { $0.type == type }.count
+                HStack(spacing: 4) {
+                    Text(BalootLabels.project[type] ?? type)
+                    if count > 0 {
+                        Text("×\(count)")
+                            .foregroundStyle(.white.opacity(0.9))
+                    }
+                }
+                .font(.caption.weight(.bold))
+                .foregroundStyle(count > 0 ? Color(red: 0.22, green: 0.15, blue: 0.05)
+                                           : Color.black.opacity(0.45))
+                .padding(.horizontal, 12).frame(height: 28)
+                .background(
+                    Capsule().fill(count > 0
+                        ? AnyShapeStyle(goldButtonFill)
+                        : AnyShapeStyle(Color(red: 0.98, green: 0.94, blue: 0.84).opacity(0.55)))
+                )
+                .overlay(Capsule().stroke(count > 0 ? gold.opacity(0.6)
+                                                    : Color.white.opacity(0.15), lineWidth: 1))
+            }
+        }
     }
 
     // MARK: - يدي (مروحة كبيرة أسفل الطاولة)
@@ -1002,6 +1197,17 @@ struct BalootTableView: View {
                 }
             }
             .padding(.top, 10)
+            // علامة زات الحكم بجانبي عندما أكون المشتري (v1.1 §5)
+            .overlay(alignment: .topLeading) {
+                if vm.matchState?.hand?.contract?.buyerSeat == vm.mySeat,
+                   let ts = vm.matchState?.hand?.contract?.trumpSuit {
+                    Text(BalootLabels.suitSymbol[ts] ?? "")
+                        .font(.callout.weight(.bold))
+                        .foregroundStyle(gold)
+                        .shadow(color: gold.opacity(0.6), radius: 6)
+                        .offset(x: 6, y: -16)
+                }
+            }
             // إعادة ترتيب المروحة بعد كل رمية ≈0.3ث (§6)
             .animation(.easeInOut(duration: BalootPhysics.fanReflow), value: myHand.count)
             .confirmationDialog("بلوت مع هذه الورقة؟", isPresented: Binding(
