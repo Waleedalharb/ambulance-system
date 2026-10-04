@@ -1186,6 +1186,46 @@ app.get('/health', (req, res) => {
 });
 
 // ============================================
+// API: سياسة إصدار التطبيق (Force/Soft Update)
+// مسار عام بلا مصادقة — العميل يفحصه قبل تسجيل الدخول وقبل إنشاء أي
+// جلسة فعّالة. الإعداد مركزي بالكامل من السيرفر: يُخزَّن في app_settings
+// تحت المفتاح app_version_policy_<platform> ككائن:
+//   { latestVersion, minimumVersion, forceUpdate, appStoreUrl, message }
+// ويُغيَّر متى شئنا (SQL/سكربت) دون إصدار نسخة جديدة من التطبيق.
+// عند غياب الصف تُستخدم الافتراضيات الآمنة أدناه (لا منع لأي نسخة).
+// ============================================
+const APP_VERSION_DEFAULTS = {
+    latestVersion: '1.0',
+    minimumVersion: '1.0',
+    forceUpdate: false,
+    // رابط App Store مركزي بالكامل من السيرفر (قرار المالك — لا يوجد أي
+    // رابط داخل ملفات iOS): يُضبط في app_settings تحت المفتاح
+    // app_version_policy_<platform>، أو عبر متغير البيئة APP_STORE_URL.
+    // فارغ حتى تهيئة Apple App ID الرسمي — والعميل يخفي زر التحديث حينها.
+    appStoreUrl: process.env.APP_STORE_URL || '',
+    message: 'يتوفر إصدار جديد من التطبيق. يجب تحديث التطبيق للمتابعة.'
+};
+
+app.get('/api/app/version', async (req, res) => {
+    const platform = String(req.query.platform || 'ios').toLowerCase();
+    try {
+        const stored = await db.AppSettings.get(`app_version_policy_${platform}`);
+        const policy = Object.assign({}, APP_VERSION_DEFAULTS, stored || {});
+        res.json({
+            platform,
+            latestVersion: String(policy.latestVersion),
+            minimumVersion: String(policy.minimumVersion),
+            forceUpdate: !!policy.forceUpdate,
+            appStoreUrl: String(policy.appStoreUrl || ''),
+            message: String(policy.message || APP_VERSION_DEFAULTS.message)
+        });
+    } catch (err) {
+        logger.warn('app/version check failed: ' + err.message);
+        res.status(500).json({ error: 'تعذر التحقق من إصدار التطبيق' });
+    }
+});
+
+// ============================================
 // API: المصادقة (JWT)
 // ============================================
 app.post('/api/auth/login', validateBody({

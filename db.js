@@ -6069,6 +6069,7 @@ module.exports = {
   OpsFiles,
   Hospitals,
   References,
+  AppSettings,
   Timeline,
   Employees,
   Teams,
