@@ -1225,6 +1225,54 @@ app.get('/api/app/version', async (req, res) => {
     }
 });
 
+// قراءة/تحديث سياسة الإصدار — admin/director فقط (نفس نمط settings القائم).
+// يتيح إدارة app_version_policy_<platform> دون وصول مباشر لقاعدة البيانات.
+const VERSION_RE = /^\d+(\.\d+){0,2}$/;
+
+app.get('/api/settings/app-version-policy', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    const platform = String(req.query.platform || 'ios').toLowerCase();
+    try {
+        const stored = await db.AppSettings.get(`app_version_policy_${platform}`);
+        res.json({ success: true, platform, stored: stored || null, defaults: APP_VERSION_DEFAULTS });
+    } catch (err) {
+        logger.warn('app-version-policy read failed: ' + err.message);
+        res.status(500).json({ error: 'فشل في قراءة سياسة الإصدار' });
+    }
+});
+
+app.put('/api/settings/app-version-policy', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    const platform = String((req.body && req.body.platform) || 'ios').toLowerCase();
+    const body = req.body || {};
+    try {
+        const current = (await db.AppSettings.get(`app_version_policy_${platform}`)) || {};
+        const next = { ...current };
+        if (body.latestVersion !== undefined) {
+            if (!VERSION_RE.test(String(body.latestVersion))) return res.status(400).json({ error: 'صيغة latestVersion غير صالحة — أرقام بنقاط مثل 1.2.0' });
+            next.latestVersion = String(body.latestVersion);
+        }
+        if (body.minimumVersion !== undefined) {
+            if (!VERSION_RE.test(String(body.minimumVersion))) return res.status(400).json({ error: 'صيغة minimumVersion غير صالحة — أرقام بنقاط مثل 1.2.0' });
+            next.minimumVersion = String(body.minimumVersion);
+        }
+        if (body.forceUpdate !== undefined) next.forceUpdate = !!body.forceUpdate;
+        if (body.appStoreUrl !== undefined) {
+            const url = String(body.appStoreUrl);
+            if (url.length > 500) return res.status(400).json({ error: 'appStoreUrl طويل جدًا' });
+            next.appStoreUrl = url;
+        }
+        if (body.message !== undefined) {
+            const msg = String(body.message);
+            if (msg.length > 500) return res.status(400).json({ error: 'message طويلة جدًا' });
+            next.message = msg;
+        }
+        await db.AppSettings.set(`app_version_policy_${platform}`, next);
+        res.json({ success: true, platform, stored: next });
+    } catch (err) {
+        logger.warn('app-version-policy update failed: ' + err.message);
+        res.status(500).json({ error: 'فشل في تحديث سياسة الإصدار' });
+    }
+});
+
 // ============================================
 // API: المصادقة (JWT)
 // ============================================
