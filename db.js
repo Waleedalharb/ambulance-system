@@ -3745,7 +3745,7 @@ const AppSettings = {
     const json = JSON.stringify(value);
     const existing = await get('SELECT key FROM app_settings WHERE key = ?', [key]);
     if (existing) {
-      return run('UPDATE app_settings SET value = ?, updated_at = datetime("now") WHERE key = ?', [json, key]);
+      return run("UPDATE app_settings SET value = ?, updated_at = datetime('now') WHERE key = ?", [json, key]);
     } else {
       return run('INSERT INTO app_settings (key, value) VALUES (?, ?)', [key, json]);
     }
