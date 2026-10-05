@@ -17,10 +17,21 @@ const ROOT = path.join(__dirname, '..');
 const NODE = process.execPath;
 
 // ─── الـ baseline الثابت المعتمد (يُحدَّث فقط بقرار مالك المنصة) ───
+// محدَّث 2026-10-05 (قرار المالك): 160/12 بعد دخول 3cdf0b7 إلى origin/main —
+// CHAT_DISABLED=true (قرار مالك موثق في server.js: «تعطيل المحادثة الخاصة»)
+// يُفشل فحصَي المحادثة عمدًا: بطارية القراءة على /api/chat/* ← 403 CHAT_DISABLED،
+// و«إنشاء/فتح محادثة خاصة» تبعًا لها. الفشلون العشرة الأوائل أقدم من ذلك وثابتون.
 const BASELINE = {
-    pass: 167,
+    pass: 160,
     knownFailures: ['W1-B ①', 'W1-B ②', 'W1-B ④', 'V-B ⑪', 'V-B ⑫', 'V-B ②④', 'V-B ②⑦', 'F6 ④', 'SR-1 ①', 'SR-1 ⑨'],
-    knownCrash: 'EMPTY_PERIODS_GUARD'
+    knownCrash: 'EMPTY_PERIODS_GUARD',
+    // فشلا CHAT_DISABLED بأنماط مثبتة من الطرفين: أي فشل إضافي داخل بطارية
+    // القراءة (غير مسارات /api/chat/* الثلاثة بالضبط) أو تغيّر سبب فشل المحادثة
+    // يكسر التطابق ويُحسب فشلًا جديدًا — لا تبييض صامت لأعطال مستقبلية.
+    knownFailurePatterns: [
+        /^بطارية القراءة \(\d+\/\d+\) — \/api\/chat\/users→403 \| \/api\/chat\/conversations→403 \| \/api\/chat\/online→403$/,
+        /^إنشاء\/فتح محادثة خاصة — لا يوجد مستخدم آخر$/
+    ]
 };
 
 // المخازن المُرحَّلة إلى SQLite SSOT (JSON الخاص بها مجمّد: لا قراءة حية ولا كتابة)
@@ -112,7 +123,8 @@ async function main() {
         report('3 FULL_REGRESSION', passCount > 0, passCount + ' ✅ / ' + failLines.length + ' ❌');
         const newFailures = failLines
             .map(l => l.replace(/^.*?❌\s*/, '').split(':')[0].trim())
-            .filter(name => !BASELINE.knownFailures.some(k => name.startsWith(k)));
+            .filter(name => !BASELINE.knownFailures.some(k => name.startsWith(k)))
+            .filter(name => !(BASELINE.knownFailurePatterns || []).some(rx => rx.test(name)));
         const crashKnown = regOut.includes(BASELINE.knownCrash);
         const ok = passCount >= BASELINE.pass && newFailures.length === 0 && crashKnown;
         report('4 BASELINE_COMPARE', ok,
