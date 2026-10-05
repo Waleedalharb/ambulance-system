@@ -9368,6 +9368,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     // ── الإقلاع التشغيلي — خلف AuthGate فقط (لا يعمل قبل المصادقة) ──
     AuthGate.onStart(function() {
         connectSSE();
+        loadCentersReference(); // A-2/P3: إعادة جلب مرجع المراكز من SSOT بعد دخول البوابة (الإقلاع الأول يسبق المصادقة)
         loadShifts();
         loadAllData();
         loadNotifications();
