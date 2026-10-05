@@ -37,26 +37,6 @@ struct BalootFlightCard: Identifiable {
     var faceDown: Bool = false
 }
 
-// MARK: - ظهر الورقة الأزرق (توزيع الخصوم — 21.0)
-
-/// نفس تدرج ظهور miniCardBacks الأزرق المعتمد في الشاشة (بلا Assets جديدة):
-/// أزرق متدرج، حد أبيض خفيف، ظل كورقة الوجه — بمقاس ورقة المركز.
-private struct BalootCardBackView: View {
-    var body: some View {
-        let (w, h) = BalootCardSize.medium.dims
-        RoundedRectangle(cornerRadius: 10, style: .continuous)
-            .fill(LinearGradient(colors: [Color(red: 0.15, green: 0.28, blue: 0.60),
-                                          Color(red: 0.08, green: 0.16, blue: 0.38)],
-                                 startPoint: .top, endPoint: .bottom))
-            .overlay(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .stroke(Color.white.opacity(0.25), lineWidth: 1)
-            )
-            .frame(width: w, height: h)
-            .shadow(color: .black.opacity(0.45), radius: 4, y: 3)
-    }
-}
-
 // MARK: - ورقة طائرة واحدة
 
 private struct BalootFlyingCardView: View {
@@ -71,7 +51,8 @@ private struct BalootFlyingCardView: View {
     var body: some View {
         Group {
             if flight.faceDown {
-                BalootCardBackView()
+                // ظهر «قطاع الجنوب» الرسمي (Stage 07) — المُصيّر المشترك
+                BalootCardBack(size: .medium)
             } else {
                 BalootCardFace(card: flight.card, size: .medium)
             }

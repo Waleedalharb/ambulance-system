@@ -164,6 +164,9 @@ final class BalootTrickDirector: ObservableObject {
 
     /// الأوراق الأربع تصغر وتطير مجتمعة لجهة الفائز وتختفي عند وصولها (§4).
     private func collectTrick(_ last: BalootLastTrickDTO, input: SyncInput) {
+        // Stage 06 (D7) — سويش جمع الأكلة (28.62+) يُشغَّل هنا عند بدء الحركة
+        // البصرية فعليًا، لا عند وصول trick_won الذي يسبق الجمع بـ≈1.3ث.
+        BalootSoundService.shared.play(.refCollect)
         let winnerRel = relative(last.winnerSeat, mySeat: input.mySeat)
         let target = input.geo.seatOrigin(relative: winnerRel)
         settled = []

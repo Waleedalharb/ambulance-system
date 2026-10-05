@@ -7,13 +7,17 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0D8AADC52CE59F64C66C34F4 /* ref_baloot.wav in Resources */ = {isa = PBXBuildFile; fileRef = 585CB93E02C4D2169EB63BB1 /* ref_baloot.wav */; };
+		2882F3E2CA16F659F81A8B1A /* ref_hand_start.wav in Resources */ = {isa = PBXBuildFile; fileRef = B1CC91D26709C435C279BA1A /* ref_hand_start.wav */; };
+		3C35C51CAEA1EAE2F49CCA0B /* ref_gold.wav in Resources */ = {isa = PBXBuildFile; fileRef = 08BFE9C99F16FE1D3AA8652B /* ref_gold.wav */; };
+		4EC966E317AA410D86A4F8A5 /* ref_confirm.wav in Resources */ = {isa = PBXBuildFile; fileRef = 0CB976C512EA721BE4DDB0DD /* ref_confirm.wav */; };
+		5E4000000000000000000000 /* say_sunn.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000000 /* say_sunn.mp3 */; };
 		5E4000000000000000000001 /* EMSOperationsApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000001 /* EMSOperationsApp.swift */; };
 		5E4000000000000000000002 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000002 /* RootView.swift */; };
 		5E4000000000000000000003 /* AppEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000003 /* AppEnvironment.swift */; };
 		5E4000000000000000000004 /* AppLogger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000004 /* AppLogger.swift */; };
 		5E4000000000000000000005 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000005 /* APIClient.swift */; };
 		5E4000000000000000000006 /* APIError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000006 /* APIError.swift */; };
-		5E40000000000000000000F3 /* RefreshNoticeCenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000F3 /* RefreshNoticeCenter.swift */; };
 		5E4000000000000000000007 /* AuthDTO.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000007 /* AuthDTO.swift */; };
 		5E4000000000000000000008 /* PortalDTO.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000008 /* PortalDTO.swift */; };
 		5E4000000000000000000009 /* KeychainService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000009 /* KeychainService.swift */; };
@@ -83,6 +87,8 @@
 		5E4000000000000000000049 /* WorkflowOpsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000049 /* WorkflowOpsViewModel.swift */; };
 		5E400000000000000000004A /* WorkflowOpsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000004A /* WorkflowOpsView.swift */; };
 		5E400000000000000000004B /* ArchiveOpsDTO.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000004B /* ArchiveOpsDTO.swift */; };
+		5E400000000000000000004C /* ArchiveOpsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000004C /* ArchiveOpsViewModel.swift */; };
+		5E400000000000000000004D /* ArchiveOpsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000004D /* ArchiveOpsView.swift */; };
 		5E400000000000000000004E /* SmartOpsDTO.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000004E /* SmartOpsDTO.swift */; };
 		5E400000000000000000004F /* AdminOpsDTO.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000004F /* AdminOpsDTO.swift */; };
 		5E4000000000000000000050 /* AdminHubView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000050 /* AdminHubView.swift */; };
@@ -114,33 +120,6 @@
 		5E400000000000000000006A /* PermissionsAdminDTO.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000006A /* PermissionsAdminDTO.swift */; };
 		5E400000000000000000006B /* ForgotPasswordView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000006B /* ForgotPasswordView.swift */; };
 		5E400000000000000000006C /* AdminPermissionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000006C /* AdminPermissionsView.swift */; };
-		5E400000000000000000004C /* ArchiveOpsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000004C /* ArchiveOpsViewModel.swift */; };
-		5E400000000000000000004D /* ArchiveOpsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000004D /* ArchiveOpsView.swift */; };
-		5E40000000000000000000E1 /* EMSOperationsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000E1 /* EMSOperationsTests.swift */; };
-		5E40000000000000000000E2 /* BalootModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000E2 /* BalootModelsTests.swift */; };
-		5E40000000000000000000B1 /* BalootModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000B1 /* BalootModels.swift */; };
-		5E40000000000000000000B2 /* BalootService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000B2 /* BalootService.swift */; };
-		5E40000000000000000000B3 /* BalootSocket.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000B3 /* BalootSocket.swift */; };
-		5E40000000000000000000B4 /* BalootLobbyViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000B4 /* BalootLobbyViewModel.swift */; };
-		5E40000000000000000000B5 /* BalootLobbyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000B5 /* BalootLobbyView.swift */; };
-		5E40000000000000000000B6 /* BalootTableViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000B6 /* BalootTableViewModel.swift */; };
-		5E40000000000000000000B7 /* BalootTableView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000B7 /* BalootTableView.swift */; };
-		5E40000000000000000000B8 /* BalootSoundService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000B8 /* BalootSoundService.swift */; };
-		5E40000000000000000000D2 /* BalootPhysics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000D2 /* BalootPhysics.swift */; };
-		5E40000000000000000000D3 /* BalootCardFace.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000D3 /* BalootCardFace.swift */; };
-		5E40000000000000000000D4 /* BalootFlightOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000D4 /* BalootFlightOverlay.swift */; };
-		5E40000000000000000000D5 /* BalootTrickDirector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000D5 /* BalootTrickDirector.swift */; };
-		5E40000000000000000000D6 /* BalootHandCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000D6 /* BalootHandCardView.swift */; };
-		5E40000000000000000000D7 /* BalootScorePanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000D7 /* BalootScorePanelView.swift */; };
-		5E40000000000000000000C1 /* deal.wav in Resources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000C1 /* deal.wav */; };
-		5E40000000000000000000C2 /* card.wav in Resources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000C2 /* card.wav */; };
-		5E40000000000000000000C3 /* select.wav in Resources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000C3 /* select.wav */; };
-		5E40000000000000000000C4 /* contract.wav in Resources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000C4 /* contract.wav */; };
-		5E40000000000000000000C5 /* trick.wav in Resources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000C5 /* trick.wav */; };
-		5E40000000000000000000C6 /* hand_end.wav in Resources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000C6 /* hand_end.wav */; };
-		5E40000000000000000000C7 /* match_end.wav in Resources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000C7 /* match_end.wav */; };
-		5E40000000000000000000C8 /* your_turn.wav in Resources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000C8 /* your_turn.wav */; };
-		5E4000000000000000000000 /* say_sunn.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000000 /* say_sunn.mp3 */; };
 		5E400000000000000000006D /* say_hokum.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000006D /* say_hokum.mp3 */; };
 		5E400000000000000000006E /* say_pass.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000006E /* say_pass.mp3 */; };
 		5E400000000000000000006F /* say_ashkal.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000006F /* say_ashkal.mp3 */; };
@@ -150,7 +129,46 @@
 		5E4000000000000000000073 /* say_khamsin.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000073 /* say_khamsin.mp3 */; };
 		5E4000000000000000000074 /* say_miya.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000074 /* say_miya.mp3 */; };
 		5E4000000000000000000075 /* say_arba.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000075 /* say_arba.mp3 */; };
+		5E40000000000000000000B1 /* BalootModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000B1 /* BalootModels.swift */; };
+		5E40000000000000000000B2 /* BalootService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000B2 /* BalootService.swift */; };
+		5E40000000000000000000B3 /* BalootSocket.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000B3 /* BalootSocket.swift */; };
+		5E40000000000000000000B4 /* BalootLobbyViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000B4 /* BalootLobbyViewModel.swift */; };
+		5E40000000000000000000B5 /* BalootLobbyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000B5 /* BalootLobbyView.swift */; };
+		5E40000000000000000000B6 /* BalootTableViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000B6 /* BalootTableViewModel.swift */; };
+		5E40000000000000000000B7 /* BalootTableView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000B7 /* BalootTableView.swift */; };
+		5E40000000000000000000B8 /* BalootSoundService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000B8 /* BalootSoundService.swift */; };
+		5E40000000000000000000C1 /* deal.wav in Resources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000C1 /* deal.wav */; };
+		5E40000000000000000000C2 /* card.wav in Resources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000C2 /* card.wav */; };
+		5E40000000000000000000C3 /* select.wav in Resources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000C3 /* select.wav */; };
+		5E40000000000000000000C4 /* contract.wav in Resources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000C4 /* contract.wav */; };
+		5E40000000000000000000C5 /* trick.wav in Resources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000C5 /* trick.wav */; };
+		5E40000000000000000000C6 /* hand_end.wav in Resources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000C6 /* hand_end.wav */; };
+		5E40000000000000000000C7 /* match_end.wav in Resources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000C7 /* match_end.wav */; };
+		5E40000000000000000000C8 /* your_turn.wav in Resources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000C8 /* your_turn.wav */; };
+		5E40000000000000000000D2 /* BalootPhysics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000D2 /* BalootPhysics.swift */; };
+		5E40000000000000000000D3 /* BalootCardFace.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000D3 /* BalootCardFace.swift */; };
+		5E40000000000000000000D4 /* BalootFlightOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000D4 /* BalootFlightOverlay.swift */; };
+		5E40000000000000000000D5 /* BalootTrickDirector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000D5 /* BalootTrickDirector.swift */; };
+		5E40000000000000000000D6 /* BalootHandCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000D6 /* BalootHandCardView.swift */; };
+		5E40000000000000000000D7 /* BalootScorePanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000D7 /* BalootScorePanelView.swift */; };
+		5E40000000000000000000E1 /* EMSOperationsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000E1 /* EMSOperationsTests.swift */; };
+		5E40000000000000000000E2 /* BalootModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000E2 /* BalootModelsTests.swift */; };
 		5E40000000000000000000F0 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000F0 /* Assets.xcassets */; };
+		5E40000000000000000000F3 /* RefreshNoticeCenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000F3 /* RefreshNoticeCenter.swift */; };
+		5E40000000000000000000F4 /* AppVersioning.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000F4 /* AppVersioning.swift */; };
+		5E40000000000000000000F5 /* AppVersionGateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000F5 /* AppVersionGateTests.swift */; };
+		5E40000000000000000000F6 /* BalootCardFaceRenderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000F6 /* BalootCardFaceRenderTests.swift */; };
+		65A95E4230706D2C00447787 /* say_wela.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 65A95E4130706D2C00447787 /* say_wela.mp3 */; };
+		65AA983F306D4F4700DB04CE /* ref_throw.wav in Resources */ = {isa = PBXBuildFile; fileRef = 65AA983D306D4F4700DB04CE /* ref_throw.wav */; };
+		65AA9840306D4F4700DB04CE /* ref_trump.wav in Resources */ = {isa = PBXBuildFile; fileRef = 65AA983E306D4F4700DB04CE /* ref_trump.wav */; };
+		65AA9841306D4F4700DB04CE /* ref_bid.wav in Resources */ = {isa = PBXBuildFile; fileRef = 65AA983B306D4F4700DB04CE /* ref_bid.wav */; };
+		65AA9842306D4F4700DB04CE /* ref_announce.wav in Resources */ = {isa = PBXBuildFile; fileRef = 65AA983A306D4F4700DB04CE /* ref_announce.wav */; };
+		65AA9843306D4F4700DB04CE /* ref_score.wav in Resources */ = {isa = PBXBuildFile; fileRef = 65AA983C306D4F4700DB04CE /* ref_score.wav */; };
+		65F35992E763B1776E364B8A /* ref_suit_reveal.wav in Resources */ = {isa = PBXBuildFile; fileRef = 008B56C5A34C0320688EF40A /* ref_suit_reveal.wav */; };
+		8A3D1277CA9C990BEEF4044F /* ref_deal.wav in Resources */ = {isa = PBXBuildFile; fileRef = 071F9817FE332CE1B7F9EEC7 /* ref_deal.wav */; };
+		9BFA60D73C3AEE2C0BF0511C /* ref_collect.wav in Resources */ = {isa = PBXBuildFile; fileRef = 2585EE916376E848912F65A4 /* ref_collect.wav */; };
+		C5EA3420BB004942BC75E234 /* ref_project50.wav in Resources */ = {isa = PBXBuildFile; fileRef = 3490524580B477D4CC51A466 /* ref_project50.wav */; };
+		FCC267097C26A5F8B81BB7C4 /* ref_round.wav in Resources */ = {isa = PBXBuildFile; fileRef = 5EAB24093F0AD8AA8A539392 /* ref_round.wav */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -164,6 +182,14 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		008B56C5A34C0320688EF40A /* ref_suit_reveal.wav */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = audio.wav; path = ref_suit_reveal.wav; sourceTree = "<group>"; };
+		071F9817FE332CE1B7F9EEC7 /* ref_deal.wav */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = audio.wav; path = ref_deal.wav; sourceTree = "<group>"; };
+		08BFE9C99F16FE1D3AA8652B /* ref_gold.wav */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = audio.wav; path = ref_gold.wav; sourceTree = "<group>"; };
+		0CB976C512EA721BE4DDB0DD /* ref_confirm.wav */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = audio.wav; path = ref_confirm.wav; sourceTree = "<group>"; };
+		2585EE916376E848912F65A4 /* ref_collect.wav */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = audio.wav; path = ref_collect.wav; sourceTree = "<group>"; };
+		3490524580B477D4CC51A466 /* ref_project50.wav */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = audio.wav; path = ref_project50.wav; sourceTree = "<group>"; };
+		585CB93E02C4D2169EB63BB1 /* ref_baloot.wav */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = audio.wav; path = ref_baloot.wav; sourceTree = "<group>"; };
+		5E3000000000000000000000 /* say_sunn.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = say_sunn.mp3; sourceTree = "<group>"; };
 		5E3000000000000000000001 /* EMSOperationsApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EMSOperationsApp.swift; sourceTree = "<group>"; };
 		5E3000000000000000000002 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		5E3000000000000000000003 /* AppEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppEnvironment.swift; sourceTree = "<group>"; };
@@ -239,6 +265,8 @@
 		5E3000000000000000000049 /* WorkflowOpsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkflowOpsViewModel.swift; sourceTree = "<group>"; };
 		5E300000000000000000004A /* WorkflowOpsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkflowOpsView.swift; sourceTree = "<group>"; };
 		5E300000000000000000004B /* ArchiveOpsDTO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveOpsDTO.swift; sourceTree = "<group>"; };
+		5E300000000000000000004C /* ArchiveOpsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveOpsViewModel.swift; sourceTree = "<group>"; };
+		5E300000000000000000004D /* ArchiveOpsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveOpsView.swift; sourceTree = "<group>"; };
 		5E300000000000000000004E /* SmartOpsDTO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartOpsDTO.swift; sourceTree = "<group>"; };
 		5E300000000000000000004F /* AdminOpsDTO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminOpsDTO.swift; sourceTree = "<group>"; };
 		5E3000000000000000000050 /* AdminHubView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminHubView.swift; sourceTree = "<group>"; };
@@ -270,39 +298,6 @@
 		5E300000000000000000006A /* PermissionsAdminDTO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionsAdminDTO.swift; sourceTree = "<group>"; };
 		5E300000000000000000006B /* ForgotPasswordView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ForgotPasswordView.swift; sourceTree = "<group>"; };
 		5E300000000000000000006C /* AdminPermissionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminPermissionsView.swift; sourceTree = "<group>"; };
-		5E300000000000000000004C /* ArchiveOpsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveOpsViewModel.swift; sourceTree = "<group>"; };
-		5E300000000000000000004D /* ArchiveOpsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveOpsView.swift; sourceTree = "<group>"; };
-		5E30000000000000000000D0 /* EMSOperations.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = EMSOperations.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		5E30000000000000000000D1 /* EMSOperationsTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = EMSOperationsTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		5E30000000000000000000E1 /* EMSOperationsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EMSOperationsTests.swift; sourceTree = "<group>"; };
-		5E30000000000000000000F0 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		5E30000000000000000000F1 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		5E30000000000000000000F2 /* EMSOperations.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = EMSOperations.entitlements; sourceTree = "<group>"; };
-		5E30000000000000000000F3 /* RefreshNoticeCenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RefreshNoticeCenter.swift; sourceTree = "<group>"; };
-		5E30000000000000000000E2 /* BalootModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalootModelsTests.swift; sourceTree = "<group>"; };
-		5E30000000000000000000B1 /* BalootModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalootModels.swift; sourceTree = "<group>"; };
-		5E30000000000000000000B2 /* BalootService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalootService.swift; sourceTree = "<group>"; };
-		5E30000000000000000000B3 /* BalootSocket.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalootSocket.swift; sourceTree = "<group>"; };
-		5E30000000000000000000B4 /* BalootLobbyViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalootLobbyViewModel.swift; sourceTree = "<group>"; };
-		5E30000000000000000000B5 /* BalootLobbyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalootLobbyView.swift; sourceTree = "<group>"; };
-		5E30000000000000000000B6 /* BalootTableViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalootTableViewModel.swift; sourceTree = "<group>"; };
-		5E30000000000000000000B7 /* BalootTableView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalootTableView.swift; sourceTree = "<group>"; };
-		5E30000000000000000000B8 /* BalootSoundService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalootSoundService.swift; sourceTree = "<group>"; };
-		5E30000000000000000000D2 /* BalootPhysics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalootPhysics.swift; sourceTree = "<group>"; };
-		5E30000000000000000000D3 /* BalootCardFace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalootCardFace.swift; sourceTree = "<group>"; };
-		5E30000000000000000000D4 /* BalootFlightOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalootFlightOverlay.swift; sourceTree = "<group>"; };
-		5E30000000000000000000D5 /* BalootTrickDirector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalootTrickDirector.swift; sourceTree = "<group>"; };
-		5E30000000000000000000D6 /* BalootHandCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalootHandCardView.swift; sourceTree = "<group>"; };
-		5E30000000000000000000D7 /* BalootScorePanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalootScorePanelView.swift; sourceTree = "<group>"; };
-		5E30000000000000000000C1 /* deal.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = deal.wav; sourceTree = "<group>"; };
-		5E30000000000000000000C2 /* card.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = card.wav; sourceTree = "<group>"; };
-		5E30000000000000000000C3 /* select.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = select.wav; sourceTree = "<group>"; };
-		5E30000000000000000000C4 /* contract.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = contract.wav; sourceTree = "<group>"; };
-		5E30000000000000000000C5 /* trick.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = trick.wav; sourceTree = "<group>"; };
-		5E30000000000000000000C6 /* hand_end.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = hand_end.wav; sourceTree = "<group>"; };
-		5E30000000000000000000C7 /* match_end.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = match_end.wav; sourceTree = "<group>"; };
-		5E30000000000000000000C8 /* your_turn.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = your_turn.wav; sourceTree = "<group>"; };
-		5E3000000000000000000000 /* say_sunn.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = say_sunn.mp3; sourceTree = "<group>"; };
 		5E300000000000000000006D /* say_hokum.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = say_hokum.mp3; sourceTree = "<group>"; };
 		5E300000000000000000006E /* say_pass.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = say_pass.mp3; sourceTree = "<group>"; };
 		5E300000000000000000006F /* say_ashkal.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = say_ashkal.mp3; sourceTree = "<group>"; };
@@ -312,6 +307,47 @@
 		5E3000000000000000000073 /* say_khamsin.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = say_khamsin.mp3; sourceTree = "<group>"; };
 		5E3000000000000000000074 /* say_miya.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = say_miya.mp3; sourceTree = "<group>"; };
 		5E3000000000000000000075 /* say_arba.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = say_arba.mp3; sourceTree = "<group>"; };
+		5E30000000000000000000B1 /* BalootModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalootModels.swift; sourceTree = "<group>"; };
+		5E30000000000000000000B2 /* BalootService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalootService.swift; sourceTree = "<group>"; };
+		5E30000000000000000000B3 /* BalootSocket.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalootSocket.swift; sourceTree = "<group>"; };
+		5E30000000000000000000B4 /* BalootLobbyViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalootLobbyViewModel.swift; sourceTree = "<group>"; };
+		5E30000000000000000000B5 /* BalootLobbyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalootLobbyView.swift; sourceTree = "<group>"; };
+		5E30000000000000000000B6 /* BalootTableViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalootTableViewModel.swift; sourceTree = "<group>"; };
+		5E30000000000000000000B7 /* BalootTableView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalootTableView.swift; sourceTree = "<group>"; };
+		5E30000000000000000000B8 /* BalootSoundService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalootSoundService.swift; sourceTree = "<group>"; };
+		5E30000000000000000000C1 /* deal.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = deal.wav; sourceTree = "<group>"; };
+		5E30000000000000000000C2 /* card.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = card.wav; sourceTree = "<group>"; };
+		5E30000000000000000000C3 /* select.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = select.wav; sourceTree = "<group>"; };
+		5E30000000000000000000C4 /* contract.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = contract.wav; sourceTree = "<group>"; };
+		5E30000000000000000000C5 /* trick.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = trick.wav; sourceTree = "<group>"; };
+		5E30000000000000000000C6 /* hand_end.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = hand_end.wav; sourceTree = "<group>"; };
+		5E30000000000000000000C7 /* match_end.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = match_end.wav; sourceTree = "<group>"; };
+		5E30000000000000000000C8 /* your_turn.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = your_turn.wav; sourceTree = "<group>"; };
+		5E30000000000000000000D0 /* EMSOperations.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = EMSOperations.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		5E30000000000000000000D1 /* EMSOperationsTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = EMSOperationsTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		5E30000000000000000000D2 /* BalootPhysics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalootPhysics.swift; sourceTree = "<group>"; };
+		5E30000000000000000000D3 /* BalootCardFace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalootCardFace.swift; sourceTree = "<group>"; };
+		5E30000000000000000000D4 /* BalootFlightOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalootFlightOverlay.swift; sourceTree = "<group>"; };
+		5E30000000000000000000D5 /* BalootTrickDirector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalootTrickDirector.swift; sourceTree = "<group>"; };
+		5E30000000000000000000D6 /* BalootHandCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalootHandCardView.swift; sourceTree = "<group>"; };
+		5E30000000000000000000D7 /* BalootScorePanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalootScorePanelView.swift; sourceTree = "<group>"; };
+		5E30000000000000000000E1 /* EMSOperationsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EMSOperationsTests.swift; sourceTree = "<group>"; };
+		5E30000000000000000000E2 /* BalootModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalootModelsTests.swift; sourceTree = "<group>"; };
+		5E30000000000000000000F0 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		5E30000000000000000000F1 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		5E30000000000000000000F2 /* EMSOperations.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = EMSOperations.entitlements; sourceTree = "<group>"; };
+		5E30000000000000000000F3 /* RefreshNoticeCenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RefreshNoticeCenter.swift; sourceTree = "<group>"; };
+		5E30000000000000000000F4 /* AppVersioning.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppVersioning.swift; sourceTree = "<group>"; };
+		5E30000000000000000000F5 /* AppVersionGateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppVersionGateTests.swift; sourceTree = "<group>"; };
+		5E30000000000000000000F6 /* BalootCardFaceRenderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalootCardFaceRenderTests.swift; sourceTree = "<group>"; };
+		5EAB24093F0AD8AA8A539392 /* ref_round.wav */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = audio.wav; path = ref_round.wav; sourceTree = "<group>"; };
+		65A95E4130706D2C00447787 /* say_wela.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = "say_wela.mp3"; sourceTree = "<group>"; };
+		65AA983A306D4F4700DB04CE /* ref_announce.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = ref_announce.wav; sourceTree = "<group>"; };
+		65AA983B306D4F4700DB04CE /* ref_bid.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = ref_bid.wav; sourceTree = "<group>"; };
+		65AA983C306D4F4700DB04CE /* ref_score.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = ref_score.wav; sourceTree = "<group>"; };
+		65AA983D306D4F4700DB04CE /* ref_throw.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = ref_throw.wav; sourceTree = "<group>"; };
+		65AA983E306D4F4700DB04CE /* ref_trump.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = ref_trump.wav; sourceTree = "<group>"; };
+		B1CC91D26709C435C279BA1A /* ref_hand_start.wav */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = audio.wav; path = ref_hand_start.wav; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -376,6 +412,7 @@
 			isa = PBXGroup;
 			children = (
 				5E3000000000000000000003 /* AppEnvironment.swift */,
+				5E30000000000000000000F4 /* AppVersioning.swift */,
 				5E2000000000000000000051 /* Logging */,
 				5E2000000000000000000013 /* Networking */,
 				5E2000000000000000000016 /* Authentication */,
@@ -389,62 +426,6 @@
 				5E2000000000000000000068 /* UI */,
 			);
 			path = Core;
-			sourceTree = "<group>";
-		};
-		5E2000000000000000000051 /* Logging */ = {
-			isa = PBXGroup;
-			children = (
-				5E3000000000000000000004 /* AppLogger.swift */,
-			);
-			path = Logging;
-			sourceTree = "<group>";
-		};
-		5E2000000000000000000052 /* Session */ = {
-			isa = PBXGroup;
-			children = (
-				5E300000000000000000000C /* SessionStore.swift */,
-			);
-			path = Session;
-			sourceTree = "<group>";
-		};
-		5E2000000000000000000053 /* Permissions */ = {
-			isa = PBXGroup;
-			children = (
-				5E3000000000000000000021 /* PermissionStore.swift */,
-			);
-			path = Permissions;
-			sourceTree = "<group>";
-		};
-		5E2000000000000000000054 /* DeepLinks */ = {
-			isa = PBXGroup;
-			children = (
-				5E300000000000000000000E /* DeepLinkRouter.swift */,
-			);
-			path = DeepLinks;
-			sourceTree = "<group>";
-		};
-		5E2000000000000000000055 /* Storage */ = {
-			isa = PBXGroup;
-			children = (
-				5E3000000000000000000022 /* SafeCache.swift */,
-			);
-			path = Storage;
-			sourceTree = "<group>";
-		};
-		5E2000000000000000000056 /* Network */ = {
-			isa = PBXGroup;
-			children = (
-				5E3000000000000000000023 /* NetworkMonitor.swift */,
-			);
-			path = Network;
-			sourceTree = "<group>";
-		};
-		5E2000000000000000000068 /* UI */ = {
-			isa = PBXGroup;
-			children = (
-				5E30000000000000000000F3 /* RefreshNoticeCenter.swift */,
-			);
-			path = UI;
 			sourceTree = "<group>";
 		};
 		5E2000000000000000000013 /* Networking */ = {
@@ -553,199 +534,6 @@
 				5E2000000000000000000067 /* Baloot */,
 			);
 			path = Features;
-			sourceTree = "<group>";
-		};
-		5E2000000000000000000067 /* Baloot */ = {
-			isa = PBXGroup;
-			children = (
-				5E30000000000000000000B1 /* BalootModels.swift */,
-				5E30000000000000000000B2 /* BalootService.swift */,
-				5E30000000000000000000B3 /* BalootSocket.swift */,
-				5E30000000000000000000B4 /* BalootLobbyViewModel.swift */,
-				5E30000000000000000000B5 /* BalootLobbyView.swift */,
-				5E30000000000000000000B6 /* BalootTableViewModel.swift */,
-				5E30000000000000000000B7 /* BalootTableView.swift */,
-				5E30000000000000000000B8 /* BalootSoundService.swift */,
-				5E200000000000000000006A /* Physics */,
-			);
-			path = Baloot;
-			sourceTree = "<group>";
-		};
-		5E200000000000000000006A /* Physics */ = {
-			isa = PBXGroup;
-			children = (
-				5E30000000000000000000D2 /* BalootPhysics.swift */,
-				5E30000000000000000000D3 /* BalootCardFace.swift */,
-				5E30000000000000000000D4 /* BalootFlightOverlay.swift */,
-				5E30000000000000000000D5 /* BalootTrickDirector.swift */,
-				5E30000000000000000000D6 /* BalootHandCardView.swift */,
-				5E30000000000000000000D7 /* BalootScorePanelView.swift */,
-			);
-			path = Physics;
-			sourceTree = "<group>";
-		};
-		5E2000000000000000000059 /* CompletionOps */ = {
-			isa = PBXGroup;
-			children = (
-				5E3000000000000000000038 /* CompletionOpsViewModel.swift */,
-				5E3000000000000000000039 /* CompletionOpsView.swift */,
-				5E300000000000000000003A /* CompletionSupportView.swift */,
-				5E300000000000000000003B /* CompletionRecordsView.swift */,
-			);
-			path = CompletionOps;
-			sourceTree = "<group>";
-		};
-		5E200000000000000000005A /* PositioningOps */ = {
-			isa = PBXGroup;
-			children = (
-				5E300000000000000000003D /* PositioningOpsViewModel.swift */,
-				5E300000000000000000003E /* PositioningOpsView.swift */,
-			);
-			path = PositioningOps;
-			sourceTree = "<group>";
-		};
-		5E200000000000000000005B /* DispatchOps */ = {
-			isa = PBXGroup;
-			children = (
-				5E3000000000000000000040 /* DispatchOpsViewModel.swift */,
-				5E3000000000000000000041 /* DispatchOpsView.swift */,
-			);
-			path = DispatchOps;
-			sourceTree = "<group>";
-		};
-		5E200000000000000000005C /* FormsOps */ = {
-			isa = PBXGroup;
-			children = (
-				5E3000000000000000000046 /* FormsOpsViewModel.swift */,
-				5E3000000000000000000047 /* FormsOpsView.swift */,
-			);
-			path = FormsOps;
-			sourceTree = "<group>";
-		};
-		5E200000000000000000005D /* WorkflowOps */ = {
-			isa = PBXGroup;
-			children = (
-				5E3000000000000000000049 /* WorkflowOpsViewModel.swift */,
-				5E300000000000000000004A /* WorkflowOpsView.swift */,
-			);
-			path = WorkflowOps;
-			sourceTree = "<group>";
-		};
-		5E200000000000000000005E /* ArchiveOps */ = {
-			isa = PBXGroup;
-			children = (
-				5E300000000000000000004C /* ArchiveOpsViewModel.swift */,
-				5E300000000000000000004D /* ArchiveOpsView.swift */,
-			);
-			path = ArchiveOps;
-			sourceTree = "<group>";
-		};
-		5E2000000000000000000060 /* ShiftLifecycle */ = {
-			isa = PBXGroup;
-			children = (
-				5E3000000000000000000058 /* ShiftLifecycleView.swift */,
-			);
-			path = ShiftLifecycle;
-			sourceTree = "<group>";
-		};
-		5E2000000000000000000061 /* AssetsOps */ = {
-			isa = PBXGroup;
-			children = (
-				5E300000000000000000005C /* AssetsHomeView.swift */,
-				5E300000000000000000005D /* AssetDetailViews.swift */,
-			);
-			path = AssetsOps;
-			sourceTree = "<group>";
-		};
-		5E2000000000000000000062 /* HospitalsOps */ = {
-			isa = PBXGroup;
-			children = (
-				5E300000000000000000005F /* HospitalsOpsView.swift */,
-			);
-			path = HospitalsOps;
-			sourceTree = "<group>";
-		};
-		5E2000000000000000000063 /* Chat */ = {
-			isa = PBXGroup;
-			children = (
-				5E3000000000000000000061 /* ChatViews.swift */,
-			);
-			path = Chat;
-			sourceTree = "<group>";
-		};
-		5E2000000000000000000064 /* IndicatorsOps */ = {
-			isa = PBXGroup;
-			children = (
-				5E3000000000000000000063 /* IndicatorsOpsView.swift */,
-			);
-			path = IndicatorsOps;
-			sourceTree = "<group>";
-		};
-		5E2000000000000000000065 /* Requests */ = {
-			isa = PBXGroup;
-			children = (
-				5E3000000000000000000065 /* MyRequestsView.swift */,
-				5E3000000000000000000066 /* RequestsAdminView.swift */,
-			);
-			path = Requests;
-			sourceTree = "<group>";
-		};
-		5E2000000000000000000066 /* FilesOps */ = {
-			isa = PBXGroup;
-			children = (
-				5E3000000000000000000069 /* FilesOpsView.swift */,
-			);
-			path = FilesOps;
-			sourceTree = "<group>";
-		};
-		5E200000000000000000005F /* AdminOps */ = {
-			isa = PBXGroup;
-			children = (
-				5E3000000000000000000050 /* AdminHubView.swift */,
-				5E3000000000000000000051 /* AdminUsersView.swift */,
-				5E3000000000000000000052 /* AdminEmployeesView.swift */,
-				5E3000000000000000000053 /* AdminRefsView.swift */,
-				5E3000000000000000000054 /* AdminSymbolsView.swift */,
-				5E3000000000000000000055 /* AdminSystemView.swift */,
-				5E3000000000000000000056 /* AdminNotificationsView.swift */,
-				5E300000000000000000006C /* AdminPermissionsView.swift */,
-			);
-			path = AdminOps;
-			sourceTree = "<group>";
-		};
-		5E2000000000000000000058 /* ScheduleOps */ = {
-			isa = PBXGroup;
-			children = (
-				5E300000000000000000002D /* ScheduleOpsViewModel.swift */,
-				5E300000000000000000002E /* ScheduleRosterGrid.swift */,
-				5E300000000000000000002F /* ScheduleHubView.swift */,
-				5E3000000000000000000030 /* ScheduleMonthView.swift */,
-				5E3000000000000000000031 /* ScheduleDayView.swift */,
-				5E3000000000000000000032 /* ScheduleTeamView.swift */,
-				5E3000000000000000000033 /* ScheduleEmployeeView.swift */,
-				5E3000000000000000000034 /* ScheduleCellSheet.swift */,
-				5E3000000000000000000035 /* ScheduleHistoryView.swift */,
-				5E3000000000000000000036 /* ScheduleAdvancedView.swift */,
-			);
-			path = ScheduleOps;
-			sourceTree = "<group>";
-		};
-		5E2000000000000000000057 /* Operations */ = {
-			isa = PBXGroup;
-			children = (
-				5E3000000000000000000024 /* OperationsHomeView.swift */,
-				5E3000000000000000000026 /* OpsTeamsView.swift */,
-				5E3000000000000000000027 /* OpsReadinessView.swift */,
-				5E3000000000000000000028 /* OpsVehiclesView.swift */,
-				5E3000000000000000000029 /* OpsEventsView.swift */,
-				5E300000000000000000002A /* OpsMapView.swift */,
-				5E300000000000000000002B /* DecisionCenterView.swift */,
-				5E3000000000000000000043 /* VehicleHistoryView.swift */,
-				5E3000000000000000000044 /* VehicleRegistryView.swift */,
-				5E300000000000000000005A /* OpsTimelinesView.swift */,
-				5E3000000000000000000067 /* SignoutsOpsView.swift */,
-			);
-			path = Operations;
 			sourceTree = "<group>";
 		};
 		5E2000000000000000000020 /* Login */ = {
@@ -860,11 +648,263 @@
 			path = Resources;
 			sourceTree = "<group>";
 		};
+		5E2000000000000000000040 /* EMSOperationsTests */ = {
+			isa = PBXGroup;
+			children = (
+				5E30000000000000000000E1 /* EMSOperationsTests.swift */,
+				5E30000000000000000000E2 /* BalootModelsTests.swift */,
+				5E30000000000000000000F5 /* AppVersionGateTests.swift */,
+				5E30000000000000000000F6 /* BalootCardFaceRenderTests.swift */,
+			);
+			path = EMSOperationsTests;
+			sourceTree = "<group>";
+		};
+		5E2000000000000000000051 /* Logging */ = {
+			isa = PBXGroup;
+			children = (
+				5E3000000000000000000004 /* AppLogger.swift */,
+			);
+			path = Logging;
+			sourceTree = "<group>";
+		};
+		5E2000000000000000000052 /* Session */ = {
+			isa = PBXGroup;
+			children = (
+				5E300000000000000000000C /* SessionStore.swift */,
+			);
+			path = Session;
+			sourceTree = "<group>";
+		};
+		5E2000000000000000000053 /* Permissions */ = {
+			isa = PBXGroup;
+			children = (
+				5E3000000000000000000021 /* PermissionStore.swift */,
+			);
+			path = Permissions;
+			sourceTree = "<group>";
+		};
+		5E2000000000000000000054 /* DeepLinks */ = {
+			isa = PBXGroup;
+			children = (
+				5E300000000000000000000E /* DeepLinkRouter.swift */,
+			);
+			path = DeepLinks;
+			sourceTree = "<group>";
+		};
+		5E2000000000000000000055 /* Storage */ = {
+			isa = PBXGroup;
+			children = (
+				5E3000000000000000000022 /* SafeCache.swift */,
+			);
+			path = Storage;
+			sourceTree = "<group>";
+		};
+		5E2000000000000000000056 /* Network */ = {
+			isa = PBXGroup;
+			children = (
+				5E3000000000000000000023 /* NetworkMonitor.swift */,
+			);
+			path = Network;
+			sourceTree = "<group>";
+		};
+		5E2000000000000000000057 /* Operations */ = {
+			isa = PBXGroup;
+			children = (
+				5E3000000000000000000024 /* OperationsHomeView.swift */,
+				5E3000000000000000000026 /* OpsTeamsView.swift */,
+				5E3000000000000000000027 /* OpsReadinessView.swift */,
+				5E3000000000000000000028 /* OpsVehiclesView.swift */,
+				5E3000000000000000000029 /* OpsEventsView.swift */,
+				5E300000000000000000002A /* OpsMapView.swift */,
+				5E300000000000000000002B /* DecisionCenterView.swift */,
+				5E3000000000000000000043 /* VehicleHistoryView.swift */,
+				5E3000000000000000000044 /* VehicleRegistryView.swift */,
+				5E300000000000000000005A /* OpsTimelinesView.swift */,
+				5E3000000000000000000067 /* SignoutsOpsView.swift */,
+			);
+			path = Operations;
+			sourceTree = "<group>";
+		};
+		5E2000000000000000000058 /* ScheduleOps */ = {
+			isa = PBXGroup;
+			children = (
+				5E300000000000000000002D /* ScheduleOpsViewModel.swift */,
+				5E300000000000000000002E /* ScheduleRosterGrid.swift */,
+				5E300000000000000000002F /* ScheduleHubView.swift */,
+				5E3000000000000000000030 /* ScheduleMonthView.swift */,
+				5E3000000000000000000031 /* ScheduleDayView.swift */,
+				5E3000000000000000000032 /* ScheduleTeamView.swift */,
+				5E3000000000000000000033 /* ScheduleEmployeeView.swift */,
+				5E3000000000000000000034 /* ScheduleCellSheet.swift */,
+				5E3000000000000000000035 /* ScheduleHistoryView.swift */,
+				5E3000000000000000000036 /* ScheduleAdvancedView.swift */,
+			);
+			path = ScheduleOps;
+			sourceTree = "<group>";
+		};
+		5E2000000000000000000059 /* CompletionOps */ = {
+			isa = PBXGroup;
+			children = (
+				5E3000000000000000000038 /* CompletionOpsViewModel.swift */,
+				5E3000000000000000000039 /* CompletionOpsView.swift */,
+				5E300000000000000000003A /* CompletionSupportView.swift */,
+				5E300000000000000000003B /* CompletionRecordsView.swift */,
+			);
+			path = CompletionOps;
+			sourceTree = "<group>";
+		};
+		5E200000000000000000005A /* PositioningOps */ = {
+			isa = PBXGroup;
+			children = (
+				5E300000000000000000003D /* PositioningOpsViewModel.swift */,
+				5E300000000000000000003E /* PositioningOpsView.swift */,
+			);
+			path = PositioningOps;
+			sourceTree = "<group>";
+		};
+		5E200000000000000000005B /* DispatchOps */ = {
+			isa = PBXGroup;
+			children = (
+				5E3000000000000000000040 /* DispatchOpsViewModel.swift */,
+				5E3000000000000000000041 /* DispatchOpsView.swift */,
+			);
+			path = DispatchOps;
+			sourceTree = "<group>";
+		};
+		5E200000000000000000005C /* FormsOps */ = {
+			isa = PBXGroup;
+			children = (
+				5E3000000000000000000046 /* FormsOpsViewModel.swift */,
+				5E3000000000000000000047 /* FormsOpsView.swift */,
+			);
+			path = FormsOps;
+			sourceTree = "<group>";
+		};
+		5E200000000000000000005D /* WorkflowOps */ = {
+			isa = PBXGroup;
+			children = (
+				5E3000000000000000000049 /* WorkflowOpsViewModel.swift */,
+				5E300000000000000000004A /* WorkflowOpsView.swift */,
+			);
+			path = WorkflowOps;
+			sourceTree = "<group>";
+		};
+		5E200000000000000000005E /* ArchiveOps */ = {
+			isa = PBXGroup;
+			children = (
+				5E300000000000000000004C /* ArchiveOpsViewModel.swift */,
+				5E300000000000000000004D /* ArchiveOpsView.swift */,
+			);
+			path = ArchiveOps;
+			sourceTree = "<group>";
+		};
+		5E200000000000000000005F /* AdminOps */ = {
+			isa = PBXGroup;
+			children = (
+				5E3000000000000000000050 /* AdminHubView.swift */,
+				5E3000000000000000000051 /* AdminUsersView.swift */,
+				5E3000000000000000000052 /* AdminEmployeesView.swift */,
+				5E3000000000000000000053 /* AdminRefsView.swift */,
+				5E3000000000000000000054 /* AdminSymbolsView.swift */,
+				5E3000000000000000000055 /* AdminSystemView.swift */,
+				5E3000000000000000000056 /* AdminNotificationsView.swift */,
+				5E300000000000000000006C /* AdminPermissionsView.swift */,
+			);
+			path = AdminOps;
+			sourceTree = "<group>";
+		};
+		5E2000000000000000000060 /* ShiftLifecycle */ = {
+			isa = PBXGroup;
+			children = (
+				5E3000000000000000000058 /* ShiftLifecycleView.swift */,
+			);
+			path = ShiftLifecycle;
+			sourceTree = "<group>";
+		};
+		5E2000000000000000000061 /* AssetsOps */ = {
+			isa = PBXGroup;
+			children = (
+				5E300000000000000000005C /* AssetsHomeView.swift */,
+				5E300000000000000000005D /* AssetDetailViews.swift */,
+			);
+			path = AssetsOps;
+			sourceTree = "<group>";
+		};
+		5E2000000000000000000062 /* HospitalsOps */ = {
+			isa = PBXGroup;
+			children = (
+				5E300000000000000000005F /* HospitalsOpsView.swift */,
+			);
+			path = HospitalsOps;
+			sourceTree = "<group>";
+		};
+		5E2000000000000000000063 /* Chat */ = {
+			isa = PBXGroup;
+			children = (
+				5E3000000000000000000061 /* ChatViews.swift */,
+			);
+			path = Chat;
+			sourceTree = "<group>";
+		};
+		5E2000000000000000000064 /* IndicatorsOps */ = {
+			isa = PBXGroup;
+			children = (
+				5E3000000000000000000063 /* IndicatorsOpsView.swift */,
+			);
+			path = IndicatorsOps;
+			sourceTree = "<group>";
+		};
+		5E2000000000000000000065 /* Requests */ = {
+			isa = PBXGroup;
+			children = (
+				5E3000000000000000000065 /* MyRequestsView.swift */,
+				5E3000000000000000000066 /* RequestsAdminView.swift */,
+			);
+			path = Requests;
+			sourceTree = "<group>";
+		};
+		5E2000000000000000000066 /* FilesOps */ = {
+			isa = PBXGroup;
+			children = (
+				5E3000000000000000000069 /* FilesOpsView.swift */,
+			);
+			path = FilesOps;
+			sourceTree = "<group>";
+		};
+		5E2000000000000000000067 /* Baloot */ = {
+			isa = PBXGroup;
+			children = (
+				5E30000000000000000000B1 /* BalootModels.swift */,
+				5E30000000000000000000B2 /* BalootService.swift */,
+				5E30000000000000000000B3 /* BalootSocket.swift */,
+				5E30000000000000000000B4 /* BalootLobbyViewModel.swift */,
+				5E30000000000000000000B5 /* BalootLobbyView.swift */,
+				5E30000000000000000000B6 /* BalootTableViewModel.swift */,
+				5E30000000000000000000B7 /* BalootTableView.swift */,
+				5E30000000000000000000B8 /* BalootSoundService.swift */,
+				5E200000000000000000006A /* Physics */,
+			);
+			path = Baloot;
+			sourceTree = "<group>";
+		};
+		5E2000000000000000000068 /* UI */ = {
+			isa = PBXGroup;
+			children = (
+				5E30000000000000000000F3 /* RefreshNoticeCenter.swift */,
+			);
+			path = UI;
+			sourceTree = "<group>";
+		};
 		5E2000000000000000000069 /* Sounds */ = {
 			isa = PBXGroup;
 			children = (
 				5E30000000000000000000C1 /* deal.wav */,
 				5E30000000000000000000C2 /* card.wav */,
+				65AA983A306D4F4700DB04CE /* ref_announce.wav */,
+				65AA983C306D4F4700DB04CE /* ref_score.wav */,
+				65AA983D306D4F4700DB04CE /* ref_throw.wav */,
+				65AA983B306D4F4700DB04CE /* ref_bid.wav */,
+				65AA983E306D4F4700DB04CE /* ref_trump.wav */,
 				5E30000000000000000000C3 /* select.wav */,
 				5E30000000000000000000C4 /* contract.wav */,
 				5E30000000000000000000C5 /* trick.wav */,
@@ -876,22 +916,36 @@
 				5E300000000000000000006E /* say_pass.mp3 */,
 				5E300000000000000000006F /* say_ashkal.mp3 */,
 				5E3000000000000000000070 /* say_double.mp3 */,
+				65A95E4130706D2C00447787 /* say_wela.mp3 */,
 				5E3000000000000000000071 /* say_baloot.mp3 */,
 				5E3000000000000000000072 /* say_sara.mp3 */,
 				5E3000000000000000000073 /* say_khamsin.mp3 */,
 				5E3000000000000000000074 /* say_miya.mp3 */,
 				5E3000000000000000000075 /* say_arba.mp3 */,
+				5EAB24093F0AD8AA8A539392 /* ref_round.wav */,
+				B1CC91D26709C435C279BA1A /* ref_hand_start.wav */,
+				0CB976C512EA721BE4DDB0DD /* ref_confirm.wav */,
+				008B56C5A34C0320688EF40A /* ref_suit_reveal.wav */,
+				071F9817FE332CE1B7F9EEC7 /* ref_deal.wav */,
+				2585EE916376E848912F65A4 /* ref_collect.wav */,
+				08BFE9C99F16FE1D3AA8652B /* ref_gold.wav */,
+				3490524580B477D4CC51A466 /* ref_project50.wav */,
+				585CB93E02C4D2169EB63BB1 /* ref_baloot.wav */,
 			);
 			path = Sounds;
 			sourceTree = "<group>";
 		};
-		5E2000000000000000000040 /* EMSOperationsTests */ = {
+		5E200000000000000000006A /* Physics */ = {
 			isa = PBXGroup;
 			children = (
-				5E30000000000000000000E1 /* EMSOperationsTests.swift */,
-				5E30000000000000000000E2 /* BalootModelsTests.swift */,
+				5E30000000000000000000D2 /* BalootPhysics.swift */,
+				5E30000000000000000000D3 /* BalootCardFace.swift */,
+				5E30000000000000000000D4 /* BalootFlightOverlay.swift */,
+				5E30000000000000000000D5 /* BalootTrickDirector.swift */,
+				5E30000000000000000000D6 /* BalootHandCardView.swift */,
+				5E30000000000000000000D7 /* BalootScorePanelView.swift */,
 			);
-			path = EMSOperationsTests;
+			path = Physics;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -980,8 +1034,14 @@
 				5E40000000000000000000C1 /* deal.wav in Resources */,
 				5E40000000000000000000C2 /* card.wav in Resources */,
 				5E40000000000000000000C3 /* select.wav in Resources */,
+				65AA983F306D4F4700DB04CE /* ref_throw.wav in Resources */,
+				65AA9840306D4F4700DB04CE /* ref_trump.wav in Resources */,
+				65AA9841306D4F4700DB04CE /* ref_bid.wav in Resources */,
+				65AA9842306D4F4700DB04CE /* ref_announce.wav in Resources */,
+				65AA9843306D4F4700DB04CE /* ref_score.wav in Resources */,
 				5E40000000000000000000C4 /* contract.wav in Resources */,
 				5E40000000000000000000C5 /* trick.wav in Resources */,
+				65A95E4230706D2C00447787 /* say_wela.mp3 in Resources */,
 				5E40000000000000000000C6 /* hand_end.wav in Resources */,
 				5E40000000000000000000C7 /* match_end.wav in Resources */,
 				5E40000000000000000000C8 /* your_turn.wav in Resources */,
@@ -995,6 +1055,15 @@
 				5E4000000000000000000073 /* say_khamsin.mp3 in Resources */,
 				5E4000000000000000000074 /* say_miya.mp3 in Resources */,
 				5E4000000000000000000075 /* say_arba.mp3 in Resources */,
+				FCC267097C26A5F8B81BB7C4 /* ref_round.wav in Resources */,
+				2882F3E2CA16F659F81A8B1A /* ref_hand_start.wav in Resources */,
+				4EC966E317AA410D86A4F8A5 /* ref_confirm.wav in Resources */,
+				65F35992E763B1776E364B8A /* ref_suit_reveal.wav in Resources */,
+				8A3D1277CA9C990BEEF4044F /* ref_deal.wav in Resources */,
+				9BFA60D73C3AEE2C0BF0511C /* ref_collect.wav in Resources */,
+				3C35C51CAEA1EAE2F49CCA0B /* ref_gold.wav in Resources */,
+				C5EA3420BB004942BC75E234 /* ref_project50.wav in Resources */,
+				0D8AADC52CE59F64C66C34F4 /* ref_baloot.wav in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1019,6 +1088,7 @@
 				5E4000000000000000000005 /* APIClient.swift in Sources */,
 				5E4000000000000000000006 /* APIError.swift in Sources */,
 				5E40000000000000000000F3 /* RefreshNoticeCenter.swift in Sources */,
+				5E40000000000000000000F4 /* AppVersioning.swift in Sources */,
 				5E4000000000000000000007 /* AuthDTO.swift in Sources */,
 				5E4000000000000000000008 /* PortalDTO.swift in Sources */,
 				5E4000000000000000000009 /* KeychainService.swift in Sources */,
@@ -1144,6 +1214,8 @@
 			files = (
 				5E40000000000000000000E1 /* EMSOperationsTests.swift in Sources */,
 				5E40000000000000000000E2 /* BalootModelsTests.swift in Sources */,
+				5E40000000000000000000F5 /* AppVersionGateTests.swift in Sources */,
+				5E40000000000000000000F6 /* BalootCardFaceRenderTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1279,7 +1351,8 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = "";
 				CODE_SIGN_ENTITLEMENTS = EMSOperations/Resources/EMSOperations.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
+				DEVELOPMENT_TEAM = K5Z9ZFF6U8;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = EMSOperations/Resources/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -1302,7 +1375,8 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = "";
 				CODE_SIGN_ENTITLEMENTS = EMSOperations/Resources/EMSOperations.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
+				DEVELOPMENT_TEAM = K5Z9ZFF6U8;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = EMSOperations/Resources/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -1323,7 +1397,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				GENERATE_INFOPLIST_FILE = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -1345,7 +1419,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				GENERATE_INFOPLIST_FILE = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",

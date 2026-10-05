@@ -46,11 +46,18 @@ struct BalootTableView: View {
     @State private var dealBacksHand = 0
     @State private var dealCounts: [Int: Int] = [:]
     @State private var dealGen = 0
+    /// رقم الصفقة التي شُغّل فيها فولي التوزيع — يضمن تشغيلًا واحدًا لكل صفقة.
+    @State private var dealSoundHand = 0
     // HUD (المرحلة 04 — v1.1): إعلان العقد الذهبي + انفجار زات الحكم +
     // وضع اختيار الزات (خطوة عرض محلية بلا أي منطق قواعد)
     @State private var showContractText = false
     @State private var showTrumpBurst = false
     @State private var suitPickMode = false
+    // Stage 06 — Final Audit: مشغّلات صوتية مرتبطة بالأحداث البصرية فقط
+    @State private var handStartSeen = 0        // آخر handStartToken عولج
+    @State private var pendingHandChime = false // رنين بداية مؤجل خلف لوحة الحسبة (D6)
+    @State private var round2BarSeen = false    // أول ظهور لشريط الجولة الثانية (11.01 ← ref_round)
+    @State private var lastHandPhase: String? = nil // لرصد انتقال السوق → اللعب (20.90 ← ref_deal)
 
     private let tableId: Int
 
@@ -294,11 +301,15 @@ struct BalootTableView: View {
                 tableArena(felt: felt)
 
                 // HUD علوي كتدفق مرن بعرض الشاشة: هيدر عائم ← شريط النقاط
-                // (مع معلومات الجولة وسطه) ← الحالات ← آخر حدث ← اللاعب
-                // العلوي أسفلها مباشرة (لا position ثابت — لا قصّ ولا تداخل).
+                // (مع معلومات الجولة وسطه) ← الحالات. (Stage 07: اللاعب
+                // العلوي انتقل إلى ساحة اللباد — tableArena — قرب الطاولة
+                // كما في المرجع البصري).
                 VStack(spacing: 6) {
                     floatingHeader
+                    // «النتيجة» عنصر HUD مستقل بفصل واضح ومتوازن عن بطاقة
+                    // رقم الطاولة — لا التصاق ولا تداخل (Positioning فقط).
                     scoreStrip
+                        .padding(.top, 12)
                     if let err = vm.actionError {
                         Text(err)
                             .font(.caption2)
@@ -310,14 +321,20 @@ struct BalootTableView: View {
                     if vm.isSpectator { spectatorCapsule }
                     // (v1.1 / P-H11) lastEventLine أُزيل — المزايدات تظهر
                     // فقاعاتٍ بجانب كل مقعد من hand.bids بدل سطر الأحداث.
-                    // اللاعب العلوي أسفل الـHUD بمسافة مريحة — لا تداخل أبدًا
-                    seatPod(relative: 2)
-                        .padding(.top, 6)
                     Spacer()
                 }
-                .frame(maxWidth: .infinity)
                 .padding(.horizontal, 16)
-                .padding(.top, 56)
+                // قفل عرض الـHUD على عرض الشاشة الفعلي حرفيًا: الخلفية
+                // (scaledToFill + ignoresSafeArea) تجعل الـZStack أعرض من
+                // الشاشة ومزاحًا يسارًا، وmaxWidth: .infinity كان يرث هذا
+                // العرض فيدفع بطاقة رقم الطاولة خارج الحافة اليسرى ويزيح
+                // تمركز «النتيجة». بقفل العرض على geo.size.width يتمركز
+                // الـHUD على الشاشة نفسها ولا يمكن لأي عنصر تجاوز حوافها.
+                .frame(width: geo.size.width)
+                // أعلى الـHUD داخل الـSafe Area دائمًا: إن كان المشهد يمتد
+                // تحت الجزيرة (الخلفية تتجاوز الحواف) نستخدم inset الفعلي
+                // + 8، وإلا نبقي الإزاحة الحالية 56 كما هي بلا تغيير بصري.
+                .padding(.top, max(geo.safeAreaInsets.top > 0 ? geo.safeAreaInsets.top + 8 : 0, 56))
 
                 // اليد والأفعال عند الحافة السفلية للطاولة — تتراكب على الإطار الخشبي
                 VStack(spacing: 6) {
@@ -411,10 +428,53 @@ struct BalootTableView: View {
                     try? await Task.sleep(nanoseconds: scorePanelNanoseconds)
                     guard vm.handScore != nil else { return }
                     withAnimation(.easeInOut(duration: 0.3)) { showScorePanel = true }
+                    // S04 — jingle فتح لوحة الحسبة في لحظة الفتح الفعلية (Stage 06)
+                    sound.play(.refScore)
                 }
             }
             .onChange(of: vm.handScore != nil) { hasScore in
                 if !hasScore { withAnimation(.easeInOut(duration: 0.25)) { showScorePanel = false } }
+            }
+            // Stage 06 — 0.39: رنين بداية الصفقة. المرجع يُظهره على طاولة
+            // خالية — إن كانت لوحة الحسبة ظاهرة أو قادمة يُؤجَّل حتى تُغلق (D6)
+            .onChange(of: vm.handStartToken) { token in
+                guard token != handStartSeen else { return }
+                handStartSeen = token
+                if showScorePanel || vm.handScore != nil {
+                    pendingHandChime = true
+                } else {
+                    sound.play(.refHandStart)
+                }
+            }
+            .onChange(of: showScorePanel) { showing in
+                if !showing, pendingHandChime {
+                    pendingHandChime = false
+                    sound.play(.refHandStart)
+                }
+            }
+            // Stage 06 — 11.01 + 15.17: أول ظهور لشريط مزايدة الجولة الثانية
+            // = سويش الانتقال الثاني (ref_round)، وكل ظهور لاحق للشريط في نفس
+            // الجولة = نغمة التأكيد (ref_confirm). Trigger واحد لكل ظهور —
+            // بلا ازدواج مع أصوات أحداث السوق (D2/D5)
+            .onChange(of: vm.options?.myTurn == true && vm.matchState?.hand?.phase == "bidding2") { cue in
+                guard cue else { return }
+                if !round2BarSeen {
+                    round2BarSeen = true
+                    sound.play(.refRound)
+                } else {
+                    sound.play(.refConfirm)
+                }
+            }
+            // Stage 06 — 16.52: سويش ظهور شريط «تأكيد حكم» في لحظة ظهوره (D3)
+            .onChange(of: suitPickMode) { picking in
+                if picking { sound.play(.refSuitReveal) }
+            }
+            // Stage 06 — 20.90: فولي التوزيع انتقل إلى syncDealBacks ليُشغَّل
+            // مع بداية طيران الأوراق فعليًا (قرار المالك) — هنا يبقى فقط
+            // تصفير مؤشر شريط الجولة الثانية خارجها
+            .onChange(of: vm.matchState?.hand?.phase) { phase in
+                if phase != "bidding2" { round2BarSeen = false }
+                lastHandPhase = phase
             }
             // صدى الخادم: الورقة غادرت يدي فعلًا → أنهِ الإخفاء المحلي
             .onChange(of: vm.matchState?.hand?.myHand) { newHand in
@@ -469,8 +529,8 @@ struct BalootTableView: View {
     }
 
     /// توزيع الخصوم ظهرًا لأعلى (§5 / المرجع 21.0): مع بداية الصفقة تطير
-    /// أوراق زرقاء الظهر من مركز الطاولة إلى مقاعد الخصوم بنفس إيقاع توزيع
-    /// يد اللاعب — بلا Flip وبلا Assets جديدة (نفس تدرج miniCardBacks).
+    /// أوراق بظهر «قطاع الجنوب» (Stage 07) من مركز الطاولة إلى مقاعد
+    /// الخصوم بنفس إيقاع توزيع يد اللاعب — بلا Flip وبلا Assets جديدة.
     /// عرض صرف فوق عدّادات الخادم (handCounts) — لا يغيّر أي حالة لعب.
     private func syncDealBacks(arena: BalootArenaGeometry) {
         guard let match = vm.matchState, let hand = match.hand,
@@ -508,6 +568,14 @@ struct BalootTableView: View {
             dealCounts[seat] = count
         }
         guard added > 0 else { return }
+        // Stage 06 — 20.90: فولي التوزيع مع بداية حركة الأوراق الفعلية على
+        // الشاشة (أول رحلة تُضاف)، وليس مع تغيّر الـphase وحده — قرار المالك.
+        // التوزيع الثاني فقط (phase == playing): توزيع بداية الصفقة له رنينه
+        // الخاص (0.39 ← ref_hand_start). مرة واحدة لكل صفقة.
+        if hand.phase == "playing", dealSoundHand != hn {
+            dealSoundHand = hn
+            sound.play(.refDeal)
+        }
         // نظّف الرحلات بعد اكتمال آخر طيران (آخر تأخير + المدة + هامش)
         let lifetime = Double(seq) * BalootPhysics.dealStagger + BalootPhysics.dealFlightDuration + 0.2
         let lifetimeNanoseconds = UInt64(lifetime * 1_000_000_000)
@@ -556,9 +624,11 @@ struct BalootTableView: View {
         }
     }
 
-    /// شريط النتيجة حسب المرجع (v1.1 §1): «لهم X : X لنا» بسطر واحد يمينًا —
-    /// لهم أحمر / لنا أخضر. لا عناصر إضافية (بقرار المالك في المراجعة
-    /// النهائية قبل الرفع). نقاط الصفقة الجارية لا تُعرض — P-H2 PENDING.
+    /// بطاقة النتيجة (Stage 07 — قرار المالك): «النتيجة» عنوانًا ذهبيًا واضحًا
+    /// فوق «لهم X : X لنا» بأرقام كبيرة ثقيلة — بطاقة HUD فعلية مقروءة أثناء
+    /// اللعب، مستقلة عن بطاقة رقم الطاولة، متمركزة أعلى الشاشة بلا اقتراب من
+    /// الحواف ولا تداخل مع اللاعبين أو الأوراق. لهم أحمر / لنا أخضر — نفس
+    /// الهوية (زجاج داكن + إطار ذهبي). نقاط الصفقة الجارية لا تُعرض — P-H2.
     private var scoreStrip: some View {
         let myTeam = vm.matchState?.seats?.first(where: { $0.seat == vm.mySeat })?.team
         let scoreA = vm.matchState?.scores?.A ?? 0
@@ -567,34 +637,41 @@ struct BalootTableView: View {
         let theirs = myTeam == "B" ? scoreA : scoreB
         let shownTheirs = myTeam == nil ? scoreB : theirs
         let shownOurs = myTeam == nil ? scoreA : ours
-        return HStack {
-            // «لهم X : X لنا» — أول عنصر في يمين الشريط في RTL كما في المرجع
-            HStack(spacing: 5) {
-                Text("لهم")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(EMSTheme.Colors.danger)
-                Text("\(shownTheirs)")
-                    .font(.headline.weight(.heavy))
-                    .foregroundStyle(EMSTheme.Colors.danger)
+        return VStack(spacing: 4) {
+            Text("النتيجة")
+                .font(.subheadline.weight(.heavy))
+                .foregroundStyle(gold)
+            HStack(spacing: 14) {
+                HStack(spacing: 6) {
+                    Text("لهم")
+                        .font(.callout.weight(.semibold))
+                        .foregroundStyle(EMSTheme.Colors.danger)
+                    Text("\(shownTheirs)")
+                        .font(.title2.weight(.heavy))
+                        .foregroundStyle(EMSTheme.Colors.danger)
+                }
                 Text(":")
-                    .font(.subheadline.weight(.bold))
+                    .font(.title3.weight(.bold))
                     .foregroundStyle(Color.white.opacity(0.65))
-                Text("\(shownOurs)")
-                    .font(.headline.weight(.heavy))
-                    .foregroundStyle(EMSTheme.Colors.emerald)
-                Text("لنا")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(EMSTheme.Colors.emerald)
+                HStack(spacing: 6) {
+                    Text("\(shownOurs)")
+                        .font(.title2.weight(.heavy))
+                        .foregroundStyle(EMSTheme.Colors.emerald)
+                    Text("لنا")
+                        .font(.callout.weight(.semibold))
+                        .foregroundStyle(EMSTheme.Colors.emerald)
+                }
             }
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 7)
-        .background(Color.black.opacity(0.55))
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .padding(.horizontal, 30)
+        .padding(.vertical, 10)
+        .background(Color.black.opacity(0.6))
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(gold.opacity(0.3), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(gold.opacity(0.45), lineWidth: 1.25)
         )
+        .shadow(color: .black.opacity(0.4), radius: 10, y: 5)
         .frame(maxWidth: .infinity)
     }
 
@@ -602,23 +679,43 @@ struct BalootTableView: View {
 
     // MARK: - ساحة الطاولة (المقاعد + المركز داخل اللباد)
 
-    /// اللاعبان الجانبان والمركز داخل اللباد بإحداثياته — الشريك العلوي في
-    /// تدفق الـHUD.
+    /// اللاعبون الثلاثة والمركز داخل اللباد بإحداثياته (Stage 07: الشريك
+    /// العلوي انتقل من تدفق الـHUD إلى حافة اللباد العلوية — قريبًا من
+    /// منطقة اللعب كما في المرجع البصري، ليعطي إحساس الجلوس حول الطاولة).
     private func tableArena(felt: CGRect) -> some View {
         ZStack {
+            // شعار قطاع الجنوب في منتصف اللباد (قرار المالك — الشعار كما
+            // أُرسل بلا تعديل): جزء بصري من اللباد — يرسم تحت centerStage
+            // وأوراق اللعب، وليس Overlay عائمًا فوقها
+            Image("baloot_sector_logo")
+                .resizable()
+                .scaledToFit()
+                .frame(width: felt.width * 0.56)
+                .position(x: felt.midX, y: felt.midY - felt.height * 0.03)
+
             centerStage
                 .frame(width: felt.width * 0.62, height: felt.height * 0.45)
                 .position(x: felt.midX, y: felt.midY - felt.height * 0.03)
 
+            // الشريك العلوي — Stage 07 Final: المقعد كاملًا أقرب لحافة
+            // الطاولة (كان felt.minY + 4 بعيدًا عن مركز اللعب في المرجع
+            // البصري). 9% من ارتفاع اللباد تقرّبه بلا أن يلاصق الطاولة
+            // أو يغطيها، وتبقى نقطة هبوط أوراقه (Physics seatOrigin)
+            // داخل منطقة مروحة ظهوره كما هي.
+            seatPod(relative: 2)
+                .position(x: felt.midX, y: felt.minY + felt.height * 0.09)
+
             seatPod(relative: 1) // يميني
-                .position(x: felt.maxX - 48, y: felt.midY - felt.height * 0.08)
+                .position(x: felt.maxX - 52, y: felt.midY - felt.height * 0.08)
 
             seatPod(relative: 3) // يساري
-                .position(x: felt.minX + 48, y: felt.midY - felt.height * 0.08)
+                .position(x: felt.minX + 52, y: felt.midY - felt.height * 0.08)
         }
     }
 
-    /// مقعد لاعب (v1.1 §2): أفاتار + اسم + ظهور أوراقه + شارة «الموزع»
+    /// مقعد لاعب (v1.1 §2 + Stage 07 Presentation): مروحة ظهور أوراق اللاعب
+    /// خلف الأفاتار كما في المرجع البصري + أفاتار دائري أكبر وأوضح + اسم
+    /// مقروء في شريط داكن أنيق (يُقتطع بلا تخريب للتخطيط) + شارة «الموزع»
     /// الخضراء (dealerSeat) + علامة حكم ذهبية للمشتري (contract) + فقاعة
     /// مزايدته الأخيرة أثناء السوق (hand.bids) — وحلقة خضراء لصاحب الدور
     /// (turnSeat فقط؛ لا عدّ رقمي — P-H4).
@@ -628,25 +725,37 @@ struct BalootTableView: View {
         let hand = vm.matchState?.hand
         let count = hand?.handCounts?[String(seat)] ?? 0
         let name = podName(seat)
-        return VStack(spacing: 2) {
-            seatAvatar(seat: seat, name: name, isTurn: isTurn)
-                .overlay(alignment: .top) {
-                    bidBubble(seat: seat, hand: hand).offset(y: -28)
+        return VStack(spacing: 3) {
+            ZStack {
+                // مروحة ظهور أوراقه قوسية خلف الأفاتار (المرجع البصري)
+                if count > 0 {
+                    miniCardBacks(count: count)
+                        .offset(y: -24)
                 }
+                seatAvatar(seat: seat, name: name, isTurn: isTurn)
+                    .overlay(alignment: .top) {
+                        bidBubble(seat: seat, hand: hand).offset(y: -46)
+                    }
+            }
+            .padding(.top, 26)
             HStack(spacing: 4) {
                 Text(name)
-                    .font(.caption2.weight(isTurn ? .bold : .medium))
-                    .foregroundStyle(isTurn ? turnGreen : Color.white.opacity(0.85))
+                    .font(.caption.weight(isTurn ? .heavy : .semibold))
+                    .foregroundStyle(isTurn ? turnGreen : Color.white.opacity(0.92))
                     .lineLimit(1)
                 // علامة الحكم الذهبية بجانب المشتري طوال الصفقة (v1.1 §5)
                 if hand?.contract?.buyerSeat == seat, let ts = hand?.contract?.trumpSuit {
                     let buyerSymbol = BalootLabels.suitSymbol[ts] ?? ""
                     Text(buyerSymbol)
-                        .font(.caption2.weight(.bold))
+                        .font(.caption.weight(.bold))
                         .foregroundStyle(gold)
                 }
             }
-            .frame(width: 76)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 2)
+            .background(Color.black.opacity(0.38))
+            .clipShape(Capsule())
+            .frame(width: 96)
             // شارة «الموزع» الخضراء (v1.1 §2) — من dealerSeat
             if hand?.dealerSeat == seat {
                 Text("الموزع")
@@ -655,9 +764,6 @@ struct BalootTableView: View {
                     .padding(.horizontal, 7).padding(.vertical, 2)
                     .background(turnGreen)
                     .clipShape(Capsule())
-            }
-            if count > 0 {
-                miniCardBacks(count: count)
             }
         }
         .animation(.easeInOut(duration: 0.3), value: isTurn)
@@ -701,6 +807,7 @@ struct BalootTableView: View {
 
     /// صورة اللاعب: صورة الموظف إن وُجدت (AsyncImage) وإلا حرف اسمه —
     /// نفس الدائرة والتوهج الذهبي لصاحب الدور في الحالتين. لا حرف فوق الصورة.
+    /// (Stage 07: قطر أكبر 58 ليقترب من حضور الأفاتار في المرجع البصري.)
     private func seatAvatar(seat: Int, name: String, isTurn: Bool) -> some View {
         ZStack {
             if let url = seatAvatarUrl(seat) {
@@ -716,21 +823,21 @@ struct BalootTableView: View {
                 avatarLetter(name, isTurn: isTurn)
             }
         }
-        .frame(width: 46, height: 46)
+        .frame(width: 58, height: 58)
         .background(podColor.opacity(0.9))
         .clipShape(Circle())
         // حلقة الدور الخضراء (v1.1 §2/P-H4) — من turnSeat فقط، بلا عدّ رقمي
         .overlay(
             Circle()
-                .stroke(isTurn ? turnGreen : gold.opacity(0.45), lineWidth: isTurn ? 2.5 : 1.5)
+                .stroke(isTurn ? turnGreen : gold.opacity(0.45), lineWidth: isTurn ? 3 : 2)
         )
-        .shadow(color: isTurn ? turnGreen.opacity(0.55) : .clear, radius: isTurn ? 9 : 0)
+        .shadow(color: isTurn ? turnGreen.opacity(0.55) : .clear, radius: isTurn ? 10 : 0)
     }
 
     /// حرف الاسم — شكل الـfallback والحالة الحالية حتى يوفر الخادم الصور.
     private func avatarLetter(_ name: String, isTurn: Bool) -> some View {
         Text(String(name.prefix(1)))
-            .font(.headline.weight(.bold))
+            .font(.title3.weight(.bold))
             .foregroundStyle(isTurn ? turnGreen : Color.white.opacity(0.9))
     }
 
@@ -745,25 +852,35 @@ struct BalootTableView: View {
                              resolvingAgainstBaseURL: false)?.url
     }
 
-    /// ظهور أوراق زرقاء صغيرة بعدد أوراق اللاعب — كما في جلسات البلوت.
+    /// مروحة ظهور أوراق اللاعب خلف أفاتاره (Stage 07 — المرجع البصري):
+    /// قوس ظهور بألوان ظهر «قطاع الجنوب» الرسمي بعدد أوراقه الفعلي
+    /// (handCounts) — الحجم الصغير لا يتسع لنص الشارة، الألوان نفسها.
     private func miniCardBacks(count: Int) -> some View {
         let shown = min(count, 8)
-        return HStack(spacing: -5) {
+        return ZStack {
             ForEach(0..<shown, id: \.self) { i in
-                RoundedRectangle(cornerRadius: 2, style: .continuous)
-                    .fill(LinearGradient(colors: [Color(red: 0.15, green: 0.28, blue: 0.60),
-                                                  Color(red: 0.08, green: 0.16, blue: 0.38)],
-                                         startPoint: .top, endPoint: .bottom))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 2, style: .continuous)
-                            .stroke(Color.white.opacity(0.25), lineWidth: 0.5)
-                    )
-                    .frame(width: 10, height: 15)
-                    .rotationEffect(.degrees(Double(i - shown / 2) * 5))
+                let t = shown > 1 ? Double(i) / Double(shown - 1) : 0.5
+                podMiniBack
+                    .rotationEffect(.degrees((t - 0.5) * 52), anchor: .bottom)
+                    .offset(x: (CGFloat(t) - 0.5) * 42)
                     .zIndex(Double(i))
             }
         }
-        .frame(height: 17)
+        .frame(width: 76, height: 34)
+    }
+
+    /// ظهر مصغّر بنفس هوية BalootCardBack (أخضر عميق + إطار ذهبي).
+    private var podMiniBack: some View {
+        RoundedRectangle(cornerRadius: 2.5, style: .continuous)
+            .fill(LinearGradient(colors: [Color(red: 0.09, green: 0.27, blue: 0.18),
+                                          Color(red: 0.045, green: 0.15, blue: 0.11)],
+                                 startPoint: .top, endPoint: .bottom))
+            .overlay(
+                RoundedRectangle(cornerRadius: 2.5, style: .continuous)
+                    .stroke(gold.opacity(0.5), lineWidth: 0.5)
+            )
+            .frame(width: 15, height: 22)
+            .shadow(color: .black.opacity(0.35), radius: 2, y: 1)
     }
 
     /// مركز الطاولة: الورقة المكشوفة في السوق، واللفة موزعة باتجاه أصحابها
@@ -903,7 +1020,7 @@ struct BalootTableView: View {
                 .clipShape(Circle())
                 .overlay(Circle().stroke(gold.opacity(0.35), lineWidth: 1))
 
-            Spacer()
+            Spacer(minLength: 8)
 
             Button { dismiss() } label: {
                 HStack(spacing: 8) {
@@ -912,6 +1029,11 @@ struct BalootTableView: View {
                     Text("طاولة بلوت #\(tableId)")
                         .font(.subheadline.weight(.semibold))
                         .lineLimit(1)
+                        // الحبّة لا تخرج من الشاشة أبدًا ولا يُقتطع الرقم:
+                        // النص يُصغَّر تدريجيًا عند الضيق (خط أكبر في إعدادات
+                        // الجهاز مثلًا) بدل القص أو تجاوز الحافة — بلا أي
+                        // تغيير في الحجم أو التصميم في الوضع الطبيعي.
+                        .minimumScaleFactor(0.75)
                 }
                 .foregroundStyle(Color.white.opacity(0.92))
                 .padding(.horizontal, 14)
@@ -920,6 +1042,7 @@ struct BalootTableView: View {
                 .clipShape(Capsule())
                 .overlay(Capsule().stroke(gold.opacity(0.35), lineWidth: 1))
             }
+            .layoutPriority(1)
             .accessibilityLabel("رجوع")
         }
         .padding(.bottom, 2)
@@ -1104,7 +1227,11 @@ struct BalootTableView: View {
                                              : AnyShapeStyle(Color.gray.opacity(0.45))
         let bidStroke: Color = enabled ? gold.opacity(0.6) : Color.white.opacity(0.15)
         Button {
-            if kind == "hokum" { suitPickMode = true }
+            // الجولة الأولى: الحكم = زات الورقة المكشوفة حصرًا (ruleset §4.1)
+            // — لا اختيار زات أصلًا، فنزايد مباشرة بلا شريط زات (الخادم كان
+            // يعرض الأربعة ثم يتجاهل الاختيار = وهم اختيار). الجولة الثانية
+            // فقط هي التي يختار فيها المشتري الزات (§4.2).
+            if kind == "hokum" && opts.phase == "bidding2" { suitPickMode = true }
             else { Task { await vm.bid(kind: kind, trumpSuit: nil) } }
         } label: {
             Text(bidTitle)
@@ -1225,10 +1352,11 @@ struct BalootTableView: View {
     }
 
     /// تداخل المروحة: كلما كثرت الأوراق ضاقت المسافة حتى تملأ عرض الشاشة.
+    /// (Stage 07: تداخل أعمق قريب من المرجع البصري على عرض الورقة 70.)
     private func handSpacing(for count: Int) -> CGFloat {
         guard count > 1 else { return 0 }
-        // عرض الورقة 66 — نجعل المروحة كلها ضمن ~عرض الجهاز
-        return count <= 5 ? 8 : (count <= 7 ? -20 : -28)
+        // عرض الورقة 70 — نجعل المروحة كلها ضمن ~عرض الجهاز
+        return count <= 5 ? 2 : (count <= 7 ? -24 : -34)
     }
 
     /// ورقة في يدي — المظهر القائم حرفيًا + طبقة الفيزياء (سحب/رفع/توزيع).
@@ -1242,7 +1370,7 @@ struct BalootTableView: View {
         let allowed = playing && (opts?.cards.contains(card.code) ?? false)
         let canBaloot = allowed && (opts?.balootCards.contains(card.code) ?? false)
         // موضع الورقة في المروحة → إزاحة انطلاق التوزيع من مركز الطاولة
-        let cardW: CGFloat = 66
+        let cardW = BalootCardSize.hand.dims.0
         let slotX = containerWidth / 2 + (CGFloat(index) - CGFloat(total - 1) / 2) * (cardW + spacing)
         let slotY = felt.maxY + 35
         let dealDelta = CGSize(width: arena.clusterCenter.x - slotX,

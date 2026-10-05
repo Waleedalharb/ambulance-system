@@ -36,6 +36,7 @@ final class BalootSoundService: ObservableObject {
         case saySunn = "say_sunn"       // «صن»
         case sayHokum = "say_hokum"     // «حكم»
         case sayPass = "say_pass"       // «بس»
+        case sayWela = "say_wela"       // «ولا» — تسجيل رسمي من المالك (Stage 07)
         case sayAshkal = "say_ashkal"   // «أشكل»
         case sayDouble = "say_double"   // «دبل»
         case sayBaloot = "say_baloot"   // «بلوت»
@@ -43,6 +44,27 @@ final class BalootSoundService: ObservableObject {
         case sayKhamsin = "say_khamsin" // «خمسين»
         case sayMiya = "say_miya"       // «مية»
         case sayArba = "say_arba"       // «أربعمية»
+        // Stage 06 — Reference Lock: الأصوات الخمسة المعتمدة من المرجع فقط
+        // (one-shot، بلا voiceover ولا loops). الأصول والحالات القديمة أعلاه
+        // محفوظة كما هي — تعطيلها يتم عند نقطة النداء لا هنا.
+        case refThrow = "ref_throw"       // S01 — بداية رمية الورقة
+        case refBid = "ref_bid"           // S02b — صوت مزايدة عام واحد
+        case refTrump = "ref_trump"       // S03 — كشف/تأكيد الحكم (بزات فقط)
+        case refScore = "ref_score"       // S04 — فتح لوحة الحسبة
+        case refAnnounce = "ref_announce" // S06 — إعلان مشروع/بلوت (ستينغر مشترك)
+        // Stage 06 — Final Audit: الأصول السبعة الإضافية المعتمدة من المرجع.
+        // ربطها عند الأحداث البصرية الفعلية فقط — بلا اختراع وبلا تعميم.
+        case refHandStart = "ref_hand_start"   // 0.39 — بداية الصفقة/المؤقت (بعد إغلاق لوحة الحسبة)
+        case refBidR1 = "ref_bid_r1"           // 1.71+ — رنين مزايدة الجولة الأولى
+        case refRound = "ref_round"            // 6.04/11.01 — سويش انتقال الجولة (باسي)
+        case refConfirm = "ref_confirm"        // 15.17 — نغمة ظهور شريط التأكيد
+        case refSuitReveal = "ref_suit_reveal" // 16.52 — سويش ظهور شريط «تأكيد حكم»
+        case refDeal = "ref_deal"              // 20.90 — فولي استكمال توزيع الورق (الدفعة الثانية)
+        case refCollect = "ref_collect"        // 28.62+ — سويش جمع الأكلة (من collectTrick فعليًا)
+        // مستخرجة من الـMaster Reference نفسه بإذن المالك (لا اختراع):
+        case refGold = "ref_gold"              // 13.16 — «حكم ثاني» الذهبي
+        case refProject50 = "ref_project50"    // 26.06 — إعلان الخمسين (هوية أسطع)
+        case refBaloot = "ref_baloot"          // 63.91 — إعلان البلوت (هوية مستقلة)
 
         /// النداءات المنطوقة mp3 والمؤثرات wav.
         var fileExtension: String { rawValue.hasPrefix("say_") ? "mp3" : "wav" }
@@ -89,6 +111,15 @@ final class BalootSoundService: ObservableObject {
         guard !isMuted, let player = players[fx] else { return }
         player.currentTime = 0
         player.play()
+    }
+
+    /// Stage 06 — النداءات المنطوقة: جدولة غير حاجبة بعد المؤثر المرجعي
+    /// بفواصل مقاسة من الفيديو (0.11–0.64ث). play(atTime:) يجدول على محرك
+    /// الصوت نفسه — بلا sleep ولا Task ولا لمس للـMain Thread.
+    func play(_ fx: Effect, afterDelay delay: Double) {
+        guard !isMuted, let player = players[fx] else { return }
+        player.currentTime = 0
+        player.play(atTime: player.deviceCurrentTime + delay)
     }
 
     /// زر «تجربة الصوت» في قائمة الطاولة — يثبت على الجهاز أن القناة تعمل.

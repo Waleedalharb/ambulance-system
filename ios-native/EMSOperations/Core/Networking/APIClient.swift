@@ -59,6 +59,12 @@ actor APIClient {
         try await send(.post, path, query: [:], body: body, authorized: false, retried: false)
     }
 
+    /// GET بلا مصادقة — فحص إصدار التطبيق يحدث قبل تسجيل الدخول وقبل أي
+    /// جلسة فعّالة، فيحتاج مسارًا عامًا بنفس قواعد send (مهلة/فك أخطاء).
+    func getPublic<T: Decodable>(_ path: String, query: [String: String] = [:]) async throws -> T {
+        try await send(.get, path, query: query, body: nil as String?, authorized: false, retried: false)
+    }
+
     /// PUT بنفس قواعد post (تعديل خلية الجدول ونحوها).
     func put<T: Decodable>(_ path: String, body: (some Encodable)? = nil) async throws -> T {
         try await send(.put, path, query: [:], body: body, authorized: true, retried: false)

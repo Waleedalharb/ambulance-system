@@ -43,22 +43,28 @@ struct BalootHandCardView: View {
     /// ⚠️ TEMPORARY (P-P1) — عتبات الإيماءة غير مثبتة؛ معزولة وقابلة للضبط.
     private let tuning = BalootGestureTuning()
 
-    private var fanAngle: Double { Double(index - (total - 1) / 2) * 3.5 }
+    // Stage 07 Final: قوس ألطف (3.8° بدل 4.2°) — ميلان طبيعي متوازن
+    // حول المنتصف ولا يدفع أطراف الأوراق نحو حافة الشاشة
+    private var fanAngle: Double { Double(index - (total - 1) / 2) * 3.8 }
     private var dealAngle: Double { (index % 2 == 0 ? 1 : -1) * BalootPhysics.dealTilt }
 
     var body: some View {
         BalootCardFace(card: card, size: .hand, dimmed: playing && !allowed)
             // ميلان المروحة يُصفَّر أثناء الرفع (إصلاح 2 — الورقة تستوي في الإصبع)
             .rotationEffect(.degrees(dragging ? 0 : fanAngle), anchor: .bottom)
-            .offset(y: allowed ? -12 : 0)
+            // الورقة المسموحة مرفوعة بوضوح أكبر (-16 بدل -12) — Stage 07
+            // Final: تمييز الورقة القابلة للعب بلا تشويه باقي المروحة
+            .offset(y: allowed ? -16 : 0)
             .shadow(color: allowed ? EMSTheme.Colors.teal.opacity(0.55) : .clear,
                     radius: allowed ? 10 : 0)
             // دخول التوزيع: من مركز الطاولة إلى موضع المروحة
             .offset(arrived ? .zero : dealDelta)
             .rotationEffect(.degrees(arrived ? 0 : dealAngle), anchor: .bottom)
-            // سحب الإصبع: تتبع + تكبير الرفع المرصود
+            // سحب الإصبع: تتبع + تكبير الرفع المرصود + ظل سقوط عميق يعطي
+            // إحساس ورقة حقيقية مرفوعة عن اللباد (Stage 07 — عرض فقط)
             .offset(drag)
             .scaleEffect(dragging ? BalootPhysics.liftScale : 1)
+            .shadow(color: .black.opacity(dragging ? 0.50 : 0), radius: dragging ? 14 : 0, y: dragging ? 9 : 0)
             .zIndex(dragging ? 100 : 0)
             .animation(.spring(response: 0.3, dampingFraction: 0.7), value: allowed)
             // رفع تدريجي (تكبير + استواء) بدل القفزة اللحظية — ⚠️ TEMPORARY (إصلاح 2)

@@ -44,6 +44,9 @@ final class BalootTableViewModel: ObservableObject {
     @Published private(set) var handScoreToken = 0
     /// يتزايد مع كل baloot_announced — مشغّل نص «بلوت» الذهبي.
     @Published private(set) var balootFlashToken = 0
+    /// يتزايد مع كل hand_started — مشغّل رنين بداية الصفقة (Stage 06).
+    /// التشغيل الفعلي في الواجهة بعد إغلاق لوحة الحسبة (D6 — المرجع 0.39).
+    @Published private(set) var handStartToken = 0
 
     let tableId: Int
     private let socket: BalootSocket
@@ -55,6 +58,9 @@ final class BalootTableViewModel: ObservableObject {
     private var subscribedMatchId: Int?
     private var lastHandNumber = 0
     private var wasMyTurn = false
+    /// طور اليد في الرسالة السابقة — تصنيف أحداث السوق يحتاج طور ما قبل
+    /// الحدث (مزايدة حكم تُنهي السوق تصل وقد تغيّر الطور في نفس اللقطة).
+    private var prevHandPhase: String?
 
     init(tableId: Int, socket: BalootSocket) {
         self.tableId = tableId
@@ -187,48 +193,78 @@ final class BalootTableViewModel: ObservableObject {
     /// تُستدعى مع كل بث مباراة: أصوات الأحداث + انتقال الدور إليّ + توزيع صفقة جديدة.
     private func playSounds(events: [BalootWSEvent], state: BalootMatchStateDTO) {
         let sound = BalootSoundService.shared
+        // طور ما قبل هذه الدفعة — أحداث السوق تُصنَّف عليه (مزايدة تُنهي السوق
+        // تصل وقد سبقها تغيّر الطور في نفس اللقطة).
+        let bidPhase = prevHandPhase ?? state.hand?.phase ?? ""
         for ev in events {
             switch ev.type {
-            case "hand_started", "redeal": sound.play(.deal)
-            case "card_played", "auto_play": sound.play(.cardPlayed)
-            // النداءات المنطوقة — كل مزايدة تُنطق باسمها (sun/hokum/pass/ashkal)
+            // ⚠️ Stage 06 — Final Audit: كل ربط أدناه مبني على حدث مرصود في
+            // المرجع فقط. الأحداث بلا Asset مطابق = PENDING صامتة (قرار المالك:
+            // لا اختراع ولا تغطية بصوت عام). الأصول والحالات القديمة محفوظة.
+            // 0.39 — بداية الصفقة: التشغيل في الواجهة بعد إغلاق لوحة الحسبة (D6)
+            case "hand_started": handStartToken += 1
+            case "redeal": break
+            // S01 — بداية رمية الورقة (لي وللخصوم — 15 occurrence في المرجع)
+            case "card_played", "auto_play": sound.play(.refThrow)
+            // المزايدة مقسومة بالجولة (1.71 جولة1 / 8.29 جولة2):
+            //   bidding1 → ref_bid_r1 · bidding2 → ref_bid
+            //   «حكم ثاني» (13.16) → ref_gold المستخرج من المرجع نفسه (D1)
+            //   + النداءات المنطوقة المؤكدة في المرجع بطبقة مجدولة بعد المؤثر
+            //   («بس» جولة1 فقط: +0.14 · حكم جولة2: +0.11 — قياسات Re-Audit)
             case "bid":
-                switch ev.kind {
-                case "sun": sound.play(.saySunn)
-                case "hokum": sound.play(.sayHokum)
-                case "pass": sound.play(.sayPass)
-                case "ashkal": sound.play(.sayAshkal)
-                default: sound.play(.select)
+                if bidPhase == "bidding2" {
+                    if ev.kind == "hokum" {
+                        sound.play(.refGold)
+                        sound.play(.sayHokum, afterDelay: 0.11)
+                    } else {
+                        // «ولا» الجولة الثانية: المؤثر + التسجيل الرسمي
+                        // «ولا» من المالك (Stage 07) — لا sayPass هنا إطلاقًا
+                        sound.play(.refBid)
+                        if ev.kind == "pass" { sound.play(.sayWela, afterDelay: 0.12) }
+                    }
+                } else {
+                    sound.play(.refBidR1)
+                    if ev.kind == "pass" { sound.play(.sayPass, afterDelay: 0.14) }
                 }
-            case "contract_set": break // النداء صدر مع المزايدة نفسها — لا تكرار
-            case "doubled": sound.play(.sayDouble)
-            case "baloot_announced": sound.play(.sayBaloot)
-            case "baloot_confirmed": break // تأكيد لاحق لنفس البلوت — لا تكرار
-            // المشاريع تُنطق بأسمائها حسب نوعها القادم من المحرك
+            // S03 — ستينغر كشف الحكم فقط عندما يكون العقد حكمًا بزات (18.24)
+            case "contract_set":
+                if state.hand?.contract?.trumpSuit != nil { sound.play(.refTrump) }
+            case "doubled": break // sayDouble — voiceover غير مثبت في المرجع
+            // بلوت (63.91) — ref_baloot المستخرج من المرجع نفسه (هوية مستقلة، D4)
+            // + النداء المنطوق «بلوت» بعد الستينغر (63.91→64.55 في المرجع)
+            case "baloot_announced":
+                sound.play(.refBaloot)
+                sound.play(.sayBaloot, afterDelay: 0.64)
+            // تثبيت البلوت (68.58 — نص «أكلة» الذهبي + الشارات): نفس هوية
+            // عائلة الإعلان في المرجع (corr 0.991) → ref_announce مطابق معتمد
+            case "baloot_confirmed": sound.play(.refAnnounce)
+            // إعلانات المشاريع: سيرا (48.29) من عائلة الإعلان → ref_announce (0.995)
+            // + النداء المنطوق «سيرا» بعد الستينغر (48.29→48.59 في المرجع).
+            // خمسين (26.06) → ref_project50 المستخرج من المرجع (هوية أسطع).
+            // مية/أربعمية: لا occurrence مؤكد بهوية مستقلة في المرجع → PENDING صامت
             case "declaration_announced":
-                switch ev.project {
-                case "sara": sound.play(.saySara)
-                case "khamsin": sound.play(.sayKhamsin)
-                case "miya": sound.play(.sayMiya)
-                case "arba": sound.play(.sayArba)
-                default: sound.play(.select)
+                if ev.project == "sara" {
+                    sound.play(.refAnnounce)
+                    sound.play(.saySara, afterDelay: 0.30)
                 }
-            case "declarations_revealed", "bidding_round2": break
-            case "trick_won": sound.play(.trick)
-            case "hand_scored": sound.play(.handEnd)
-            case "match_ended": sound.play(.matchEnd)
+                else if ev.project == "khamsin" { sound.play(.refProject50) }
+            case "declarations_revealed": break
+            // 6.04 — سويش انتقال الجولة (bass whoosh) مع حدث الجولة الثانية
+            case "bidding_round2": sound.play(.refRound)
+            case "trick_won": break // جمع الأكلة يُشغَّل من collectTrick (D7 — اللحظة البصرية)
+            case "hand_scored": break // S04 يُشغَّل عند فتح اللوحة (BalootTableView) لا عند الحدث
+            case "match_ended": break // matchEnd — غير مثبت في المرجع (قرار المالك)
             default: break
             }
         }
+        prevHandPhase = state.hand?.phase
         // توزيع جديد وصل بلا حدث (لقطة بعد عودة اتصال مثلًا)
         if let hn = state.handNumber, hn > lastHandNumber, lastHandNumber != 0 {
             // لا صوت هنا — hand_started يغطي المسار الحي؛ اللقطة الصامتة لا تُزعج
         }
         if let hn = state.handNumber { lastHandNumber = hn }
-        // الدور انتقل إليّ الآن — تنبيه واضح غير مزعج
+        // الدور انتقل إليّ الآن — yourTurn مُعطَّل: غير مثبت في المرجع (قرار المالك)
         let myTurn = activeTurnSeat != nil && activeTurnSeat == mySeat
-        if myTurn && !wasMyTurn { sound.play(.yourTurn) }
-        else if !myTurn && wasMyTurn { /* انتقل الدور عني — tick خفيف يكفي من card_played */ }
         wasMyTurn = myTurn
     }
 
