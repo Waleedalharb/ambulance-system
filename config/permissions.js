@@ -87,13 +87,14 @@ const PERMISSIONS = {
     'assets.inventory':     { label: 'تنفيذ جلسات الجرد (منح فردي فقط — لا دور يحملها)', domain: 'assets' },
     'assets.manage':        { label: 'إدارة العهد: اعتماد الاستيراد/الجرد والنقل والاستبدال والأرشفة', domain: 'assets' },
     // ═══ EMS Community — C1 Foundation (اعتماد المالك الكتابي 2026-09-24) ═══
-    // مساحة مستقلة بالكامل عن التشغيل: كلها منح فردي حصرًا — لا دور يحمل أيًّا منها
-    // (نفس سابقة ops.my_portal / staff.phone_view / ops.team_locations.view).
+    // مساحة مستقلة بالكامل عن التشغيل. قرار المالك 2026-10-05: مفاتيح البلوت
+    // الثلاثة (view/create_activity/join_activity) تُمنح لكل الأدوار — البلوت
+    // متاح لجميع الموظفين. بقية المفاتيح تبقى منحًا فرديًا حصرًا.
     // مفاتيح التعطيل تعمل في اتجاه التقييد فقط ولا تفتح ما تمنعه قاعدة التشغيل.
-    'community.view':            { label: 'المجتمع: الدخول والاطلاع (منح فردي فقط — لا دور يحملها)', domain: 'community' },
+    'community.view':            { label: 'المجتمع: الدخول والاطلاع (لجميع الموظفين — قرار 2026-10-05)', domain: 'community' },
     'community.post':            { label: 'المجتمع: النشر والتفاعل داخل المجالس (منح فردي فقط)', domain: 'community' },
-    'community.create_activity': { label: 'المجتمع: إنشاء فعاليات «اجتمعوا» (منح فردي فقط)', domain: 'community' },
-    'community.join_activity':   { label: 'المجتمع: الانضمام للفعاليات (منح فردي فقط)', domain: 'community' },
+    'community.create_activity': { label: 'المجتمع: إنشاء فعاليات «اجتمعوا» (لجميع الموظفين — قرار 2026-10-05)', domain: 'community' },
+    'community.join_activity':   { label: 'المجتمع: الانضمام للفعاليات (لجميع الموظفين — قرار 2026-10-05)', domain: 'community' },
     'community.tournament':      { label: 'المجتمع: المشاركة في التحديات والبطولات (منح فردي فقط)', domain: 'community' },
     'community.moderate':        { label: 'المجتمع: الإشراف ومعالجة البلاغات (منح فردي فقط)', domain: 'community' },
     'community.admin':           { label: 'المجتمع: الإدارة ومفاتيح التعطيل (منح فردي فقط)', domain: 'community' }
@@ -126,10 +127,15 @@ const ROLE_LABELS = {
 const OPS_EXECUTE = ['ops.completion', 'ops.dispatch', 'ops.deployments', 'ops.forms', 'ops.vehicles'];
 const OPS_VIEW = ['ops.reports', 'ops.report_revert', 'ops.report_detail', 'ops.team_exit', 'ops.volunteers'];
 const OPS_ALL = OPS_EXECUTE.concat(OPS_VIEW);
+// قرار المالك 2026-10-05: البلوت متاح لجميع الموظفين — مفاتيح المجتمع الثلاثة
+// الخاصة باللعب (اطلاع/إنشاء طاولة/انضمام ولعب) تُمنح لكل الأدوار. بقية مفاتيح
+// community.* (نشر/بطولات/إشراف/إدارة) تبقى منحًا فرديًا كما هي.
+const COMMUNITY_BALOOT = ['community.view', 'community.create_activity', 'community.join_activity'];
 const ROLES_PERMISSIONS = {
     sysadmin: ['*'],
     ops_supervisor: [
         ...OPS_ALL,
+        ...COMMUNITY_BALOOT,
         'shift.lifecycle', 'shift.approve',
         'workflow.view', 'workflow.manage', 'workflow.approve',
         'requests.review',          // مراجعة طلبات الموظفين (2026-09-29): المخوَّل الأساسي بالأدوار الجديدة
@@ -140,18 +146,21 @@ const ROLES_PERMISSIONS = {
     ],
     field_leadership: [
         ...OPS_ALL,             // نفس حزمة operator التشغيلية
+        ...COMMUNITY_BALOOT,
         'workflow.view',
         'workflow.approve'      // اعتماد سير العمل (كبير/مساعد كبير المسعفين)
     ],
     operator: [
         ...OPS_ALL,             // 4 تنفيذ + 5 اطلاع — حزمة التحكم والتنسيق الموحدة
+        ...COMMUNITY_BALOOT,
         'workflow.view'
     ],
-    viewer: [],                    // مشاهدة فقط — القراءة متاحة للموثّقين أصلًا، ولا كتابة إطلاقًا
+    viewer: [...COMMUNITY_BALOOT], // مشاهدة تشغيلية فقط + البلوت للجميع (قرار 2026-10-05)
     // ── الأدوار التقنية الحالية (لا تغيير سلوكي — الـ20 يبقون admin='*') ──
     admin: ['*'],
     director: [
         ...OPS_ALL,
+        ...COMMUNITY_BALOOT,
         'shift.lifecycle', 'shift.approve',
         'workflow.view', 'workflow.manage', 'workflow.approve',
         'requests.review',          // مراجعة طلبات الموظفين (2026-09-29): استمرارية دور director القائم
@@ -161,7 +170,7 @@ const ROLES_PERMISSIONS = {
         'assets.view', 'assets.manage',   // العهد والأصول: الإدارة تعتمد وتراجع (2026-08-23)
         'symbols.manage'                  // إدارة الرموز (جولة تنظيم الوصول، قرار ②ب — 2026-08-30): تثبيت وصول director القائم بعد ربط المسارات
     ],
-    user: ['ops.execute']          // المفتاح الشامل القديم — توافق فقط، بلا schedule.*
+    user: ['ops.execute', ...COMMUNITY_BALOOT]  // المفتاح الشامل القديم — توافق فقط، بلا schedule.* + البلوت للجميع
 };
 
 module.exports = { PERMISSIONS, PERMISSION_KEYS, ROLE_LABELS, ROLES_PERMISSIONS };

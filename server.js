@@ -329,12 +329,14 @@ function initWebSocket(server) {
                 var msg = JSON.parse(raw);
                 ws.lastSeen = Date.now();
 
-                if (msg.type === 'chat_typing') {
+                // CHAT_DISABLED (قرار المالك 2026-10-05): معالجات المحادثات عبر WS
+                // مُطفأة مع HTTP — لا بث كتابة ولا اشتراكات محادثات أثناء التعطيل.
+                if (msg.type === 'chat_typing' && !CHAT_DISABLED) {
                     // Only broadcast to conversation participants (DB-backed, fail-closed)
                     broadcastToConversation(msg.conversationId, { type: 'chat_typing', conversationId: msg.conversationId, user: ws.user })
                         .catch(function(e) { console.error('[WS] chat_typing broadcast error:', e.message); });
                 }
-                if (msg.type === 'chat_subscribe') {
+                if (msg.type === 'chat_subscribe' && !CHAT_DISABLED) {
                     ws.chatConversations = ws.chatConversations || [];
                     if (!ws.chatConversations.includes(msg.conversationId)) {
                         ws.chatConversations.push(msg.conversationId);
@@ -15909,6 +15911,17 @@ app.post('/api/agent/chat', authenticate, async (req, res) => {
 // ============================================
 // API: CHAT MODULE
 // ============================================
+
+// ═══ تعطيل مؤقت لنظام المحادثات الخاصة — قرار المالك 2026-10-05 ═══
+// إيقاف كامل وقابل للعكس: لا تحميل ولا إنشاء ولا إرسال ولا استقبال عبر كل
+// مسارات /api/chat/*، ولا بث كتابة/اشتراكات محادثات عبر WS. البيانات محفوظة
+// كاملة في القاعدة ولا يُحذف منها شيء. لإعادة التفعيل: اجعل القيمة false وأعد النشر.
+const CHAT_DISABLED = true;
+// authenticate أولًا: بلا توكن يبقى 401 كالمعتاد، ومع توكن صحيح 403 CHAT_DISABLED.
+app.use('/api/chat', authenticate, (req, res, next) => {
+    if (!CHAT_DISABLED) return next();
+    return res.status(403).json({ error: 'نظام المحادثات معطّل حاليًا', code: 'CHAT_DISABLED' });
+});
 
 // Note: broadcastToConversation and broadcastToAll are defined above in the WebSocket section
 // and are reused here for chat message delivery.
