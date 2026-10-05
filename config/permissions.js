@@ -67,9 +67,13 @@ const PERMISSIONS = {
     'workflow.approve':     { label: 'اعتماد سير العمل', domain: 'workflow' },
     // مراجعة طلبات الموظفين (معتمدة 2026-09-29): مفتاح موحد لاستقبال ومراجعة
     // طلبات الإجازات وطلبات تغيير المناوبات — يحرس endpoints الاعتماد/المراجعة
-    // ويحدد مستلمي إشعاري leave.submitted / shift_change.submitted. الفصل إلى
-    // leave.review / shift_change.review تحسين مستقبلي عند الحاجة فقط.
-    'requests.review':      { label: 'مراجعة طلبات الموظفين (إجازات/تغيير مناوبات)', domain: 'admin' },
+    // ويحدد مستلمي إشعاري leave.submitted / shift_change.submitted.
+    // A-4.3 (2026-10-05): فُصلت الإجازات إلى leave.review — requests.review تبقى
+    // لطلبات تغيير المناوبات فقط، بلا سحب من أي دور يحملها.
+    'requests.review':      { label: 'مراجعة طلبات الموظفين (تغيير مناوبات)', domain: 'admin' },
+    // A-4.3: مراجعة طلبات الإجازات (اعتماد/رفض/إلغاء معتمدة) — مفتاح مستقل
+    // يحرس POST /:id/approve وإلغاء المعتمدة ويحدد مستلمي leave.submitted.
+    'leave.review':         { label: 'مراجعة طلبات الإجازات (اعتماد/رفض/إلغاء)', domain: 'admin' },
     // المؤشرات
     'indicators.contribution': { label: 'مؤشرات مساهمة الموظفين', domain: 'indicators' },
     // الإدارة
@@ -139,6 +143,7 @@ const ROLES_PERMISSIONS = {
         'shift.lifecycle', 'shift.approve',
         'workflow.view', 'workflow.manage', 'workflow.approve',
         'requests.review',          // مراجعة طلبات الموظفين (2026-09-29): المخوَّل الأساسي بالأدوار الجديدة
+        'leave.review',             // A-4.3 (2026-10-05): مراجعة طلبات الإجازات — المخوَّل الأساسي
         'indicators.contribution',
         'employees.manage',
         'archive.sensitive',
@@ -164,6 +169,7 @@ const ROLES_PERMISSIONS = {
         'shift.lifecycle', 'shift.approve',
         'workflow.view', 'workflow.manage', 'workflow.approve',
         'requests.review',          // مراجعة طلبات الموظفين (2026-09-29): استمرارية دور director القائم
+        'leave.review',             // A-4.3 (2026-10-05): مراجعة طلبات الإجازات — استمرارية دور director
         'indicators.contribution',
         'employees.manage',
         'archive.sensitive',

@@ -122,6 +122,19 @@ function rollbackTransaction() {
   db.exec('ROLLBACK');
 }
 
+// A-4.3 (M4 — additive صرف): غلاف معاملة عام للخدمات. يمرّر handle better-sqlite3
+// المتزامن للدالة داخل معاملة واحدة — أي رمي = ROLLBACK كامل، والنجاح = COMMIT.
+// run/get/all أعلاه لا تتغير ولا يتحول إليها أي مستهلك قائم.
+// tx.immediate: BEGIN IMMEDIATE — يحجز قفل الكتابة فورًا (فحوص R1 عند الاعتماد).
+function tx(fn) {
+  const t = db.transaction((hdl) => fn(hdl));
+  return t(db);
+}
+tx.immediate = function (fn) {
+  const t = db.transaction((hdl) => fn(hdl));
+  return t.immediate(db);
+};
+
 // ============================================
 // TABLE SCHEMAS
 // ============================================
@@ -405,6 +418,20 @@ const TABLE_SCHEMAS = [
     approved_by INTEGER,
     approved_at DATETIME,
     FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE
+  );`,
+
+  // Leave Status Events (A-4.3): سجل تدقيقي لكل انتقال حالة في طلبات الإجازة.
+  // from_status=NULL عند الإنشاء. لا roster_action — D7 يمنع تعديل shift_roster.
+  `CREATE TABLE IF NOT EXISTS leave_status_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    request_id INTEGER NOT NULL,
+    from_status TEXT,
+    to_status TEXT NOT NULL,
+    actor_user_id INTEGER,
+    actor_role TEXT,
+    reason TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (request_id) REFERENCES leave_requests(id) ON DELETE CASCADE
   );`,
 
   // Shift Schedule Auto
@@ -1041,6 +1068,7 @@ async function initTables() {
     await exec(`CREATE INDEX IF NOT EXISTS idx_leave_requests_employee ON leave_requests(employee_id);`);
     await exec(`CREATE INDEX IF NOT EXISTS idx_leave_requests_status ON leave_requests(status);`);
     await exec(`CREATE INDEX IF NOT EXISTS idx_leave_requests_dates ON leave_requests(start_date, end_date);`);
+    await exec(`CREATE INDEX IF NOT EXISTS idx_leave_events_req ON leave_status_events(request_id);`);
     await exec(`CREATE INDEX IF NOT EXISTS idx_shift_schedule_auto_date ON shift_schedule_auto(shift_date);`);
     await exec(`CREATE INDEX IF NOT EXISTS idx_shift_schedule_auto_employee ON shift_schedule_auto(employee_id);`);
     await exec(`CREATE INDEX IF NOT EXISTS idx_staffing_alerts_date ON staffing_alerts(alert_date);`);
@@ -2038,6 +2066,15 @@ async function migrateFleetVA() {
   // Fleet Engine V1 ②: عمود ملاحظات السجل المرجعي — إضافي وidempotent
   // (ensureColumn يقرأ PRAGMA table_info؛ آمن على القواعد القائمة والجديدة).
   await ensureColumn('vehicles', 'notes', 'TEXT');
+
+  // A-4.3: تطوير leave_requests بشكل additive صرف (لا DROP ولا إعادة بناء).
+  // كل الأعمدة nullable ⇒ لا أثر على السجلات القائمة (منها طلب الإنتاج pending).
+  await ensureColumn('leave_requests', 'denial_reason', 'TEXT');
+  await ensureColumn('leave_requests', 'cancelled_by', 'INTEGER');
+  await ensureColumn('leave_requests', 'cancelled_at', 'DATETIME');
+  await ensureColumn('leave_requests', 'cancel_reason', 'TEXT');
+  await ensureColumn('leave_requests', 'created_by', 'INTEGER');
+  await ensureColumn('leave_requests', 'updated_at', 'DATETIME');
 
   // v4.2: مستوى الخدمة ALS/BLS — المصدر الصريح الوحيد لتصنيف المركبة (قرار المالك:
   // لا مطابقة نصية على الموديل). NULL = غير مؤكد ← يُعامل BLS مؤقتًا ويُوسم «غير مؤكد».
@@ -3594,17 +3631,35 @@ const LeaveRequests = {
     return all('SELECT lr.*, e.name as employee_name, e.employee_code FROM leave_requests lr JOIN employees e ON lr.employee_id = e.id WHERE lr.status = \'approved\' AND lr.start_date <= ? AND lr.end_date >= ?', [end_date, start_date]);
   },
   async create(data) {
-    const result = await run('INSERT INTO leave_requests (employee_id, start_date, end_date, type, status, reason, approved_by, approved_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?);', [data.employee_id, data.start_date, data.end_date, data.type || 'إجازة', data.status || 'pending', data.reason || null, data.approved_by || null, data.approved_at || null]);
+    const result = await run('INSERT INTO leave_requests (employee_id, start_date, end_date, type, status, reason, approved_by, approved_at, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);', [data.employee_id, data.start_date, data.end_date, data.type || 'إجازة', data.status || 'pending', data.reason || null, data.approved_by || null, data.approved_at || null, data.created_by || null]);
     return result.id;
   },
   async update(id, data) {
-    return run('UPDATE leave_requests SET employee_id = ?, start_date = ?, end_date = ?, type = ?, status = ?, reason = ?, approved_by = ?, approved_at = ? WHERE id = ?;', [data.employee_id, data.start_date, data.end_date, data.type, data.status, data.reason, data.approved_by, data.approved_at, id]);
+    return run('UPDATE leave_requests SET employee_id = ?, start_date = ?, end_date = ?, type = ?, status = ?, reason = ?, approved_by = ?, approved_at = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?;', [data.employee_id, data.start_date, data.end_date, data.type, data.status, data.reason, data.approved_by, data.approved_at, id]);
   },
   async updateStatus(id, status, approved_by) {
     return run('UPDATE leave_requests SET status = ?, approved_by = ?, approved_at = CURRENT_TIMESTAMP WHERE id = ?;', [status, approved_by, id]);
   },
   async delete(id) {
     return run('DELETE FROM leave_requests WHERE id = ?', [id]);
+  }
+};
+
+// ============================================
+// CRUD: LEAVE STATUS EVENTS (A-4.3 — سجل التدقيق)
+// ============================================
+const LeaveEvents = {
+  async add(evt) {
+    const result = await run(
+      'INSERT INTO leave_status_events (request_id, from_status, to_status, actor_user_id, actor_role, reason) VALUES (?, ?, ?, ?, ?, ?);',
+      [evt.request_id, evt.from_status || null, evt.to_status, evt.actor_user_id || null, evt.actor_role || null, evt.reason || null]);
+    return result.id;
+  },
+  async getByRequest(requestId) {
+    return all('SELECT * FROM leave_status_events WHERE request_id = ? ORDER BY id ASC', [requestId]);
+  },
+  async getAll() {
+    return all('SELECT * FROM leave_status_events ORDER BY id DESC');
   }
 };
 
@@ -6263,6 +6318,7 @@ module.exports = {
   beginTransaction,
   commitTransaction,
   rollbackTransaction,
+  tx,
   // CRUD namespaces
   Reports,
   Shifts,
@@ -6285,6 +6341,7 @@ module.exports = {
   TeamAssignments,
   ShiftPatterns,
   LeaveRequests,
+  LeaveEvents,
   ShiftScheduleAuto,
   StaffingAlerts,
   Notifications,
