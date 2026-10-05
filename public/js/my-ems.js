@@ -521,6 +521,18 @@
         return b;
     }
 
+    // A-4.4 S1: PUT/DELETE بنفس عقد apiPost (الخطأ: {state, message} من body.error)
+    async function apiSend(path, method, body) {
+        const r = await fetch(path, {
+            method,
+            headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+            body: body ? JSON.stringify(body) : undefined
+        });
+        const b = await r.json().catch(() => ({}));
+        if (!r.ok) throw { state: r.status, message: b.error };
+        return b;
+    }
+
     // ── مركبتي (v2) — المركبات المعيّنة حاليًا لفرقة اليوم ──
     function renderVehicle(d) {
         let body;
@@ -701,6 +713,267 @@
         } catch (_) { /* تبقى البطاقة القديمة — لا انهيار */ }
     }
 
+    // ═══ A-4.4 S1: إجازاتي — تقديم/تعديل/إلغاء/سجل، من /api/leave-requests (SSOT: SQLite — A-4.3) ═══
+    // لا employee_id يُدخَل أو يُختار من الواجهة إطلاقًا: الهوية من profile
+    // (الحساب المرتبط بسجل الموظف) فقط، والخادم يفرض النطاق Server-side (M3).
+    // كشف تعارض المناوبات عميليًا من /api/my/schedule — مسار
+    // /api/leave-requests/conflicts محجوز لحامل leave.review فلا يُستخدم هنا.
+    const LV_STATUS = {
+        pending: ['st-pending', 'قيد المراجعة'],
+        approved: ['st-approved', 'معتمدة'],
+        denied: ['st-denied', 'مرفوضة'],
+        cancelled: ['st-cancelled', 'ملغاة']
+    };
+    const LV_TYPES = ['إجازة', 'مرضية', 'استثنائية']; // الأنواع المقبولة في A-4.3 حصرًا
+    const LV_EV_LABEL = { pending: 'قيد المراجعة', approved: 'معتمدة ✓', denied: 'مرفوضة ✗', cancelled: 'ملغاة' };
+    let leaveProfile = null;        // يُملأ من load() — المصدر الوحيد لـ employee.id
+    let leaveEditingId = null;      // وضع التعديل (PUT) — null يعني طلبًا جديدًا
+    let leaveRowsById = new Map();  // صفوف آخر جلب — لتعبئة نموذج التعديل
+    const lvSchedCache = new Map(); // كاش جداول الأشهر لكشف التعارض («YYYY-M»)
+
+    function lvDaysCount(s, e) {
+        const a = Date.parse(s), b = Date.parse(e);
+        if (isNaN(a) || isNaN(b) || b < a) return null;
+        return Math.round((b - a) / 86400000) + 1; // شامل الطرفين
+    }
+
+    function renderLeave(d) {
+        const today = riyadhToday();
+        let rows = '';
+        if (d && d.__error) {
+            rows = '<div class="empty">تعذر تحميل طلباتك حاليًا — حدّث الصفحة للمحاولة مجددًا.</div>';
+        } else {
+            const reqs = (d && d.requests) || [];
+            leaveRowsById = new Map(reqs.map(r => [Number(r.id), r]));
+            rows = reqs.map(r => {
+                const st = LV_STATUS[r.status] || ['', r.status];
+                const days = lvDaysCount(r.start_date, r.end_date);
+                // pending انتهت أيامه دون مراجعة — يُوسم صراحة ولا يُعرض كطلب قابل للتنفيذ
+                const expiredPending = r.status === 'pending' && today && r.end_date < today;
+                // التعديل/الإلغاء: pending وبدايته في المستقبل فقط (الخادم يحسم أي سباق — M2)
+                const canAct = r.status === 'pending' && today && r.start_date > today;
+                const denyNote = r.status === 'denied' && r.denial_reason
+                    ? `<div class="lv-reason-note">سبب الرفض: ${esc(r.denial_reason)}</div>` : '';
+                const cancelNote = r.status === 'cancelled' && r.cancel_reason
+                    ? `<div class="lv-reason-note cancel">سبب الإلغاء: ${esc(r.cancel_reason)}</div>` : '';
+                return `<div class="lv-row">
+                    <div class="lv-head">
+                        <div>
+                            <div class="lv-type">${esc(r.type)}${days ? ` <small style="color:var(--muted);font-weight:400">(${days} ${days === 1 ? 'يوم' : 'أيام'})</small>` : ''}</div>
+                            <div class="lv-range">${esc(r.start_date)} ← ${esc(r.end_date)}</div>
+                        </div>
+                        <span class="lv-status ${st[0]}">${esc(st[1])}</span>
+                    </div>
+                    ${expiredPending ? '<span class="lv-expired">منتهي — بانتظار المراجعة</span>' : ''}
+                    ${r.reason ? `<div class="lv-range">السبب: ${esc(r.reason)}</div>` : ''}
+                    ${denyNote}${cancelNote}
+                    <div class="lv-row-actions">
+                        <button class="lv-btn" type="button" data-lvevents="${r.id}">السجل</button>
+                        ${canAct ? `<button class="lv-btn edit" type="button" data-lvedit="${r.id}">تعديل</button>
+                        <button class="lv-btn cancel" type="button" data-lvcancel="${r.id}">إلغاء الطلب</button>` : ''}
+                    </div>
+                    <div class="lv-events" id="lvEvents${r.id}"></div>
+                </div>`;
+            }).join('') || '<div class="empty">لا توجد طلبات إجازة بعد — قدّم طلبك من الزر أعلاه.</div>';
+        }
+        return `<div class="card" id="leaveCard"><div class="card-head leave">🌴 إجازاتي</div>
+            <div class="card-body">
+                <button class="lv-new-btn" id="lvNewBtn" type="button">＋ طلب إجازة جديد</button>
+                <div class="lv-form" id="lvForm">
+                    <div class="lv-form-title" id="lvFormTitle">طلب إجازة جديد</div>
+                    <div class="lv-dates">
+                        <div><label>من تاريخ</label><input type="date" id="lvStart"></div>
+                        <div><label>إلى تاريخ</label><input type="date" id="lvEnd"></div>
+                    </div>
+                    <label>نوع الإجازة</label>
+                    <select id="lvType">${LV_TYPES.map(t => `<option>${t}</option>`).join('')}</select>
+                    <label>السبب (اختياري)</label>
+                    <textarea id="lvReason" maxlength="300"></textarea>
+                    <div class="lv-days" id="lvDays"></div>
+                    <div class="lv-conflict" id="lvConflict"></div>
+                    <div class="lv-error" id="lvError"></div>
+                    <div class="lv-form-actions">
+                        <button class="lv-submit" id="lvSubmit" type="button">إرسال الطلب</button>
+                        <button class="lv-cancel-form" id="lvCancelForm" type="button">تراجع</button>
+                    </div>
+                </div>
+                <div style="margin-top:12px">${rows}</div>
+            </div>
+        </div>`;
+    }
+
+    function lvShowError(m) {
+        const el = document.getElementById('lvError');
+        if (el) { el.textContent = m; el.classList.add('show'); }
+    }
+    function lvHideError() {
+        const el = document.getElementById('lvError');
+        if (el) { el.textContent = ''; el.classList.remove('show'); }
+    }
+    function lvUpdateDays() {
+        const s = document.getElementById('lvStart').value, e = document.getElementById('lvEnd').value;
+        const n = lvDaysCount(s, e);
+        const el = document.getElementById('lvDays');
+        el.textContent = n ? `المدة: ${n} ${n === 1 ? 'يوم' : 'أيام'}` : (s && e ? 'تحقق من التواريخ — النهاية قبل البداية.' : '');
+    }
+
+    // تعارض المناوبات المنشورة مع الفترة المختارة — شريط أصفر غير حاجب (D7:
+    // اعتماد الإجازة لا يعدّل shift_roster؛ المعالجة إجراء مستقل لاحقًا).
+    // يوم مناوبة = له shiftCode وليس يوم راحة/إجازة (نفس قاعدة renderSchedule).
+    async function lvCheckConflict() {
+        const el = document.getElementById('lvConflict');
+        if (!el) return;
+        el.classList.remove('show'); el.textContent = '';
+        const s = document.getElementById('lvStart').value, e = document.getElementById('lvEnd').value;
+        if (!s || !e || e < s) return;
+        try {
+            const days = [];
+            let y = +s.slice(0, 4), m = +s.slice(5, 7);
+            const ey = +e.slice(0, 4), em = +e.slice(5, 7);
+            let guard = 0;
+            while ((y < ey || (y === ey && m <= em)) && guard++ < 24) {
+                const key = y + '-' + m;
+                if (!lvSchedCache.has(key)) {
+                    lvSchedCache.set(key, await api(`/api/my/schedule?month=${m}&year=${y}`).catch(() => null));
+                }
+                const sch = lvSchedCache.get(key);
+                ((sch && sch.days) || []).forEach(d => {
+                    if (d.date >= s && d.date <= e && d.shiftCode &&
+                        !(d.codeStatus && d.codeStatus !== 'دوام' && d.codeStatus !== 'تكميل')) {
+                        days.push(d);
+                    }
+                });
+                m++; if (m > 12) { m = 1; y++; }
+            }
+            if (days.length) {
+                el.innerHTML = '⚠️ لديك مناوبات منشورة خلال هذه الفترة: ' +
+                    days.map(d => `${fmtDateShort(d.date)} ${arDay(d.date)} (${esc(d.shiftName || d.shiftCode)}${d.teamName ? ' — ' + esc(d.teamName) : ''})`).join('، ') +
+                    '.<br>اعتماد الإجازة لا يلغي المناوبة تلقائيًا — تُعالج بإجراء مستقل من المشرف.';
+                el.classList.add('show');
+            }
+        } catch (_) { /* فشل الكشف لا يمنع التقديم — التحذير مساعد فقط */ }
+    }
+
+    function lvRenderEvents(events) {
+        if (!events.length) return '<div class="lv-ev">لا توجد أحداث مسجلة.</div>';
+        return events.map(ev => {
+            const to = LV_EV_LABEL[ev.to_status] || ev.to_status;
+            const trans = ev.from_status == null
+                ? `<b>تقديم الطلب ← ${esc(to)}</b>`
+                : `<b>${esc(LV_EV_LABEL[ev.from_status] || ev.from_status)} ← ${esc(to)}</b>`;
+            return `<div class="lv-ev">• ${trans}${ev.reason ? ' — ' + esc(ev.reason) : ''}<br>
+                <span class="lv-ev-time">${esc((ev.created_at || '').slice(0, 16))}</span></div>`;
+        }).join('');
+    }
+
+    function bindLeaveEvents() {
+        const newBtn = document.getElementById('lvNewBtn');
+        if (!newBtn) return;
+        const form = document.getElementById('lvForm');
+        const startEl = document.getElementById('lvStart');
+        const endEl = document.getElementById('lvEnd');
+        const submitBtn = document.getElementById('lvSubmit');
+        const today = riyadhToday();
+        if (today) { startEl.min = today; endEl.min = today; }
+
+        function openForm(editRow) {
+            leaveEditingId = editRow ? editRow.id : null;
+            document.getElementById('lvFormTitle').textContent = editRow ? 'تعديل طلب الإجازة' : 'طلب إجازة جديد';
+            submitBtn.textContent = editRow ? 'حفظ التعديل' : 'إرسال الطلب';
+            submitBtn.disabled = false;
+            startEl.value = editRow ? editRow.start_date : '';
+            endEl.value = editRow ? editRow.end_date : '';
+            document.getElementById('lvType').value = editRow ? editRow.type : LV_TYPES[0];
+            document.getElementById('lvReason').value = editRow ? (editRow.reason || '') : '';
+            lvHideError(); lvUpdateDays(); lvCheckConflict();
+            form.classList.add('open');
+        }
+        newBtn.addEventListener('click', () => {
+            if (form.classList.contains('open') && !leaveEditingId) { form.classList.remove('open'); return; }
+            openForm(null);
+        });
+        document.getElementById('lvCancelForm').addEventListener('click', () => {
+            form.classList.remove('open'); leaveEditingId = null;
+        });
+        startEl.addEventListener('change', () => {
+            if (endEl.value && startEl.value && startEl.value > endEl.value) endEl.value = startEl.value;
+            if (startEl.value) endEl.min = startEl.value;
+            lvUpdateDays(); lvCheckConflict();
+        });
+        endEl.addEventListener('change', () => { lvUpdateDays(); lvCheckConflict(); });
+
+        submitBtn.addEventListener('click', async () => {
+            lvHideError();
+            const s = startEl.value, e = endEl.value;
+            const type = document.getElementById('lvType').value;
+            const reason = document.getElementById('lvReason').value.trim();
+            if (!s || !e) { lvShowError('حدّد تاريخي البداية والنهاية.'); return; }
+            if (e < s) { lvShowError('تاريخ النهاية قبل تاريخ البداية.'); return; }
+            if (!leaveProfile || !leaveProfile.employee || leaveProfile.employee.id == null) {
+                lvShowError('حسابك غير مربوط بسجل موظف — راجع المشرف.'); return;
+            }
+            submitBtn.disabled = true;
+            try {
+                if (leaveEditingId) {
+                    await apiSend('/api/leave-requests/' + leaveEditingId, 'PUT',
+                        { start_date: s, end_date: e, type, reason: reason || undefined });
+                    toast('تم حفظ التعديل — طلبك بانتظار المراجعة');
+                } else {
+                    // employee_id من profile المرتبط بالحساب — لا إدخال ولا اختيار
+                    const b = await apiPost('/api/leave-requests',
+                        { employee_id: leaveProfile.employee.id, start_date: s, end_date: e, type, reason: reason || undefined });
+                    if (b && Array.isArray(b.warnings) && b.warnings.length) {
+                        toast('⚠️ ' + b.warnings.map(w =>
+                            `يوم ${w.date}: يوجد ${w.pendingCount} طلب أخرى قيد المراجعة`).join(' — '));
+                    }
+                    toast('تم إرسال طلبك — بانتظار المراجعة');
+                }
+                leaveEditingId = null;
+                await refreshLeave();
+            } catch (err) {
+                submitBtn.disabled = false;
+                lvShowError((err && err.message) || 'تعذر إرسال الطلب — حاول مجددًا.');
+            }
+        });
+
+        document.querySelectorAll('[data-lvedit]').forEach(b => b.addEventListener('click', () => {
+            const row = leaveRowsById.get(Number(b.dataset.lvedit));
+            if (row) openForm(row);
+        }));
+        document.querySelectorAll('[data-lvcancel]').forEach(b => b.addEventListener('click', async () => {
+            if (!confirm('هل تريد إلغاء طلب الإجازة هذا؟')) return;
+            b.disabled = true;
+            try {
+                // إلغاء المالك لطلب pending — بلا سبب (السبب إلزامي فقط لإلغاء المخوَّل لمعتمدة)
+                await apiSend('/api/leave-requests/' + b.dataset.lvcancel, 'DELETE');
+                toast('تم إلغاء الطلب');
+                await refreshLeave();
+            } catch (err) { b.disabled = false; toast((err && err.message) || 'تعذر الإلغاء'); }
+        }));
+        document.querySelectorAll('[data-lvevents]').forEach(b => b.addEventListener('click', async () => {
+            const box = document.getElementById('lvEvents' + b.dataset.lvevents);
+            if (!box) return;
+            if (box.classList.contains('open')) { box.classList.remove('open'); return; }
+            box.innerHTML = '<div class="lv-ev">جارٍ التحميل…</div>';
+            box.classList.add('open');
+            try {
+                const r = await api('/api/leave-requests/' + b.dataset.lvevents + '/events');
+                box.innerHTML = lvRenderEvents(r.events || []);
+            } catch (_) { box.innerHTML = '<div class="lv-ev">تعذر تحميل السجل.</div>'; }
+        }));
+    }
+
+    async function refreshLeave() {
+        try {
+            const d = await api('/api/leave-requests').catch(() => ({ __error: true }));
+            const tmp = document.createElement('div');
+            tmp.innerHTML = renderLeave(d);
+            const old = document.getElementById('leaveCard');
+            if (old) old.replaceWith(tmp.firstElementChild); // نمط refreshNotifs نفسه
+            bindLeaveEvents();
+        } catch (_) { /* تبقى البطاقة القديمة — لا انهيار */ }
+    }
+
     // ── v5.1: التحديث اللحظي — SSE الموجَّه القائم (OV-S6: لا قناة جديدة تُنشأ). ──
     // Initial Load يبقى REST دائمًا؛ هذه طبقة تسريع فقط: عند بث notification_created
     // يظهر 🔔 فورًا ثم يُعاد جلب القسمين من REST (مصدر الحقيقة). انقطاعها لا يُسقط
@@ -717,6 +990,10 @@
             toast('🔔 ' + (data.message || 'وصلك إشعار جديد'));
             refreshNotifs();
             refreshChanges();
+            // A-4.4 S1: إشعارات الإجازات (اعتماد/رفض/إلغاء) ← تحديث «إجازاتي» فورًا بلا Refresh.
+            // العنوان والنص الحقيقيان داخل data.notification — المستوى الأعلى رسالة عامة (عقد A-1).
+            const n = data.notification || {};
+            if (/إجاز/.test(String(n.title || '') + ' ' + String(n.message || ''))) refreshLeave();
         };
         // رفض خادمي (401/403 ⇒ CLOSED): إيقاف نهائي بلا عاصفة إعادة اتصال — نفس
         // سياسة websocket-sync. الأخطاء العابرة يعيد المتصفح الاتصال بها تلقائيًا.
@@ -766,7 +1043,7 @@
                 curYear = t ? +t.slice(0, 4) : new Date().getFullYear();
                 curMonth = t ? +t.slice(5, 7) : new Date().getMonth() + 1;
             }
-            const [schedule, incidents, vehicle, inventory, checkData, mates, notifs, changes] = await Promise.all([
+            const [schedule, incidents, vehicle, inventory, checkData, mates, notifs, changes, leave] = await Promise.all([
                 api(`/api/my/schedule?month=${curMonth}&year=${curYear}`),
                 sec.incidents ? api('/api/my/team-incidents') : Promise.resolve(null),
                 sec.vehicle ? api('/api/my/vehicle') : Promise.resolve(null),
@@ -775,9 +1052,13 @@
                 // v5: الأقسام الثلاثة الجديدة — فشل أيٍّ منها لا يُسقط بقية الصفحة
                 api('/api/my/shift-mates').catch(() => null),
                 api('/api/my/notifications').catch(() => null),
-                api('/api/my/schedule-changes').catch(() => null)]);
+                api('/api/my/schedule-changes').catch(() => null),
+                // A-4.4 S1: طلبات إجازاتي — فشل الجلب يُظهر حالة داخل البطاقة ولا يُسقط الصفحة
+                sec.leave ? api('/api/leave-requests').catch(() => ({ __error: true })) : Promise.resolve(null)]);
+            leaveProfile = profile; // المصدر الوحيد لـ employee.id عند تقديم الطلب
             app.innerHTML = renderProfile(profile)
                 + (notifs ? renderNotifs(notifs) : '')
+                + (leave ? renderLeave(leave) : '')
                 + (mates ? renderMates(mates) : '')
                 + (checkData ? renderCheck(checkData) : '')
                 + (incidents ? renderIncidents(incidents) : '')
@@ -788,6 +1069,7 @@
                 + renderAssignments(assignments);
             if (checkData) bindCheckEvents();
             if (notifs) bindNotifEvents();
+            if (leave) bindLeaveEvents();
             connectLive(); // v5.1: القناة اللحظية بعد نجاح التحميل الأول — REST يبقى المصدر
             if (logoutBtn) logoutBtn.style.display = ''; // نجاح التحميل ← الزر يظهر في الشريط العلوي الثابت
 
