@@ -5119,6 +5119,13 @@ const ShiftChangeRequests = {
   async updateStatus(id, status, reviewedBy) {
     if (!SHIFT_CHANGE_REQUEST_STATUSES.includes(status)) throw new Error('ShiftChangeRequests.updateStatus: status غير صالحة: ' + status);
     return run('UPDATE shift_change_requests SET status = ?, reviewed_by = ?, reviewed_at = CURRENT_TIMESTAMP WHERE id = ?', [status, reviewedBy || null, id]);
+  },
+  // F-1 (الجدول المرن): تحديث شرطي لمسار الاعتماد الذري — يصيب الطلب فقط إن
+  // كان ما زال pending، فيملك أول معتمدٍ الطلب ويرد الثاني changes=0 (409).
+  // دالة مستقلة: updateStatus القائمة وأي مستدعٍ حالي لا يتغير سلوكهما.
+  async updateStatusIfPending(id, status, reviewedBy) {
+    if (!SHIFT_CHANGE_REQUEST_STATUSES.includes(status)) throw new Error('ShiftChangeRequests.updateStatusIfPending: status غير صالحة: ' + status);
+    return run("UPDATE shift_change_requests SET status = ?, reviewed_by = ?, reviewed_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'pending'", [status, reviewedBy || null, id]);
   }
 };
 

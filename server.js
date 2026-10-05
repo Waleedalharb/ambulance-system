@@ -14154,6 +14154,103 @@ app.post('/api/shift-change-request/:id/review', authenticate, authorizePerm('re
         if (!['approved', 'denied', 'cancelled'].includes(status)) {
             return res.status(400).json({ error: 'حالة غير صالحة' });
         }
+
+        // ── F-1 (الجدول المرن): الاعتماد يطبّق proposed_shift_code على يوم
+        // الطلب المحدد فقط، داخل معاملة ذرية واحدة مع اعتماد الطلب. أي فشل
+        // قبل COMMIT يبقي الطلب pending والجدول كما كان — لا حالة وسطى.
+        if (status === 'approved') {
+            const request = await db.ShiftChangeRequests.getById(req.params.id);
+            if (!request) return res.status(404).json({ error: 'الطلب غير موجود' });
+            if (request.status !== 'pending') {
+                return res.status(409).json({ error: 'تمت معالجة هذا الطلب مسبقًا', code: 'SHIFT_CHANGE_ALREADY_PROCESSED' });
+            }
+            const employee = await db.Employees.getById(request.employee_id);
+            if (!employee || employee.is_active === 0) {
+                return res.status(409).json({ error: 'الموظف غير موجود أو غير نشط — بقي الطلب معلقًا', code: 'SHIFT_CHANGE_EMPLOYEE_INVALID' });
+            }
+            // الرمز يجب أن يكون من shift_codes المعتمدة وقت المراجعة — ممنوع اختراع رموز
+            const codeRow = await db.ShiftCodes.getByCode(request.proposed_shift_code);
+            if (!codeRow) {
+                return res.status(409).json({ error: `رمز المناوبة "${request.proposed_shift_code}" لم يعد موجودًا في قائمة الرموز المعتمدة — بقي الطلب معلقًا`, code: 'SHIFT_CHANGE_CODE_INVALID' });
+            }
+            const date = String(request.shift_date).trim();
+            const year = Number(date.slice(0, 4));
+            const month = Number(date.slice(5, 7));
+
+            let appliedRow = null; let changeType = null; let crRevisionId = null; let crAuditId = null;
+            await db.beginTransaction();
+            try {
+                // قفل ضد الاعتماد المزدوج/المتزامن: أول تحديث يصيب pending يملك الطلب
+                const lock = await db.ShiftChangeRequests.updateStatusIfPending(req.params.id, 'approved', req.user.username || req.user.name);
+                if (!lock || lock.changes === 0) {
+                    await db.rollbackTransaction();
+                    return res.status(409).json({ error: 'تمت معالجة هذا الطلب مسبقًا', code: 'SHIFT_CHANGE_ALREADY_PROCESSED' });
+                }
+                // القيمة القديمة تُقرأ من سطر shift_roster الفعلي وقت التطبيق —
+                // old_shift_code المخزّن في الطلب قد يكون أقدم من الواقع
+                const existing = await db.ShiftRoster.getByEmployeeAndDate(request.employee_id, date);
+                if (existing) {
+                    // تحديث رمز اليوم المحدد فقط — team_id وبقية الأيام كما هي
+                    await db.run('UPDATE shift_roster SET shift_code = ? WHERE id = ?', [codeRow.code, existing.id]);
+                    appliedRow = await db.ShiftRoster.getById(existing.id);
+                    changeType = 'edit';
+                } else {
+                    // إنشاء السطر بفرقة التعيين النشط في ذلك التاريخ (قراءة فقط
+                    // من team_assignments — نفس قاعدة تعديل الخلية حرفيًا)
+                    const activeAssign = await db.get(
+                        `SELECT team_id FROM team_assignments
+                         WHERE employee_id = ? AND (assigned_date IS NULL OR assigned_date <= ?)
+                           AND (end_date IS NULL OR end_date >= ?)
+                         ORDER BY id DESC LIMIT 1`, [request.employee_id, date, date]);
+                    const newId = await db.ShiftRoster.create({
+                        employee_id: request.employee_id, team_id: activeAssign ? activeAssign.team_id : null,
+                        shift_date: date, shift_code: codeRow.code, month, year
+                    });
+                    appliedRow = await db.ShiftRoster.getById(newId);
+                    changeType = 'add';
+                }
+                crRevisionId = await db.ScheduleRevisions.create({
+                    source: 'change-request', actor_id: req.user.id, actor_name: req.user.name,
+                    stats_json: { request_id: Number(req.params.id), employee_id: request.employee_id, date, change_type: changeType,
+                        old_shift_code: existing ? existing.shift_code : null, new_shift_code: codeRow.code }
+                });
+                crAuditId = await addShiftAuditLog({
+                    roster_id: appliedRow.id, employee_id: request.employee_id, team_id: appliedRow.team_id,
+                    shift_date: date, old_shift_code: existing ? existing.shift_code : null, new_shift_code: codeRow.code,
+                    old_team_id: existing ? existing.team_id : null, new_team_id: appliedRow.team_id,
+                    changed_by: req.user.username || req.user.name, changed_by_name: req.user.name,
+                    change_type: changeType, reason: 'تطبيق طلب تغيير مناوبة #' + req.params.id, revision_id: crRevisionId
+                });
+                await db.commitTransaction();
+            } catch (txErr) {
+                await db.rollbackTransaction();
+                throw txErr;
+            }
+
+            // بعد COMMIT فقط: الإشعارات والبث — فشلها لا يمس الجدول ولا الطلب
+            await fireScheduleChangeNotify(crRevisionId, crAuditId ? [crAuditId] : []);
+            try {
+                if (db.Notifications) {
+                    const ownerUserId = await resolveEmployeeUserId(request.employee_id);
+                    if (ownerUserId) {
+                        await notificationService.notifyPersonal(ownerUserId, {
+                            title: 'تمت الموافقة على طلب تغيير المناوبة',
+                            message: 'مناوبة ' + date + ': تمت الموافقة وطُبّق الرمز «' + codeRow.code + '» على جدولك',
+                            type: 'success'
+                        });
+                    }
+                }
+            } catch (nErr) { console.error('ShiftChange approve notify error:', nErr.message); }
+            await addAuditLogEntry('shift_change_request_applied',
+                `اعتماد طلب تغيير مناوبة #${req.params.id} وتطبيقه: موظف #${request.employee_id} يوم ${date} ← ${codeRow.code}`,
+                'schedule', req.user.name, req.user.role, req.user.id);
+            broadcast({ type: 'shift_change_request', payload: { request_id: req.params.id, employee_id: request.employee_id, status: 'approved' } });
+            broadcast({ type: 'shift_roster_updated', payload: { type: 'single', changes: [{ roster_id: appliedRow.id, change_type: changeType }], by_user: req.user.name || req.user.username } });
+            return res.json({ success: true, message: 'تمت الموافقة وتطبيق التغيير على الجدول',
+                applied: { roster_id: appliedRow.id, change_type: changeType, shift_date: date, shift_code: codeRow.code } });
+        }
+
+        // ── denied / cancelled: السلوك القائم كما هو — لا كتابة على الجدول ──
         await db.ShiftChangeRequests.updateStatus(req.params.id, status, req.user.username || req.user.name);
         const entry = await db.ShiftChangeRequests.getById(req.params.id);
 
