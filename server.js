@@ -15082,21 +15082,61 @@ async function resolveEmployeeUserId(employeeId) {
     } catch (_) { return null; }
 }
 
+// ── A-4.3: خدمة الإجازات — كل قواعد R1–R10 + M1–M4 تعيش في services/leave-service.js ──
+// كسولة لأن db قد يكون null قبل اكتمال الإقلاع؛ تُبنى عند أول طلب فعلي.
+const LeaveService = require('./services/leave-service');
+let leaveService = null;
+function getLeaveService() {
+    if (!leaveService) {
+        if (!db) throw new Error('قاعدة البيانات غير متاحة');
+        leaveService = new LeaveService({ db });
+    }
+    return leaveService;
+}
+
+// عكس resolveEmployeeUserId (A-4.3 — M2/M3): userId ← users.json ← username
+// = employees.employee_code. بلا ربط = null (الموظف بلا حساب = يرى/يملك لا شيء).
+async function resolveUserEmployeeId(userId) {
+    try {
+        const users = JSON.parse(await fs.readFile(USERS_PATH, 'utf8'));
+        const u = users.find(x => String(x.id) === String(userId));
+        if (!u || !u.username) return null;
+        const emp = await db.get('SELECT id FROM employees WHERE employee_code = ?', [u.username]);
+        return emp ? emp.id : null;
+    } catch (_) { return null; }
+}
+
+// تاريخ اليوم المحلي للسيرفر بصيغة YYYY-MM-DD — مرجع R3 (لا ماضٍ) وقبل-البداية.
+function todayLocalStr() {
+    const d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+// تحويل أخطاء الخدمة المُنمَّطة (httpStatus/code/date/conflict) إلى رد HTTP،
+// وغير المُنمَّط إلى 500 موحّد — بلا التفافات مكررة في كل route.
+function leaveError(res, e, fallback) {
+    if (e && e.httpStatus) {
+        const body = { error: e.message };
+        if (e.code) body.code = e.code;
+        if (e.date) body.date = e.date;
+        if (e.conflict) body.conflict = e.conflict;
+        return res.status(e.httpStatus).json(body);
+    }
+    console.error(fallback + ':', e);
+    return res.status(500).json({ error: fallback });
+}
+
+// A-4.3 (M3): نطاق الرؤية يُفرض سيرفريًا داخل الخدمة — المخوَّل يرى الكل،
+// والموظف يرى طلباته فقط ولا يتجاوزها بـ employee_id أجنبية (403).
 app.get('/api/leave-requests', authenticate, async (req, res) => {
     try {
         const { status, employee_id } = req.query;
-        let requests;
-        if (status) {
-            requests = await db.LeaveRequests.getByStatus(status);
-        } else if (employee_id) {
-            requests = await db.LeaveRequests.getByEmployee(employee_id);
-        } else {
-            requests = await db.LeaveRequests.getAll();
-        }
+        const canReview = await getPermissionService().hasPermission(req.user.id, req.user.role, 'leave.review');
+        const viewerEmployeeId = canReview ? null : await resolveUserEmployeeId(req.user.id);
+        const requests = await getLeaveService().list({ canReview, viewerEmployeeId, status, employee_id });
         res.json({ success: true, requests });
     } catch (error) {
-        console.error('Leave requests GET error:', error);
-        res.status(500).json({ error: 'فشل في جلب طلبات الإجازة' });
+        leaveError(res, error, 'فشل في جلب طلبات الإجازة');
     }
 });
 
@@ -15108,43 +15148,23 @@ app.post('/api/leave-requests', authenticate, validateBody({
 }), async (req, res) => {
     try {
         const { employee_id, start_date, end_date, type, reason } = req.body;
-        
-        const start = new Date(start_date);
-        const end = new Date(end_date);
-        const daysInRange = [];
-        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-            daysInRange.push(d.toISOString().split('T')[0]);
-        }
-        
-        for (const dateStr of daysInRange) {
-            const activeLeave = await db.LeaveRequests.getActiveForDate(dateStr);
-            const otherLeave = activeLeave.filter(lr => lr.employee_id !== employee_id && lr.status !== 'cancelled');
-            if (otherLeave.length >= 2) {
-                return res.status(400).json({ 
-                    error: 'لا يمكن قبول الإجازة', 
-                    message: `يوجد ${otherLeave.length} موظفين في إجازة بتاريخ ${dateStr}. الحد الأقصى 2.`,
-                    date: dateStr
-                });
-            }
-        }
-        
-        const id = await db.LeaveRequests.create({
-            employee_id,
-            start_date,
-            end_date,
-            type,
-            reason,
-            status: 'pending'
-        });
-        
+
+        // A-4.3: R1(تقديم)/R2/R3/R9 + إنشاء + تدقيق — ذريًا داخل الخدمة.
+        // warnings = أيام فيها pending متداخلة لآخرين (غير حاجبة — تُعرض للمستخدم).
+        const { id, warnings } = getLeaveService().submit(
+            { employee_id, start_date, end_date, type, reason },
+            { todayStr: todayLocalStr(), actor: { userId: req.user.id, role: req.user.role } }
+        );
+
         broadcast({
             type: 'leave_request_submitted',
             message: 'تم تقديم طلب إجازة جديد',
             requestId: id
         });
 
-        // إشعار المسؤولين: Inbox (صف لكل admin/director) + Push لأجهزتهم.
-        // فشل الإشعار أو Push لا يُفقد الطلب — لهذا هو داخل try منفصل ولا يرمي.
+        // إشعار المخوَّلين بمراجعة الإجازات: Inbox + Push — بعد COMMIT حصرًا
+        // (بنية A-1)، وفشل الإشعار لا يُفقد الطلب. A-4.3: permKey انتقل من
+        // requests.review إلى leave.review بعد فصل الصلاحيتين.
         try {
             if (db.Notifications) {
                 const createdReq = await db.LeaveRequests.getById(id); // يحمل employee_name من الـJOIN
@@ -15154,108 +15174,134 @@ app.post('/api/leave-requests', authenticate, validateBody({
                     title: 'طلب إجازة جديد',
                     message: empName + ': ' + type + ' من ' + start_date + ' إلى ' + end_date,
                     push: true,
-                    permKey: 'requests.review'
+                    permKey: 'leave.review'
                 });
             }
         } catch (nErr) { console.error('Leave submit notify error:', nErr.message); }
 
-        res.json({ success: true, id });
+        res.json({ success: true, id, warnings });
     } catch (error) {
-        console.error('Leave request POST error:', error);
-        res.status(500).json({ error: 'فشل في تقديم طلب الإجازة' });
+        leaveError(res, error, 'فشل في تقديم طلب الإجازة');
     }
 });
 
+// A-4.3 (M2): التعديل لصاحب الطلب فقط، pending فقط، وقبل start_date —
+// مع إعادة تطبيق R2/R3/R9 على القيم الجديدة وحدث تدقيق pending→pending.
+// لا يمكن تعديل أي طلب تمت معالجته (معتمد/مرفوض/ملغى) من أي جهة.
 app.put('/api/leave-requests/:id', authenticate, async (req, res) => {
     try {
-        const existing = await db.LeaveRequests.getById(req.params.id);
-        if (!existing) {
-            return res.status(404).json({ error: 'الطلب غير موجود' });
+        const { start_date, end_date, type, reason } = req.body;
+        if (!start_date || !end_date) {
+            return res.status(400).json({ error: 'تاريخا البداية والنهاية مطلوبان للتعديل' });
         }
-        
-        if (existing.status !== 'pending' && req.user.role !== 'admin' && req.user.role !== 'director') {
-            return res.status(403).json({ error: 'لا يمكن تعديل طلب تمت معالجته' });
-        }
-        
-        const data = { ...req.body, approved_by: null, approved_at: null };
-        await db.LeaveRequests.update(req.params.id, data);
-        
+        const viewerEmployeeId = await resolveUserEmployeeId(req.user.id);
+        getLeaveService().edit(req.params.id, { start_date, end_date, type, reason }, {
+            todayStr: todayLocalStr(),
+            actor: { userId: req.user.id, role: req.user.role },
+            viewerEmployeeId
+        });
+
         broadcast({
             type: 'leave_request_updated',
             message: 'تم تحديث طلب الإجازة',
             requestId: req.params.id
         });
-        
+
         res.json({ success: true });
     } catch (error) {
-        console.error('Leave request PUT error:', error);
-        res.status(500).json({ error: 'فشل في تحديث طلب الإجازة' });
+        leaveError(res, error, 'فشل في تحديث طلب الإجازة');
     }
 });
 
+// A-4.3 (M1): لا حذف فيزيائي إطلاقًا — DELETE أصبح إلغاءً ناعمًا
+// (status='cancelled' + cancelled_by/at/reason + حدث تدقيق). pending يُلغيه
+// المالك فقط وقبل start_date؛ المعتمدة يُلغيها حامل leave.review بسبب إلزامي (R7).
 app.delete('/api/leave-requests/:id', authenticate, async (req, res) => {
     try {
-        const existing = await db.LeaveRequests.getById(req.params.id);
-        if (!existing) {
-            return res.status(404).json({ error: 'الطلب غير موجود' });
-        }
-        
-        if (existing.status === 'approved') {
-            // requests.review (2026-09-29): إلغاء إجازة معتمدة = فعل مراجعة — صلاحية لا دور
-            const canReview = await getPermissionService().hasPermission(req.user.id, req.user.role, 'requests.review');
-            if (!canReview) {
-                return res.status(403).json({ error: 'لا يمكن إلغاء إجازة معتمدة' });
+        const canReview = await getPermissionService().hasPermission(req.user.id, req.user.role, 'leave.review');
+        const viewerEmployeeId = await resolveUserEmployeeId(req.user.id);
+        const reason = (req.body && req.body.reason) || req.query.reason || null;
+        const { wasApproved, request } = getLeaveService().cancel(req.params.id, {
+            actor: { userId: req.user.id, role: req.user.role },
+            canReview,
+            reason,
+            todayStr: todayLocalStr(),
+            viewerEmployeeId
+        });
+
+        // إشعارات بعد COMMIT — بنية A-1، وفشلها لا يؤثر على الإلغاء.
+        try {
+            if (db.Notifications) {
+                if (wasApproved) {
+                    // إلغاء مخوَّل لإجازة معتمدة → إشعار شخصي للمالك بالسبب
+                    const ownerUserId = await resolveEmployeeUserId(request.employee_id);
+                    if (ownerUserId) {
+                        await notificationService.notifyPersonal(ownerUserId, {
+                            title: 'تم إلغاء إجازتك المعتمدة',
+                            message: request.type + ' من ' + request.start_date + ' إلى ' + request.end_date + (reason ? ' — السبب: ' + reason : ''),
+                            type: 'warning'
+                        });
+                    }
+                } else {
+                    // موظف ألغى طلبه المعلَّق → إشعار تشغيلي للمخوَّلين بلا push
+                    const full = await db.LeaveRequests.getById(req.params.id);
+                    const empName = (full && full.employee_name) || ('موظف #' + request.employee_id);
+                    await notificationService.notifyOperational({
+                        eventKey: 'leave.cancelled',
+                        title: 'ألغى موظف طلب إجازة',
+                        message: empName + ': ' + request.type + ' من ' + request.start_date + ' إلى ' + request.end_date,
+                        push: false,
+                        permKey: 'leave.review'
+                    });
+                }
             }
-        }
-        
-        await db.LeaveRequests.delete(req.params.id);
-        
+        } catch (nErr) { console.error('Leave cancel notify error:', nErr.message); }
+
         broadcast({
             type: 'leave_request_cancelled',
             message: 'تم إلغاء طلب الإجازة',
             requestId: req.params.id
         });
-        
+
         res.json({ success: true });
     } catch (error) {
-        console.error('Leave request DELETE error:', error);
-        res.status(500).json({ error: 'فشل في إلغاء طلب الإجازة' });
+        leaveError(res, error, 'فشل في إلغاء طلب الإجازة');
     }
 });
 
-app.post('/api/leave-requests/:id/approve', authenticate, authorizePerm('requests.review'), async (req, res) => {
+// A-4.3: الصلاحية انتقلت من requests.review إلى leave.review (فصل معتمد).
+// الفحص الحاسم لـ R1 داخل tx.immediate في الخدمة — اعتمادان متزامنان = واحد فقط.
+// الرد يحمل conflicts (R8): مناوبات الموظف المنشورة خلال أيام الطلب — للعرض
+// فقط، والاعتماد لا يكتب شيئًا في shift_roster (D7).
+app.post('/api/leave-requests/:id/approve', authenticate, authorizePerm('leave.review'), async (req, res) => {
     try {
-        const { status } = req.body;
-        if (!status || !['approved', 'denied'].includes(status)) {
-            return res.status(400).json({ error: 'الحالة يجب أن تكون approved أو denied' });
-        }
-        
-        const existing = await db.LeaveRequests.getById(req.params.id);
-        if (!existing) {
-            return res.status(404).json({ error: 'الطلب غير موجود' });
-        }
-        
-        if (existing.status !== 'pending') {
-            return res.status(400).json({ error: 'الطلب تمت معالجته مسبقاً' });
-        }
-        
-        await db.LeaveRequests.updateStatus(req.params.id, status, req.user.id);
+        const { status, denial_reason } = req.body;
+        const { request } = getLeaveService().review(req.params.id, status, {
+            actor: { userId: req.user.id, role: req.user.role },
+            denial_reason
+        });
 
         // إشعار شخصي لصاحب الطلب: Inbox + Push (حسابه = users.username بـ employee_code).
-        // بلا حساب مربوط/نشط يُتخطى الإشعار بهدوء ولا يتعطل القرار.
+        // بلا حساب مربوط/نشط يُتخطى الإشعار بهدوء ولا يتعطل القرار. الرفض يتضمن سببه (R10).
         try {
             if (db.Notifications) {
-                const ownerUserId = await resolveEmployeeUserId(existing.employee_id);
+                const ownerUserId = await resolveEmployeeUserId(request.employee_id);
                 if (ownerUserId) {
                     const approved = status === 'approved';
                     await notificationService.notifyPersonal(ownerUserId, {
                         title: approved ? 'تمت الموافقة على طلب الإجازة' : 'تم رفض طلب الإجازة',
-                        message: existing.type + ' من ' + existing.start_date + ' إلى ' + existing.end_date,
+                        message: request.type + ' من ' + request.start_date + ' إلى ' + request.end_date + (!approved && denial_reason ? ' — السبب: ' + String(denial_reason).trim() : ''),
                         type: approved ? 'success' : 'warning'
                     });
                 }
             }
         } catch (nErr) { console.error('Leave resolve notify error:', nErr.message); }
+
+        // R8: تعارضات المناوبة المنشورة — قراءة صرفة بعد COMMIT، وفشلها لا يُسقط القرار
+        let conflicts = [];
+        try {
+            conflicts = await getLeaveService().conflictsForRequest(request);
+        } catch (cErr) { console.error('Leave conflicts error:', cErr.message); }
 
         broadcast({
             type: 'leave_request_resolved',
@@ -15263,11 +15309,46 @@ app.post('/api/leave-requests/:id/approve', authenticate, authorizePerm('request
             requestId: req.params.id,
             status
         });
-        
-        res.json({ success: true });
+
+        res.json({ success: true, conflicts });
     } catch (error) {
-        console.error('Leave request approve error:', error);
-        res.status(500).json({ error: 'فشل في معالجة طلب الإجازة' });
+        leaveError(res, error, 'فشل في معالجة طلب الإجازة');
+    }
+});
+
+// A-4.3: سجل تدقيق الطلب — لصاحبه أو لحامل leave.review فقط.
+app.get('/api/leave-requests/:id/events', authenticate, async (req, res) => {
+    try {
+        const row = await db.LeaveRequests.getById(req.params.id);
+        if (!row) return res.status(404).json({ error: 'الطلب غير موجود' });
+        const canReview = await getPermissionService().hasPermission(req.user.id, req.user.role, 'leave.review');
+        if (!canReview) {
+            const viewerEmployeeId = await resolveUserEmployeeId(req.user.id);
+            if (viewerEmployeeId == null || Number(viewerEmployeeId) !== Number(row.employee_id)) {
+                return res.status(403).json({ error: 'ليس لديك الصلاحية', code: 'LEAVE_SCOPE' });
+            }
+        }
+        const events = await getLeaveService().getEvents(req.params.id);
+        res.json({ success: true, events });
+    } catch (error) {
+        leaveError(res, error, 'فشل في جلب سجل طلب الإجازة');
+    }
+});
+
+// A-4.3 (R8): تعارضات مناوبة موظف مع نطاق أيام — للمخوَّل، قراءة صرفة.
+// يستخدمها المراجع قبل القرار ليرى أثر الاعتماد على الجدول المنشور (بلا كتابة — D7).
+app.get('/api/leave-requests/conflicts', authenticate, authorizePerm('leave.review'), async (req, res) => {
+    try {
+        const { employee_id, from, to } = req.query;
+        if (!employee_id || !from || !to) {
+            return res.status(400).json({ error: 'employee_id وfrom وto مطلوبة' });
+        }
+        const conflicts = await getLeaveService().conflictsForRequest({
+            employee_id: Number(employee_id), start_date: from, end_date: to
+        });
+        res.json({ success: true, conflicts });
+    } catch (error) {
+        leaveError(res, error, 'فشل في جلب تعارضات المناوبة');
     }
 });
 
