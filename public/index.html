@@ -2756,6 +2756,7 @@ window.addEventListener('load', function() {
                 <button class="sidebar-item" id="sbAdminUsers" style="display:none;" onclick="toggleSidebar(); navigateToPage('admin-users.html');"><i class="fas fa-users"></i> إدارة المستخدمين</button>
                 <button class="sidebar-item" id="sbAssetsCenter" style="display:none;" onclick="toggleSidebar(); navigateToPage('assets-center.html');"><i class="fas fa-box-open"></i> مركز العهد والأجهزة</button>
                 <button class="sidebar-item" id="sbContribution" style="display:none;" onclick="toggleSidebar(); navigateToPage('contribution-stats.html');"><i class="fas fa-chart-line"></i> المساهمة التشغيلية</button>
+                <button class="sidebar-item" id="sbLeaveReview" style="display:none;" onclick="toggleSidebar(); navigateToPage('leave-admin.html?v=1');"><i class="fas fa-calendar-check"></i> مراجعة الإجازات</button>
             </div>
         </div>
         <!-- الإعدادات -->
@@ -2832,6 +2833,7 @@ function navigateToPage(url) {
         show('sbAdminUsers',   star || perms.indexOf('admin.users_manage') !== -1);
         show('sbAssetsCenter', star || perms.indexOf('assets.view') !== -1 || perms.indexOf('assets.manage') !== -1);
         show('sbContribution', star || perms.indexOf('indicators.contribution') !== -1);
+        show('sbLeaveReview', star || perms.indexOf('leave.review') !== -1);
         var group = document.getElementById('sbAdminGroup');
         if (group && anyVisible) group.style.display = '';
     }

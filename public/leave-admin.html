@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>مراجعة الإجازات — منصة الجنوب</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+<style>
+    /* هوية منصة الجنوب المعتمدة — نفس وصفة الصفحات الإدارية المستقلة (contribution-stats) */
+    :root {
+        --navy-900: #0B1E33; --navy-700: #1A3A5C;
+        --teal-id: #2E8B7A; --gold-id: #E8C84A;
+        --bg: #0A1728;
+        --surface: rgba(255,255,255,0.035);
+        --surface-2: rgba(255,255,255,0.05);
+        --border: rgba(255,255,255,0.08);
+        --border-soft: rgba(255,255,255,0.06);
+        --text: #F1F5F9; --text-2: #A9BACD; --muted: #8A9BB0;
+        --ops: #60A5FA; --emerald: #0EA47A; --coral: #EF4444;
+        --th-bg: #0E2038;
+        --radius: 16px; --radius-md: 12px;
+        --shadow-card: inset 0 1px 0 rgba(255,255,255,0.045), 0 10px 30px rgba(0,0,0,0.30);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'IBM Plex Sans Arabic', 'Segoe UI', Tahoma, Arial, sans-serif; background: var(--bg); color: var(--text); padding: 24px 20px 48px; min-height: 100vh; }
+    body::before {
+        content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+        background:
+            radial-gradient(ellipse 60% 40% at 50% -10%, rgba(46, 139, 122, 0.10), transparent 70%),
+            radial-gradient(ellipse 45% 32% at 50% 110%, rgba(232, 200, 74, 0.05), transparent 70%),
+            linear-gradient(180deg, #0B1E33 0%, #0A1728 55%, #081220 100%);
+    }
+    .container { max-width: 1400px; margin: 0 auto; }
+    .header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 18px; }
+    .header h1 { font-size: 1.45rem; font-weight: 700; }
+    .header h1 i { color: var(--gold-id); margin-left: 8px; }
+    .subtitle { color: var(--text-2); font-size: 0.85rem; margin-top: 4px; }
+    .controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; background: var(--surface); padding: 10px 14px; border-radius: var(--radius-md); border: 1px solid var(--border-soft); box-shadow: var(--shadow-card); }
+    .controls select, .controls input, .controls button { font-family: inherit; padding: 8px 12px; border-radius: 9px; border: 1px solid var(--border); background: var(--th-bg); color: var(--text); font-size: 0.9rem; }
+    .controls select { cursor: pointer; }
+    .controls input { min-width: 150px; }
+    .controls input[type="date"] { min-width: 135px; }
+    .controls button { background: linear-gradient(135deg, var(--teal-id), var(--emerald)); color: #fff; border: none; cursor: pointer; font-weight: 600; box-shadow: 0 6px 18px rgba(14,164,122,0.25); transition: filter 0.2s ease; }
+    .controls button:hover { filter: brightness(1.1); }
+    .meta { color: var(--muted); font-size: 0.78rem; margin-bottom: 14px; }
+    .group-card { background: var(--surface); border: 1px solid var(--border-soft); border-radius: var(--radius); margin-bottom: 22px; overflow: hidden; box-shadow: var(--shadow-card); }
+    .table-wrap { overflow-x: auto; }
+    .table-wrap::-webkit-scrollbar { height: 8px; }
+    .table-wrap::-webkit-scrollbar-track { background: transparent; }
+    .table-wrap::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.14); border-radius: 8px; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; white-space: nowrap; }
+    th { background: var(--th-bg); color: var(--text-2); font-weight: 600; padding: 10px 8px; text-align: center; position: sticky; top: 0; }
+    td { padding: 9px 8px; text-align: center; border-top: 1px solid var(--border-soft); }
+    td.name { text-align: right; font-weight: 600; }
+    td .code { display: block; font-size: 0.72rem; color: var(--muted); font-weight: 400; }
+    tbody tr:hover td { background: rgba(255,255,255,0.03); }
+    .num { font-variant-numeric: tabular-nums; }
+    .chip { display: inline-block; border-radius: 20px; padding: 3px 12px; font-size: 0.78rem; font-weight: 600; border: 1px solid var(--border-soft); }
+    .chip.pending  { background: rgba(232,200,74,0.12);  color: #EADDA8; border-color: rgba(232,200,74,0.35); }
+    .chip.approved { background: rgba(14,164,122,0.14);  color: #7FE3C4; border-color: rgba(14,164,122,0.4); }
+    .chip.denied   { background: rgba(239,68,68,0.12);   color: #FCA5A5; border-color: rgba(239,68,68,0.35); }
+    .chip.cancelled{ background: var(--surface-2);       color: var(--text-2); }
+    .chip.expired  { background: rgba(96,165,250,0.12);  color: #BAD7FA; border-color: rgba(96,165,250,0.35); }
+    .conflict-warn { color: var(--gold-id); font-size: 0.78rem; }
+    .conflict-none { color: var(--muted); opacity: 0.6; }
+    .detail-toggle { cursor: pointer; color: var(--ops); font-size: 0.8rem; background: none; border: 1px solid var(--border); border-radius: 8px; padding: 5px 12px; font-family: inherit; }
+    .detail-toggle:hover { background: var(--surface-2); }
+    .loading, .error-box { text-align: center; padding: 40px; color: var(--muted); }
+    .error-box { color: var(--coral); }
+    /* بطاقة الحالة (بوابة Fail-Closed) */
+    .state-card { max-width: 560px; margin: 80px auto; background: var(--surface); border: 1px solid var(--border-soft); border-radius: var(--radius); padding: 40px 32px; text-align: center; box-shadow: var(--shadow-card); }
+    .state-card i { font-size: 2.6rem; margin-bottom: 16px; display: block; }
+    .state-card.denied i { color: var(--coral); }
+    .state-card h2 { font-size: 1.2rem; margin-bottom: 10px; }
+    .state-card p { color: var(--text-2); font-size: 0.88rem; line-height: 1.8; }
+    /* نافذة التفاصيل */
+    .modal-overlay { position: fixed; inset: 0; background: rgba(4,10,20,0.72); backdrop-filter: blur(3px); z-index: 100; display: none; align-items: flex-start; justify-content: center; padding: 40px 16px; overflow-y: auto; }
+    .modal-overlay.open { display: flex; }
+    .modal-card { background: #0D1F38; border: 1px solid var(--border); border-radius: var(--radius); width: 100%; max-width: 760px; box-shadow: 0 24px 60px rgba(0,0,0,0.5); }
+    .modal-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--border-soft); }
+    .modal-head h3 { font-size: 1.05rem; }
+    .modal-head h3 i { color: var(--gold-id); margin-left: 8px; }
+    .modal-close { background: none; border: none; color: var(--muted); font-size: 1.2rem; cursor: pointer; }
+    .modal-close:hover { color: var(--text); }
+    .modal-body { padding: 18px 20px 22px; }
+    .kv-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px 18px; margin-bottom: 16px; }
+    .kv { background: var(--surface); border: 1px solid var(--border-soft); border-radius: var(--radius-md); padding: 9px 12px; }
+    .kv .k { font-size: 0.72rem; color: var(--muted); margin-bottom: 3px; }
+    .kv .v { font-size: 0.9rem; font-weight: 600; word-break: break-word; }
+    .section-title { font-size: 0.85rem; font-weight: 700; color: var(--text-2); margin: 16px 0 8px; display: flex; align-items: center; gap: 7px; }
+    .section-title i { color: var(--gold-id); }
+    .warn-box { background: rgba(232,200,74,0.07); border: 1px solid rgba(232,200,74,0.28); border-radius: var(--radius-md); padding: 10px 14px; font-size: 0.82rem; color: #EADDA8; }
+    .warn-box li { margin: 3px 0; }
+    .timeline { list-style: none; }
+    .timeline li { position: relative; padding: 8px 22px 8px 0; border-right: 2px solid var(--border); margin-right: 6px; font-size: 0.82rem; color: var(--text-2); }
+    .timeline li::before { content: ''; position: absolute; right: -6px; top: 12px; width: 10px; height: 10px; border-radius: 50%; background: var(--ops); }
+    .timeline li .t { color: var(--muted); font-size: 0.72rem; display: block; margin-top: 2px; }
+    .decision-bar { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--border-soft); }
+    .btn { font-family: inherit; padding: 9px 20px; border-radius: 10px; border: none; cursor: pointer; font-weight: 700; font-size: 0.88rem; transition: filter 0.2s ease; }
+    .btn:hover { filter: brightness(1.12); }
+    .btn.approve { background: linear-gradient(135deg, var(--teal-id), var(--emerald)); color: #fff; box-shadow: 0 6px 18px rgba(14,164,122,0.25); }
+    .btn.deny { background: linear-gradient(135deg, #B91C1C, var(--coral)); color: #fff; box-shadow: 0 6px 18px rgba(239,68,68,0.22); }
+    .btn.cancel-leave { background: var(--surface-2); color: #FCA5A5; border: 1px solid rgba(239,68,68,0.4); }
+    .reason-box { width: 100%; margin-top: 10px; }
+    .reason-box textarea { width: 100%; min-height: 74px; font-family: inherit; font-size: 0.88rem; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--th-bg); color: var(--text); resize: vertical; }
+    .reason-box .reason-actions { display: flex; gap: 8px; margin-top: 8px; }
+    .btn.secondary { background: var(--surface-2); color: var(--text-2); border: 1px solid var(--border); }
+    /* Toast */
+    #toastBox { position: fixed; bottom: 22px; right: 22px; z-index: 200; display: flex; flex-direction: column; gap: 8px; }
+    .toast { background: #122740; border: 1px solid var(--border); border-right: 4px solid var(--ops); border-radius: 10px; padding: 11px 16px; font-size: 0.85rem; box-shadow: 0 10px 26px rgba(0,0,0,0.4); max-width: 380px; animation: toastIn 0.25s ease; }
+    .toast.success { border-right-color: var(--emerald); }
+    .toast.error { border-right-color: var(--coral); }
+    .toast.warn { border-right-color: var(--gold-id); }
+    @keyframes toastIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+    @media (max-width: 720px) {
+        body { padding: 16px 10px 40px; }
+        .controls { width: 100%; }
+        .controls input { min-width: 0; flex: 1; }
+        .kv-grid { grid-template-columns: 1fr 1fr; }
+    }
+</style>
+<link rel="stylesheet" href="/css/platform-identity.css?v=1">
+<style>
+/* جسر الهوية الموحدة — نفس معالجة contribution-stats: ربط الرموز القديمة بقيم التكميل */
+:root {
+    --teal-id: var(--pi-green); --gold-id: var(--pi-gold);
+    --emerald: var(--pi-green); --coral: var(--pi-red);
+}
+</style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <div>
+            <h1><i class="fas fa-calendar-check"></i>مراجعة الإجازات</h1>
+            <div class="subtitle">قرارات الاعتماد والرفض والإلغاء — صلاحية «مراجعة الإجازات» (leave.review) · تعارض المناوبات للاطلاع فقط ولا يعدّل الجدول المنشور</div>
+        </div>
+        <div class="controls" id="filtersBar" style="display:none">
+            <select id="statusFilter">
+                <option value="">كل الحالات</option>
+                <option value="pending" selected>قيد المراجعة</option>
+                <option value="approved">معتمدة</option>
+                <option value="denied">مرفوضة</option>
+                <option value="cancelled">ملغاة</option>
+            </select>
+            <input type="text" id="searchInput" placeholder="بحث باسم الموظف أو الكود…">
+            <input type="date" id="dateFrom" title="من تاريخ (بداية الإجازة)">
+            <input type="date" id="dateTo" title="إلى تاريخ (نهاية الإجازة)">
+            <button id="refreshBtn"><i class="fas fa-rotate"></i> تحديث</button>
+        </div>
+    </div>
+
+    <div class="meta" id="metaLine"></div>
+
+    <!-- بوابة الحالة: تحميل / رفض (Fail-Closed) -->
+    <div id="gateBox"></div>
+
+    <!-- جسم الصفحة — لا يظهر ولا يُجلب إلا بعد اجتياز البوابة -->
+    <div id="appBox" style="display:none">
+        <div class="group-card">
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>الموظف</th><th>النوع</th><th>البداية</th><th>النهاية</th>
+                            <th>الأيام</th><th>الحالة</th><th>تاريخ الطلب</th><th>تعارض الجدول</th><th></th>
+                        </tr>
+                    </thead>
+                    <tbody id="rowsBody">
+                        <tr><td colspan="9" class="loading"><i class="fas fa-spinner fa-spin"></i> جاري التحميل…</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- نافذة تفاصيل الطلب -->
+<div class="modal-overlay" id="detailModal">
+    <div class="modal-card">
+        <div class="modal-head">
+            <h3><i class="fas fa-file-circle-check"></i>تفاصيل طلب الإجازة</h3>
+            <button class="modal-close" id="detailClose"><i class="fas fa-xmark"></i></button>
+        </div>
+        <div class="modal-body" id="detailBody"></div>
+    </div>
+</div>
+
+<div id="toastBox"></div>
+
+<script src="js/core/core-auth.js"></script>
+<script src="js/leave-admin.js?v=1"></script>
+</body>
+</html>
