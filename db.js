@@ -974,6 +974,56 @@ const TABLE_SCHEMAS = [
     actor_name TEXT,
     stats_json TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );`,
+
+  // A-3.5: peak-data — SQLite هو SSOT (peak-data.json مجمّد: لا يُقرأ ولا
+  // يُكتب ولا يُحذف). created_at TEXT يحمل نفس createdAt (ISO) من JSON حتى
+  // يبقى الترتيب «الأحدث أولًا» مطابقًا لسلوك unshift السابق.
+  // ملاحظة FK مقصودة: لا قيد REFERENCES صلب على peak_alerts.mission_id —
+  // السلوك القديم يقصّ الأسقف (100 مهمة / 50 تنبيهًا) بلا تتالي، فيمكن أن
+  // تبقى تنبيهات لمهمة قُصّت بالسقف، وpragma foreign_keys=ON العام كان
+  // سيكسر قصّ الأسقف. التكامل المرجعي يُفرض من طبقة التطبيق: حذف متسلسل
+  // صريح داخل معاملة عند حذف مهمة + فحص أيتام يوقف الزرع عند أي تعارض.
+  `CREATE TABLE IF NOT EXISTS peak_missions (
+    id TEXT PRIMARY KEY,
+    location TEXT NOT NULL,
+    lat REAL,
+    lng REAL,
+    unit TEXT,
+    start_time TEXT,
+    end_time TEXT,
+    priority TEXT DEFAULT 'عالية',
+    notes TEXT DEFAULT '',
+    status TEXT DEFAULT 'نشط',
+    created_at TEXT
+  );`,
+  `CREATE TABLE IF NOT EXISTS peak_alerts (
+    id TEXT PRIMARY KEY,
+    title TEXT,
+    details TEXT,
+    priority TEXT,
+    unit TEXT,
+    location TEXT,
+    start_time TEXT,
+    end_time TEXT,
+    notes TEXT DEFAULT '',
+    lat REAL,
+    lng REAL,
+    radius INTEGER DEFAULT 5000,
+    mission_id TEXT,
+    status TEXT DEFAULT 'نشط',
+    created_at TEXT
+  );`,
+  `CREATE INDEX IF NOT EXISTS idx_peak_alerts_mission ON peak_alerts(mission_id);`,
+  `CREATE TABLE IF NOT EXISTS peak_logs (
+    id TEXT PRIMARY KEY,
+    icon TEXT,
+    action TEXT,
+    details TEXT,
+    priority TEXT,
+    time TEXT,
+    date TEXT,
+    created_at TEXT
   );`
 ];
 
@@ -1363,6 +1413,67 @@ async function runMigrations() {
     }
   } catch (err) {
     logger.warn('notification_log v5 rebuild migration: ' + err.message);
+  }
+
+  // A-3.5: إعادة بناء جداول peak القديمة إن وُجدت بمخطط سكربت db/migrate.js
+  // التاريخي (id INTEGER PK + mission_id/alert_id/log_id TEXT UNIQUE) إلى
+  // المخطط القياسي الجديد (id TEXT PK = المعرف النصي الأصلي). القواعد التي
+  // لم يمرّ عليها ذلك السكربت (مثل Render) تأخذ المخطط القياسي من
+  // TABLE_SCHEMAS مباشرة ولا تدخل هنا. الصفوف تُنسخ حرفيًا محافظةً على
+  // المعرفات والتواريخ؛ الصفوف بلا معرف نصي تُستبعد (لا معرف = لا هوية).
+  // النمط نفسه: foreign_keys OFF + معاملة واحدة لكل جدول.
+  const peakLegacyRebuilds = [
+    { table: 'peak_missions', legacyCol: 'mission_id',
+      ddl: `CREATE TABLE peak_missions_new (
+        id TEXT PRIMARY KEY, location TEXT NOT NULL, lat REAL, lng REAL, unit TEXT,
+        start_time TEXT, end_time TEXT, priority TEXT DEFAULT 'عالية', notes TEXT DEFAULT '',
+        status TEXT DEFAULT 'نشط', created_at TEXT)`,
+      copy: `INSERT INTO peak_missions_new (id, location, lat, lng, unit, start_time, end_time, priority, notes, status, created_at)
+        SELECT mission_id, location, lat, lng, unit, start_time, end_time, priority, notes, status, created_at
+        FROM peak_missions WHERE mission_id IS NOT NULL` },
+    { table: 'peak_alerts', legacyCol: 'alert_id',
+      ddl: `CREATE TABLE peak_alerts_new (
+        id TEXT PRIMARY KEY, title TEXT, details TEXT, priority TEXT, unit TEXT, location TEXT,
+        start_time TEXT, end_time TEXT, notes TEXT DEFAULT '', lat REAL, lng REAL,
+        radius INTEGER DEFAULT 5000, mission_id TEXT, status TEXT DEFAULT 'نشط', created_at TEXT)`,
+      copy: `INSERT INTO peak_alerts_new (id, title, details, priority, unit, location, start_time, end_time, notes, lat, lng, radius, mission_id, status, created_at)
+        SELECT alert_id, title, details, priority, unit, location, start_time, end_time, notes, lat, lng, radius, mission_id, status, created_at
+        FROM peak_alerts WHERE alert_id IS NOT NULL` },
+    { table: 'peak_logs', legacyCol: 'log_id',
+      ddl: `CREATE TABLE peak_logs_new (
+        id TEXT PRIMARY KEY, icon TEXT, action TEXT, details TEXT, priority TEXT, time TEXT, date TEXT, created_at TEXT)`,
+      copy: `INSERT INTO peak_logs_new (id, icon, action, details, priority, time, date, created_at)
+        SELECT log_id, icon, action, details, priority, time, date, created_at
+        FROM peak_logs WHERE log_id IS NOT NULL` }
+  ];
+  for (const rb of peakLegacyRebuilds) {
+    try {
+      const cols = await all(`PRAGMA table_info(${rb.table})`);
+      if (!cols.length || !cols.some(c => c.name === rb.legacyCol)) continue;
+      logger.info(`Rebuilding ${rb.table}: legacy db/migrate.js schema detected (A-3.5)`);
+      db.pragma('foreign_keys = OFF');
+      beginTransaction();
+      try {
+        await exec(rb.ddl);
+        await exec(rb.copy);
+        await exec(`DROP TABLE ${rb.table}`);
+        await exec(`ALTER TABLE ${rb.table}_new RENAME TO ${rb.table}`);
+        commitTransaction();
+        db.pragma('foreign_keys = ON');
+        logger.info(`${rb.table} rebuilt to canonical A-3.5 schema`);
+      } catch (rbErr) {
+        rollbackTransaction();
+        db.pragma('foreign_keys = ON');
+        throw rbErr;
+      }
+    } catch (err) {
+      logger.warn(`${rb.table} legacy rebuild migration: ` + err.message);
+    }
+  }
+  try {
+    await exec(`CREATE INDEX IF NOT EXISTS idx_peak_alerts_mission ON peak_alerts(mission_id);`);
+  } catch (err) {
+    logger.warn('idx_peak_alerts_mission ensure: ' + err.message);
   }
 
   // Reconcile legacy JSON shifts into SQLite (X2 single-source adoption):
@@ -2139,6 +2250,32 @@ const Announcements = {
   },
   async deleteAll() {
     return run('DELETE FROM announcements');
+  }
+};
+
+// ============================================
+// CRUD: PEAK DATA (A-3.5 — SQLite SSOT)
+// snake_case خام هنا؛ تحويل العقد إلى camelCase يتم في طبقة القراءة
+// بـ server.js (mapPeak*Row) حتى يبقى API كما هو 100%.
+// ============================================
+const PeakData = {
+  async counts() {
+    const m = await get('SELECT COUNT(*) n FROM peak_missions');
+    const a = await get('SELECT COUNT(*) n FROM peak_alerts');
+    const l = await get('SELECT COUNT(*) n FROM peak_logs');
+    return { missions: m.n, alerts: a.n, logs: l.n };
+  },
+  async insertMission(r) {
+    return run('INSERT INTO peak_missions (id, location, lat, lng, unit, start_time, end_time, priority, notes, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);',
+      [r.id, r.location, r.lat, r.lng, r.unit, r.start_time, r.end_time, r.priority, r.notes, r.status, r.created_at]);
+  },
+  async insertAlert(r) {
+    return run('INSERT INTO peak_alerts (id, title, details, priority, unit, location, start_time, end_time, notes, lat, lng, radius, mission_id, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);',
+      [r.id, r.title, r.details, r.priority, r.unit, r.location, r.start_time, r.end_time, r.notes, r.lat, r.lng, r.radius, r.mission_id, r.status, r.created_at]);
+  },
+  async insertLog(r) {
+    return run('INSERT INTO peak_logs (id, icon, action, details, priority, time, date, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?);',
+      [r.id, r.icon, r.action, r.details, r.priority, r.time, r.date, r.created_at]);
   }
 };
 
@@ -4332,6 +4469,70 @@ async function migrateTimeline() {
   }
 }
 
+// A-3.5: زرع peak-data من JSON المجمّد إلى SQLite — مرة واحدة، idempotent
+// (يُتخطى إن كانت الجداول تحمل أي بيانات). فحص الأيتام إلزامي: أي تنبيه
+// يشير لمهمة غير موجودة يوقف خطوة الترحيل كاملة ويُبلَّغ عنها صراحة —
+// لا حذف ولا تجاهل ولا إصلاح تلقائي (قرار المالك).
+// الإدراج من الأقدم للأحدث: JSON مرتّب بـ unshift (الأحدث أولًا)، وعكسه
+// يجعل rowid تصاعديًا مع الزمن فيبقى ترتيب القراءة (created_at DESC,
+// rowid DESC) مطابقًا لترتيب JSON تمامًا.
+async function migratePeakData() {
+  try {
+    const existing = await PeakData.counts();
+    if (existing.missions > 0 || existing.alerts > 0 || existing.logs > 0) {
+      logger.warn('peak-data tables already have data. Skipping migration.');
+      return;
+    }
+    const dataPath = path.join(DATA_DIR, 'peak-data.json');
+    const data = JSON.parse(await fs.readFile(dataPath, 'utf8'));
+    const missions = Array.isArray(data.missions) ? data.missions : [];
+    const alerts = Array.isArray(data.alerts) ? data.alerts : [];
+    const logs = Array.isArray(data.logs) ? data.logs : [];
+    const missionIds = new Set(missions.map(m => String(m.id)));
+    const orphans = alerts.filter(a => a && a.missionId != null && !missionIds.has(String(a.missionId)));
+    if (orphans.length > 0) {
+      logger.error(`A-3.5 peak-data migration ABORTED: ${orphans.length} orphan alert(s) — ` +
+        orphans.map(o => `alert ${o.id} -> mission ${o.missionId}`).join(', ') +
+        '. لا حذف ولا إصلاح تلقائي؛ يتطلب قرار المالك.');
+      return;
+    }
+    for (const m of [...missions].reverse()) {
+      if (!m || m.id == null) continue;
+      await PeakData.insertMission({
+        id: String(m.id), location: m.location || '', lat: m.lat != null ? m.lat : null,
+        lng: m.lng != null ? m.lng : null, unit: m.unit || '', start_time: m.startTime || '',
+        end_time: m.endTime || '', priority: m.priority || 'عالية', notes: m.notes || '',
+        status: m.status || 'نشط', created_at: m.createdAt || null
+      });
+    }
+    for (const a of [...alerts].reverse()) {
+      if (!a || a.id == null) continue;
+      await PeakData.insertAlert({
+        id: String(a.id), title: a.title || '', details: a.details || '', priority: a.priority || 'عالية',
+        unit: a.unit || '', location: a.location || '', start_time: a.startTime || '', end_time: a.endTime || '',
+        notes: a.notes || '', lat: a.lat != null ? a.lat : null, lng: a.lng != null ? a.lng : null,
+        radius: a.radius != null ? a.radius : 5000, mission_id: a.missionId != null ? String(a.missionId) : null,
+        status: a.status || 'نشط', created_at: a.createdAt || null
+      });
+    }
+    for (const l of [...logs].reverse()) {
+      if (!l || l.id == null) continue;
+      await PeakData.insertLog({
+        id: String(l.id), icon: l.icon || '', action: l.action || '', details: l.details || '',
+        priority: l.priority || 'عادي', time: l.time || '', date: l.date || null,
+        created_at: l.date || null
+      });
+    }
+    logger.info(`✅ Migrated peak-data to SQLite: ${missions.length} missions, ${alerts.length} alerts, ${logs.length} logs`);
+  } catch (error) {
+    if (error.code === 'ENOENT') {
+      logger.warn('No peak-data.json found. Skipping peak-data migration.');
+    } else {
+      logger.error('Failed to migrate peak-data:', error);
+    }
+  }
+}
+
 async function migrateAll() {
   logger.info('=== Starting SQLite Migration ===');
   logger.info('Note: JSON files are preserved and will continue to work as fallback');
@@ -4343,6 +4544,7 @@ async function migrateAll() {
   await migrateHospitals();
   await migrateReferences();
   await migrateTimeline();
+  await migratePeakData(); // A-3.5
   logger.info('=== SQLite Migration Complete ===');
 }
 
@@ -6066,6 +6268,7 @@ module.exports = {
   Shifts,
   Users,
   Announcements,
+  PeakData,
   OpsFiles,
   Hospitals,
   References,

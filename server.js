@@ -617,10 +617,6 @@ const SHIFT_ABSENCES_PATH = path.join(STORAGE_PATH, 'shift-absences.json');
 const SHIFT_NOTES_PATH = path.join(STORAGE_PATH, 'shift-notes.json');
 const PEAK_PLANS_PATH = path.join(STORAGE_PATH, 'peak-plans.json');
 const AUDIT_LOG_PATH = path.join(STORAGE_PATH, 'audit-log.json');
-const INCIDENTS_PATH = path.join(STORAGE_PATH, 'incidents.json');
-const SENIOR_SHIFTS_PATH = path.join(STORAGE_PATH, 'senior-shifts.json');
-const E_CASES_PATH = path.join(STORAGE_PATH, 'e-cases.json');
-const ESCALATIONS_PATH = path.join(STORAGE_PATH, 'escalations.json');
 // SCHEDULE_FILE: تجاوز اختياري لمسار ملف الجدولة — يعزل الاختبارات عن ملف التشغيل المشترك
 const SCHEDULE_EMPLOYEES_PATH = process.env.SCHEDULE_FILE || path.join(STORAGE_PATH, 'schedule-employees.json');
 const SCHEDULE_FILES_PATH = path.join(STORAGE_PATH, 'schedule-files.json');
@@ -3614,8 +3610,11 @@ async function readData() {
 }
 
 // ═══ Slice 2 (X2): shifts read from SQLite — the single source of truth ═══
-// shift-data.json is kept as a frozen legacy fallback only. All ~30 callers
-// keep working unchanged: rows are normalized to the legacy camelCase shape.
+// A-3.4: readShifts — SQLite حصراً (SSOT). أُزيل السقوط إلى shift-data.json نهائيًا:
+// الملف لقطة يونيو بائتة (لا writer منذ الشريحة 8)، وكان السقوط يقدّمها كبيانات
+// حية عند فراغ/تعطل القاعدة (حادثة D-39/OV-S9 الموثقة). الاسم محفوظ فلا يتغير
+// أي من مواضع الاستدعاء الـ 18. reconcile في db.js يبقى كما هو (قارئ ترحيل عند
+// الإقلاع — لا علاقة له بالسقوط)، وملف shift-data.json يبقى مجمّدًا لا يُحذف.
 function normalizeShiftRow(row) {
     const parseJson = (v, fb) => { try { return v ? JSON.parse(v) : fb; } catch (e) { return fb; } };
     return {
@@ -3639,22 +3638,12 @@ function normalizeShiftRow(row) {
     };
 }
 
+// A-3.4: قراءة من SQLite فقط — بلا أي سقوط إلى shift-data.json.
+// قاعدة فارغة/غير متاحة ⇒ [] صادق؛ فشل القراءة ⇒ الخطأ يُرمى لمعالج المسار (500 صادق).
 async function readShifts() {
-    try {
-        if (db && db.Shifts && db.Shifts.getAll) {
-            const rows = await db.Shifts.getAll();
-            if (rows && rows.length > 0) return rows.map(normalizeShiftRow);
-        }
-    } catch (e) {
-        console.warn('[readShifts] SQLite read failed, falling back to JSON:', e.message);
-    }
-    try {
-        const data = await fs.readFile(SHIFT_DATA_PATH, 'utf8');
-        return JSON.parse(data);
-    } catch (error) {
-        if (error.code === 'ENOENT') return [];
-        throw error;
-    }
+    if (!db || !db.Shifts || !db.Shifts.getAll) return [];
+    const rows = await db.Shifts.getAll();
+    return (rows || []).map(normalizeShiftRow);
 }
 
 // OV-S9 (SSOT): قراءة المناوبات من SQLite حصراً — بلا أي سقوط إلى JSON.
@@ -3724,67 +3713,8 @@ async function getActiveShiftId() {
     } catch (e) { return null; }
 }
 
-async function writeShifts(data) {
-    await fs.writeFile(SHIFT_DATA_PATH, JSON.stringify(data, null, 2));
-}
-
-// ═══ Phase 2+3: JSON → SQLite migration helpers ═══
-async function migrateJsonShiftToSqlite(jsonShift) {
-    // Migrate a shift from JSON file to SQLite table
-    try {
-        if (!dbAvailable() || !db.run) return null;
-        
-        // Check if already migrated
-        const existing = await opsService.getShiftById(jsonShift.id);
-        if (existing) return jsonShift.id;
-        
-        // Insert into SQLite
-        await db.run(
-            `INSERT INTO shifts (id, shift_name, shift_date, shift_time, shift_type, shift_day, start_time, 
-             total_reports, rapid_locations, centers_data, vehicle_data, fuel_data, general_notes, status, created_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
-            [
-                jsonShift.id,
-                jsonShift.shiftName || jsonShift.shift_name || '',
-                jsonShift.shiftDate || jsonShift.shift_date || '',
-                jsonShift.shiftTime || jsonShift.shift_time || '',
-                jsonShift.shiftType || jsonShift.shift_type || '',
-                jsonShift.shiftDay || jsonShift.shift_day || '',
-                jsonShift.startTime || jsonShift.start_time || '',
-                jsonShift.totalReports || jsonShift.total_reports || 0,
-                JSON.stringify(jsonShift.rapidLocations || []),
-                JSON.stringify(jsonShift.centersData || {}),
-                JSON.stringify(jsonShift.vehicleData || {}),
-                JSON.stringify(jsonShift.fuelData || {}),
-                jsonShift.generalNotes || jsonShift.general_notes || '',
-                jsonShift.status || 'active'
-            ]
-        );
-        
-        console.log('[Migrate] Shift', jsonShift.id, 'migrated from JSON to SQLite');
-        return jsonShift.id;
-    } catch (err) {
-        console.error('[Migrate] Failed:', err.message);
-        return null;
-    }
-}
-
-async function updateShiftInJson(shiftId, updates) {
-    // Update a shift in JSON file (legacy fallback)
-    try {
-        const shifts = await readShifts();
-        const idx = shifts.findIndex(s => s.id === shiftId);
-        if (idx === -1) return false;
-        
-        shifts[idx] = Object.assign({}, shifts[idx], updates);
-        shifts[idx].lastUpdate = new Date().toISOString();
-        await writeShifts(shifts);
-        return true;
-    } catch (err) {
-        console.error('[UpdateShiftJson] Failed:', err.message);
-        return false;
-    }
-}
+// ═══ A-3.2: أُزيلت writeShifts + migrateJsonShiftToSqlite + updateShiftInJson
+// (سلسلة ميتة: بلا أي مستدعٍ — الحفظ الحي عبر ShiftService/SQLite منذ الشريحة 8) ═══
 
 async function readDocs() {
     try {
@@ -3835,18 +3765,36 @@ async function writePassword(password) {
 // ============================================
 // دوال وقت الذروة
 // ============================================
+// ═══ A-3.5: peak-data — SQLite هو SSOT للقراءة والكتابة ═══
+// peak-data.json مجمّد (Frozen Backup): لا يُقرأ ولا يُكتب منذ هذا البند ولا
+// يُحذف (الزرع الأولي الوحيد يتم مرة واحدة في db.js/migratePeakData عند
+// الجداول الفارغة). لا سقوط صامت إلى JSON — فشل DB يظهر كـ 500 صادق
+// (نمط A-3.3.1). الترتيب: الأحدث أولًا (created_at DESC, rowid DESC)
+// مطابقًا لسلوك unshift السابق. عقد API محفوظ 100%: التخزين snake_case
+// والتحويل إلى camelCase يتم هنا فقط.
+function mapPeakMissionRow(r) {
+    return { id: r.id, location: r.location, lat: r.lat, lng: r.lng, unit: r.unit, startTime: r.start_time, endTime: r.end_time, priority: r.priority, notes: r.notes, status: r.status, createdAt: r.created_at };
+}
+function mapPeakAlertRow(r) {
+    return { id: r.id, title: r.title, details: r.details, priority: r.priority, unit: r.unit, location: r.location, startTime: r.start_time, endTime: r.end_time, notes: r.notes, lat: r.lat, lng: r.lng, radius: r.radius, missionId: r.mission_id, status: r.status, createdAt: r.created_at };
+}
+function mapPeakLogRow(r) {
+    // عقد السجلات في JSON لا يحمل createdAt — يبقى كما هو (7 حقول فقط)
+    return { id: r.id, icon: r.icon, action: r.action, details: r.details, priority: r.priority, time: r.time, date: r.date };
+}
 async function readPeakData() {
-    try {
-        const data = await fs.readFile(PEAK_DATA_PATH, 'utf8');
-        return JSON.parse(data);
-    } catch (error) {
-        if (error.code === 'ENOENT') return { missions: [], alerts: [], logs: [] };
-        return { missions: [], alerts: [], logs: [] };
-    }
+    const [missions, alerts, logs] = await Promise.all([
+        db.all('SELECT * FROM peak_missions ORDER BY created_at DESC, rowid DESC'),
+        db.all('SELECT * FROM peak_alerts ORDER BY created_at DESC, rowid DESC'),
+        db.all('SELECT * FROM peak_logs ORDER BY created_at DESC, rowid DESC')
+    ]);
+    return { missions: missions.map(mapPeakMissionRow), alerts: alerts.map(mapPeakAlertRow), logs: logs.map(mapPeakLogRow) };
 }
 
-async function writePeakData(data) {
-    await fs.writeFile(PEAK_DATA_PATH, JSON.stringify(data, null, 2));
+// قصّ الأسقف: الإبقاء على الأحدث N (مطابق لـ unshift ثم pop في JSON سابقًا —
+// بلا تتالي: قصّ المهمات لا يحذف تنبيهاتها، كما كان تمامًا).
+async function trimPeakTable(table, keep) {
+    await db.run(`DELETE FROM ${table} WHERE id IN (SELECT id FROM ${table} ORDER BY created_at DESC, rowid DESC LIMIT -1 OFFSET ?)`, [keep]);
 }
 
 // ============================================
@@ -3866,64 +3814,8 @@ async function writeThemeSettings(data) {
     await fs.writeFile(THEME_SETTINGS_PATH, JSON.stringify(data, null, 2));
 }
 
-// ============================================
-// دوال سجل الأحداث والغيابات والملاحظات للمناوبات
-// ============================================
-async function readShiftEvents() {
-    try {
-        const data = await fs.readFile(SHIFT_EVENTS_PATH, 'utf8');
-        return JSON.parse(data);
-    } catch (error) {
-        if (error.code === 'ENOENT') return [];
-        throw error;
-    }
-}
-
-async function writeShiftEvents(data) {
-    await fs.writeFile(SHIFT_EVENTS_PATH, JSON.stringify(data, null, 2));
-}
-
-async function readShiftAbsences() {
-    try {
-        const data = await fs.readFile(SHIFT_ABSENCES_PATH, 'utf8');
-        return JSON.parse(data);
-    } catch (error) {
-        if (error.code === 'ENOENT') return [];
-        throw error;
-    }
-}
-
-async function writeShiftAbsences(data) {
-    await fs.writeFile(SHIFT_ABSENCES_PATH, JSON.stringify(data, null, 2));
-}
-
-async function readShiftNotes() {
-    try {
-        const data = await fs.readFile(SHIFT_NOTES_PATH, 'utf8');
-        return JSON.parse(data);
-    } catch (error) {
-        if (error.code === 'ENOENT') return [];
-        throw error;
-    }
-}
-
-async function writeShiftNotes(data) {
-    await fs.writeFile(SHIFT_NOTES_PATH, JSON.stringify(data, null, 2));
-}
-
-async function readPeakPlans() {
-    try {
-        const data = await fs.readFile(PEAK_PLANS_PATH, 'utf8');
-        return JSON.parse(data);
-    } catch (error) {
-        if (error.code === 'ENOENT') return [];
-        throw error;
-    }
-}
-
-async function writePeakPlans(data) {
-    await fs.writeFile(PEAK_PLANS_PATH, JSON.stringify(data, null, 2));
-}
+// ═══ A-3.2: أُزيلت قرّاء/كتّاب shift-events/absences/notes/peak-plans JSON
+// (refs=0 مؤكد — المحتوى عبر contentList/SQLite و positioningService) ═══
 
 async function readAuditLog() {
     try {
@@ -4001,73 +3893,8 @@ async function addAuditLogEntry(action, details, category, user, role, userId, s
     }
 }
 
-// ============================================
-// دوال سجلات الحوادث
-// ============================================
-async function readIncidents() {
-    try {
-        const data = await fs.readFile(INCIDENTS_PATH, 'utf8');
-        return JSON.parse(data);
-    } catch (error) {
-        if (error.code === 'ENOENT') return [];
-        throw error;
-    }
-}
-
-async function writeIncidents(data) {
-    await fs.writeFile(INCIDENTS_PATH, JSON.stringify(data, null, 2));
-}
-
-// ============================================
-// دوال مناوبات كبار الضباط
-// ============================================
-async function readSeniorShifts() {
-    try {
-        const data = await fs.readFile(SENIOR_SHIFTS_PATH, 'utf8');
-        return JSON.parse(data);
-    } catch (error) {
-        if (error.code === 'ENOENT') return [];
-        throw error;
-    }
-}
-
-async function writeSeniorShifts(data) {
-    await fs.writeFile(SENIOR_SHIFTS_PATH, JSON.stringify(data, null, 2));
-}
-
-// ============================================
-// دوال حالات الطوارئ (E-Cases)
-// ============================================
-async function readECases() {
-    try {
-        const data = await fs.readFile(E_CASES_PATH, 'utf8');
-        return JSON.parse(data);
-    } catch (error) {
-        if (error.code === 'ENOENT') return [];
-        throw error;
-    }
-}
-
-async function writeECases(data) {
-    await fs.writeFile(E_CASES_PATH, JSON.stringify(data, null, 2));
-}
-
-// ============================================
-// دوال بلاغات التصعيد
-// ============================================
-async function readEscalations() {
-    try {
-        const data = await fs.readFile(ESCALATIONS_PATH, 'utf8');
-        return JSON.parse(data);
-    } catch (error) {
-        if (error.code === 'ENOENT') return [];
-        throw error;
-    }
-}
-
-async function writeEscalations(data) {
-    await fs.writeFile(ESCALATIONS_PATH, JSON.stringify(data, null, 2));
-}
+// ═══ A-3.2: أُزيلت قرّاء/كتّاب incidents/senior-shifts/e-cases/escalations JSON
+// (refs=0 مؤكد — النماذج تسير عبر forms-service/SQLite) ═══
 
 // ============================================
 // دوال الجدولة الذكية
@@ -4186,18 +4013,15 @@ async function readMapLocations() {
     }
 }
 
+// ═══ A-3.3.1: announcements — SQLite هو SSOT للقراءة والكتابة ═══
+// announcements.json مجمّد (Frozen Backup): لا يُقرأ ولا يُكتب منذ هذا البند،
+// ولا يُحذف. لا سقوط صامت إلى JSON — فشل DB يظهر كـ 500 صادق.
+// الترتيب: الأحدث أولًا (created_at DESC) مطابقًا لسلوك JSON السابق (unshift) —
+// بلا أولوية pinned/urgent (قرار مالك المنصة في A-3.3.1).
 async function readAnnouncements() {
-    try {
-        const data = await fs.readFile(ANNOUNCEMENTS_PATH, 'utf8');
-        return JSON.parse(data);
-    } catch (error) {
-        if (error.code === 'ENOENT') return [];
-        return [];
-    }
-}
-
-async function writeAnnouncements(data) {
-    await fs.writeFile(ANNOUNCEMENTS_PATH, JSON.stringify(data, null, 2));
+    const rows = await db.all('SELECT id, title, body, date, pinned, urgent FROM announcements ORDER BY created_at DESC, rowid DESC');
+    // عقد API: pinned/urgent booleans (وليس 1/0) والحقول الستة فقط
+    return rows.map(r => ({ id: r.id, title: r.title, body: r.body, date: r.date, pinned: !!r.pinned, urgent: !!r.urgent }));
 }
 
 async function readUnitLocations() {
@@ -10231,7 +10055,9 @@ app.post('/api/peak-mission', authenticate, authorizePerm('ops.deployments'), as
             return res.status(400).json({ error: 'بيانات ناقصة' });
         }
 
-        const data = await readPeakData();
+        // A-3.5: الكتابة في SQLite داخل معاملة واحدة — نفس الحقول ونفس
+        // الأسقف (100 مهمة / 50 تنبيهًا / 50 سجلًا) ونفس البث.
+        const nowIso = new Date().toISOString();
         const mission = {
             id: Date.now().toString(),
             location,
@@ -10243,24 +10069,18 @@ app.post('/api/peak-mission', authenticate, authorizePerm('ops.deployments'), as
             priority: priority || 'عالية',
             notes: notes || '',
             status: 'نشط',
-            createdAt: new Date().toISOString()
+            createdAt: nowIso
         };
-
-        data.missions.unshift(mission);
-        if (data.missions.length > 100) data.missions.pop();
-
-        data.logs.unshift({
+        const logEntry = {
             id: Date.now().toString(),
             icon: '🟡',
             action: 'مهمة جديدة',
             details: unit + ' في ' + location,
             priority: priority || 'عادي',
             time: TimeRiyadh.formatTimeSec(new Date()),
-            date: new Date().toISOString()
-        });
-        if (data.logs.length > 50) data.logs.pop();
-
-        data.alerts.unshift({
+            date: nowIso
+        };
+        const alert = {
             id: Date.now().toString(),
             title: 'تمركز مطلوب لـ ' + unit,
             details: 'المطلوب تمركز ' + unit + ' في ' + location + ' (' + startTime + ' - ' + endTime + ')',
@@ -10275,11 +10095,25 @@ app.post('/api/peak-mission', authenticate, authorizePerm('ops.deployments'), as
             radius: 5000,
             missionId: mission.id,
             status: 'نشط',
-            createdAt: new Date().toISOString()
-        });
-        if (data.alerts.length > 50) data.alerts.pop();
+            createdAt: nowIso
+        };
 
-        await writePeakData(data);
+        db.beginTransaction();
+        try {
+            await db.run('INSERT INTO peak_missions (id, location, lat, lng, unit, start_time, end_time, priority, notes, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                [mission.id, mission.location, mission.lat, mission.lng, mission.unit, mission.startTime, mission.endTime, mission.priority, mission.notes, mission.status, mission.createdAt]);
+            await db.run('INSERT INTO peak_logs (id, icon, action, details, priority, time, date, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                [logEntry.id, logEntry.icon, logEntry.action, logEntry.details, logEntry.priority, logEntry.time, logEntry.date, logEntry.date]);
+            await db.run('INSERT INTO peak_alerts (id, title, details, priority, unit, location, start_time, end_time, notes, lat, lng, radius, mission_id, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                [alert.id, alert.title, alert.details, alert.priority, alert.unit, alert.location, alert.startTime, alert.endTime, alert.notes, alert.lat, alert.lng, alert.radius, alert.missionId, alert.status, alert.createdAt]);
+            await trimPeakTable('peak_missions', 100);
+            await trimPeakTable('peak_alerts', 50);
+            await trimPeakTable('peak_logs', 50);
+            db.commitTransaction();
+        } catch (txErr) {
+            try { db.rollbackTransaction(); } catch (_) {}
+            throw txErr;
+        }
 
         broadcast({
             type: 'peak_mission_added',
@@ -10301,11 +10135,12 @@ app.post('/api/peak-resolve', authenticate, authorizePerm('ops.deployments'), as
             return res.status(400).json({ error: 'معرف التنبيه مطلوب' });
         }
 
-        const data = await readPeakData();
-        const alert = data.alerts.find(a => a.id === alertId);
-        if (alert) {
-            alert.status = 'منتهي';
-            data.logs.unshift({
+        // A-3.5: القراءة والتحديث من/في SQLite — نفس الدلالة: تنبيه موجود ⇒
+        // status 'منتهي' + سجل + بث؛ غير موجود ⇒ success صامت كما كان.
+        const row = await db.get('SELECT * FROM peak_alerts WHERE id = ?', [String(alertId)]);
+        if (row) {
+            const alert = mapPeakAlertRow(row);
+            const logEntry = {
                 id: Date.now().toString(),
                 icon: '✅',
                 action: 'تم التنفيذ',
@@ -10313,9 +10148,18 @@ app.post('/api/peak-resolve', authenticate, authorizePerm('ops.deployments'), as
                 priority: alert.priority || 'عادي',
                 time: TimeRiyadh.formatTimeSec(new Date()),
                 date: new Date().toISOString()
-            });
-            if (data.logs.length > 50) data.logs.pop();
-            await writePeakData(data);
+            };
+            db.beginTransaction();
+            try {
+                await db.run("UPDATE peak_alerts SET status = 'منتهي' WHERE id = ?", [String(alertId)]);
+                await db.run('INSERT INTO peak_logs (id, icon, action, details, priority, time, date, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                    [logEntry.id, logEntry.icon, logEntry.action, logEntry.details, logEntry.priority, logEntry.time, logEntry.date, logEntry.date]);
+                await trimPeakTable('peak_logs', 50);
+                db.commitTransaction();
+            } catch (txErr) {
+                try { db.rollbackTransaction(); } catch (_) {}
+                throw txErr;
+            }
 
             broadcast({
                 type: 'peak_alert_resolved',
@@ -10332,14 +10176,14 @@ app.post('/api/peak-resolve', authenticate, authorizePerm('ops.deployments'), as
 app.delete('/api/peak-mission/:id', authenticate, authorize(['admin', 'director']), async (req, res) => {
     try {
         const id = req.params.id;
-        const data = await readPeakData();
-        const mission = data.missions.find(m => m.id === id);
-        if (!mission) {
+        // A-3.5: حذف متسلسل صريح داخل معاملة (تنبيهات المهمة ثم المهمة) —
+        // مطابق لدلالة filter في JSON سابقًا، مع سجل + بث كما كان.
+        const row = await db.get('SELECT * FROM peak_missions WHERE id = ?', [id]);
+        if (!row) {
             return res.status(404).json({ error: 'المهمة غير موجودة' });
         }
-        data.missions = data.missions.filter(m => m.id !== id);
-        data.alerts = data.alerts.filter(a => a.missionId !== id);
-        data.logs.unshift({
+        const mission = mapPeakMissionRow(row);
+        const logEntry = {
             id: Date.now().toString(),
             icon: '🔴',
             action: 'مهمة محذوفة',
@@ -10347,9 +10191,19 @@ app.delete('/api/peak-mission/:id', authenticate, authorize(['admin', 'director'
             priority: mission.priority || 'عادي',
             time: TimeRiyadh.formatTimeSec(new Date()),
             date: new Date().toISOString()
-        });
-        if (data.logs.length > 50) data.logs.pop();
-        await writePeakData(data);
+        };
+        db.beginTransaction();
+        try {
+            await db.run('DELETE FROM peak_alerts WHERE mission_id = ?', [id]);
+            await db.run('DELETE FROM peak_missions WHERE id = ?', [id]);
+            await db.run('INSERT INTO peak_logs (id, icon, action, details, priority, time, date, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                [logEntry.id, logEntry.icon, logEntry.action, logEntry.details, logEntry.priority, logEntry.time, logEntry.date, logEntry.date]);
+            await trimPeakTable('peak_logs', 50);
+            db.commitTransaction();
+        } catch (txErr) {
+            try { db.rollbackTransaction(); } catch (_) {}
+            throw txErr;
+        }
 
         broadcast({
             type: 'peak_mission_deleted',
@@ -10634,7 +10488,36 @@ app.post('/api/announcements', authenticate, authorize(['admin']), async (req, r
         if (!data) {
             return res.status(400).json({ error: 'بيانات ناقصة' });
         }
-        await writeAnnouncements(data);
+        // A-3.3.1: استبدال كامل على SQLite في معاملة واحدة — upsert لما ورد في
+        // الـ payload وحذف ما لم يرد (مطابق لدلالة الكتابة الكاملة في JSON سابقًا).
+        // idempotent: المفتاح id (PK) — تكرار التنفيذ بلا duplicates.
+        const items = Array.isArray(data) ? data : [];
+        db.beginTransaction();
+        try {
+            const seen = [];
+            for (const item of items) {
+                if (!item || item.id === undefined || item.id === null) continue;
+                const id = String(item.id);
+                seen.push(id);
+                await db.run(
+                    `INSERT INTO announcements (id, title, body, date, pinned, urgent)
+                     VALUES (?, ?, ?, ?, ?, ?)
+                     ON CONFLICT(id) DO UPDATE SET title=excluded.title, body=excluded.body,
+                       date=excluded.date, pinned=excluded.pinned, urgent=excluded.urgent`,
+                    [id, item.title || '', item.body || '', item.date || '', item.pinned ? 1 : 0, item.urgent ? 1 : 0]
+                );
+            }
+            if (seen.length > 0) {
+                const placeholders = seen.map(() => '?').join(',');
+                await db.run(`DELETE FROM announcements WHERE id NOT IN (${placeholders})`, seen);
+            } else {
+                await db.run('DELETE FROM announcements');
+            }
+            db.commitTransaction();
+        } catch (txErr) {
+            try { db.rollbackTransaction(); } catch (_) {}
+            throw txErr;
+        }
         broadcast({
             type: 'announcements_updated',
             message: 'تم تحديث الإعلانات'
@@ -10651,9 +10534,8 @@ app.post('/api/announcements', authenticate, authorize(['admin']), async (req, r
 
 app.delete('/api/announcements/:id', authenticate, authorize(['admin']), async (req, res) => {
     try {
-        const data = await readAnnouncements();
-        const filtered = data.filter(item => item.id !== req.params.id);
-        await writeAnnouncements(filtered);
+        // A-3.3.1: الحذف مباشرة من SQLite (المفتاح id)
+        await db.Announcements.delete(req.params.id);
         broadcast({
             type: 'announcement_deleted',
             message: 'تم حذف إعلان',
@@ -10677,7 +10559,6 @@ app.post('/api/announcements/add', authenticate, authorize(['admin']), validateB
         if (!title || !body) {
             return res.status(400).json({ error: 'العنوان والنص مطلوبان' });
         }
-        const data = await readAnnouncements();
         const newAnnouncement = {
             id: Date.now().toString(),
             title,
@@ -10686,8 +10567,8 @@ app.post('/api/announcements/add', authenticate, authorize(['admin']), validateB
             pinned: !!pinned,
             urgent: !!urgent
         };
-        data.unshift(newAnnouncement);
-        await writeAnnouncements(data);
+        // A-3.3.1: الإنشاء في SQLite — created_at الآن ⇒ يظهر أولًا (الأحدث أولًا)
+        await db.Announcements.create(newAnnouncement);
         broadcast({
             type: 'announcement_added',
             message: 'تم إضافة إعلان جديد: ' + title,
@@ -10812,8 +10693,19 @@ app.get('/api/admin/stats', authenticate, authorize(['admin']), async (req, res)
         }
         
         // Center performance - use actual center names from centersData
+        // P3/A-2 (إكمال دلالي أثناء الدمج): أسماء المراكز تُشتق من SSOT
+        // (teams.center عبر centers-geo-service) — الجدول الثابت حُذف في P3
+        // وهذان المساران كانا يشيران إليه (ReferenceError كامن في origin/main).
+        let derivedCenterNames = [];
+        try {
+            const cgSvc = getCentersGeoService();
+            if (cgSvc) {
+                const tc = await cgSvc.getTeamCenters();
+                derivedCenterNames = [...new Set(Object.values(tc))];
+            }
+        } catch (e) { /* فارغ صادق — لا fallback ثابت */ }
         const centerStats = {};
-        const centerNames = Object.keys(centersData);
+        const centerNames = derivedCenterNames;
         for (let i = 0; i < centerNames.length; i++) {
             const center = centerNames[i];
             let centerReports = 0;
@@ -11227,8 +11119,23 @@ app.get('/api/export', authenticate, async (req, res) => {
             [],
             ["المركز", "الوحدة", "عدد البلاغات", "التواقيت"]
         ];
-        for (let center in centersData) {
-            for (let unit of centersData[center]) {
+        // P3/A-2 (إكمال دلالي أثناء الدمج): مراكز/فرق التصدير تُشتق من SSOT
+        // (teams.center عبر centers-geo-service) — الجدول الثابت حُذف في P3
+        // وهذا المسار كان يشير إليه (ReferenceError كامن في origin/main).
+        let exportCenters = {};
+        try {
+            const cgSvc = getCentersGeoService();
+            if (cgSvc) {
+                const tc = await cgSvc.getTeamCenters();
+                for (const team of Object.keys(tc)) {
+                    const c = tc[team];
+                    if (!exportCenters[c]) exportCenters[c] = [];
+                    exportCenters[c].push(team);
+                }
+            }
+        } catch (e) { /* فارغ صادق — لا fallback ثابت */ }
+        for (let center in exportCenters) {
+            for (let unit of exportCenters[center]) {
                 let key = `${center}|${unit}`;
                 let record = safeReports[key] || { count: 0, times: [] };
                 let timesStr = (record.times && record.times.length) ? record.times.join(" ؛ ") : "لا يوجد بلاغات";
@@ -11253,7 +11160,7 @@ app.get('/api/export', authenticate, async (req, res) => {
 
 const OPS_UPLOAD_DIR = path.join(STORAGE_PATH, 'uploads', 'operational');
 const OPS_METADATA_PATH = path.join(OPS_UPLOAD_DIR, 'metadata.json');
-const ANNOUNCEMENTS_PATH = path.join(STORAGE_PATH, 'announcements.json');
+// A-3.3.1: أُزيل ANNOUNCEMENTS_PATH — announcements.json مجمّد ولا مسار كود يقرؤه/يكتبه.
 
 // التأكد من وجود المجلد والملف
 async function ensureOpsDir() {

@@ -141,6 +141,7 @@ async function notifyOperational({ eventKey, title, message, push, permKey }) {
     }
     let created = 0, deduped = 0;
     const createdUserIds = [];
+    const createdRows = []; // {uid, id} — صف كل مستهدف للبث الموجَّه
     for (const t of targets) {
         const uid = t.id.toString();
         const existing = await d.db.Notifications.findRecentMatch(uid, title, message, DEDUPE_WINDOW_MINUTES);
@@ -149,9 +150,23 @@ async function notifyOperational({ eventKey, title, message, push, permKey }) {
             await d.db.Notifications.touch(existing.id);
             deduped++;
         } else {
-            await d.db.Notifications.create({ user_id: uid, title, message, type });
+            const newId = await d.db.Notifications.create({ user_id: uid, title, message, type });
             created++;
             createdUserIds.push(uid);
+            createdRows.push({ uid, id: newId });
+        }
+    }
+    // بث لحظي موجَّه (A-1): لمن أُنشئ له صف فعلًا فقط، بنفس عقد notification_created
+    // الذي تعالجه الواجهة (D-21) — يظهر الإشعار على الشاشة المفتوحة بلا Refresh.
+    // التكرار داخل النافذة (touch) لا يبث ولا يزعج الشاشة، تمامًا كما لا يزعج
+    // الجهاز بـ Push. غياب broadcastToUsers (اختبارات) = بلا بث وبلا رمي.
+    if (typeof d.broadcastToUsers === 'function') {
+        for (const row of createdRows) {
+            d.broadcastToUsers([row.uid], {
+                type: 'notification_created',
+                message: 'تم إنشاء إشعار جديد',
+                notification: { id: row.id, user_id: row.uid, title, message: message || '', type }
+            });
         }
     }
     let pushed = null;
