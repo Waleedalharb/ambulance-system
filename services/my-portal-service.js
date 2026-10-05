@@ -348,7 +348,11 @@ class MyPortalService {
                 incidents: hasFieldAssignment,
                 vehicle: this._isFieldTeam(todayTeam),
                 inventory,
-                check
+                check,
+                // A-4.4 S1: قسم «إجازاتي» — ثابت لكل موظف مربوط (من لم يُحلّ
+                // resolveEmployee يخرج أعلاه بـnotFound فلا يصل هنا أصلًا).
+                // البيانات نفسها من /api/leave-requests (SQLite SSOT — A-4.3).
+                leave: true
             }
         };
     }
