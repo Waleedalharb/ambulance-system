@@ -14530,7 +14530,7 @@ app.put('/api/shift-patterns/:code', authenticate, authorize(['admin']), async (
 
 // ربط موظف بنمط (أو فكه بـ null) — يغيّر pattern_code فقط؛ لا يمس الرموز
 // ولا الجدول ولا التعيينات، ولا يتغير تلقائيًا من أي مسار آخر.
-app.put('/api/employees/:employeeCode/pattern', authenticate, authorize(['admin', 'director']), async (req, res) => {
+app.put('/api/employees/:employeeCode/pattern', authenticate, authorizePerm('employees.manage'), async (req, res) => {
     try {
         if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
         const employee = await db.Employees.getByCode(String(req.params.employeeCode || '').trim());
@@ -14709,7 +14709,7 @@ app.post('/api/employees/phones/import', authenticate, authorize(['admin', 'dire
 // 'from-date'  : يغلق التعيين النشط (end_date = اليوم السابق) ويفتح تعيينًا
 //                جديدًا من date مع source='manual' — محمي من الاستيراد الصامت.
 // في الحالتين: المناوبات السابقة لا تتأثر وpattern_code لا يتغير أبدًا.
-app.post('/api/employees/:employeeCode/transfer', authenticate, authorize(['admin', 'director']), validateBody({
+app.post('/api/employees/:employeeCode/transfer', authenticate, authorizePerm('employees.manage'), validateBody({
     teamId: { required: true, type: 'number' },
     scope: { required: true, type: 'string', minLength: 1 },
     date: { required: true, type: 'string', minLength: 10, maxLength: 10 }
@@ -15074,7 +15074,7 @@ async function generateRecommendations(year, month) {
 // API: Smart Shift Schedule
 // ============================================
 
-app.post('/api/shift-schedule/generate', authenticate, authorize(['admin', 'director']), async (req, res) => {
+app.post('/api/shift-schedule/generate', authenticate, authorizePerm('schedule.generate'), async (req, res) => {
     try {
         const { year, month, mode = 'normal' } = req.body;
         if (!year || !month) {
@@ -15161,7 +15161,7 @@ app.get('/api/shift-schedule/month', authenticate, async (req, res) => {
     }
 });
 
-app.post('/api/shift-schedule/update', authenticate, authorize(['admin', 'director']), async (req, res) => {
+app.post('/api/shift-schedule/update', authenticate, authorizePerm('schedule.bulk_update'), async (req, res) => {
     try {
         const { id, employee_id, team_id, shift_date, shift_code, shift_hours, mode, is_override } = req.body;
         if (!id) {
