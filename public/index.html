@@ -2759,6 +2759,8 @@ window.addEventListener('load', function() {
                 <button class="sidebar-item" id="sbLeaveReview" style="display:none;" onclick="toggleSidebar(); navigateToPage('leave-admin.html?v=1');"><i class="fas fa-calendar-check"></i> مراجعة الإجازات</button>
                 <button class="sidebar-item" id="sbShiftChangeReview" style="display:none;" onclick="toggleSidebar(); navigateToPage('shift-change-admin.html?v=1');"><i class="fas fa-arrow-right-arrow-left"></i> مراجعة طلبات المناوبة</button>
                 <button class="sidebar-item" id="sbUnableAttendReview" style="display:none;" onclick="toggleSidebar(); navigateToPage('unable-attend-admin.html?v=1');"><i class="fas fa-user-slash"></i> مراجعة طلبات عدم التمكّن</button>
+                <button class="sidebar-item" id="sbShiftSwapReview" style="display:none;" onclick="toggleSidebar(); navigateToPage('shift-swap-admin.html?v=1');"><i class="fas fa-arrow-right-arrow-left"></i> مراجعة طلبات التبديل</button>
+                <button class="sidebar-item" id="sbScheduleProposals" style="display:none;" onclick="toggleSidebar(); navigateToPage('schedule-proposals-admin.html?v=1');"><i class="fas fa-wand-magic-sparkles"></i> العروض التكميلية</button>
             </div>
         </div>
         <!-- الإعدادات -->
@@ -2839,6 +2841,9 @@ function navigateToPage(url) {
         show('sbShiftChangeReview', star || perms.indexOf('requests.review') !== -1);
         // FSS E-3/ج4: رابط مراجعة عدم التمكّن — محروس سيرفيًا بـ schedule.requests.review (M10)
         show('sbUnableAttendReview', star || perms.indexOf('schedule.requests.review') !== -1);
+        // FSS E-7: رابطا مراجعة التبديل (schedule.requests.review) والعروض التكميلية (schedule.proposals.manage)
+        show('sbShiftSwapReview', star || perms.indexOf('schedule.requests.review') !== -1);
+        show('sbScheduleProposals', star || perms.indexOf('schedule.proposals.manage') !== -1);
         var group = document.getElementById('sbAdminGroup');
         if (group && anyVisible) group.style.display = '';
     }

@@ -174,8 +174,8 @@ async function main() {
             const code = myems.slice(i, j).split('\n').filter(l => !l.trim().startsWith('//')).join('\n');
             return !code.includes('localStorage');
         })());
-    check('my-ems.html: my-ems.js?v=8 (نسخة كاش مرفوعة) + أنماط E-3 (card-head.prefs/pf-sec)',
-        myhtml.includes('js/my-ems.js?v=8') && myhtml.includes('.card-head.prefs::before') && myhtml.includes('.pf-sec'));
+    check('my-ems.html: my-ems.js?v=9 (نسخة كاش مرفوعة — E-7 رفعها من v=8) + أنماط E-3 (card-head.prefs/pf-sec)',
+        myhtml.includes('js/my-ems.js?v=9') && myhtml.includes('.card-head.prefs::before') && myhtml.includes('.pf-sec'));
     check('my-ems.html: تحميل التفضيلات وعدم التمكّن ضمن Promise.all بسقوط آمن لا يُسقط الصفحة',
         myems.includes("api('/api/my/schedule-preferences').catch(() => ({ __error: true }))") &&
         myems.includes("api('/api/my/unable-attend').catch(() => ({ __error: true }))"));
@@ -239,8 +239,8 @@ async function main() {
     check('GET /js/unable-attend-admin.js = 200 + يحوي البوابة',
         adminJs.status === 200 && adminJs.text.includes('checkAccess'));
     const myPage = await api('GET', '/my-ems.html');
-    check('GET /my-ems.html = 200 + my-ems.js?v=8',
-        myPage.status === 200 && myPage.text.includes('js/my-ems.js?v=8'));
+    check('GET /my-ems.html = 200 + my-ems.js?v=9',
+        myPage.status === 200 && myPage.text.includes('js/my-ems.js?v=9'));
     const myJs = await api('GET', '/js/my-ems.js');
     check('GET /js/my-ems.js = 200 + يحوي بطاقتي prefsCard/unableCard',
         myJs.status === 200 && myJs.text.includes('prefsCard') && myJs.text.includes('unableCard'));

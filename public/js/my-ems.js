@@ -1427,6 +1427,267 @@
         } catch (_) { /* تبقى البطاقة القديمة — لا انهيار */ }
     }
 
+    // ═══ FSS E-7 (معتمد 2026-10-06 — L1/L2/L4): عروضي التكميلية ═══
+    // استهلاك صِرف لعقد E-5 الخلفي (GET /api/my/proposals + respond accept|decline).
+    // L4: سبب العرض للموظف مبسّط وثابت — لا ترتيب ولا عدالة ولا تفصيل M5 هنا
+    // (ranking_explanation/coverage_snapshot يصلان في الرد لكن لا يُعرضان إطلاقًا؛
+    // التفصيل الكامل شاشة المسؤول فقط). لا localStorage — كل عرض من API مباشرة.
+    const PR_STATUS = {
+        offered: ['st-pending', 'بانتظار ردك'],
+        accepted: ['st-approved', 'مقبول — بانتظار التطبيق من المسؤول'],
+        declined: ['st-denied', 'رفضته'],
+        withdrawn: ['st-cancelled', 'سُحب'],
+        superseded: ['st-cancelled', 'متجاوَز']
+    };
+
+    function renderProposals(d) {
+        let rows = '';
+        if (d && d.__error) {
+            rows = '<div class="empty">تعذر تحميل العروض حاليًا — حدّث الصفحة للمحاولة مجددًا.</div>';
+        } else {
+            rows = ((d && d.proposals) || []).map(p => {
+                const st = PR_STATUS[p.status] || ['', p.status];
+                return `<div class="lv-row">
+                    <div class="lv-head">
+                        <div>
+                            <div class="lv-type">${esc(p.date)} — ${arDay(p.date)} · ${esc(p.shift_code)} (${p.period === 'night' ? 'ليلية' : 'صباحية'})</div>
+                            ${p.status === 'offered' ? '<div class="lv-range">وصلك هذا العرض لأنه متوافق مع تفضيلاتك وقواعد الجدولة.</div>' : ''}
+                        </div>
+                        <span class="lv-status ${st[0]}">${esc(st[1])}</span>
+                    </div>
+                    <div class="lv-row-actions">
+                        ${p.status === 'offered' ? `<button class="lv-submit" type="button" data-praccept="${p.id}">قبول</button>
+                        <button class="lv-btn cancel" type="button" data-prdecline="${p.id}">رفض</button>` : ''}
+                    </div>
+                </div>`;
+            }).join('') || '<div class="empty">لا توجد عروض تكميلية — تصلك هنا عند توليدها من المسؤول.</div>';
+        }
+        return `<div class="card" id="proposalsCard"><div class="card-head prefs">✨ عروضي التكميلية</div>
+            <div class="card-body">${rows}</div>
+        </div>`;
+    }
+
+    function bindProposalsEvents() {
+        document.querySelectorAll('[data-praccept],[data-prdecline]').forEach(b => b.addEventListener('click', async () => {
+            const isAccept = b.hasAttribute('data-praccept');
+            const id = isAccept ? b.dataset.praccept : b.dataset.prdecline;
+            if (!isAccept && !confirm('هل تريد رفض هذا العرض؟ قد يُعرض على زميل آخر ولن يعود إليك.')) return;
+            b.disabled = true;
+            try {
+                await apiPost('/api/my/proposals/' + id + '/respond', { decision: isAccept ? 'accept' : 'decline' });
+                toast(isAccept ? 'قبلتَ العرض — بانتظار التطبيق من المسؤول' : 'رفضتَ العرض');
+                await refreshProposals();
+            } catch (err) {
+                b.disabled = false;
+                toast((err && err.message) || 'تعذر إرسال الرد — حاول مجددًا.');
+                refreshProposals(); // الحالة قد تغيرت خادميًا (409) — أعد الجلب لعرض الحقيقة
+            }
+        }));
+    }
+
+    async function refreshProposals() {
+        try {
+            const d = await api('/api/my/proposals').catch(() => ({ __error: true }));
+            const tmp = document.createElement('div');
+            tmp.innerHTML = renderProposals(d);
+            const old = document.getElementById('proposalsCard');
+            if (old) old.replaceWith(tmp.firstElementChild);
+            bindProposalsEvents();
+        } catch (_) { /* تبقى البطاقة القديمة — لا انهيار */ }
+    }
+
+    // ═══ FSS E-7 (معتمد 2026-10-06 — L1/L2/L3/L5): التبديل بالتراضي ═══
+    // استهلاك صِرف لعقد E-6 الخلفي. لا API جديد (L2): «مناوبتي» من بيانات
+    // /api/my/schedule القائمة، وتاريخ الزميل حر بتحقق خادم (SWAP_ROSTER_NOT_FOUND).
+    // الزملاء من /api/my/team-colleagues (L5 — نفس مصدر التفضيلات، SSOT).
+    // الهوية والرمزان والفريق مشتقة خادميًا؛ الواجهة ترسل التواريخ والزميل فقط.
+    const SW_STATUS = {
+        pending_consent: ['st-pending', 'بانتظار موافقة الطرف الثاني'],
+        declined_by_peer: ['st-denied', 'رفضه الزميل'],
+        pending_review: ['st-pending', 'قيد مراجعة المسؤول'],
+        auto_applied: ['st-approved', 'طُبّق تلقائيًا'],
+        applied: ['st-approved', 'طُبّق بعد اعتماد المسؤول'],
+        rejected: ['st-denied', 'رفضه المسؤول'],
+        cancelled: ['st-cancelled', 'ملغي']
+    };
+    let swSchedCache = null;      // مناوباتي للشهر الحالي+القادم — لمنتقي «مناوبتي»
+    let swColleaguesCache = null; // زملاء الفريق النشط — لمنتقي الزميل
+
+    function swMyId() {
+        return (leaveProfile && leaveProfile.employee && leaveProfile.employee.id) || null;
+    }
+
+    function renderSwaps(d) {
+        let rows = '';
+        if (d && d.__error) {
+            rows = '<div class="empty">تعذر تحميل طلبات التبديل حاليًا — حدّث الصفحة للمحاولة مجددًا.</div>';
+        } else {
+            const myId = swMyId();
+            rows = ((d && d.requests) || []).map(r => {
+                const st = SW_STATUS[r.status] || ['', r.status];
+                const outgoing = myId !== null && Number(r.initiator_employee_id) === Number(myId);
+                const line = outgoing
+                    ? `مناوبتك ${esc(r.initiator_date)} (${esc(r.initiator_shift_code)}) ↔ مناوبة ${esc(r.target_name)} ${esc(r.target_date)} (${esc(r.target_shift_code)})`
+                    : `${esc(r.initiator_name)} يطلب: مناوبته ${esc(r.initiator_date)} (${esc(r.initiator_shift_code)}) ↔ مناوبتك ${esc(r.target_date)} (${esc(r.target_shift_code)})`;
+                return `<div class="lv-row">
+                    <div class="lv-head">
+                        <div>
+                            <div class="lv-type">${line}</div>
+                            <div class="lv-range">${outgoing ? 'صادر منك' : 'وارد إليك'} · ${esc(r.team_name || '')}</div>
+                            ${r.status === 'pending_review' ? '<div class="lv-range">وافق الطرفان — بانتظار قرار المسؤول.</div>' : ''}
+                        </div>
+                        <span class="lv-status ${st[0]}">${esc(st[1])}</span>
+                    </div>
+                    <div class="lv-row-actions">
+                        ${!outgoing && r.status === 'pending_consent' ? `<button class="lv-submit" type="button" data-swaccept="${r.id}">قبول التبديل</button>
+                        <button class="lv-btn cancel" type="button" data-swdecline="${r.id}">رفض</button>` : ''}
+                        ${outgoing && (r.status === 'pending_consent' || r.status === 'pending_review') ? `<button class="lv-btn cancel" type="button" data-swcancel="${r.id}">إلغاء الطلب</button>` : ''}
+                    </div>
+                </div>`;
+            }).join('') || '<div class="empty">لا توجد طلبات تبديل — قدّم طلبك من الزر أعلاه.</div>';
+        }
+        return `<div class="card" id="swapCard"><div class="card-head changes">🔃 التبديل بالتراضي</div>
+            <div class="card-body">
+                <button class="lv-new-btn" id="swNewBtn" type="button">＋ طلب تبديل مناوبة</button>
+                <div class="lv-form" id="swForm">
+                    <div class="lv-form-title">طلب تبديل بالتراضي</div>
+                    <label>مناوبتي</label>
+                    <select id="swMyShift"><option value="">جاري تحميل مناوباتك…</option></select>
+                    <label>الزميل (نفس الفريق)</label>
+                    <select id="swColleague"><option value="">جاري تحميل الزملاء…</option></select>
+                    <label>تاريخ مناوبة الزميل</label>
+                    <input type="date" id="swTargetDate">
+                    <div class="pf-hint">النظام يتحقق من وجود مناوبة للزميل في هذا التاريخ ومن قواعد الجدولة قبل إرسال الطلب.</div>
+                    <div class="lv-error" id="swError"></div>
+                    <div class="lv-form-actions">
+                        <button class="lv-submit" id="swSubmit" type="button">إرسال الطلب</button>
+                        <button class="lv-cancel-form" id="swCancelForm" type="button">تراجع</button>
+                    </div>
+                </div>
+                <div style="margin-top:12px">${rows}</div>
+            </div>
+        </div>`;
+    }
+
+    function swShowError(m) {
+        const el = document.getElementById('swError');
+        if (el) { el.textContent = m; el.classList.add('show'); }
+    }
+    function swHideError() {
+        const el = document.getElementById('swError');
+        if (el) { el.textContent = ''; el.classList.remove('show'); }
+    }
+
+    // L2: لا endpoint جديد — مناوباتي تُشتق من /api/my/schedule القائم (الحالي+القادم)
+    async function swEnsureRefs() {
+        const today = riyadhToday();
+        if (!swSchedCache) {
+            try {
+                const y = today ? +today.slice(0, 4) : new Date().getFullYear();
+                const m = today ? +today.slice(5, 7) : new Date().getMonth() + 1;
+                const nm = m === 12 ? 1 : m + 1, ny = m === 12 ? y + 1 : y;
+                const [cur, nxt] = await Promise.all([
+                    api(`/api/my/schedule?month=${m}&year=${y}`).catch(() => null),
+                    api(`/api/my/schedule?month=${nm}&year=${ny}`).catch(() => null)]);
+                swSchedCache = ((cur && cur.days) || []).concat((nxt && nxt.days) || []);
+            } catch (_) { swSchedCache = []; }
+        }
+        const mySel = document.getElementById('swMyShift');
+        if (mySel) {
+            const opts = swSchedCache.filter(x => x.shiftCode && x.date && x.date >= today);
+            mySel.innerHTML = '<option value="">— اختر مناوبتك —</option>' + (opts.length
+                ? opts.map(x => `<option value="${esc(x.date)}">${esc(x.date)} — ${arDay(x.date)} · ${esc(x.shiftName || x.shiftCode)}</option>`).join('')
+                : '<option value="" disabled>لا توجد مناوبات قادمة في جدولك</option>');
+        }
+        if (!swColleaguesCache) {
+            swColleaguesCache = await api('/api/my/team-colleagues').catch(() => null);
+        }
+        const colSel = document.getElementById('swColleague');
+        if (colSel) {
+            const colleagues = (swColleaguesCache && swColleaguesCache.colleagues) || [];
+            colSel.innerHTML = '<option value="">— اختر الزميل —</option>' + (colleagues.length
+                ? colleagues.map(c => `<option value="${c.id}">${esc(c.name)} (${esc(c.employee_code || '')})</option>`).join('')
+                : '<option value="" disabled>لا يوجد زملاء نشطون في فريقك الحالي</option>');
+        }
+        const dt = document.getElementById('swTargetDate');
+        if (dt && today) dt.min = today; // تلميح واجهة — الخادم يفرض PAST_DATE
+    }
+
+    function bindSwapEvents() {
+        const newBtn = document.getElementById('swNewBtn');
+        if (!newBtn) return;
+        const form = document.getElementById('swForm');
+        const submitBtn = document.getElementById('swSubmit');
+        newBtn.addEventListener('click', () => {
+            form.classList.toggle('open');
+            if (form.classList.contains('open')) { swHideError(); swEnsureRefs(); }
+        });
+        document.getElementById('swCancelForm').addEventListener('click', () => form.classList.remove('open'));
+        submitBtn.addEventListener('click', async () => {
+            swHideError();
+            const myDate = document.getElementById('swMyShift').value;
+            const collId = document.getElementById('swColleague').value;
+            const targetDate = document.getElementById('swTargetDate').value;
+            if (!myDate) { swShowError('اختر مناوبتك.'); return; }
+            if (!collId) { swShowError('اختر الزميل.'); return; }
+            if (!targetDate) { swShowError('حدّد تاريخ مناوبة الزميل.'); return; }
+            submitBtn.disabled = true;
+            try {
+                // التواريخ والزميل فقط — الهوية والرمزان والفريق يشتقها الخادم (عقد E-6)
+                await apiPost('/api/my/shift-swaps',
+                    { target_employee_id: Number(collId), my_shift_date: myDate, target_shift_date: targetDate });
+                toast('تم إرسال طلب التبديل — بانتظار موافقة الزميل');
+                form.classList.remove('open');
+                await refreshSwaps();
+            } catch (err) {
+                submitBtn.disabled = false;
+                swShowError((err && err.message) || 'تعذر إرسال الطلب — حاول مجددًا.');
+            }
+        });
+        document.querySelectorAll('[data-swaccept],[data-swdecline]').forEach(b => b.addEventListener('click', async () => {
+            const isAccept = b.hasAttribute('data-swaccept');
+            const id = isAccept ? b.dataset.swaccept : b.dataset.swdecline;
+            if (!isAccept && !confirm('هل تريد رفض طلب التبديل هذا؟')) return;
+            b.disabled = true;
+            try {
+                const out = await apiPost('/api/my/shift-swaps/' + id + '/consent', { decision: isAccept ? 'accept' : 'decline' });
+                if (out && out.status === 'auto_applied') {
+                    toast('وافقتَ وطُبّق التبديل تلقائيًا على الجدول');
+                    refreshSchedule();
+                } else if (out && out.status === 'pending_review') {
+                    toast('وافقتَ — صُعّد الطلب لمراجعة المسؤول');
+                } else {
+                    toast('رفضتَ الطلب — أُغلق');
+                }
+                await refreshSwaps();
+            } catch (err) {
+                b.disabled = false;
+                toast((err && err.message) || 'تعذر إرسال الرد — حاول مجددًا.');
+                refreshSwaps();
+            }
+        }));
+        document.querySelectorAll('[data-swcancel]').forEach(b => b.addEventListener('click', async () => {
+            if (!confirm('هل تريد إلغاء طلب التبديل هذا؟')) return;
+            b.disabled = true;
+            try {
+                await apiPost('/api/my/shift-swaps/' + b.dataset.swcancel + '/cancel', {});
+                toast('تم إلغاء الطلب');
+                await refreshSwaps();
+            } catch (err) { b.disabled = false; toast((err && err.message) || 'تعذر الإلغاء'); }
+        }));
+    }
+
+    async function refreshSwaps() {
+        try {
+            const d = await api('/api/my/shift-swaps').catch(() => ({ __error: true }));
+            const tmp = document.createElement('div');
+            tmp.innerHTML = renderSwaps(d);
+            const old = document.getElementById('swapCard');
+            if (old) old.replaceWith(tmp.firstElementChild);
+            bindSwapEvents();
+        } catch (_) { /* تبقى البطاقة القديمة — لا انهيار */ }
+    }
+
     // ── v5.1: التحديث اللحظي — SSE الموجَّه القائم (OV-S6: لا قناة جديدة تُنشأ). ──
     // Initial Load يبقى REST دائمًا؛ هذه طبقة تسريع فقط: عند بث notification_created
     // يظهر 🔔 فورًا ثم يُعاد جلب القسمين من REST (مصدر الحقيقة). انقطاعها لا يُسقط
@@ -1451,6 +1712,10 @@
             if (/مناوبة/.test(String(n.title || '') + ' ' + String(n.message || ''))) refreshShiftChange();
             // FSS E-3: إشعارات عدم التمكّن (اعتماد/رفض المراجعة) ← تحديث البطاقة فورًا بلا Refresh
             if (/تمكّن/.test(String(n.title || '') + ' ' + String(n.message || ''))) refreshUnable();
+            // FSS E-7: إشعارات العروض التكميلية (عرض جديد وصل) ← تحديث البطاقة فورًا بلا Refresh
+            if (/تكميلي/.test(String(n.title || '') + ' ' + String(n.message || ''))) refreshProposals();
+            // FSS E-7: إشعارات التبديل (طلب/رفض/إلغاء/اعتماد/تطبيق) ← تحديث البطاقة + الجدول فورًا
+            if (/تبديل/.test(String(n.title || '') + ' ' + String(n.message || ''))) { refreshSwaps(); refreshSchedule(); }
         };
         // رفض خادمي (401/403 ⇒ CLOSED): إيقاف نهائي بلا عاصفة إعادة اتصال — نفس
         // سياسة websocket-sync. الأخطاء العابرة يعيد المتصفح الاتصال بها تلقائيًا.
@@ -1500,7 +1765,7 @@
                 curYear = t ? +t.slice(0, 4) : new Date().getFullYear();
                 curMonth = t ? +t.slice(5, 7) : new Date().getMonth() + 1;
             }
-            const [schedule, incidents, vehicle, inventory, checkData, mates, notifs, changes, leave, shiftChanges, prefs, unable] = await Promise.all([
+            const [schedule, incidents, vehicle, inventory, checkData, mates, notifs, changes, leave, shiftChanges, prefs, unable, proposals, swaps] = await Promise.all([
                 api(`/api/my/schedule?month=${curMonth}&year=${curYear}`),
                 sec.incidents ? api('/api/my/team-incidents') : Promise.resolve(null),
                 sec.vehicle ? api('/api/my/vehicle') : Promise.resolve(null),
@@ -1516,7 +1781,10 @@
                 api('/api/my/shift-change-requests').catch(() => ({ __error: true })),
                 // FSS E-3: تفضيلاتي + عدم التمكّن — نفس النمط (فشل الجلب لا يُسقط الصفحة)
                 api('/api/my/schedule-preferences').catch(() => ({ __error: true })),
-                api('/api/my/unable-attend').catch(() => ({ __error: true }))]);
+                api('/api/my/unable-attend').catch(() => ({ __error: true })),
+                // FSS E-7: عروضي التكميلية + طلبات التبديل — نفس النمط (فشل الجلب لا يُسقط الصفحة)
+                api('/api/my/proposals').catch(() => ({ __error: true })),
+                api('/api/my/shift-swaps').catch(() => ({ __error: true }))]);
             leaveProfile = profile; // المصدر الوحيد لـ employee.id عند تقديم الطلب
             app.innerHTML = renderProfile(profile)
                 + (notifs ? renderNotifs(notifs) : '')
@@ -1524,6 +1792,8 @@
                 + renderShiftChange(shiftChanges)
                 + renderPrefs(prefs)
                 + renderUnable(unable)
+                + renderProposals(proposals)
+                + renderSwaps(swaps)
                 + (mates ? renderMates(mates) : '')
                 + (checkData ? renderCheck(checkData) : '')
                 + (incidents ? renderIncidents(incidents) : '')
@@ -1538,6 +1808,8 @@
             bindShiftChangeEvents(); // F-2: بطاقة طلبات المناوبة تُعرض دائمًا للموظف
             bindPrefsEvents();   // FSS E-3: بطاقة التفضيلات (عرض فقط عند إغلاق النافذة)
             bindUnableEvents();  // FSS E-3: بطاقة عدم التمكّن
+            bindProposalsEvents(); // FSS E-7: بطاقة العروض التكميلية
+            bindSwapEvents();      // FSS E-7: بطاقة التبديل بالتراضي
             connectLive(); // v5.1: القناة اللحظية بعد نجاح التحميل الأول — REST يبقى المصدر
             if (logoutBtn) logoutBtn.style.display = ''; // نجاح التحميل ← الزر يظهر في الشريط العلوي الثابت
 
