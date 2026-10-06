@@ -3508,6 +3508,221 @@ app.post('/api/my/proposals/:id/respond', authenticate, authorizePerm('ops.my_po
     }
 });
 
+// ═══ FSS E-6 (قرار M9 + K1–K6 معتمدة 2026-10-06، K2 معدّلًا): التبديل بالتراضي ═══
+// تبادل مناوبتين فعليتين بين موظفين بموافقة الطرفين. الخادم يشتق الصفين/الرمزين
+// (لا roster_id ولا shift_code من العميل). نفس الفريق (K3) ونفس التاريخ مسموح
+// (K2 — E-4 الحكم). نافذة 48س (K4) من بداية أقرب مناوبة لحظة القبول: داخلها أو
+// فشل E-4 ⇒ تصعيد pending_review وليس رفضًا. التطبيق ذرّي في swap-service مع
+// حارس خام نهائي داخل tx.immediate — أي فشل = ROLLBACK كامل. الشهر المنشور لا
+// يمنع M9. الإشعارات/البث بعد COMMIT فقط وسقوطها آمن. لا Permission جديد.
+let swapService = null;
+function getSwapService() {
+    if (!swapService && db) {
+        const { SwapService } = require('./services/schedule-engine/swap-service');
+        swapService = new SwapService(db);
+    }
+    return swapService;
+}
+
+/** إشعارات/بث ما بعد التطبيق الناجح (auto_applied أو applied) — بعد COMMIT فقط. */
+async function _notifySwapApplied(out, actorUser) {
+    const req_ = out.request;
+    try {
+        await fireScheduleChangeNotify(out.applied.revisionId, out.applied.auditIds);
+    } catch (nErr) { console.error('swap apply revision notify error:', nErr.message); }
+    try {
+        broadcast({
+            type: 'shift_roster_swapped',
+            payload: { roster_id_1: out.applied.roster_id_1, roster_id_2: out.applied.roster_id_2, by_user: actorUser.name || actorUser.username }
+        });
+    } catch (nErr) { console.error('swap apply broadcast error:', nErr.message); }
+    if (out.applied.auto) {
+        // M9: المسؤول يبقى مطّلعًا على التطبيق التلقائي — إشعار اطلاعي للمراجعين
+        try {
+            await notificationService.notifyOperational({
+                eventKey: 'shift_swap.auto_applied',
+                title: 'تبديل بالتراضي طُبّق تلقائيًا',
+                message: `طلب #${req_.id}: موظف #${req_.initiator_employee_id} (${req_.initiator_date} ${req_.initiator_shift_code}) ↔ موظف #${req_.target_employee_id} (${req_.target_date} ${req_.target_shift_code})`,
+                push: true,
+                permKey: 'schedule.requests.review'
+            });
+        } catch (nErr) { console.error('swap auto-applied notify error:', nErr.message); }
+    } else {
+        // applied بقرار مسؤول — إشعار شخصي للطرفين
+        for (const empId of [req_.initiator_employee_id, req_.target_employee_id]) {
+            try {
+                const uid = await resolveEmployeeUserId(empId);
+                if (uid) {
+                    await notificationService.notifyPersonal(uid, {
+                        title: 'اعتُمد طلب التبديل',
+                        message: `اعتمد المسؤول طلب التبديل #${req_.id} وطُبّق على جدول المناوبات`,
+                        type: 'success'
+                    });
+                }
+            } catch (nErr) { console.error('swap applied personal notify error:', nErr.message); }
+        }
+    }
+}
+
+// تقديم طلب تبديل — الهوية والصفوف مشتقة خادميًا
+app.post('/api/my/shift-swaps', authenticate, authorizePerm('ops.my_portal'), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const emp = await getMyPortalService().resolveEmployee(req.user);
+        if (!emp) return res.status(404).json(MY_PORTAL_NO_EMPLOYEE);
+        const out = await getSwapService().submit(emp, req.user, req.body || {});
+        // بعد COMMIT فقط: إشعار شخصي للطرف الثاني — سقوط آمن بلا حساب مربوط
+        try {
+            const targetUserId = await resolveEmployeeUserId(out.request.target_employee_id);
+            if (targetUserId) {
+                await notificationService.notifyPersonal(targetUserId, {
+                    title: 'طلب تبديل مناوبة',
+                    message: `${emp.name} يطلب تبديل مناوبته (${out.request.initiator_date} ${out.request.initiator_shift_code}) مع مناوبتك (${out.request.target_date} ${out.request.target_shift_code}) — اقبل أو ارفض من بوابتك`,
+                    type: 'info'
+                });
+            }
+        } catch (nErr) { console.error('swap submit notify error:', nErr.message); }
+        res.json({ success: true, id: out.id, status: out.status });
+    } catch (error) {
+        if (error && error.status && error.code) {
+            return res.status(error.status).json({ error: error.message, code: error.code });
+        }
+        console.error('[my-portal] shift-swaps submit error:', error);
+        res.status(500).json({ error: 'فشل في تقديم طلب التبديل' });
+    }
+});
+
+app.get('/api/my/shift-swaps', authenticate, authorizePerm('ops.my_portal'), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const emp = await getMyPortalService().resolveEmployee(req.user);
+        if (!emp) return res.status(404).json(MY_PORTAL_NO_EMPLOYEE);
+        const rows = await getSwapService().getMine(emp);
+        res.json({ success: true, requests: rows });
+    } catch (error) {
+        console.error('[my-portal] shift-swaps GET error:', error);
+        res.status(500).json({ error: 'فشل في جلب طلبات التبديل' });
+    }
+});
+
+// رد الطرف الثاني: accept|decline — accept قد يطبّق تلقائيًا أو يصعّد للمراجعة
+app.post('/api/my/shift-swaps/:id/consent', authenticate, authorizePerm('ops.my_portal'), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const emp = await getMyPortalService().resolveEmployee(req.user);
+        if (!emp) return res.status(404).json(MY_PORTAL_NO_EMPLOYEE);
+        const { decision } = req.body || {};
+        const out = await getSwapService().consent(emp, req.user, req.params.id, decision);
+        // بعد COMMIT فقط — سقوط آمن في كل الإشعارات
+        try {
+            if (out.status === 'declined_by_peer') {
+                const initiatorUserId = await resolveEmployeeUserId(out.request.initiator_employee_id);
+                if (initiatorUserId) {
+                    await notificationService.notifyPersonal(initiatorUserId, {
+                        title: 'رُفض طلب التبديل',
+                        message: `${emp.name} رفض طلب التبديل #${out.id} — أُغلق الطلب`,
+                        type: 'warning'
+                    });
+                }
+            } else if (out.status === 'pending_review') {
+                await notificationService.notifyOperational({
+                    eventKey: 'shift_swap.pending_review',
+                    title: 'طلب تبديل بالتراضي يحتاج مراجعة',
+                    message: `طلب #${out.id}: وافق الطرفان لكن الفحوصات صعّدته للمراجعة (${out.escalation_reason || ''})`,
+                    push: true,
+                    permKey: 'schedule.requests.review'
+                });
+            }
+        } catch (nErr) { console.error('swap consent notify error:', nErr.message); }
+        if (out.status === 'auto_applied' && out.applied) {
+            await _notifySwapApplied(out, req.user);
+        }
+        res.json({ success: true, id: out.id, status: out.status, escalation_reason: out.escalation_reason || null });
+    } catch (error) {
+        if (error && error.status && error.code) {
+            return res.status(error.status).json({ error: error.message, code: error.code });
+        }
+        console.error('[my-portal] shift-swaps consent error:', error);
+        res.status(500).json({ error: 'فشل في الرد على طلب التبديل' });
+    }
+});
+
+// إلغاء المبادر (K5) — من pending_consent/pending_review بلا حذف فعلي
+app.post('/api/my/shift-swaps/:id/cancel', authenticate, authorizePerm('ops.my_portal'), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const emp = await getMyPortalService().resolveEmployee(req.user);
+        if (!emp) return res.status(404).json(MY_PORTAL_NO_EMPLOYEE);
+        const out = await getSwapService().cancelMine(emp, req.user, req.params.id);
+        // بعد COMMIT فقط: إشعار الطرف الثاني بالإلغاء — سقوط آمن
+        try {
+            const targetUserId = await resolveEmployeeUserId(out.request.target_employee_id);
+            if (targetUserId) {
+                await notificationService.notifyPersonal(targetUserId, {
+                    title: 'أُلغي طلب التبديل',
+                    message: `${emp.name} ألغى طلب التبديل #${out.id}`,
+                    type: 'info'
+                });
+            }
+        } catch (nErr) { console.error('swap cancel notify error:', nErr.message); }
+        res.json({ success: true, id: out.id, status: out.status });
+    } catch (error) {
+        if (error && error.status && error.code) {
+            return res.status(error.status).json({ error: error.message, code: error.code });
+        }
+        console.error('[my-portal] shift-swaps cancel error:', error);
+        res.status(500).json({ error: 'فشل في إلغاء طلب التبديل' });
+    }
+});
+
+// قائمة المراجعة للمسؤول
+app.get('/api/schedule/shift-swaps', authenticate, authorizePerm('schedule.requests.review'), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const rows = await getSwapService().getReviewQueue(req.query.status || 'pending_review');
+        res.json({ success: true, requests: rows });
+    } catch (error) {
+        if (error && error.status && error.code) {
+            return res.status(error.status).json({ error: error.message, code: error.code });
+        }
+        console.error('[schedule] shift-swaps queue error:', error);
+        res.status(500).json({ error: 'فشل في جلب قائمة طلبات التبديل' });
+    }
+});
+
+// قرار المسؤول: approve|reject — approve يعيد E-4 للاتجاهين إلزاميًا (M9)
+app.post('/api/schedule/shift-swaps/:id/review', authenticate, authorizePerm('schedule.requests.review'), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const { decision, note } = req.body || {};
+        const out = await getSwapService().review(req.user, req.params.id, decision, note);
+        if (out.status === 'applied' && out.applied) {
+            await _notifySwapApplied(out, req.user);
+        } else if (out.status === 'rejected') {
+            // بعد COMMIT فقط: إشعار شخصي للطرفين بالرفض — سقوط آمن
+            for (const empId of [out.request.initiator_employee_id, out.request.target_employee_id]) {
+                try {
+                    const uid = await resolveEmployeeUserId(empId);
+                    if (uid) {
+                        await notificationService.notifyPersonal(uid, {
+                            title: 'رُفض طلب التبديل',
+                            message: `رفض المسؤول طلب التبديل #${out.id}${note ? ' — ' + String(note).slice(0, 200) : ''}`,
+                            type: 'warning'
+                        });
+                    }
+                } catch (nErr) { console.error('swap reject notify error:', nErr.message); }
+            }
+        }
+        res.json({ success: true, id: out.id, status: out.status });
+    } catch (error) {
+        if (error && error.status && error.code) {
+            return res.status(error.status).json({ error: error.message, code: error.code });
+        }
+        console.error('[schedule] shift-swaps review error:', error);
+        res.status(500).json({ error: 'فشل في مراجعة طلب التبديل' });
+    }
+});
+
 app.get('/api/permissions/catalog', authenticate, authorizePerm('admin.users_manage'), async (req, res) => {
     res.json({ success: true, permissions: PERMISSIONS_CATALOG, roles: ROLE_LABELS_MAP });
 });

@@ -1881,6 +1881,49 @@ async function runMigrations() {
     logger.warn('schedule_proposals: ' + err.message);
   }
 
+  // ═══ FSS E-6 (قرار M9 + K1–K6 معتمدة 2026-10-06): التبديل بالتراضي ═══
+  // تبادل مناوبتين بين موظفين بموافقة الطرفين. نفس الفريق (K3) ونفس التاريخ
+  // مسموح (K2 المعدّل — E-4 الحكم). التطبيق الذرّي على shift_roster يتم في
+  // swap-service فقط عبر tx.immediate مع حارس خام نهائي (صفان/موظفان/رموز/
+  // عضوية) — أي فشل = ROLLBACK كامل. الفهرسان الجزئيان يمنعان طلبين حيّين
+  // على نفس صف roster (pending_consent/pending_review). لا حذف فعلي أبدًا —
+  // declined_by_peer/rejected/cancelled حالات تاريخية نهائية.
+  try {
+    await exec(`CREATE TABLE IF NOT EXISTS shift_swap_requests (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      initiator_employee_id INTEGER NOT NULL REFERENCES employees(id),
+      target_employee_id INTEGER NOT NULL REFERENCES employees(id),
+      initiator_date TEXT NOT NULL,
+      initiator_shift_code TEXT NOT NULL,
+      target_date TEXT NOT NULL,
+      target_shift_code TEXT NOT NULL,
+      team_id INTEGER NOT NULL REFERENCES teams(id),
+      month TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending_consent'
+        CHECK (status IN ('pending_consent','declined_by_peer','pending_review','auto_applied','applied','rejected','cancelled')),
+      escalation_reason TEXT,
+      consent_by INTEGER,
+      consent_at TEXT,
+      reviewed_by INTEGER,
+      reviewed_at TEXT,
+      review_note TEXT,
+      created_by INTEGER NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT
+    )`);
+    await exec(`CREATE UNIQUE INDEX IF NOT EXISTS uq_swap_live_initiator
+      ON shift_swap_requests(initiator_employee_id, initiator_date)
+      WHERE status IN ('pending_consent','pending_review')`);
+    await exec(`CREATE UNIQUE INDEX IF NOT EXISTS uq_swap_live_target
+      ON shift_swap_requests(target_employee_id, target_date)
+      WHERE status IN ('pending_consent','pending_review')`);
+    await exec('CREATE INDEX IF NOT EXISTS idx_swap_requests_status ON shift_swap_requests(status)');
+    await exec('CREATE INDEX IF NOT EXISTS idx_swap_requests_month ON shift_swap_requests(month)');
+    logger.info('shift_swap_requests table created');
+  } catch (err) {
+    logger.warn('shift_swap_requests: ' + err.message);
+  }
+
   // incidents (replaces incidents.json)
   try {
     await exec(`CREATE TABLE IF NOT EXISTS incidents (
@@ -4186,6 +4229,40 @@ const ScheduleProposals = {
   async getLiveByEmployeeDate(employeeId, date) {
     return get(`SELECT * FROM schedule_proposals WHERE employee_id = ? AND date = ?
                 AND status IN ('offered','accepted')`, [employeeId, date]);
+  }
+};
+
+// ============================================
+// CRUD: SHIFT SWAP REQUESTS (FSS E-6 — قرار M9) — قراءات فقط هنا
+// كل الكتابات (submit/consent/cancel/review/التطبيق الذرّي) داخل tx.immediate
+// في swap-service مع قيود التدقيق في نفس الترانزاكشن (نمط E-1/E-2/E-5).
+// «الطلبات الحية» = pending_consent/pending_review (يقابل الفهرسين الجزئيين).
+// ============================================
+const ShiftSwapRequests = {
+  async getById(id) {
+    return get('SELECT * FROM shift_swap_requests WHERE id = ?', [id]);
+  },
+  async getMine(employeeId) {
+    return all(`SELECT * FROM shift_swap_requests WHERE initiator_employee_id = ? OR target_employee_id = ?
+                ORDER BY id DESC`, [employeeId, employeeId]);
+  },
+  // طلب حيٌّ يمس صف roster معين (موظف+تاريخ) في أي دور (مبادر أو هدف)
+  async getLiveForRoster(employeeId, date) {
+    return get(`SELECT id, status FROM shift_swap_requests
+                WHERE status IN ('pending_consent','pending_review')
+                  AND ((initiator_employee_id = ? AND initiator_date = ?) OR (target_employee_id = ? AND target_date = ?))
+                LIMIT 1`, [employeeId, date, employeeId, date]);
+  },
+  async getReviewQueue(status) {
+    return all(`SELECT s.*,
+                  ei.name AS initiator_name, ei.employee_code AS initiator_code,
+                  et.name AS target_name, et.employee_code AS target_code,
+                  t.name AS team_name
+                FROM shift_swap_requests s
+                JOIN employees ei ON ei.id = s.initiator_employee_id
+                JOIN employees et ON et.id = s.target_employee_id
+                JOIN teams t ON t.id = s.team_id
+                WHERE s.status = ? ORDER BY s.id`, [status]);
   }
 };
 
@@ -6583,6 +6660,7 @@ module.exports = {
   ScheduleMonths,
   ScheduleProposalRuns,
   ScheduleProposals,
+  ShiftSwapRequests,
   Timeline,
   Employees,
   Teams,
