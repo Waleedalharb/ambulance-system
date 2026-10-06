@@ -686,6 +686,31 @@ class MyPortalService {
             }))
         };
     }
+
+    /** F-2: طلبات تغيير المناوبة الخاصة بي فقط — نطاق الحساب المرتبط (لا غير). */
+    async getMyShiftChangeRequests(user) {
+        const emp = await this.resolveEmployee(user);
+        if (!emp) return { notFound: true };
+        const { codeMap } = await this._refs();
+        const codeName = c => {
+            if (c == null || c === '') return null;
+            const r = codeMap.get(String(c));
+            return r ? r.name : String(c);
+        };
+        const rows = await this.db.all(
+            `SELECT id, shift_date, proposed_shift_code, old_shift_code, status, reason,
+                    reviewed_by, reviewed_at, created_at
+             FROM shift_change_requests WHERE employee_id = ? ORDER BY id DESC LIMIT 50`, [emp.id]);
+        return {
+            requests: rows.map(r => ({
+                id: r.id, date: r.shift_date,
+                proposedShiftCode: r.proposed_shift_code, proposedShiftName: codeName(r.proposed_shift_code),
+                oldShiftCode: r.old_shift_code, oldShiftName: codeName(r.old_shift_code),
+                status: r.status, reason: r.reason,
+                reviewedBy: r.reviewed_by, reviewedAt: r.reviewed_at, createdAt: r.created_at
+            }))
+        };
+    }
 }
 
 module.exports = MyPortalService;

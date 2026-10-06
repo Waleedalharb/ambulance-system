@@ -3115,6 +3115,48 @@ app.get('/api/my/schedule-changes', authenticate, authorizePerm('ops.my_portal')
     }
 });
 
+// F-2: طلبات تغيير المناوبة الخاصة بالموظف — نطاق الحساب المرتبط فقط
+app.get('/api/my/shift-change-requests', authenticate, authorizePerm('ops.my_portal'), async (req, res) => {
+    try {
+        const out = await getMyPortalService().getMyShiftChangeRequests(req.user);
+        if (out.notFound) return res.status(404).json(MY_PORTAL_NO_EMPLOYEE);
+        res.json({ success: true, ...out });
+    } catch (error) {
+        console.error('[my-portal] shift-change-requests error:', error);
+        res.status(500).json({ error: 'فشل في جلب طلبات تغيير المناوبة' });
+    }
+});
+
+// F-2 (د1 — قرار المالك): إلغاء الموظف لطلبه المعلّق — المالك فقط، pending فقط،
+// بلا حذف فعلي للسجل، مع تدقيق العملية. القفل الشرطي (F-1) يحسم أي سباق إلغاء مزدوج.
+app.post('/api/my/shift-change-requests/:id/cancel', authenticate, authorizePerm('ops.my_portal'), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const emp = await getMyPortalService().resolveEmployee(req.user);
+        if (!emp) return res.status(404).json(MY_PORTAL_NO_EMPLOYEE);
+        const request = await db.ShiftChangeRequests.getById(req.params.id);
+        if (!request) return res.status(404).json({ error: 'الطلب غير موجود' });
+        if (Number(request.employee_id) !== Number(emp.id)) {
+            return res.status(403).json({ error: 'لا يمكنك إلغاء طلب ليس لك', code: 'NOT_REQUEST_OWNER' });
+        }
+        if (request.status !== 'pending') {
+            return res.status(409).json({ error: 'لا يمكن إلغاء طلب تمت معالجته', code: 'SHIFT_CHANGE_ALREADY_PROCESSED' });
+        }
+        const lock = await db.ShiftChangeRequests.updateStatusIfPending(req.params.id, 'cancelled', req.user.username || req.user.name);
+        if (!lock || lock.changes === 0) {
+            return res.status(409).json({ error: 'لا يمكن إلغاء طلب تمت معالجته', code: 'SHIFT_CHANGE_ALREADY_PROCESSED' });
+        }
+        await addAuditLogEntry('shift_change_request_owner_cancel',
+            `إلغاء الموظف طلب تغيير المناوبة #${req.params.id} (يوم ${request.shift_date} ← ${request.proposed_shift_code})`,
+            'schedule', req.user.name, req.user.role, req.user.id);
+        broadcast({ type: 'shift_change_request', payload: { request_id: req.params.id, employee_id: emp.id, status: 'cancelled' } });
+        res.json({ success: true, message: 'تم إلغاء الطلب' });
+    } catch (error) {
+        console.error('[my-portal] shift-change cancel error:', error);
+        res.status(500).json({ error: 'فشل في إلغاء الطلب' });
+    }
+});
+
 app.get('/api/permissions/catalog', authenticate, authorizePerm('admin.users_manage'), async (req, res) => {
     res.json({ success: true, permissions: PERMISSIONS_CATALOG, roles: ROLE_LABELS_MAP });
 });
@@ -14095,19 +14137,43 @@ app.get('/api/shift-roster/employee-schedule/:employeeId', authenticate, authori
 app.post('/api/shift-change-request', authenticate, async (req, res) => {
     try {
         if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
-        const { roster_id, employee_id, team_id, shift_date, proposed_shift_code, old_shift_code, reason } = req.body;
-        if (!employee_id || !shift_date || !proposed_shift_code) {
+        const { shift_date, proposed_shift_code, reason } = req.body;
+        // F-2 (د2 — قرار المالك): تشديد ملكية التقديم. من لا يحمل requests.review
+        // يقدّم لنفسه فقط: employee_id يُفرض من ملف الموظف المرتبط بالحساب،
+        // وأي employee_id مغاير في الجسم ⇒ 403 (تلاعب). المخوَّلون (requests.review)
+        // يبقون على العقد القائم — iOS لا يتكسر لأنه يقدّم باسم موظف الحساب نفسه.
+        const canReview = await getPermissionService().hasPermission(req.user.id, req.user.role, 'requests.review');
+        let employeeId = req.body.employee_id;
+        if (!canReview) {
+            const ownEmp = await getMyPortalService().resolveEmployee(req.user);
+            if (!ownEmp) {
+                return res.status(403).json({ error: 'لا يوجد ملف موظف مرتبط بهذا الحساب — لا يمكن تقديم طلب', code: 'NO_EMPLOYEE' });
+            }
+            if (employeeId != null && Number(employeeId) !== Number(ownEmp.id)) {
+                return res.status(403).json({ error: 'لا يمكنك تقديم طلب تغيير مناوبة باسم موظف آخر', code: 'EMPLOYEE_MISMATCH' });
+            }
+            employeeId = ownEmp.id;
+        }
+        if (!employeeId || !shift_date || !proposed_shift_code) {
             return res.status(400).json({ error: 'معرف الموظف وتاريخ المناوبة والرمز المقترح مطلوبة' });
         }
+        // F-2 (قاعدة المالك الإضافية): roster_id و old_shift_code و team_id تُشتق
+        // من سطر shift_roster الفعلي على السيرفر — قيم العميل لهذه الحقول
+        // تُقبل في العقد لكنها لا تُوثق ولا تُخزَّن (لا تزوير للمناوبة الحالية).
+        const rosterRow = await db.ShiftRoster.getByEmployeeAndDate(employeeId, String(shift_date).trim());
         const id = await db.ShiftChangeRequests.create({
-            roster_id, employee_id, team_id, shift_date, proposed_shift_code, old_shift_code,
+            roster_id: rosterRow ? rosterRow.id : null,
+            employee_id: employeeId,
+            team_id: rosterRow ? rosterRow.team_id : null,
+            shift_date, proposed_shift_code,
+            old_shift_code: rosterRow ? rosterRow.shift_code : null,
             requested_by: req.user.username || req.user.name,
             requested_by_name: req.user.name,
             status: 'pending', reason
         });
         broadcast({
             type: 'shift_change_request',
-            payload: { request_id: id, employee_id, status: 'pending' }
+            payload: { request_id: id, employee_id: employeeId, status: 'pending' }
         });
 
         // إشعار المسؤولين: Inbox + Push — نفس منطق طلبات الإجازة، وفشله لا يُفقد الطلب.
@@ -14139,6 +14205,17 @@ app.get('/api/shift-change-request', authenticate, authorizePerm('requests.revie
             entries = await db.ShiftChangeRequests.getByStatus(status, parseInt(limit));
         } else {
             entries = await db.ShiftChangeRequests.getAll(parseInt(limit));
+        }
+        // F-2: إثراء إضافي صرف (لا يحذف أي حقل — iOS يتجاهل الزائد): اسم الموظف
+        // + القيمة الفعلية الحالية في shift_roster ليوم الطلب، لأن old_shift_code
+        // المخزّن لقطة وقت التقديم وقد يسبق الواقع (F-1 يطبّق على الواقع).
+        for (const e of entries) {
+            const cur = await db.get(
+                `SELECT (SELECT name FROM employees WHERE id = ?) AS employee_name,
+                        (SELECT shift_code FROM shift_roster WHERE employee_id = ? AND shift_date = ?) AS current_shift_code`,
+                [e.employee_id, e.employee_id, e.shift_date]);
+            e.employee_name = cur ? cur.employee_name : null;
+            e.current_shift_code = cur ? cur.current_shift_code : null;
         }
         res.json({ success: true, requests: entries });
     } catch (error) {
