@@ -974,6 +974,170 @@
         } catch (_) { /* تبقى البطاقة القديمة — لا انهيار */ }
     }
 
+    // ═══ F-2: طلبات تغيير المناوبة — تقديم/متابعة/إلغاء، نطاق الحساب فقط ═══
+    // لا employee_id ولا old_shift_code يُرسَلان من الواجهة إطلاقًا: الخادم يفرض
+    // الموظف من الحساب المرتبط (د2) ويشتق المناوبة الحالية من shift_roster
+    // (قاعدة المالك) — الواجهة ترسل التاريخ والرمز المقترح والسبب فقط.
+    const SC_STATUS = {
+        pending: ['st-pending', 'قيد المراجعة'],
+        approved: ['st-approved', 'معتمدة'],
+        denied: ['st-denied', 'مرفوضة'],
+        cancelled: ['st-cancelled', 'ملغاة']
+    };
+    let scCodesCache = null;        // الرموز المعتمدة (/api/shift-codes) — تُجلب مرة واحدة
+    const scSchedCache = new Map(); // كاش أشهر الجدول لعرض «مناوبتك الحالية» لليوم المختار
+
+    function renderShiftChange(d) {
+        let rows = '';
+        if (d && d.__error) {
+            rows = '<div class="empty">تعذر تحميل طلباتك حاليًا — حدّث الصفحة للمحاولة مجددًا.</div>';
+        } else {
+            const reqs = (d && d.requests) || [];
+            rows = reqs.map(r => {
+                const st = SC_STATUS[r.status] || ['', r.status];
+                const oldV = r.oldShiftCode ? (r.oldShiftName || r.oldShiftCode) : 'لا مناوبة مسجلة';
+                return `<div class="lv-row">
+                    <div class="lv-head">
+                        <div>
+                            <div class="lv-type">${esc(r.date)}</div>
+                            <div class="lv-range">${esc(oldV)} ← <b>${esc(r.proposedShiftName || r.proposedShiftCode)}</b></div>
+                        </div>
+                        <span class="lv-status ${st[0]}">${esc(st[1])}</span>
+                    </div>
+                    ${r.reason ? `<div class="lv-range">السبب: ${esc(r.reason)}</div>` : ''}
+                    <div class="lv-row-actions">
+                        ${r.status === 'pending' ? `<button class="lv-btn cancel" type="button" data-sccancel="${r.id}">إلغاء الطلب</button>` : ''}
+                    </div>
+                </div>`;
+            }).join('') || '<div class="empty">لا توجد طلبات تغيير مناوبة — قدّم طلبك من الزر أعلاه.</div>';
+        }
+        return `<div class="card" id="shiftChangeCard"><div class="card-head leave">🔁 طلبات تغيير المناوبة</div>
+            <div class="card-body">
+                <button class="lv-new-btn" id="scNewBtn" type="button">＋ طلب تغيير مناوبة</button>
+                <div class="lv-form" id="scForm">
+                    <div class="lv-form-title">طلب تغيير مناوبة</div>
+                    <label>يوم المناوبة</label>
+                    <input type="date" id="scDate">
+                    <div class="lv-days" id="scCurrent"></div>
+                    <label>الرمز المقترح</label>
+                    <select id="scCode"><option value="">— حدّد يوم المناوبة أولًا —</option></select>
+                    <label>السبب (اختياري)</label>
+                    <textarea id="scReason" maxlength="300"></textarea>
+                    <div class="lv-error" id="scError"></div>
+                    <div class="lv-form-actions">
+                        <button class="lv-submit" id="scSubmit" type="button">إرسال الطلب</button>
+                        <button class="lv-cancel-form" id="scCancelForm" type="button">تراجع</button>
+                    </div>
+                </div>
+                <div style="margin-top:12px">${rows}</div>
+            </div>
+        </div>`;
+    }
+
+    function scShowError(m) {
+        const el = document.getElementById('scError');
+        if (el) { el.textContent = m; el.classList.add('show'); }
+    }
+    function scHideError() {
+        const el = document.getElementById('scError');
+        if (el) { el.textContent = ''; el.classList.remove('show'); }
+    }
+
+    // عرض «مناوبتك الحالية» لليوم المختار — للاطلاع فقط؛ القيمة المخزَّنة يشتقها
+    // الخادم من shift_roster عند التقديم ولا تُرسَل من هنا (قاعدة المالك).
+    async function scShowCurrent() {
+        const el = document.getElementById('scCurrent');
+        if (!el) return;
+        el.textContent = '';
+        const date = document.getElementById('scDate').value;
+        if (!date) return;
+        try {
+            const y = +date.slice(0, 4), m = +date.slice(5, 7);
+            const key = y + '-' + m;
+            if (!scSchedCache.has(key)) {
+                scSchedCache.set(key, await api(`/api/my/schedule?month=${m}&year=${y}`).catch(() => null));
+            }
+            const sch = scSchedCache.get(key);
+            const day = ((sch && sch.days) || []).find(d => d.date === date);
+            el.textContent = day && day.shiftCode
+                ? `مناوبتك الحالية في هذا اليوم: ${day.shiftName || day.shiftCode}${day.teamName ? ' — ' + day.teamName : ''}`
+                : 'لا توجد مناوبة مسجلة لك في هذا اليوم — عند الاعتماد سيُنشأ سطر بالرمز المقترح.';
+        } catch (_) { /* العرض مساعد فقط — لا يمنع التقديم */ }
+    }
+
+    async function scEnsureCodes() {
+        const sel = document.getElementById('scCode');
+        if (!sel || scCodesCache) return;
+        try {
+            const d = await api('/api/shift-codes');
+            const codes = (d && (d.codes || d.shift_codes || d.data)) || (Array.isArray(d) ? d : []);
+            scCodesCache = codes;
+            sel.innerHTML = '<option value="">— اختر الرمز المقترح —</option>' +
+                codes.map(c => `<option value="${esc(c.code)}">${esc(c.name || c.code)} (${esc(c.code)})</option>`).join('');
+        } catch (_) {
+            sel.innerHTML = '<option value="">— تعذر تحميل الرموز —</option>';
+        }
+    }
+
+    function bindShiftChangeEvents() {
+        const newBtn = document.getElementById('scNewBtn');
+        if (!newBtn) return;
+        const form = document.getElementById('scForm');
+        const dateEl = document.getElementById('scDate');
+        const submitBtn = document.getElementById('scSubmit');
+
+        newBtn.addEventListener('click', () => {
+            form.classList.toggle('open');
+            if (form.classList.contains('open')) { scHideError(); scEnsureCodes(); scShowCurrent(); }
+        });
+        document.getElementById('scCancelForm').addEventListener('click', () => form.classList.remove('open'));
+        dateEl.addEventListener('change', scShowCurrent);
+
+        submitBtn.addEventListener('click', async () => {
+            scHideError();
+            const date = dateEl.value;
+            const code = document.getElementById('scCode').value;
+            const reason = document.getElementById('scReason').value.trim();
+            if (!date) { scShowError('حدّد يوم المناوبة.'); return; }
+            if (!code) { scShowError('اختر الرمز المقترح.'); return; }
+            submitBtn.disabled = true;
+            try {
+                // التاريخ + الرمز + السبب فقط — الموظف والقيمة الحالية من الخادم (د2 + قاعدة المالك)
+                await apiPost('/api/shift-change-request',
+                    { shift_date: date, proposed_shift_code: code, reason: reason || undefined });
+                toast('تم إرسال طلبك — بانتظار المراجعة');
+                form.classList.remove('open');
+                dateEl.value = ''; document.getElementById('scReason').value = '';
+                document.getElementById('scCurrent').textContent = '';
+                await refreshShiftChange();
+            } catch (err) {
+                submitBtn.disabled = false;
+                scShowError((err && err.message) || 'تعذر إرسال الطلب — حاول مجددًا.');
+            }
+        });
+
+        document.querySelectorAll('[data-sccancel]').forEach(b => b.addEventListener('click', async () => {
+            if (!confirm('هل تريد إلغاء طلب تغيير المناوبة هذا؟')) return;
+            b.disabled = true;
+            try {
+                await apiPost('/api/my/shift-change-requests/' + b.dataset.sccancel + '/cancel', {});
+                toast('تم إلغاء الطلب');
+                await refreshShiftChange();
+            } catch (err) { b.disabled = false; toast((err && err.message) || 'تعذر الإلغاء'); }
+        }));
+    }
+
+    async function refreshShiftChange() {
+        try {
+            const d = await api('/api/my/shift-change-requests').catch(() => ({ __error: true }));
+            const tmp = document.createElement('div');
+            tmp.innerHTML = renderShiftChange(d);
+            const old = document.getElementById('shiftChangeCard');
+            if (old) old.replaceWith(tmp.firstElementChild); // نمط refreshLeave نفسه
+            bindShiftChangeEvents();
+        } catch (_) { /* تبقى البطاقة القديمة — لا انهيار */ }
+    }
+
     // ── v5.1: التحديث اللحظي — SSE الموجَّه القائم (OV-S6: لا قناة جديدة تُنشأ). ──
     // Initial Load يبقى REST دائمًا؛ هذه طبقة تسريع فقط: عند بث notification_created
     // يظهر 🔔 فورًا ثم يُعاد جلب القسمين من REST (مصدر الحقيقة). انقطاعها لا يُسقط
@@ -994,6 +1158,8 @@
             // العنوان والنص الحقيقيان داخل data.notification — المستوى الأعلى رسالة عامة (عقد A-1).
             const n = data.notification || {};
             if (/إجاز/.test(String(n.title || '') + ' ' + String(n.message || ''))) refreshLeave();
+            // F-2: إشعارات طلبات المناوبة (اعتماد/رفض/تطبيق) ← تحديث البطاقة فورًا بلا Refresh
+            if (/مناوبة/.test(String(n.title || '') + ' ' + String(n.message || ''))) refreshShiftChange();
         };
         // رفض خادمي (401/403 ⇒ CLOSED): إيقاف نهائي بلا عاصفة إعادة اتصال — نفس
         // سياسة websocket-sync. الأخطاء العابرة يعيد المتصفح الاتصال بها تلقائيًا.
@@ -1043,7 +1209,7 @@
                 curYear = t ? +t.slice(0, 4) : new Date().getFullYear();
                 curMonth = t ? +t.slice(5, 7) : new Date().getMonth() + 1;
             }
-            const [schedule, incidents, vehicle, inventory, checkData, mates, notifs, changes, leave] = await Promise.all([
+            const [schedule, incidents, vehicle, inventory, checkData, mates, notifs, changes, leave, shiftChanges] = await Promise.all([
                 api(`/api/my/schedule?month=${curMonth}&year=${curYear}`),
                 sec.incidents ? api('/api/my/team-incidents') : Promise.resolve(null),
                 sec.vehicle ? api('/api/my/vehicle') : Promise.resolve(null),
@@ -1054,11 +1220,14 @@
                 api('/api/my/notifications').catch(() => null),
                 api('/api/my/schedule-changes').catch(() => null),
                 // A-4.4 S1: طلبات إجازاتي — فشل الجلب يُظهر حالة داخل البطاقة ولا يُسقط الصفحة
-                sec.leave ? api('/api/leave-requests').catch(() => ({ __error: true })) : Promise.resolve(null)]);
+                sec.leave ? api('/api/leave-requests').catch(() => ({ __error: true })) : Promise.resolve(null),
+                // F-2: طلبات تغيير المناوبة — نفس نمط الإجازات (فشل الجلب لا يُسقط الصفحة)
+                api('/api/my/shift-change-requests').catch(() => ({ __error: true }))]);
             leaveProfile = profile; // المصدر الوحيد لـ employee.id عند تقديم الطلب
             app.innerHTML = renderProfile(profile)
                 + (notifs ? renderNotifs(notifs) : '')
                 + (leave ? renderLeave(leave) : '')
+                + renderShiftChange(shiftChanges)
                 + (mates ? renderMates(mates) : '')
                 + (checkData ? renderCheck(checkData) : '')
                 + (incidents ? renderIncidents(incidents) : '')
@@ -1070,6 +1239,7 @@
             if (checkData) bindCheckEvents();
             if (notifs) bindNotifEvents();
             if (leave) bindLeaveEvents();
+            bindShiftChangeEvents(); // F-2: بطاقة طلبات المناوبة تُعرض دائمًا للموظف
             connectLive(); // v5.1: القناة اللحظية بعد نجاح التحميل الأول — REST يبقى المصدر
             if (logoutBtn) logoutBtn.style.display = ''; // نجاح التحميل ← الزر يظهر في الشريط العلوي الثابت
 

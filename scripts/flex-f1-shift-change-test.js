@@ -227,7 +227,8 @@ async function main() {
         WHERE employee_id = ? AND (assigned_date IS NULL OR assigned_date <= ?)
           AND (end_date IS NULL OR end_date >= ?) ORDER BY id DESC LIMIT 1`, [EMP2, D_ADD, D_ADD]);
     const expectedTeam = expectedAssign.length ? expectedAssign[0].team_id : null;
-    const sub2 = await api('POST', '/api/shift-change-request', { employee_id: EMP2, shift_date: D_ADD, proposed_shift_code: C2, reason: 'تغطية' }, demo1);
+    // F-2 (د2): التقديم لموظف آخر أصبح حكرًا على حامل requests.review — يقدّمه admin
+    const sub2 = await api('POST', '/api/shift-change-request', { employee_id: EMP2, shift_date: D_ADD, proposed_shift_code: C2, reason: 'تغطية' }, admin);
     check('تقديم طلب (add) ينجح', sub2.ok && sub2.data.id);
     const ap2 = await api('POST', '/api/shift-change-request/' + sub2.data.id + '/review', { status: 'approved' }, admin);
     check('الاعتماد 200 + applied(add)', ap2.ok && ap2.data.applied && ap2.data.applied.change_type === 'add', JSON.stringify(ap2.data));
@@ -249,7 +250,8 @@ async function main() {
     // ── 6) موظف غير نشط ⇒ 409 + pending ──
     console.log('\n── الموظف غير النشط ──');
     dbRun('UPDATE employees SET is_active = 0 WHERE id = ?', [EMP3]);
-    const sub4 = await api('POST', '/api/shift-change-request', { employee_id: EMP3, shift_date: D_INACTIVE, proposed_shift_code: C2, reason: 'اختبار' }, demo1);
+    // F-2 (د2): التقديم لموظف آخر يتطلب requests.review — يقدّمه admin
+    const sub4 = await api('POST', '/api/shift-change-request', { employee_id: EMP3, shift_date: D_INACTIVE, proposed_shift_code: C2, reason: 'اختبار' }, admin);
     const ap4 = await api('POST', '/api/shift-change-request/' + sub4.data.id + '/review', { status: 'approved' }, admin);
     check('موظف غير نشط = 409 (SHIFT_CHANGE_EMPLOYEE_INVALID)', ap4.status === 409 && ap4.data.code === 'SHIFT_CHANGE_EMPLOYEE_INVALID', 'status=' + ap4.status);
     check('الطلب يبقى pending', dbAll('SELECT status FROM shift_change_requests WHERE id = ?', [sub4.data.id])[0].status === 'pending');
