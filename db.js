@@ -1771,6 +1771,29 @@ async function runMigrations() {
     logger.warn('schedule_months: ' + err.message);
   }
 
+  // ═══ FSS E-1 (معتمد 2026-10-06): تفضيلات الموظفين للشهر المستهدف ═══
+  // Soft Preferences صِرفة (M14): لا التزام ولا ضمان ولا ترجمة لجدولة في E-1.
+  // pref_value نصي موحّد (رمز/تاريخ/employee_id) حتى يعمل قيد UNIQUE فعليًا
+  // (قيم NULL في SQLite لا تتكرر ولا يضبطها UNIQUE). colleague يُقبل ويُخزَّن
+  // حتى لزميل من فريق آخر — لا رفض آلي (قرار المالك E-1/②).
+  try {
+    await exec(`CREATE TABLE IF NOT EXISTS employee_preferences (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      employee_id INTEGER NOT NULL REFERENCES employees(id),
+      month TEXT NOT NULL,
+      pref_type TEXT NOT NULL CHECK (pref_type IN ('shift','day_off','colleague')),
+      pref_value TEXT NOT NULL,
+      created_by INTEGER NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT,
+      UNIQUE (employee_id, month, pref_type, pref_value)
+    )`);
+    await exec('CREATE INDEX IF NOT EXISTS idx_employee_preferences_emp_month ON employee_preferences(employee_id, month)');
+    logger.info('employee_preferences table created');
+  } catch (err) {
+    logger.warn('employee_preferences: ' + err.message);
+  }
+
   // incidents (replaces incidents.json)
   try {
     await exec(`CREATE TABLE IF NOT EXISTS incidents (
@@ -3979,6 +4002,17 @@ const AppSettings = {
   },
   async delete(key) {
     return run('DELETE FROM app_settings WHERE key = ?', [key]);
+  }
+};
+
+// ============================================
+// CRUD: EMPLOYEE PREFERENCES (FSS E-1 — معتمد 2026-10-06)
+// Soft Preferences فقط: لا التزام ولا ضمان. الاستبدال الذرّي (Full-Replace)
+// يتم داخل tx في preference-service — هذه الدوال لا تفتح ترانزاكشن بنفسها.
+// ============================================
+const EmployeePreferences = {
+  async getByEmployeeMonth(employeeId, month) {
+    return all('SELECT * FROM employee_preferences WHERE employee_id = ? AND month = ? ORDER BY pref_type, pref_value', [employeeId, month]);
   }
 };
 
@@ -6371,6 +6405,7 @@ module.exports = {
   Hospitals,
   References,
   AppSettings,
+  EmployeePreferences,
   Timeline,
   Employees,
   Teams,

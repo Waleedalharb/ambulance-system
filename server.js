@@ -3157,6 +3157,51 @@ app.post('/api/my/shift-change-requests/:id/cancel', authenticate, authorizePerm
     }
 });
 
+// ═══ FSS E-1 (معتمد 2026-10-06): تفضيلات الموظف — Soft Preferences صِرفة ═══
+// هوية الموظف تُشتق خادميًا (resolveEmployee) — لا employee_id من العميل إطلاقًا.
+// النافذة والحدود من إعدادات E-0. لا منطق محرك ولا كتابة في shift_roster.
+let preferenceService = null;
+function getPreferenceService() {
+    if (!preferenceService && db) {
+        const { PreferenceService } = require('./services/schedule-engine/preference-service');
+        preferenceService = new PreferenceService(db);
+    }
+    return preferenceService;
+}
+
+app.get('/api/my/schedule-preferences', authenticate, authorizePerm('ops.my_portal'), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const emp = await getMyPortalService().resolveEmployee(req.user);
+        if (!emp) return res.status(404).json(MY_PORTAL_NO_EMPLOYEE);
+        const out = await getPreferenceService().getMyPreferences(emp);
+        res.json({ success: true, ...out });
+    } catch (error) {
+        console.error('[my-portal] schedule-preferences GET error:', error);
+        res.status(500).json({ error: 'فشل في جلب التفضيلات' });
+    }
+});
+
+// E-1: استبدال كامل ذرّي (Full-Replace) + قيد audit_log — كلها داخل ترانزاكشن
+// واحدة في الخدمة (validate ← delete ← insert ← audit): أي رفض = ROLLBACK كامل
+// بلا كتابة ولا Audit. الفاعل ومُقدم العملية يُشتقان من الجلسة خادميًا فقط (M3/M5).
+app.put('/api/my/schedule-preferences', authenticate, authorizePerm('ops.my_portal'), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const emp = await getMyPortalService().resolveEmployee(req.user);
+        if (!emp) return res.status(404).json(MY_PORTAL_NO_EMPLOYEE);
+        const { month, preferences } = req.body || {};
+        const out = await getPreferenceService().replaceMyPreferences(emp, req.user, month, preferences);
+        res.json({ success: true, ...out });
+    } catch (error) {
+        if (error && error.status && error.code) {
+            return res.status(error.status).json({ error: error.message, code: error.code });
+        }
+        console.error('[my-portal] schedule-preferences PUT error:', error);
+        res.status(500).json({ error: 'فشل في حفظ التفضيلات' });
+    }
+});
+
 app.get('/api/permissions/catalog', authenticate, authorizePerm('admin.users_manage'), async (req, res) => {
     res.json({ success: true, permissions: PERMISSIONS_CATALOG, roles: ROLE_LABELS_MAP });
 });
