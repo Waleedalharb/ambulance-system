@@ -17,6 +17,10 @@ const OPS_UPLOAD_DIR = path.join(DATA_DIR, 'uploads', 'operational');
 const OPS_METADATA_PATH = path.join(OPS_UPLOAD_DIR, 'metadata.json');
 const fsSync = require('fs');
 
+// FSS E-0 (قرارات M1–M14 معتمدة 2026-10-06): ثوابت إعدادات محرك الجدولة —
+// وحدة نقية بلا أي تبعية على db.js (لا دورة استيراد).
+const { ENGINE_DEFAULTS } = require('./services/schedule-engine/config.js');
+
 // ترحيل لمرة واحدة: إن وُجدت القاعدة القديمة في جذر المشروع والهدف الجديد
 // غائب أو فارغ (0 بايت) تُنقل القاعدة الحية إلى موقع التخزين الدائم.
 // لا يعمل عند تعيين DB_PATH صراحة (عزل الاختبارات يبقى كما هو).
@@ -1734,6 +1738,37 @@ async function runMigrations() {
     logger.info('app_settings table created');
   } catch (err) {
     logger.warn('app_settings: ' + err.message);
+  }
+
+  // ═══ FSS E-0 (قرارات M1–M14 معتمدة 2026-10-06) ═══
+  // زرع خامل (Idempotent) لإعدادات محرك الجدولة: يُدرج المفتاح فقط إذا كان
+  // غير موجود، ولا يكتب أبدًا فوق قيمة عدّلها مسؤول. تشغيله مرتين = صفر تغيير.
+  try {
+    for (const [k, v] of Object.entries(ENGINE_DEFAULTS)) {
+      const exists = await get('SELECT key FROM app_settings WHERE key = ?', [k]);
+      if (!exists) {
+        await run('INSERT INTO app_settings (key, value) VALUES (?, ?)', [k, JSON.stringify(v)]);
+      }
+    }
+    logger.info('schedule engine settings seeded (idempotent)');
+  } catch (err) {
+    logger.warn('schedule engine settings seed: ' + err.message);
+  }
+
+  // FSS E-0 (M13): سجل حالة نشر الشهور — جدول تسجيلي بحت.
+  // لا كاتب له في E-0؛ وجوده يثبّت عقد draft/published الذي ستستخدمه مراحل E اللاحقة.
+  // المحرك لا يكتب أبدًا في شهر status='published' (قاعدة مجمّدة).
+  try {
+    await exec(`CREATE TABLE IF NOT EXISTS schedule_months (
+      month TEXT PRIMARY KEY,
+      status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','published')),
+      published_by INTEGER,
+      published_at TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`);
+    logger.info('schedule_months table created');
+  } catch (err) {
+    logger.warn('schedule_months: ' + err.message);
   }
 
   // incidents (replaces incidents.json)

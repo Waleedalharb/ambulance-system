@@ -58,6 +58,13 @@ const PERMISSIONS = {
     'schedule.export':      { label: 'تصدير الجداول عبر الخادم — PDF مركز/فئة (أزرار Excel/الطباعة: تحكم واجهة فقط)', domain: 'schedule' },
     'schedule.print':       { label: 'طباعة الجداول (تحكم واجهة فقط — لا مسار خادمي)', domain: 'schedule' },
     'schedule.clear':       { label: '⚠️ مسح كل بيانات الجداول — شديدة الحساسية: يدوية حصرًا ولا دور يحملها', domain: 'schedule' },
+    // ═══ محرك الجدولة الذكي FSS — E-0 (قرار المالك M10 معتمد 2026-10-06) ═══
+    // ثلاثة مفاتيح دقيقة تفصل تشغيل المحرك عن مراجعة المصعّدات عن إدارة السياسات.
+    // كلها منح فردي حصرًا: لا تُضاف لأي دور في ROLES_PERMISSIONS، ولا تُمنح تلقائيًا.
+    // requests.review (طلبات تغيير المناوبات F-1) تبقى مستقلة ولا تُستخدم لمهام المحرك.
+    'schedule.proposals.manage': { label: 'إدارة اقتراحات محرك الجدولة: توليد/مراجعة/اعتماد (منح فردي فقط)', domain: 'schedule' },
+    'schedule.requests.review':  { label: 'مراجعة مصعّدات الجدولة: عدم تمكّن/تبديلات (منح فردي فقط)', domain: 'schedule' },
+    'schedule.settings.manage':  { label: 'إدارة إعدادات محرك الجدولة (منح فردي فقط)', domain: 'schedule' },
     // المناوبة: الدورة ≠ الاعتماد
     'shift.lifecycle':      { label: 'دورة حياة المناوبة (بدء/إنهاء/تحديث)', domain: 'shift' },
     'shift.approve':        { label: 'اعتماد المناوبة (تسليم/أرشفة/استعادة)', domain: 'shift' },
