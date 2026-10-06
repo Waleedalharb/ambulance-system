@@ -3157,6 +3157,774 @@ app.post('/api/my/shift-change-requests/:id/cancel', authenticate, authorizePerm
     }
 });
 
+// ═══ FSS E-1 (معتمد 2026-10-06): تفضيلات الموظف — Soft Preferences صِرفة ═══
+// هوية الموظف تُشتق خادميًا (resolveEmployee) — لا employee_id من العميل إطلاقًا.
+// النافذة والحدود من إعدادات E-0. لا منطق محرك ولا كتابة في shift_roster.
+let preferenceService = null;
+function getPreferenceService() {
+    if (!preferenceService && db) {
+        const { PreferenceService } = require('./services/schedule-engine/preference-service');
+        preferenceService = new PreferenceService(db);
+    }
+    return preferenceService;
+}
+
+app.get('/api/my/schedule-preferences', authenticate, authorizePerm('ops.my_portal'), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const emp = await getMyPortalService().resolveEmployee(req.user);
+        if (!emp) return res.status(404).json(MY_PORTAL_NO_EMPLOYEE);
+        const out = await getPreferenceService().getMyPreferences(emp);
+        res.json({ success: true, ...out });
+    } catch (error) {
+        console.error('[my-portal] schedule-preferences GET error:', error);
+        res.status(500).json({ error: 'فشل في جلب التفضيلات' });
+    }
+});
+
+// E-1: استبدال كامل ذرّي (Full-Replace) + قيد audit_log — كلها داخل ترانزاكشن
+// واحدة في الخدمة (validate ← delete ← insert ← audit): أي رفض = ROLLBACK كامل
+// بلا كتابة ولا Audit. الفاعل ومُقدم العملية يُشتقان من الجلسة خادميًا فقط (M3/M5).
+app.put('/api/my/schedule-preferences', authenticate, authorizePerm('ops.my_portal'), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const emp = await getMyPortalService().resolveEmployee(req.user);
+        if (!emp) return res.status(404).json(MY_PORTAL_NO_EMPLOYEE);
+        const { month, preferences } = req.body || {};
+        const out = await getPreferenceService().replaceMyPreferences(emp, req.user, month, preferences);
+        res.json({ success: true, ...out });
+    } catch (error) {
+        if (error && error.status && error.code) {
+            return res.status(error.status).json({ error: error.message, code: error.code });
+        }
+        console.error('[my-portal] schedule-preferences PUT error:', error);
+        res.status(500).json({ error: 'فشل في حفظ التفضيلات' });
+    }
+});
+
+// ═══ FSS E-3 (قرار ج3 معتمد 2026-10-06): زملاء الفريق النشط — Read-only ═══
+// المصدر الوحيد team_assignments (SSOT) · الهوية من الجلسة (لا employee_id من
+// العميل) · الفريق النشط الحالي فقط (is_primary أولًا) · الموظف نفسه مستبعد ·
+// الزملاء النشطون فقط · لا Permission جديد · لا كتابة DB. يغذّي منتقي تفضيل
+// الزمالة (M14) في واجهة التفضيلات — لا بيانات ثابتة في الواجهة.
+app.get('/api/my/team-colleagues', authenticate, authorizePerm('ops.my_portal'), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const emp = await getMyPortalService().resolveEmployee(req.user);
+        if (!emp) return res.status(404).json(MY_PORTAL_NO_EMPLOYEE);
+        const p = TimeRiyadh.riyadhParts(new Date());
+        const today = `${p.year}-${p.month}-${p.day}`;
+        const team = await db.get(
+            `SELECT ta.team_id, t.name AS team_name FROM team_assignments ta
+             JOIN teams t ON t.id = ta.team_id
+             WHERE ta.employee_id = ? AND (ta.end_date IS NULL OR ta.end_date = '' OR ta.end_date >= ?)
+             ORDER BY ta.is_primary DESC, ta.id DESC LIMIT 1`, [emp.id, today]);
+        if (!team) return res.json({ success: true, team: null, colleagues: [] });
+        const colleagues = await db.all(
+            `SELECT DISTINCT e.id, e.name, e.employee_code, e.job_title FROM team_assignments ta
+             JOIN employees e ON e.id = ta.employee_id
+             WHERE ta.team_id = ? AND ta.employee_id != ? AND e.is_active = 1
+               AND (ta.end_date IS NULL OR ta.end_date = '' OR ta.end_date >= ?)
+             ORDER BY e.name`, [team.team_id, emp.id, today]);
+        res.json({ success: true, team: { id: team.team_id, name: team.team_name }, colleagues });
+    } catch (error) {
+        console.error('[my-portal] team-colleagues error:', error);
+        res.status(500).json({ error: 'فشل في جلب زملاء الفريق' });
+    }
+});
+
+// ═══ FSS E-2 (قرارات M1/M2 + د1/د2/د3 معتمدة 2026-10-06): طلبات عدم التمكّن ═══
+// كيان مستقل عن leave_requests. الهوية خادمية. كل كتابة + Audit في ترانزاكشن
+// واحدة داخل الخدمة. الإشعارات بعد COMMIT فقط وفشلها لا يُفقد الطلب.
+// لا كتابة في shift_roster إطلاقًا. المراجعة محروسة بـ schedule.requests.review (M10/E-0).
+let unableAttendService = null;
+function getUnableAttendService() {
+    if (!unableAttendService && db) {
+        const { UnableAttendService } = require('./services/schedule-engine/unable-attend-service');
+        unableAttendService = new UnableAttendService(db);
+    }
+    return unableAttendService;
+}
+
+app.get('/api/my/unable-attend', authenticate, authorizePerm('ops.my_portal'), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const emp = await getMyPortalService().resolveEmployee(req.user);
+        if (!emp) return res.status(404).json(MY_PORTAL_NO_EMPLOYEE);
+        const out = await getUnableAttendService().getMine(emp, req.query.month || null);
+        res.json({ success: true, ...out });
+    } catch (error) {
+        console.error('[my-portal] unable-attend GET error:', error);
+        res.status(500).json({ error: 'فشل في جلب طلبات عدم التمكّن' });
+    }
+});
+
+app.post('/api/my/unable-attend', authenticate, authorizePerm('ops.my_portal'), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const emp = await getMyPortalService().resolveEmployee(req.user);
+        if (!emp) return res.status(404).json(MY_PORTAL_NO_EMPLOYEE);
+        const { off_date, reason } = req.body || {};
+        const out = await getUnableAttendService().submit(emp, req.user, off_date, reason);
+        // بعد COMMIT فقط: تصعيد للمراجعين عند pending_review (M2) — فشله لا يُفقد الطلب
+        if (out.status === 'pending_review') {
+            try {
+                if (db.Notifications) {
+                    await notificationService.notifyOperational({
+                        eventKey: 'unable_attend.escalated',
+                        title: 'طلب عدم تمكّن يحتاج مراجعة',
+                        message: `${emp.name}: يوم ${out.off_date}` + (out.is_exception ? ' (تجاوز حد الأيام الشهري)' : ' (تعارض تغطية محتمل)'),
+                        push: true,
+                        permKey: 'schedule.requests.review'
+                    });
+                }
+            } catch (nErr) { console.error('unable-attend escalate notify error:', nErr.message); }
+        }
+        res.json({ success: true, ...out });
+    } catch (error) {
+        if (error && error.status && error.code) {
+            return res.status(error.status).json({ error: error.message, code: error.code });
+        }
+        console.error('[my-portal] unable-attend POST error:', error);
+        res.status(500).json({ error: 'فشل في تقديم الطلب' });
+    }
+});
+
+// د1: إلغاء المالك — الحالات الثلاث ما دام اليوم في المستقبل، بلا حذف فعلي، مع Audit
+app.post('/api/my/unable-attend/:id/cancel', authenticate, authorizePerm('ops.my_portal'), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const emp = await getMyPortalService().resolveEmployee(req.user);
+        if (!emp) return res.status(404).json(MY_PORTAL_NO_EMPLOYEE);
+        const out = await getUnableAttendService().cancelMine(emp, req.user, req.params.id);
+        res.json({ success: true, ...out });
+    } catch (error) {
+        if (error && error.status && error.code) {
+            return res.status(error.status).json({ error: error.message, code: error.code });
+        }
+        console.error('[my-portal] unable-attend cancel error:', error);
+        res.status(500).json({ error: 'فشل في إلغاء الطلب' });
+    }
+});
+
+app.get('/api/schedule/unable-attend', authenticate, authorizePerm('schedule.requests.review'), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const rows = await getUnableAttendService().getReviewQueue(req.query.status || 'pending_review');
+        res.json({ success: true, requests: rows });
+    } catch (error) {
+        console.error('[schedule] unable-attend queue error:', error);
+        res.status(500).json({ error: 'فشل في جلب قائمة المراجعة' });
+    }
+});
+
+app.post('/api/schedule/unable-attend/:id/review', authenticate, authorizePerm('schedule.requests.review'), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const { decision, note } = req.body || {};
+        const out = await getUnableAttendService().review(req.params.id, req.user, decision, note);
+        // بعد COMMIT فقط: إشعار شخصي لصاحب الطلب بنتيجة المراجعة — سقوط آمن بلا حساب مربوط
+        try {
+            if (db.Notifications) {
+                const ownerUserId = await resolveEmployeeUserId(out.request.employee_id);
+                if (ownerUserId) {
+                    const approved = out.status === 'approved';
+                    await notificationService.notifyPersonal(ownerUserId, {
+                        title: approved ? 'تمت الموافقة على طلب عدم التمكّن' : 'تم رفض طلب عدم التمكّن',
+                        message: `يوم ${out.request.off_date}: ${approved ? 'تمت الموافقة على' : 'تم رفض'} طلب عدم التمكّن من الحضور`,
+                        type: approved ? 'success' : 'warning'
+                    });
+                }
+            }
+        } catch (nErr) { console.error('unable-attend review notify error:', nErr.message); }
+        res.json({ success: true, id: out.id, status: out.status });
+    } catch (error) {
+        if (error && error.status && error.code) {
+            return res.status(error.status).json({ error: error.message, code: error.code });
+        }
+        console.error('[schedule] unable-attend review error:', error);
+        res.status(500).json({ error: 'فشل في مراجعة الطلب' });
+    }
+});
+
+// ═══ FSS E-5 (Design Revision 2 معتمد 2026-10-06): محرك الاقتراحات — APIs خلفية فقط ═══
+// J7: لا UI في E-5. عروض مسودة على Draft فقط (M13: published ⇒ صفر كتابة في
+// كل المسارات). لا Auto-Apply ولا كتابة في shift_roster إطلاقًا (J4): accepted
+// يُشعر حاملي schedule.proposals.manage والتطبيق عبر F-1/المسارات المعتمدة.
+// كل كتابة + Audit داخل tx.immediate واحدة في الخدمة. الإشعارات بعد COMMIT
+// فقط وسقوطها آمن. لا Permission جديد — schedule.proposals.manage (M10/E-0).
+let proposalService = null;
+function getProposalService() {
+    if (!proposalService && db) {
+        const { ProposalService } = require('./services/schedule-engine/proposal-service');
+        proposalService = new ProposalService(db);
+    }
+    return proposalService;
+}
+
+// توليد عروض مسودة لشهر/فريق — J1/J2/J3/J6 (month + team)
+app.post('/api/schedule/proposals/generate', authenticate, authorizePerm('schedule.proposals.manage'), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const { month, team_id } = req.body || {};
+        const out = await getProposalService().generate({ month, teamId: team_id, user: req.user });
+        // بعد COMMIT فقط: إشعار شخصي لكل موظف وُضع له عرض — سقوط آمن بلا حساب مربوط
+        for (const offer of out.offers) {
+            try {
+                if (db.Notifications) {
+                    const ownerUserId = await resolveEmployeeUserId(offer.employee_id);
+                    if (ownerUserId) {
+                        await notificationService.notifyPersonal(ownerUserId, {
+                            title: 'عرض مناوبة تكميلية',
+                            message: `عُرضت عليك مناوبة تكميلية يوم ${offer.date} (${offer.shift_code}) — اقبل أو ارفض من بوابتك`,
+                            type: 'info'
+                        });
+                    }
+                }
+            } catch (nErr) { console.error('proposal offer notify error:', nErr.message); }
+        }
+        res.json({ success: true, ...out });
+    } catch (error) {
+        if (error && error.status && error.code) {
+            return res.status(error.status).json({ error: error.message, code: error.code });
+        }
+        console.error('[schedule] proposals generate error:', error);
+        res.status(500).json({ error: 'فشل في توليد الاقتراحات' });
+    }
+});
+
+app.get('/api/schedule/proposals', authenticate, authorizePerm('schedule.proposals.manage'), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const { month, team_id, status } = req.query || {};
+        const rows = await getProposalService().listByMonthTeam(month, team_id, status);
+        res.json({ success: true, proposals: rows });
+    } catch (error) {
+        if (error && error.status && error.code) {
+            return res.status(error.status).json({ error: error.message, code: error.code });
+        }
+        console.error('[schedule] proposals list error:', error);
+        res.status(500).json({ error: 'فشل في جلب الاقتراحات' });
+    }
+});
+
+app.get('/api/schedule/proposals/runs/:id', authenticate, authorizePerm('schedule.proposals.manage'), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const run = await getProposalService().getRun(req.params.id);
+        res.json({ success: true, run });
+    } catch (error) {
+        if (error && error.status && error.code) {
+            return res.status(error.status).json({ error: error.message, code: error.code });
+        }
+        console.error('[schedule] proposal run error:', error);
+        res.status(500).json({ error: 'فشل في جلب التشغيلة' });
+    }
+});
+
+// سحب عرض قائم + تسلسل J5 للمرشح التالي
+app.post('/api/schedule/proposals/:id/withdraw', authenticate, authorizePerm('schedule.proposals.manage'), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const out = await getProposalService().withdraw(req.user, req.params.id);
+        // بعد COMMIT فقط: إشعار الموظف التالي إن وُجد عرض جديد — سقوط آمن
+        if (out.next_employee_id) {
+            try {
+                if (db.Notifications) {
+                    const ownerUserId = await resolveEmployeeUserId(out.next_employee_id);
+                    if (ownerUserId) {
+                        await notificationService.notifyPersonal(ownerUserId, {
+                            title: 'عرض مناوبة تكميلية',
+                            message: `عُرضت عليك مناوبة تكميلية يوم ${out.proposal.date} (${out.proposal.shift_code}) — اقبل أو ارفض من بوابتك`,
+                            type: 'info'
+                        });
+                    }
+                }
+            } catch (nErr) { console.error('proposal next notify error:', nErr.message); }
+        }
+        res.json({ success: true, id: out.id, status: out.status, outcome: out.outcome, next_proposal_id: out.next_proposal_id });
+    } catch (error) {
+        if (error && error.status && error.code) {
+            return res.status(error.status).json({ error: error.message, code: error.code });
+        }
+        console.error('[schedule] proposal withdraw error:', error);
+        res.status(500).json({ error: 'فشل في سحب العرض' });
+    }
+});
+
+// عروضي — هوية الموظف مشتقة خادميًا (لا employee_id من العميل)
+app.get('/api/my/proposals', authenticate, authorizePerm('ops.my_portal'), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const emp = await getMyPortalService().resolveEmployee(req.user);
+        if (!emp) return res.status(404).json(MY_PORTAL_NO_EMPLOYEE);
+        const out = await getProposalService().getMine(emp, req.query.month || null);
+        res.json({ success: true, ...out });
+    } catch (error) {
+        console.error('[my-portal] proposals GET error:', error);
+        res.status(500).json({ error: 'فشل في جلب العروض' });
+    }
+});
+
+// رد الموظف: accept|decline — decline يطلق تسلسل J5 داخل الخدمة
+app.post('/api/my/proposals/:id/respond', authenticate, authorizePerm('ops.my_portal'), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const emp = await getMyPortalService().resolveEmployee(req.user);
+        if (!emp) return res.status(404).json(MY_PORTAL_NO_EMPLOYEE);
+        const { decision } = req.body || {};
+        const out = await getProposalService().respond(emp, req.user, req.params.id, decision);
+        // بعد COMMIT فقط — سقوط آمن في الإشعارين
+        try {
+            if (db.Notifications && out.status === 'accepted') {
+                // J4: لا Auto-Apply — القبول يُشعر حاملي schedule.proposals.manage
+                // والتطبيق عبر F-1/المسارات المعتمدة خارج E-5
+                await notificationService.notifyOperational({
+                    eventKey: 'schedule_proposal.accepted',
+                    title: 'عرض تكميلي مقبول يحتاج تطبيقًا',
+                    message: `${emp.name} قبل عرض يوم ${out.proposal.date} (${out.proposal.shift_code}) — طبّقه عبر المسارات المعتمدة`,
+                    push: true,
+                    permKey: 'schedule.proposals.manage'
+                });
+            }
+            if (db.Notifications && out.next_employee_id) {
+                const nextUserId = await resolveEmployeeUserId(out.next_employee_id);
+                if (nextUserId) {
+                    await notificationService.notifyPersonal(nextUserId, {
+                        title: 'عرض مناوبة تكميلية',
+                        message: `عُرضت عليك مناوبة تكميلية يوم ${out.proposal.date} (${out.proposal.shift_code}) — اقبل أو ارفض من بوابتك`,
+                        type: 'info'
+                    });
+                }
+            }
+        } catch (nErr) { console.error('proposal respond notify error:', nErr.message); }
+        res.json({ success: true, id: out.id, status: out.status, outcome: out.outcome, next_proposal_id: out.next_proposal_id });
+    } catch (error) {
+        if (error && error.status && error.code) {
+            return res.status(error.status).json({ error: error.message, code: error.code });
+        }
+        console.error('[my-portal] proposal respond error:', error);
+        res.status(500).json({ error: 'فشل في الرد على العرض' });
+    }
+});
+
+// ═══ FSS E-6 (قرار M9 + K1–K6 معتمدة 2026-10-06، K2 معدّلًا): التبديل بالتراضي ═══
+// تبادل مناوبتين فعليتين بين موظفين بموافقة الطرفين. الخادم يشتق الصفين/الرمزين
+// (لا roster_id ولا shift_code من العميل). نفس الفريق (K3) ونفس التاريخ مسموح
+// (K2 — E-4 الحكم). نافذة 48س (K4) من بداية أقرب مناوبة لحظة القبول: داخلها أو
+// فشل E-4 ⇒ تصعيد pending_review وليس رفضًا. التطبيق ذرّي في swap-service مع
+// حارس خام نهائي داخل tx.immediate — أي فشل = ROLLBACK كامل. الشهر المنشور لا
+// يمنع M9. الإشعارات/البث بعد COMMIT فقط وسقوطها آمن. لا Permission جديد.
+let swapService = null;
+function getSwapService() {
+    if (!swapService && db) {
+        const { SwapService } = require('./services/schedule-engine/swap-service');
+        swapService = new SwapService(db);
+    }
+    return swapService;
+}
+
+// FSS E-8 (معتمد 2026-10-06): مرونة الموظف — مساران منفصلان (نقل الالتزام ≠
+// التغطية)، 8 ساعات قاعدة مستقلة، Fail-Closed للمفتاحين المعلّقين، تطبيق ذري
+// بنمط E-6، الإشعارات بعد COMMIT فقط. لا Permission جديد (L8).
+let flexService = null;
+function getFlexService() {
+    if (!flexService && db) {
+        const { FlexService } = require('./services/schedule-engine/flex-service');
+        flexService = new FlexService(db);
+    }
+    return flexService;
+}
+
+/** إشعارات/بث ما بعد التطبيق الناجح (auto_applied أو applied) — بعد COMMIT فقط. */
+async function _notifySwapApplied(out, actorUser) {
+    const req_ = out.request;
+    try {
+        await fireScheduleChangeNotify(out.applied.revisionId, out.applied.auditIds);
+    } catch (nErr) { console.error('swap apply revision notify error:', nErr.message); }
+    try {
+        broadcast({
+            type: 'shift_roster_swapped',
+            payload: { roster_id_1: out.applied.roster_id_1, roster_id_2: out.applied.roster_id_2, by_user: actorUser.name || actorUser.username }
+        });
+    } catch (nErr) { console.error('swap apply broadcast error:', nErr.message); }
+    if (out.applied.auto) {
+        // M9: المسؤول يبقى مطّلعًا على التطبيق التلقائي — إشعار اطلاعي للمراجعين
+        try {
+            await notificationService.notifyOperational({
+                eventKey: 'shift_swap.auto_applied',
+                title: 'تبديل بالتراضي طُبّق تلقائيًا',
+                message: `طلب #${req_.id}: موظف #${req_.initiator_employee_id} (${req_.initiator_date} ${req_.initiator_shift_code}) ↔ موظف #${req_.target_employee_id} (${req_.target_date} ${req_.target_shift_code})`,
+                push: true,
+                permKey: 'schedule.requests.review'
+            });
+        } catch (nErr) { console.error('swap auto-applied notify error:', nErr.message); }
+    } else {
+        // applied بقرار مسؤول — إشعار شخصي للطرفين
+        for (const empId of [req_.initiator_employee_id, req_.target_employee_id]) {
+            try {
+                const uid = await resolveEmployeeUserId(empId);
+                if (uid) {
+                    await notificationService.notifyPersonal(uid, {
+                        title: 'اعتُمد طلب التبديل',
+                        message: `اعتمد المسؤول طلب التبديل #${req_.id} وطُبّق على جدول المناوبات`,
+                        type: 'success'
+                    });
+                }
+            } catch (nErr) { console.error('swap applied personal notify error:', nErr.message); }
+        }
+    }
+}
+
+// تقديم طلب تبديل — الهوية والصفوف مشتقة خادميًا
+app.post('/api/my/shift-swaps', authenticate, authorizePerm('ops.my_portal'), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const emp = await getMyPortalService().resolveEmployee(req.user);
+        if (!emp) return res.status(404).json(MY_PORTAL_NO_EMPLOYEE);
+        const out = await getSwapService().submit(emp, req.user, req.body || {});
+        // بعد COMMIT فقط: إشعار شخصي للطرف الثاني — سقوط آمن بلا حساب مربوط
+        try {
+            const targetUserId = await resolveEmployeeUserId(out.request.target_employee_id);
+            if (targetUserId) {
+                await notificationService.notifyPersonal(targetUserId, {
+                    title: 'طلب تبديل مناوبة',
+                    message: `${emp.name} يطلب تبديل مناوبته (${out.request.initiator_date} ${out.request.initiator_shift_code}) مع مناوبتك (${out.request.target_date} ${out.request.target_shift_code}) — اقبل أو ارفض من بوابتك`,
+                    type: 'info'
+                });
+            }
+        } catch (nErr) { console.error('swap submit notify error:', nErr.message); }
+        res.json({ success: true, id: out.id, status: out.status });
+    } catch (error) {
+        if (error && error.status && error.code) {
+            return res.status(error.status).json({ error: error.message, code: error.code });
+        }
+        console.error('[my-portal] shift-swaps submit error:', error);
+        res.status(500).json({ error: 'فشل في تقديم طلب التبديل' });
+    }
+});
+
+app.get('/api/my/shift-swaps', authenticate, authorizePerm('ops.my_portal'), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const emp = await getMyPortalService().resolveEmployee(req.user);
+        if (!emp) return res.status(404).json(MY_PORTAL_NO_EMPLOYEE);
+        const rows = await getSwapService().getMine(emp);
+        res.json({ success: true, requests: rows });
+    } catch (error) {
+        console.error('[my-portal] shift-swaps GET error:', error);
+        res.status(500).json({ error: 'فشل في جلب طلبات التبديل' });
+    }
+});
+
+// رد الطرف الثاني: accept|decline — accept قد يطبّق تلقائيًا أو يصعّد للمراجعة
+app.post('/api/my/shift-swaps/:id/consent', authenticate, authorizePerm('ops.my_portal'), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const emp = await getMyPortalService().resolveEmployee(req.user);
+        if (!emp) return res.status(404).json(MY_PORTAL_NO_EMPLOYEE);
+        const { decision } = req.body || {};
+        const out = await getSwapService().consent(emp, req.user, req.params.id, decision);
+        // بعد COMMIT فقط — سقوط آمن في كل الإشعارات
+        try {
+            if (out.status === 'declined_by_peer') {
+                const initiatorUserId = await resolveEmployeeUserId(out.request.initiator_employee_id);
+                if (initiatorUserId) {
+                    await notificationService.notifyPersonal(initiatorUserId, {
+                        title: 'رُفض طلب التبديل',
+                        message: `${emp.name} رفض طلب التبديل #${out.id} — أُغلق الطلب`,
+                        type: 'warning'
+                    });
+                }
+            } else if (out.status === 'pending_review') {
+                await notificationService.notifyOperational({
+                    eventKey: 'shift_swap.pending_review',
+                    title: 'طلب تبديل بالتراضي يحتاج مراجعة',
+                    message: `طلب #${out.id}: وافق الطرفان لكن الفحوصات صعّدته للمراجعة (${out.escalation_reason || ''})`,
+                    push: true,
+                    permKey: 'schedule.requests.review'
+                });
+            }
+        } catch (nErr) { console.error('swap consent notify error:', nErr.message); }
+        if (out.status === 'auto_applied' && out.applied) {
+            await _notifySwapApplied(out, req.user);
+        }
+        res.json({ success: true, id: out.id, status: out.status, escalation_reason: out.escalation_reason || null });
+    } catch (error) {
+        if (error && error.status && error.code) {
+            return res.status(error.status).json({ error: error.message, code: error.code });
+        }
+        console.error('[my-portal] shift-swaps consent error:', error);
+        res.status(500).json({ error: 'فشل في الرد على طلب التبديل' });
+    }
+});
+
+// إلغاء المبادر (K5) — من pending_consent/pending_review بلا حذف فعلي
+app.post('/api/my/shift-swaps/:id/cancel', authenticate, authorizePerm('ops.my_portal'), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const emp = await getMyPortalService().resolveEmployee(req.user);
+        if (!emp) return res.status(404).json(MY_PORTAL_NO_EMPLOYEE);
+        const out = await getSwapService().cancelMine(emp, req.user, req.params.id);
+        // بعد COMMIT فقط: إشعار الطرف الثاني بالإلغاء — سقوط آمن
+        try {
+            const targetUserId = await resolveEmployeeUserId(out.request.target_employee_id);
+            if (targetUserId) {
+                await notificationService.notifyPersonal(targetUserId, {
+                    title: 'أُلغي طلب التبديل',
+                    message: `${emp.name} ألغى طلب التبديل #${out.id}`,
+                    type: 'info'
+                });
+            }
+        } catch (nErr) { console.error('swap cancel notify error:', nErr.message); }
+        res.json({ success: true, id: out.id, status: out.status });
+    } catch (error) {
+        if (error && error.status && error.code) {
+            return res.status(error.status).json({ error: error.message, code: error.code });
+        }
+        console.error('[my-portal] shift-swaps cancel error:', error);
+        res.status(500).json({ error: 'فشل في إلغاء طلب التبديل' });
+    }
+});
+
+// قائمة المراجعة للمسؤول
+app.get('/api/schedule/shift-swaps', authenticate, authorizePerm('schedule.requests.review'), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const rows = await getSwapService().getReviewQueue(req.query.status || 'pending_review');
+        res.json({ success: true, requests: rows });
+    } catch (error) {
+        if (error && error.status && error.code) {
+            return res.status(error.status).json({ error: error.message, code: error.code });
+        }
+        console.error('[schedule] shift-swaps queue error:', error);
+        res.status(500).json({ error: 'فشل في جلب قائمة طلبات التبديل' });
+    }
+});
+
+// قرار المسؤول: approve|reject — approve يعيد E-4 للاتجاهين إلزاميًا (M9)
+app.post('/api/schedule/shift-swaps/:id/review', authenticate, authorizePerm('schedule.requests.review'), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const { decision, note } = req.body || {};
+        const out = await getSwapService().review(req.user, req.params.id, decision, note);
+        if (out.status === 'applied' && out.applied) {
+            await _notifySwapApplied(out, req.user);
+        } else if (out.status === 'rejected') {
+            // بعد COMMIT فقط: إشعار شخصي للطرفين بالرفض — سقوط آمن
+            for (const empId of [out.request.initiator_employee_id, out.request.target_employee_id]) {
+                try {
+                    const uid = await resolveEmployeeUserId(empId);
+                    if (uid) {
+                        await notificationService.notifyPersonal(uid, {
+                            title: 'رُفض طلب التبديل',
+                            message: `رفض المسؤول طلب التبديل #${out.id}${note ? ' — ' + String(note).slice(0, 200) : ''}`,
+                            type: 'warning'
+                        });
+                    }
+                } catch (nErr) { console.error('swap reject notify error:', nErr.message); }
+            }
+        }
+        res.json({ success: true, id: out.id, status: out.status });
+    } catch (error) {
+        if (error && error.status && error.code) {
+            return res.status(error.status).json({ error: error.message, code: error.code });
+        }
+        console.error('[schedule] shift-swaps review error:', error);
+        res.status(500).json({ error: 'فشل في مراجعة طلب التبديل' });
+    }
+});
+
+// ═══ FSS E-8: مرونة الموظف — APIs الخلفية فقط (L9: لا UI في هذه المرحلة) ═══
+
+app.post('/api/my/flex-requests', authenticate, authorizePerm('ops.my_portal'), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const emp = await getMyPortalService().resolveEmployee(req.user);
+        if (!emp) return res.status(404).json(MY_PORTAL_NO_EMPLOYEE);
+        const out = await getFlexService().submit(emp, req.user, req.body || {});
+        // بعد COMMIT فقط — سقوط الإشعار آمن ولا يُفقد الطلب (⑨)
+        try {
+            if (out.status === 'applied') {
+                await notificationService.notifyPersonal(req.user.id, {
+                    title: 'نُقلت مناوبتك بطلب المرونة',
+                    message: `نُقل التزامك من مناوبة ${(req.body || {}).orig_shift_date} إلى ${out.makeup_date} — التغطية لم تتأثر`,
+                    type: 'success'
+                });
+            } else if (out.status === 'offer_pending' && out.offer) {
+                const uid = await resolveEmployeeUserId(out.offer.employee_id);
+                if (uid) {
+                    await notificationService.notifyPersonal(uid, {
+                        title: 'عرض تغطية مناوبة',
+                        message: `${emp.name} لا يستطيع حضور مناوبته (${out.offer.cover_date} ${out.offer.shift_code}) — هل تغطيها؟ اقبل أو ارفض من بوابتك`,
+                        type: 'info'
+                    });
+                }
+            } else if (out.status === 'escalated') {
+                await notificationService.notifyOperational({
+                    eventKey: 'flex.escalated',
+                    title: 'طلب مرونة يحتاج مراجعة',
+                    message: `${emp.name}: نقل مناوبة ${(req.body || {}).orig_shift_date} — استُنفدت قنوات البحث الآلي عن بديل`,
+                    push: true,
+                    permKey: 'schedule.requests.review'
+                });
+            }
+        } catch (nErr) { console.error('flex submit notify error:', nErr.message); }
+        res.json({ success: true, ...out });
+    } catch (error) {
+        if (error && error.status && error.code) {
+            return res.status(error.status).json({ error: error.message, code: error.code });
+        }
+        console.error('[my-portal] flex-requests submit error:', error);
+        res.status(500).json({ error: 'فشل في تقديم طلب المرونة' });
+    }
+});
+
+app.get('/api/my/flex-requests', authenticate, authorizePerm('ops.my_portal'), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const emp = await getMyPortalService().resolveEmployee(req.user);
+        if (!emp) return res.status(404).json(MY_PORTAL_NO_EMPLOYEE);
+        const rows = await getFlexService().getMine(emp);
+        res.json({ success: true, requests: rows });
+    } catch (error) {
+        console.error('[my-portal] flex-requests list error:', error);
+        res.status(500).json({ error: 'فشل في جلب طلبات المرونة' });
+    }
+});
+
+app.post('/api/my/flex-requests/:id/cancel', authenticate, authorizePerm('ops.my_portal'), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const emp = await getMyPortalService().resolveEmployee(req.user);
+        if (!emp) return res.status(404).json(MY_PORTAL_NO_EMPLOYEE);
+        const out = await getFlexService().cancel(Number(req.params.id), emp, req.user);
+        // بعد COMMIT فقط: إشعار المرشح بسحب العرض إن وُجد
+        if (out.withdrawn_offer) {
+            try {
+                const uid = await resolveEmployeeUserId(out.withdrawn_offer.employee_id);
+                if (uid) {
+                    await notificationService.notifyPersonal(uid, {
+                        title: 'سُحب عرض التغطية',
+                        message: `ألغى ${emp.name} طلب المرونة — لم يعد عرض التغطية (${out.withdrawn_offer.cover_date}) قائمًا`,
+                        type: 'info'
+                    });
+                }
+            } catch (nErr) { console.error('flex cancel notify error:', nErr.message); }
+        }
+        res.json({ success: true, ...out });
+    } catch (error) {
+        if (error && error.status && error.code) {
+            return res.status(error.status).json({ error: error.message, code: error.code });
+        }
+        console.error('[my-portal] flex-requests cancel error:', error);
+        res.status(500).json({ error: 'فشل في إلغاء طلب المرونة' });
+    }
+});
+
+app.get('/api/my/flex-offers', authenticate, authorizePerm('ops.my_portal'), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const emp = await getMyPortalService().resolveEmployee(req.user);
+        if (!emp) return res.status(404).json(MY_PORTAL_NO_EMPLOYEE);
+        const rows = await getFlexService().getMyOffers(emp);
+        res.json({ success: true, offers: rows });
+    } catch (error) {
+        console.error('[my-portal] flex-offers list error:', error);
+        res.status(500).json({ error: 'فشل في جلب عروض التغطية' });
+    }
+});
+
+app.post('/api/my/flex-offers/:id/respond', authenticate, authorizePerm('ops.my_portal'), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const emp = await getMyPortalService().resolveEmployee(req.user);
+        if (!emp) return res.status(404).json(MY_PORTAL_NO_EMPLOYEE);
+        const { action } = req.body || {};
+        const out = await getFlexService().respondOffer(Number(req.params.id), emp, req.user, action);
+        // بعد COMMIT فقط
+        try {
+            if (out.status === 'applied') {
+                const uid = await resolveEmployeeUserId(out.requester_id);
+                if (uid) {
+                    await notificationService.notifyPersonal(uid, {
+                        title: 'قُبل عرض التغطية — نُقلت مناوبتك',
+                        message: `قبل ${emp.name} تغطية مناوبتك الأصلية، ونُقل التزامك إلى اليوم البديل بنجاح`,
+                        type: 'success'
+                    });
+                }
+            } else if (out.status === 'offer_pending' && out.next_offer) {
+                const uid = await resolveEmployeeUserId(out.next_offer.employee_id);
+                if (uid) {
+                    await notificationService.notifyPersonal(uid, {
+                        title: 'عرض تغطية مناوبة',
+                        message: `مطلوب تغطية مناوبة (${out.next_offer.cover_date} ${out.next_offer.shift_code}) — اقبل أو ارفض من بوابتك`,
+                        type: 'info'
+                    });
+                }
+            } else if (out.status === 'escalated') {
+                await notificationService.notifyOperational({
+                    eventKey: 'flex.escalated',
+                    title: 'طلب مرونة يحتاج مراجعة',
+                    message: 'استُنفدت قنوات البحث الآلي عن بديل لتغطية مناوبة — طلب مرونة بانتظار القرار',
+                    push: true,
+                    permKey: 'schedule.requests.review'
+                });
+            }
+        } catch (nErr) { console.error('flex respond notify error:', nErr.message); }
+        res.json({ success: true, ...out });
+    } catch (error) {
+        if (error && error.status && error.code) {
+            return res.status(error.status).json({ error: error.message, code: error.code });
+        }
+        console.error('[my-portal] flex-offers respond error:', error);
+        res.status(500).json({ error: 'فشل في الرد على عرض التغطية' });
+    }
+});
+
+app.get('/api/schedule/flex-requests', authenticate, authorizePerm('schedule.requests.review'), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const rows = await getFlexService().getReviewQueue(req.query.status || 'escalated');
+        const withOffers = [];
+        for (const r of rows) {
+            withOffers.push({ ...r, offers: await getFlexService().getOffersForRequest(r.id) });
+        }
+        res.json({ success: true, requests: withOffers });
+    } catch (error) {
+        console.error('[schedule] flex-requests queue error:', error);
+        res.status(500).json({ error: 'فشل في جلب طلبات المرونة' });
+    }
+});
+
+app.post('/api/schedule/flex-requests/:id/review', authenticate, authorizePerm('schedule.requests.review'), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const { action, note } = req.body || {};
+        const out = await getFlexService().review(Number(req.params.id), req.user, action, note);
+        // بعد COMMIT فقط: إشعار صاحب الطلب بالقرار
+        try {
+            const uid = await resolveEmployeeUserId(out.requester_id);
+            if (uid) {
+                await notificationService.notifyPersonal(uid, {
+                    title: out.status === 'applied' ? 'اعتُمد طلب المرونة وطُبّق' : 'رُفض طلب المرونة',
+                    message: out.status === 'applied'
+                        ? `اعتمد المسؤول طلب المرونة #${out.request_id} ونُقل التزامك إلى اليوم البديل`
+                        : `رفض المسؤول طلب المرونة #${out.request_id}${note ? ' — ' + String(note).slice(0, 200) : ''}`,
+                    type: out.status === 'applied' ? 'success' : 'warning'
+                });
+            }
+        } catch (nErr) { console.error('flex review notify error:', nErr.message); }
+        res.json({ success: true, ...out });
+    } catch (error) {
+        if (error && error.status && error.code) {
+            return res.status(error.status).json({ error: error.message, code: error.code });
+        }
+        console.error('[schedule] flex-requests review error:', error);
+        res.status(500).json({ error: 'فشل في مراجعة طلب المرونة' });
+    }
+});
+
 app.get('/api/permissions/catalog', authenticate, authorizePerm('admin.users_manage'), async (req, res) => {
     res.json({ success: true, permissions: PERMISSIONS_CATALOG, roles: ROLE_LABELS_MAP });
 });

@@ -17,6 +17,10 @@ const OPS_UPLOAD_DIR = path.join(DATA_DIR, 'uploads', 'operational');
 const OPS_METADATA_PATH = path.join(OPS_UPLOAD_DIR, 'metadata.json');
 const fsSync = require('fs');
 
+// FSS E-0 (قرارات M1–M14 معتمدة 2026-10-06): ثوابت إعدادات محرك الجدولة —
+// وحدة نقية بلا أي تبعية على db.js (لا دورة استيراد).
+const { ENGINE_DEFAULTS } = require('./services/schedule-engine/config.js');
+
 // ترحيل لمرة واحدة: إن وُجدت القاعدة القديمة في جذر المشروع والهدف الجديد
 // غائب أو فارغ (0 بايت) تُنقل القاعدة الحية إلى موقع التخزين الدائم.
 // لا يعمل عند تعيين DB_PATH صراحة (عزل الاختبارات يبقى كما هو).
@@ -1734,6 +1738,253 @@ async function runMigrations() {
     logger.info('app_settings table created');
   } catch (err) {
     logger.warn('app_settings: ' + err.message);
+  }
+
+  // ═══ FSS E-0 (قرارات M1–M14 معتمدة 2026-10-06) ═══
+  // زرع خامل (Idempotent) لإعدادات محرك الجدولة: يُدرج المفتاح فقط إذا كان
+  // غير موجود، ولا يكتب أبدًا فوق قيمة عدّلها مسؤول. تشغيله مرتين = صفر تغيير.
+  try {
+    for (const [k, v] of Object.entries(ENGINE_DEFAULTS)) {
+      const exists = await get('SELECT key FROM app_settings WHERE key = ?', [k]);
+      if (!exists) {
+        await run('INSERT INTO app_settings (key, value) VALUES (?, ?)', [k, JSON.stringify(v)]);
+      }
+    }
+    logger.info('schedule engine settings seeded (idempotent)');
+  } catch (err) {
+    logger.warn('schedule engine settings seed: ' + err.message);
+  }
+
+  // FSS E-0 (M13): سجل حالة نشر الشهور — جدول تسجيلي بحت.
+  // لا كاتب له في E-0؛ وجوده يثبّت عقد draft/published الذي ستستخدمه مراحل E اللاحقة.
+  // المحرك لا يكتب أبدًا في شهر status='published' (قاعدة مجمّدة).
+  try {
+    await exec(`CREATE TABLE IF NOT EXISTS schedule_months (
+      month TEXT PRIMARY KEY,
+      status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','published')),
+      published_by INTEGER,
+      published_at TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`);
+    logger.info('schedule_months table created');
+  } catch (err) {
+    logger.warn('schedule_months: ' + err.message);
+  }
+
+  // ═══ FSS E-1 (معتمد 2026-10-06): تفضيلات الموظفين للشهر المستهدف ═══
+  // Soft Preferences صِرفة (M14): لا التزام ولا ضمان ولا ترجمة لجدولة في E-1.
+  // pref_value نصي موحّد (رمز/تاريخ/employee_id) حتى يعمل قيد UNIQUE فعليًا
+  // (قيم NULL في SQLite لا تتكرر ولا يضبطها UNIQUE). colleague يُقبل ويُخزَّن
+  // حتى لزميل من فريق آخر — لا رفض آلي (قرار المالك E-1/②).
+  try {
+    await exec(`CREATE TABLE IF NOT EXISTS employee_preferences (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      employee_id INTEGER NOT NULL REFERENCES employees(id),
+      month TEXT NOT NULL,
+      pref_type TEXT NOT NULL CHECK (pref_type IN ('shift','day_off','colleague')),
+      pref_value TEXT NOT NULL,
+      created_by INTEGER NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT,
+      UNIQUE (employee_id, month, pref_type, pref_value)
+    )`);
+    await exec('CREATE INDEX IF NOT EXISTS idx_employee_preferences_emp_month ON employee_preferences(employee_id, month)');
+    logger.info('employee_preferences table created');
+  } catch (err) {
+    logger.warn('employee_preferences: ' + err.message);
+  }
+
+  // ═══ FSS E-2 (قرارات M1/M2 معتمدة 2026-10-06): طلبات عدم التمكّن من الحضور ═══
+  // كيان مستقل تمامًا عن leave_requests — لا يُخصم من أي رصيد ولا يُعامل كإجازة.
+  // يوم واحد لكل طلب. الحالات: auto_approved (فحص M2 نظيف) · pending_review
+  // (تصعيد — تعارض تغطية أو تجاوز حد الأيام، وليس رفضًا) · approved/rejected
+  // (قرار مراجع) · cancelled (إلغاء مالك — د1: المستقبل فقط، بلا حذف فعلي).
+  // is_exception=1: الطلب الخامس+ في الشهر ⇒ مراجعة إجبارية (M1).
+  // لا كاتب له في shift_roster — E-2 لا يغيّر الجدول إطلاقًا.
+  try {
+    await exec(`CREATE TABLE IF NOT EXISTS unable_attend_requests (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      employee_id INTEGER NOT NULL REFERENCES employees(id),
+      month TEXT NOT NULL,
+      off_date TEXT NOT NULL,
+      reason TEXT,
+      status TEXT NOT NULL DEFAULT 'pending_review'
+        CHECK (status IN ('auto_approved','pending_review','approved','rejected','cancelled')),
+      is_exception INTEGER NOT NULL DEFAULT 0,
+      reviewed_by INTEGER,
+      reviewed_at TEXT,
+      review_note TEXT,
+      created_by INTEGER NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT,
+      UNIQUE (employee_id, off_date)
+    )`);
+    await exec('CREATE INDEX IF NOT EXISTS idx_unable_attend_emp_month ON unable_attend_requests(employee_id, month)');
+    await exec('CREATE INDEX IF NOT EXISTS idx_unable_attend_status ON unable_attend_requests(status)');
+    logger.info('unable_attend_requests table created');
+  } catch (err) {
+    logger.warn('unable_attend_requests: ' + err.message);
+  }
+
+  // ═══ FSS E-5 (Design Revision 2 معتمد 2026-10-06): محرك الاقتراحات ═══
+  // تشغيلات التوليد + العروض المسودة. الحالات الحية للعرض: offered+accepted فقط.
+  // الفهرس الفريد الجزئي uq_proposals_live_emp_date هو الحارس البنيوي الأخير
+  // ضد عرضين حيّين لنفس الموظف في نفس اليوم (M7 — مناوبة واحدة في اليوم).
+  // قرار المالك 2026-10-06 (مراجعة E-5): لا يوجد UNIQUE رباعي — declined حالة
+  // نهائية تاريخية لا تُحيى أبدًا؛ التشغيلة الجديدة تنشئ Proposal جديدًا مستقلًا
+  // (Proposal #1 ← declined · Proposal #2 ← offered) فيبقى الـHistory واضحًا.
+  // M13: شهر published ⇒ توقف فوري بصفر كتابة؛ العروض offered لشهر منشور تبقى
+  // تاريخية ميتة (لا تُحدَّث)، وsuperseded محصور قبل النشر (gap_resolved/withdraw).
+  try {
+    await exec(`CREATE TABLE IF NOT EXISTS schedule_proposal_runs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      month TEXT NOT NULL,
+      team_id INTEGER NOT NULL REFERENCES teams(id),
+      status TEXT NOT NULL DEFAULT 'completed'
+        CHECK (status IN ('completed','aborted_published','failed')),
+      gap_summary TEXT,
+      candidates_summary TEXT,
+      created_by INTEGER NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`);
+    await exec('CREATE INDEX IF NOT EXISTS idx_proposal_runs_month_team ON schedule_proposal_runs(month, team_id)');
+    logger.info('schedule_proposal_runs table created');
+  } catch (err) {
+    logger.warn('schedule_proposal_runs: ' + err.message);
+  }
+  try {
+    await exec(`CREATE TABLE IF NOT EXISTS schedule_proposals (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      run_id INTEGER NOT NULL REFERENCES schedule_proposal_runs(id),
+      month TEXT NOT NULL,
+      team_id INTEGER NOT NULL REFERENCES teams(id),
+      employee_id INTEGER NOT NULL REFERENCES employees(id),
+      date TEXT NOT NULL,
+      shift_code TEXT NOT NULL,
+      period TEXT NOT NULL CHECK (period IN ('day','night')),
+      status TEXT NOT NULL DEFAULT 'offered'
+        CHECK (status IN ('offered','accepted','declined','withdrawn','superseded')),
+      rank_position INTEGER,
+      ranking_explanation TEXT,
+      coverage_snapshot TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      responded_at TEXT,
+      responded_by INTEGER
+    )`);
+    await exec('CREATE INDEX IF NOT EXISTS idx_proposals_month_team ON schedule_proposals(month, team_id)');
+    await exec('CREATE INDEX IF NOT EXISTS idx_proposals_emp_month ON schedule_proposals(employee_id, month)');
+    // M7 البنيوي: عرض حيٌّ واحد كحد أقصى لكل (موظف، يوم) — الحالات الحية فقط
+    await exec(`CREATE UNIQUE INDEX IF NOT EXISTS uq_proposals_live_emp_date
+      ON schedule_proposals(employee_id, date) WHERE status IN ('offered','accepted')`);
+    logger.info('schedule_proposals table created');
+  } catch (err) {
+    logger.warn('schedule_proposals: ' + err.message);
+  }
+
+  // ═══ FSS E-6 (قرار M9 + K1–K6 معتمدة 2026-10-06): التبديل بالتراضي ═══
+  // تبادل مناوبتين بين موظفين بموافقة الطرفين. نفس الفريق (K3) ونفس التاريخ
+  // مسموح (K2 المعدّل — E-4 الحكم). التطبيق الذرّي على shift_roster يتم في
+  // swap-service فقط عبر tx.immediate مع حارس خام نهائي (صفان/موظفان/رموز/
+  // عضوية) — أي فشل = ROLLBACK كامل. الفهرسان الجزئيان يمنعان طلبين حيّين
+  // على نفس صف roster (pending_consent/pending_review). لا حذف فعلي أبدًا —
+  // declined_by_peer/rejected/cancelled حالات تاريخية نهائية.
+  try {
+    await exec(`CREATE TABLE IF NOT EXISTS shift_swap_requests (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      initiator_employee_id INTEGER NOT NULL REFERENCES employees(id),
+      target_employee_id INTEGER NOT NULL REFERENCES employees(id),
+      initiator_date TEXT NOT NULL,
+      initiator_shift_code TEXT NOT NULL,
+      target_date TEXT NOT NULL,
+      target_shift_code TEXT NOT NULL,
+      team_id INTEGER NOT NULL REFERENCES teams(id),
+      month TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending_consent'
+        CHECK (status IN ('pending_consent','declined_by_peer','pending_review','auto_applied','applied','rejected','cancelled')),
+      escalation_reason TEXT,
+      consent_by INTEGER,
+      consent_at TEXT,
+      reviewed_by INTEGER,
+      reviewed_at TEXT,
+      review_note TEXT,
+      created_by INTEGER NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT
+    )`);
+    await exec(`CREATE UNIQUE INDEX IF NOT EXISTS uq_swap_live_initiator
+      ON shift_swap_requests(initiator_employee_id, initiator_date)
+      WHERE status IN ('pending_consent','pending_review')`);
+    await exec(`CREATE UNIQUE INDEX IF NOT EXISTS uq_swap_live_target
+      ON shift_swap_requests(target_employee_id, target_date)
+      WHERE status IN ('pending_consent','pending_review')`);
+    await exec('CREATE INDEX IF NOT EXISTS idx_swap_requests_status ON shift_swap_requests(status)');
+    await exec('CREATE INDEX IF NOT EXISTS idx_swap_requests_month ON shift_swap_requests(month)');
+    logger.info('shift_swap_requests table created');
+  } catch (err) {
+    logger.warn('shift_swap_requests: ' + err.message);
+  }
+
+  // ═══ FSS E-8 (معتمد 2026-10-06 — Final Schema Review): مرونة الموظف ═══
+  // flex_requests: نقل التزام الموظف فقط — نتيجة التغطية كلها في flex_offers
+  // (مراجعة ①: لا replacement_employee_id هنا). المفتاحان المعلّقان
+  // (max_flex_moves_per_month / flex_makeup_search_days) غير مزروعَين عمدًا —
+  // غيابهما = FLEX_CONFIG_MISSING (Fail-Closed)، وليس unlimited (مراجعة ⑥⑦).
+  try {
+    await exec(`CREATE TABLE IF NOT EXISTS flex_requests (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      employee_id INTEGER NOT NULL REFERENCES employees(id),
+      month TEXT NOT NULL,
+      roster_id INTEGER NOT NULL REFERENCES shift_roster(id),
+      orig_shift_date TEXT NOT NULL,
+      orig_shift_code TEXT NOT NULL,
+      orig_team_id INTEGER REFERENCES teams(id),
+      makeup_options_json TEXT NOT NULL,
+      makeup_date TEXT,
+      coverage_state TEXT CHECK(coverage_state IN ('holds','broken') OR coverage_state IS NULL),
+      status TEXT NOT NULL DEFAULT 'submitted' CHECK(status IN (
+        'submitted','pending_validation','replacement_search','offer_pending',
+        'ready','applied','escalated','approved','rejected','cancelled','expired')),
+      escalation_reason TEXT,
+      review_note TEXT,
+      reviewed_by INTEGER,
+      reviewed_at TEXT,
+      created_by INTEGER NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      applied_at TEXT,
+      updated_at TEXT
+    )`);
+    await exec(`CREATE TABLE IF NOT EXISTS flex_offers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      flex_request_id INTEGER NOT NULL REFERENCES flex_requests(id),
+      employee_id INTEGER NOT NULL REFERENCES employees(id),
+      team_id INTEGER NOT NULL REFERENCES teams(id),
+      cover_date TEXT NOT NULL,
+      shift_code TEXT NOT NULL,
+      tier TEXT NOT NULL CHECK(tier IN ('same_team','same_center','south_1_10','rapid')),
+      rank_position INTEGER NOT NULL,
+      m5_json TEXT,
+      status TEXT NOT NULL DEFAULT 'offered' CHECK(status IN (
+        'offered','accepted','declined','withdrawn','expired','invalidated')),
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      responded_at TEXT
+    )`);
+    await exec('CREATE INDEX IF NOT EXISTS idx_flex_req_emp_month ON flex_requests(employee_id, month)');
+    await exec('CREATE INDEX IF NOT EXISTS idx_flex_req_status ON flex_requests(status)');
+    // طلب حيٌّ واحد على صف roster (مراجعة ②⑧) — يتعايش مع حارسي E-6
+    // (employee,date): التنسيق تطبيقي + حارسان نهائيان شرطيان في الجهتين.
+    await exec(`CREATE UNIQUE INDEX IF NOT EXISTS uq_flex_live_roster ON flex_requests(roster_id)
+      WHERE status IN ('submitted','pending_validation','replacement_search','offer_pending','ready','escalated')`);
+    // عرض حيٌّ واحد لكل طلب — تسلسل واحدًا بعد الآخر بلا فقدان التاريخ (مراجعة ④)
+    await exec(`CREATE UNIQUE INDEX IF NOT EXISTS uq_flex_offer_live ON flex_offers(flex_request_id)
+      WHERE status = 'offered'`);
+    // حارس M7: مرشح = عرض حيٌّ واحد في اليوم عبر كل طلبات المرونة (مراجعة ⑧)
+    await exec(`CREATE UNIQUE INDEX IF NOT EXISTS uq_flex_offer_live_emp_date ON flex_offers(employee_id, cover_date)
+      WHERE status IN ('offered','accepted')`);
+    await exec('CREATE INDEX IF NOT EXISTS idx_flex_offers_req ON flex_offers(flex_request_id)');
+    await exec('CREATE INDEX IF NOT EXISTS idx_flex_offers_emp ON flex_offers(employee_id)');
+    logger.info('flex_requests/flex_offers tables created');
+  } catch (err) {
+    logger.warn('flex_requests/flex_offers: ' + err.message);
   }
 
   // incidents (replaces incidents.json)
@@ -3944,6 +4195,137 @@ const AppSettings = {
   },
   async delete(key) {
     return run('DELETE FROM app_settings WHERE key = ?', [key]);
+  }
+};
+
+// ============================================
+// CRUD: EMPLOYEE PREFERENCES (FSS E-1 — معتمد 2026-10-06)
+// Soft Preferences فقط: لا التزام ولا ضمان. الاستبدال الذرّي (Full-Replace)
+// يتم داخل tx في preference-service — هذه الدوال لا تفتح ترانزاكشن بنفسها.
+// ============================================
+const EmployeePreferences = {
+  async getByEmployeeMonth(employeeId, month) {
+    return all('SELECT * FROM employee_preferences WHERE employee_id = ? AND month = ? ORDER BY pref_type, pref_value', [employeeId, month]);
+  }
+};
+
+// ============================================
+// CRUD: UNABLE-ATTEND REQUESTS (FSS E-2 — قرارات M1/M2)
+// قراءات فقط هنا — كل الكتابات (submit/cancel/review) تتم داخل tx.immediate
+// في unable-attend-service مع قيد audit_log في نفس الترانزاكشن (نمط E-1).
+// «الطلبات الحية» = كل الحالات عدا rejected/cancelled (لعدّ M1 الشهري).
+// ============================================
+const UnableAttendRequests = {
+  async getById(id) {
+    return get('SELECT * FROM unable_attend_requests WHERE id = ?', [id]);
+  },
+  async getByEmployeeMonth(employeeId, month) {
+    return all('SELECT * FROM unable_attend_requests WHERE employee_id = ? AND month = ? ORDER BY off_date', [employeeId, month]);
+  },
+  async getLiveByEmployeeMonth(employeeId, month) {
+    return all("SELECT * FROM unable_attend_requests WHERE employee_id = ? AND month = ? AND status IN ('auto_approved','pending_review','approved') ORDER BY off_date", [employeeId, month]);
+  },
+  async getByEmployeeDate(employeeId, offDate) {
+    return get('SELECT * FROM unable_attend_requests WHERE employee_id = ? AND off_date = ?', [employeeId, offDate]);
+  },
+  // الطلبات المعتمدة لفريق في يوم (لفحص التغطية M2/M4): عضوية الفريق من سطر
+  // roster نفسه لذلك اليوم — team-centric بلا أي تعريف تغطية مستقل.
+  async getApprovedForTeamDate(teamId, offDate) {
+    return all(`SELECT uar.* FROM unable_attend_requests uar
+                JOIN shift_roster sr ON sr.employee_id = uar.employee_id AND sr.shift_date = uar.off_date
+                WHERE sr.team_id = ? AND uar.off_date = ? AND uar.status IN ('auto_approved','approved')`, [teamId, offDate]);
+  },
+  async getReviewQueue(status) {
+    return all(`SELECT uar.*, e.name AS employee_name, e.employee_code, e.job_title,
+                  (SELECT t.name FROM team_assignments ta JOIN teams t ON t.id = ta.team_id
+                   WHERE ta.employee_id = uar.employee_id AND (ta.end_date IS NULL OR ta.end_date = '' OR ta.end_date >= date('now'))
+                   ORDER BY ta.is_primary DESC, ta.id DESC LIMIT 1) AS team_name
+                FROM unable_attend_requests uar JOIN employees e ON e.id = uar.employee_id
+                WHERE uar.status = ? ORDER BY uar.off_date, uar.id`, [status]);
+  }
+};
+
+// ============================================
+// CRUD: SCHEDULE MONTHS (FSS E-0) — قراءة فقط (إضافة E-5 مصرّح بها)
+// بوابة M13: شهر published ⇒ المحرك يتوقف بصفر كتابة في كل مساراته.
+// ============================================
+const ScheduleMonths = {
+  async get(month) {
+    return get('SELECT * FROM schedule_months WHERE month = ?', [month]);
+  }
+};
+
+// ============================================
+// CRUD: SCHEDULE PROPOSALS (FSS E-5) — قراءات فقط هنا
+// كل الكتابات (generate/respond/withdraw/تسلسل J5) داخل tx.immediate في
+// proposal-service مع قيد audit_log في نفس الترانزاكشن (نمط E-1/E-2).
+// «العروض الحية» = offered+accepted فقط (يقابل الفهرس الجزئي uq_proposals_live_emp_date).
+// ============================================
+const ScheduleProposalRuns = {
+  async getById(id) {
+    return get('SELECT * FROM schedule_proposal_runs WHERE id = ?', [id]);
+  }
+};
+
+const ScheduleProposals = {
+  async getById(id) {
+    return get('SELECT * FROM schedule_proposals WHERE id = ?', [id]);
+  },
+  async getByRun(runId) {
+    return all('SELECT * FROM schedule_proposals WHERE run_id = ? ORDER BY date, id', [runId]);
+  },
+  async getByMonthTeam(month, teamId, status) {
+    if (status) {
+      return all(`SELECT p.*, e.name AS employee_name, e.employee_code FROM schedule_proposals p
+                  JOIN employees e ON e.id = p.employee_id
+                  WHERE p.month = ? AND p.team_id = ? AND p.status = ? ORDER BY p.date, p.id`, [month, teamId, status]);
+    }
+    return all(`SELECT p.*, e.name AS employee_name, e.employee_code FROM schedule_proposals p
+                JOIN employees e ON e.id = p.employee_id
+                WHERE p.month = ? AND p.team_id = ? ORDER BY p.date, p.id`, [month, teamId]);
+  },
+  async getByEmployeeMonth(employeeId, month) {
+    return all('SELECT * FROM schedule_proposals WHERE employee_id = ? AND month = ? ORDER BY date, id', [employeeId, month]);
+  },
+  // العرض الحي (offered/accepted) لموظف في يوم — حارس M7 الثلاثي في الخدمة
+  // (الفحص على مستوى الموظف بغض النظر عن الفريق)، والفهرس الجزئي حارس بنيوي أخير.
+  async getLiveByEmployeeDate(employeeId, date) {
+    return get(`SELECT * FROM schedule_proposals WHERE employee_id = ? AND date = ?
+                AND status IN ('offered','accepted')`, [employeeId, date]);
+  }
+};
+
+// ============================================
+// CRUD: SHIFT SWAP REQUESTS (FSS E-6 — قرار M9) — قراءات فقط هنا
+// كل الكتابات (submit/consent/cancel/review/التطبيق الذرّي) داخل tx.immediate
+// في swap-service مع قيود التدقيق في نفس الترانزاكشن (نمط E-1/E-2/E-5).
+// «الطلبات الحية» = pending_consent/pending_review (يقابل الفهرسين الجزئيين).
+// ============================================
+const ShiftSwapRequests = {
+  async getById(id) {
+    return get('SELECT * FROM shift_swap_requests WHERE id = ?', [id]);
+  },
+  async getMine(employeeId) {
+    return all(`SELECT * FROM shift_swap_requests WHERE initiator_employee_id = ? OR target_employee_id = ?
+                ORDER BY id DESC`, [employeeId, employeeId]);
+  },
+  // طلب حيٌّ يمس صف roster معين (موظف+تاريخ) في أي دور (مبادر أو هدف)
+  async getLiveForRoster(employeeId, date) {
+    return get(`SELECT id, status FROM shift_swap_requests
+                WHERE status IN ('pending_consent','pending_review')
+                  AND ((initiator_employee_id = ? AND initiator_date = ?) OR (target_employee_id = ? AND target_date = ?))
+                LIMIT 1`, [employeeId, date, employeeId, date]);
+  },
+  async getReviewQueue(status) {
+    return all(`SELECT s.*,
+                  ei.name AS initiator_name, ei.employee_code AS initiator_code,
+                  et.name AS target_name, et.employee_code AS target_code,
+                  t.name AS team_name
+                FROM shift_swap_requests s
+                JOIN employees ei ON ei.id = s.initiator_employee_id
+                JOIN employees et ON et.id = s.target_employee_id
+                JOIN teams t ON t.id = s.team_id
+                WHERE s.status = ? ORDER BY s.id`, [status]);
   }
 };
 
@@ -6336,6 +6718,12 @@ module.exports = {
   Hospitals,
   References,
   AppSettings,
+  EmployeePreferences,
+  UnableAttendRequests,
+  ScheduleMonths,
+  ScheduleProposalRuns,
+  ScheduleProposals,
+  ShiftSwapRequests,
   Timeline,
   Employees,
   Teams,
