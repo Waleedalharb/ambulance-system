@@ -1138,6 +1138,295 @@
         } catch (_) { /* تبقى البطاقة القديمة — لا انهيار */ }
     }
 
+    // ═══ FSS E-3 (معتمد 2026-10-06 — ج1): تفضيلاتي للشهر القادم ═══
+    // استهلاك صِرف لعقد E-1 (GET/PUT /api/my/schedule-preferences): النافذة
+    // تُنفَّذ خادميًا (ج2/ب — 422 PREFERENCE_WINDOW_CLOSED) والواجهة تعكسها
+    // فقط. Soft Preferences: لا ضمان ولا ترجمة لجدولة هنا. لا localStorage —
+    // كل عرض من API مباشرة (درس V-B). حد الزمالة 3 (M14) — تلميح واجهة،
+    // والخادم هو الحارس (COLLEAGUE_LIMIT_EXCEEDED).
+    const PF_TYPES = { shift: 'مناوبة مفضلة', day_off: 'يوم راحة', colleague: 'زميل مفضل' };
+    let pfCodesCache = null;       // رموز المناوبات (/api/shift-codes) — تُجلب مرة
+    let pfColleaguesCache = null;  // زملاء الفريق النشط (/api/my/team-colleagues — ج3)
+
+    function pfPrefChips(prefs, colleagues) {
+        if (!prefs.length) return '<div class="empty">لا توجد تفضيلات مسجلة لهذا الشهر بعد.</div>';
+        const nameOf = (id) => {
+            const c = (colleagues || []).find(x => String(x.id) === String(id));
+            return c ? c.name : ('زميل #' + id);
+        };
+        return '<div class="chip-row">' + prefs.map(p => {
+            const label = p.pref_type === 'colleague' ? 'زميل: ' + esc(nameOf(p.pref_value))
+                : p.pref_type === 'day_off' ? 'راحة: ' + esc(p.pref_value)
+                : 'مناوبة: ' + esc(p.pref_value);
+            return `<span class="chip">${label}</span>`;
+        }).join('') + '</div>';
+    }
+
+    function renderPrefs(d) {
+        let body = '';
+        if (d && d.__error) {
+            body = '<div class="empty">تعذر تحميل التفضيلات حاليًا — حدّث الصفحة للمحاولة مجددًا.</div>';
+        } else {
+            const w = (d && d.window) || {};
+            const prefs = (d && d.preferences) || [];
+            const winLine = w.is_open
+                ? `النافذة مفتوحة لشهر <b>${esc(w.target_month || '')}</b> — التقديم حتى يوم ${esc(String(w.close_day || ''))}`
+                : `النافذة مغلقة حاليًا (تفتح يوم ${esc(String(w.open_day || ''))} وتغلق يوم ${esc(String(w.close_day || ''))} — الشهر المستهدف ${esc(w.target_month || '')})`;
+            if (w.is_open) {
+                body = `<div class="lv-days" style="margin-bottom:10px">${winLine}</div>
+                    <div class="pf-sec">المناوبات المفضلة <small>(رمز «دوام» فقط — بلا سقف في هذه النسخة)</small></div>
+                    <div class="pf-opts" id="pfShiftOpts"><div class="empty">جاري تحميل الرموز…</div></div>
+                    <div class="pf-sec">أيام راحة مفضلة <small>(داخل ${esc(w.target_month || '')})</small></div>
+                    <div id="pfDayOffList"></div>
+                    <button class="lv-btn" id="pfAddDayOff" type="button">＋ إضافة يوم راحة</button>
+                    <div class="pf-sec">زملاء مفضلون <small>(حتى 3 — تفضيل إيجابي فقط، وليس ضمانًا)</small></div>
+                    <div class="pf-opts" id="pfColleagueOpts"><div class="empty">جاري تحميل الزملاء…</div></div>
+                    <div class="lv-error" id="pfError"></div>
+                    <div class="lv-form-actions">
+                        <button class="lv-submit" id="pfSave" type="button">حفظ التفضيلات</button>
+                    </div>`;
+            } else {
+                body = `<div class="lv-days" style="margin-bottom:10px">${winLine}</div>
+                    ${pfPrefChips(prefs, null)}
+                    <div class="pf-hint">بعد إغلاق النافذة يمكنك استخدام المسارات المعتمدة: طلب تغيير المناوبة، أو الإجازة، أو طلب عدم التمكّن من البطاقة أدناه.</div>`;
+            }
+        }
+        return `<div class="card" id="prefsCard"><div class="card-head prefs">⭐ تفضيلاتي للشهر القادم</div>
+            <div class="card-body">${body}</div>
+        </div>`;
+    }
+
+    function pfShowError(m) {
+        const el = document.getElementById('pfError');
+        if (el) { el.textContent = m; el.classList.add('show'); }
+    }
+    function pfHideError() {
+        const el = document.getElementById('pfError');
+        if (el) { el.textContent = ''; el.classList.remove('show'); }
+    }
+
+    async function pfEnsureRefs() {
+        const w = (await api('/api/my/schedule-preferences').catch(() => null));
+        const targetMonth = w && w.window && w.window.target_month;
+        // الرموز: «دوام» فقط — نفس قاعدة الخادم (INVALID_SHIFT_CODE)
+        if (!pfCodesCache) {
+            try {
+                const cd = await api('/api/shift-codes');
+                const codes = (cd && (cd.codes || cd.shift_codes || cd.data)) || (Array.isArray(cd) ? cd : []);
+                pfCodesCache = codes.filter(c => !c.status || c.status === 'دوام');
+            } catch (_) { pfCodesCache = []; }
+        }
+        const shiftBox = document.getElementById('pfShiftOpts');
+        if (shiftBox) {
+            const cur = (w && w.preferences || []).filter(p => p.pref_type === 'shift').map(p => p.pref_value);
+            shiftBox.innerHTML = pfCodesCache.length
+                ? pfCodesCache.map(c => `<label class="pf-opt"><input type="checkbox" class="pf-shift" value="${esc(c.code)}"${cur.includes(String(c.code)) ? ' checked' : ''}> ${esc(c.name || c.code)} (${esc(c.code)})</label>`).join('')
+                : '<div class="empty">تعذر تحميل الرموز.</div>';
+        }
+        // الزملاء: الفريق النشط من الخادم (ج3) — لا قائمة ثابتة
+        if (!pfColleaguesCache) {
+            pfColleaguesCache = await api('/api/my/team-colleagues').catch(() => null);
+        }
+        const colBox = document.getElementById('pfColleagueOpts');
+        if (colBox) {
+            const colleagues = (pfColleaguesCache && pfColleaguesCache.colleagues) || [];
+            const cur = (w && w.preferences || []).filter(p => p.pref_type === 'colleague').map(p => String(p.pref_value));
+            colBox.innerHTML = colleagues.length
+                ? colleagues.map(c => `<label class="pf-opt"><input type="checkbox" class="pf-coll" value="${c.id}"${cur.includes(String(c.id)) ? ' checked' : ''}> ${esc(c.name)} <small>(${esc(c.employee_code || '')})</small></label>`).join('')
+                : '<div class="empty">لا يوجد زملاء نشطون في فريقك الحالي.</div>';
+            colBox.querySelectorAll('.pf-coll').forEach(cb => cb.addEventListener('change', () => {
+                const checked = colBox.querySelectorAll('.pf-coll:checked');
+                if (checked.length > 3) { cb.checked = false; pfShowError('الحد الأقصى لتفضيلات الزمالة هو 3 (M14).'); }
+                else pfHideError();
+            }));
+        }
+        // أيام الراحة الحالية → صفوف جاهزة
+        const list = document.getElementById('pfDayOffList');
+        if (list && targetMonth) {
+            const cur = (w && w.preferences || []).filter(p => p.pref_type === 'day_off').map(p => p.pref_value);
+            list.innerHTML = '';
+            (cur.length ? cur : []).forEach(v => pfAddDayOffRow(targetMonth, v));
+        }
+        return targetMonth;
+    }
+
+    function pfAddDayOffRow(targetMonth, value) {
+        const list = document.getElementById('pfDayOffList');
+        if (!list) return;
+        const y = +targetMonth.slice(0, 4), m = +targetMonth.slice(5, 7);
+        const lastDay = new Date(y, m, 0).getDate();
+        const row = document.createElement('div');
+        row.className = 'pf-dayoff-row';
+        row.innerHTML = `<input type="date" class="pf-dayoff" min="${targetMonth}-01" max="${targetMonth}-${String(lastDay).padStart(2, '0')}"${value ? ` value="${esc(value)}"` : ''}>
+            <button class="lv-btn cancel" type="button">حذف</button>`;
+        row.querySelector('button').addEventListener('click', () => row.remove());
+        list.appendChild(row);
+    }
+
+    async function bindPrefsEvents() {
+        const saveBtn = document.getElementById('pfSave');
+        if (!saveBtn) return; // النافذة مغلقة — عرض فقط
+        const targetMonth = await pfEnsureRefs();
+        document.getElementById('pfAddDayOff').addEventListener('click', () => {
+            if (targetMonth) pfAddDayOffRow(targetMonth, null);
+        });
+        saveBtn.addEventListener('click', async () => {
+            pfHideError();
+            const prefs = [];
+            document.querySelectorAll('.pf-shift:checked').forEach(cb => prefs.push({ pref_type: 'shift', pref_value: cb.value }));
+            document.querySelectorAll('.pf-dayoff').forEach(inp => { if (inp.value) prefs.push({ pref_type: 'day_off', pref_value: inp.value }); });
+            document.querySelectorAll('.pf-coll:checked').forEach(cb => prefs.push({ pref_type: 'colleague', pref_value: cb.value }));
+            saveBtn.disabled = true;
+            try {
+                await apiSend('/api/my/schedule-preferences', 'PUT', { month: targetMonth, preferences: prefs });
+                toast('تم حفظ تفضيلاتك');
+                pfCodesCache = null; pfColleaguesCache = null;
+                await refreshPrefs();
+            } catch (err) {
+                saveBtn.disabled = false;
+                pfShowError((err && err.message) || 'تعذر حفظ التفضيلات — حاول مجددًا.');
+            }
+        });
+    }
+
+    async function refreshPrefs() {
+        try {
+            const d = await api('/api/my/schedule-preferences').catch(() => ({ __error: true }));
+            const tmp = document.createElement('div');
+            tmp.innerHTML = renderPrefs(d);
+            const old = document.getElementById('prefsCard');
+            if (old) old.replaceWith(tmp.firstElementChild);
+            bindPrefsEvents();
+        } catch (_) { /* تبقى البطاقة القديمة — لا انهيار */ }
+    }
+
+    // ═══ FSS E-3 (معتمد 2026-10-06 — ج1): عدم التمكّن — استهلاك صِرف لعقد E-2 ═══
+    // كل القواعد (M1 حد الأيام / M2 فحص التغطية / د1 الإلغاء / د2 الماضي) خادمية؛
+    // الواجهة تعرض الحالات الخمس وترسل التاريخ والسبب فقط. لا localStorage.
+    const UA_STATUS = {
+        auto_approved: ['st-approved', 'مقبول تلقائيًا'],
+        approved: ['st-approved', 'معتمد'],
+        pending_review: ['st-pending', 'قيد مراجعة المسؤول'],
+        rejected: ['st-denied', 'مرفوض'],
+        cancelled: ['st-cancelled', 'ملغي']
+    };
+    const UA_CANCELLABLE = ['pending_review', 'auto_approved', 'approved']; // د1
+
+    function renderUnable(d) {
+        let rows = '', counter = '';
+        if (d && d.__error) {
+            rows = '<div class="empty">تعذر تحميل الطلبات حاليًا — حدّث الصفحة للمحاولة مجددًا.</div>';
+        } else {
+            const reqs = (d && d.requests) || [];
+            const today = riyadhToday();
+            const curMonthKey = today ? today.slice(0, 7) : '';
+            const liveThisMonth = reqs.filter(r => UA_CANCELLABLE.includes(r.status) && r.month === curMonthKey).length;
+            counter = `طلباتك الحية هذا الشهر (${esc(curMonthKey)}): <b>${liveThisMonth}</b> من ${esc(String((d && d.max_days) || ''))} — ما زاد عن الحد يدخل مراجعة مسؤول تلقائيًا ولا يُرفض`;
+            rows = reqs.map(r => {
+                const st = UA_STATUS[r.status] || ['', r.status];
+                const cancellable = UA_CANCELLABLE.includes(r.status) && today && r.off_date >= today;
+                return `<div class="lv-row">
+                    <div class="lv-head">
+                        <div>
+                            <div class="lv-type">${esc(r.off_date)} — ${arDay(r.off_date)}</div>
+                            ${r.reason ? `<div class="lv-range">السبب: ${esc(r.reason)}</div>` : ''}
+                            ${r.is_exception ? '<div class="lv-range" style="color:var(--gold-id)">استثناء: تجاوز حد الأيام الشهري — يحتاج اعتماد مسؤول</div>' : ''}
+                            ${r.review_note ? `<div class="lv-range">ملاحظة المراجعة: ${esc(r.review_note)}</div>` : ''}
+                        </div>
+                        <span class="lv-status ${st[0]}">${esc(st[1])}</span>
+                    </div>
+                    <div class="lv-row-actions">
+                        ${cancellable ? `<button class="lv-btn cancel" type="button" data-uacancel="${r.id}">إلغاء الطلب</button>` : ''}
+                    </div>
+                </div>`;
+            }).join('') || '<div class="empty">لا توجد طلبات عدم تمكّن — قدّم طلبك من الزر أعلاه.</div>';
+        }
+        return `<div class="card" id="unableCard"><div class="card-head unable">🚫 عدم التمكّن من الحضور</div>
+            <div class="card-body">
+                ${counter ? `<div class="lv-days" style="margin-bottom:10px">${counter}</div>` : ''}
+                <button class="lv-new-btn" id="uaNewBtn" type="button">＋ طلب عدم تمكّن</button>
+                <div class="lv-form" id="uaForm">
+                    <div class="lv-form-title">طلب عدم تمكّن من الحضور</div>
+                    <label>اليوم</label>
+                    <input type="date" id="uaDate">
+                    <label>السبب (اختياري)</label>
+                    <textarea id="uaReason" maxlength="300"></textarea>
+                    <div class="lv-error" id="uaError"></div>
+                    <div class="lv-form-actions">
+                        <button class="lv-submit" id="uaSubmit" type="button">إرسال الطلب</button>
+                        <button class="lv-cancel-form" id="uaCancelForm" type="button">تراجع</button>
+                    </div>
+                </div>
+                <div style="margin-top:12px">${rows}</div>
+            </div>
+        </div>`;
+    }
+
+    function uaShowError(m) {
+        const el = document.getElementById('uaError');
+        if (el) { el.textContent = m; el.classList.add('show'); }
+    }
+    function uaHideError() {
+        const el = document.getElementById('uaError');
+        if (el) { el.textContent = ''; el.classList.remove('show'); }
+    }
+
+    function bindUnableEvents() {
+        const newBtn = document.getElementById('uaNewBtn');
+        if (!newBtn) return;
+        const form = document.getElementById('uaForm');
+        const dateEl = document.getElementById('uaDate');
+        const submitBtn = document.getElementById('uaSubmit');
+        newBtn.addEventListener('click', () => {
+            form.classList.toggle('open');
+            if (form.classList.contains('open')) {
+                uaHideError();
+                const t = riyadhToday();
+                if (t) dateEl.min = t; // تلميح واجهة — الخادم يفرض PAST_DATE (د2)
+            }
+        });
+        document.getElementById('uaCancelForm').addEventListener('click', () => form.classList.remove('open'));
+        submitBtn.addEventListener('click', async () => {
+            uaHideError();
+            const date = dateEl.value;
+            const reason = document.getElementById('uaReason').value.trim();
+            if (!date) { uaShowError('حدّد اليوم.'); return; }
+            submitBtn.disabled = true;
+            try {
+                const out = await apiPost('/api/my/unable-attend', { off_date: date, reason: reason || undefined });
+                toast(out && out.status === 'pending_review'
+                    ? 'تم إرسال طلبك — يحتاج مراجعة مسؤول'
+                    : 'تم قبول طلبك تلقائيًا');
+                form.classList.remove('open');
+                dateEl.value = ''; document.getElementById('uaReason').value = '';
+                await refreshUnable();
+            } catch (err) {
+                submitBtn.disabled = false;
+                uaShowError((err && err.message) || 'تعذر إرسال الطلب — حاول مجددًا.');
+            }
+        });
+        document.querySelectorAll('[data-uacancel]').forEach(b => b.addEventListener('click', async () => {
+            if (!confirm('هل تريد إلغاء طلب عدم التمكّن هذا؟')) return;
+            b.disabled = true;
+            try {
+                await apiPost('/api/my/unable-attend/' + b.dataset.uacancel + '/cancel', {});
+                toast('تم إلغاء الطلب');
+                await refreshUnable();
+            } catch (err) { b.disabled = false; toast((err && err.message) || 'تعذر الإلغاء'); }
+        }));
+    }
+
+    async function refreshUnable() {
+        try {
+            const d = await api('/api/my/unable-attend').catch(() => ({ __error: true }));
+            const tmp = document.createElement('div');
+            tmp.innerHTML = renderUnable(d);
+            const old = document.getElementById('unableCard');
+            if (old) old.replaceWith(tmp.firstElementChild);
+            bindUnableEvents();
+        } catch (_) { /* تبقى البطاقة القديمة — لا انهيار */ }
+    }
+
     // ── v5.1: التحديث اللحظي — SSE الموجَّه القائم (OV-S6: لا قناة جديدة تُنشأ). ──
     // Initial Load يبقى REST دائمًا؛ هذه طبقة تسريع فقط: عند بث notification_created
     // يظهر 🔔 فورًا ثم يُعاد جلب القسمين من REST (مصدر الحقيقة). انقطاعها لا يُسقط
@@ -1160,6 +1449,8 @@
             if (/إجاز/.test(String(n.title || '') + ' ' + String(n.message || ''))) refreshLeave();
             // F-2: إشعارات طلبات المناوبة (اعتماد/رفض/تطبيق) ← تحديث البطاقة فورًا بلا Refresh
             if (/مناوبة/.test(String(n.title || '') + ' ' + String(n.message || ''))) refreshShiftChange();
+            // FSS E-3: إشعارات عدم التمكّن (اعتماد/رفض المراجعة) ← تحديث البطاقة فورًا بلا Refresh
+            if (/تمكّن/.test(String(n.title || '') + ' ' + String(n.message || ''))) refreshUnable();
         };
         // رفض خادمي (401/403 ⇒ CLOSED): إيقاف نهائي بلا عاصفة إعادة اتصال — نفس
         // سياسة websocket-sync. الأخطاء العابرة يعيد المتصفح الاتصال بها تلقائيًا.
@@ -1209,7 +1500,7 @@
                 curYear = t ? +t.slice(0, 4) : new Date().getFullYear();
                 curMonth = t ? +t.slice(5, 7) : new Date().getMonth() + 1;
             }
-            const [schedule, incidents, vehicle, inventory, checkData, mates, notifs, changes, leave, shiftChanges] = await Promise.all([
+            const [schedule, incidents, vehicle, inventory, checkData, mates, notifs, changes, leave, shiftChanges, prefs, unable] = await Promise.all([
                 api(`/api/my/schedule?month=${curMonth}&year=${curYear}`),
                 sec.incidents ? api('/api/my/team-incidents') : Promise.resolve(null),
                 sec.vehicle ? api('/api/my/vehicle') : Promise.resolve(null),
@@ -1222,12 +1513,17 @@
                 // A-4.4 S1: طلبات إجازاتي — فشل الجلب يُظهر حالة داخل البطاقة ولا يُسقط الصفحة
                 sec.leave ? api('/api/leave-requests').catch(() => ({ __error: true })) : Promise.resolve(null),
                 // F-2: طلبات تغيير المناوبة — نفس نمط الإجازات (فشل الجلب لا يُسقط الصفحة)
-                api('/api/my/shift-change-requests').catch(() => ({ __error: true }))]);
+                api('/api/my/shift-change-requests').catch(() => ({ __error: true })),
+                // FSS E-3: تفضيلاتي + عدم التمكّن — نفس النمط (فشل الجلب لا يُسقط الصفحة)
+                api('/api/my/schedule-preferences').catch(() => ({ __error: true })),
+                api('/api/my/unable-attend').catch(() => ({ __error: true }))]);
             leaveProfile = profile; // المصدر الوحيد لـ employee.id عند تقديم الطلب
             app.innerHTML = renderProfile(profile)
                 + (notifs ? renderNotifs(notifs) : '')
                 + (leave ? renderLeave(leave) : '')
                 + renderShiftChange(shiftChanges)
+                + renderPrefs(prefs)
+                + renderUnable(unable)
                 + (mates ? renderMates(mates) : '')
                 + (checkData ? renderCheck(checkData) : '')
                 + (incidents ? renderIncidents(incidents) : '')
@@ -1240,6 +1536,8 @@
             if (notifs) bindNotifEvents();
             if (leave) bindLeaveEvents();
             bindShiftChangeEvents(); // F-2: بطاقة طلبات المناوبة تُعرض دائمًا للموظف
+            bindPrefsEvents();   // FSS E-3: بطاقة التفضيلات (عرض فقط عند إغلاق النافذة)
+            bindUnableEvents();  // FSS E-3: بطاقة عدم التمكّن
             connectLive(); // v5.1: القناة اللحظية بعد نجاح التحميل الأول — REST يبقى المصدر
             if (logoutBtn) logoutBtn.style.display = ''; // نجاح التحميل ← الزر يظهر في الشريط العلوي الثابت
 

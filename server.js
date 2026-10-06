@@ -3202,6 +3202,37 @@ app.put('/api/my/schedule-preferences', authenticate, authorizePerm('ops.my_port
     }
 });
 
+// ═══ FSS E-3 (قرار ج3 معتمد 2026-10-06): زملاء الفريق النشط — Read-only ═══
+// المصدر الوحيد team_assignments (SSOT) · الهوية من الجلسة (لا employee_id من
+// العميل) · الفريق النشط الحالي فقط (is_primary أولًا) · الموظف نفسه مستبعد ·
+// الزملاء النشطون فقط · لا Permission جديد · لا كتابة DB. يغذّي منتقي تفضيل
+// الزمالة (M14) في واجهة التفضيلات — لا بيانات ثابتة في الواجهة.
+app.get('/api/my/team-colleagues', authenticate, authorizePerm('ops.my_portal'), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const emp = await getMyPortalService().resolveEmployee(req.user);
+        if (!emp) return res.status(404).json(MY_PORTAL_NO_EMPLOYEE);
+        const p = TimeRiyadh.riyadhParts(new Date());
+        const today = `${p.year}-${p.month}-${p.day}`;
+        const team = await db.get(
+            `SELECT ta.team_id, t.name AS team_name FROM team_assignments ta
+             JOIN teams t ON t.id = ta.team_id
+             WHERE ta.employee_id = ? AND (ta.end_date IS NULL OR ta.end_date = '' OR ta.end_date >= ?)
+             ORDER BY ta.is_primary DESC, ta.id DESC LIMIT 1`, [emp.id, today]);
+        if (!team) return res.json({ success: true, team: null, colleagues: [] });
+        const colleagues = await db.all(
+            `SELECT DISTINCT e.id, e.name, e.employee_code, e.job_title FROM team_assignments ta
+             JOIN employees e ON e.id = ta.employee_id
+             WHERE ta.team_id = ? AND ta.employee_id != ? AND e.is_active = 1
+               AND (ta.end_date IS NULL OR ta.end_date = '' OR ta.end_date >= ?)
+             ORDER BY e.name`, [team.team_id, emp.id, today]);
+        res.json({ success: true, team: { id: team.team_id, name: team.team_name }, colleagues });
+    } catch (error) {
+        console.error('[my-portal] team-colleagues error:', error);
+        res.status(500).json({ error: 'فشل في جلب زملاء الفريق' });
+    }
+});
+
 // ═══ FSS E-2 (قرارات M1/M2 + د1/د2/د3 معتمدة 2026-10-06): طلبات عدم التمكّن ═══
 // كيان مستقل عن leave_requests. الهوية خادمية. كل كتابة + Audit في ترانزاكشن
 // واحدة داخل الخدمة. الإشعارات بعد COMMIT فقط وفشلها لا يُفقد الطلب.

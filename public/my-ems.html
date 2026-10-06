@@ -235,6 +235,19 @@
     .lv-ev b { color: var(--text); }
     .lv-ev .lv-ev-time { color: var(--muted); font-size: 0.66rem; }
 
+    /* ═══ FSS E-3: بطاقتا «تفضيلاتي» و«عدم التمكّن» — نفس هوية البوابة ═══ */
+    .card-head.prefs::before { background: var(--gold-id); }
+    .card-head.unable::before { background: var(--coral); }
+    .pf-sec { font-size: 0.8rem; font-weight: 700; color: var(--lead-hi); margin: 13px 0 7px; }
+    .pf-sec small { display: block; font-size: 0.66rem; color: var(--muted); font-weight: 400; margin-top: 2px; }
+    .pf-opts { display: flex; flex-wrap: wrap; gap: 7px; }
+    .pf-opt { display: inline-flex; align-items: center; gap: 6px; background: var(--surface-2); border: 1px solid var(--border-soft); border-radius: 9px; padding: 6px 11px; font-size: 0.76rem; cursor: pointer; }
+    .pf-opt input { accent-color: var(--teal-id); }
+    .pf-opt small { color: var(--muted); font-size: 0.66rem; }
+    .pf-dayoff-row { display: flex; gap: 7px; align-items: center; margin-bottom: 7px; }
+    .pf-dayoff-row input[type="date"] { flex: 1; background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 9px; padding: 8px 10px; font-family: inherit; font-size: 0.84rem; color-scheme: dark; }
+    .pf-hint { font-size: 0.72rem; color: var(--muted); margin-top: 10px; line-height: 1.8; }
+
     .empty { text-align: center; color: var(--muted); font-size: 0.85rem; padding: 22px 12px; }
     .state-card { text-align: center; padding: 44px 20px; }
     .state-card .t { font-size: 1.05rem; font-weight: 700; margin-bottom: 8px; }
@@ -261,6 +274,6 @@
     </div>
     <div id="app"><div class="loading">جارٍ تحميل بياناتك…</div></div>
 </div>
-<script src="js/my-ems.js?v=7"></script>
+<script src="js/my-ems.js?v=8"></script>
 </body>
 </html>
