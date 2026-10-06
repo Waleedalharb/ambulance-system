@@ -3347,6 +3347,167 @@ app.post('/api/schedule/unable-attend/:id/review', authenticate, authorizePerm('
     }
 });
 
+// ═══ FSS E-5 (Design Revision 2 معتمد 2026-10-06): محرك الاقتراحات — APIs خلفية فقط ═══
+// J7: لا UI في E-5. عروض مسودة على Draft فقط (M13: published ⇒ صفر كتابة في
+// كل المسارات). لا Auto-Apply ولا كتابة في shift_roster إطلاقًا (J4): accepted
+// يُشعر حاملي schedule.proposals.manage والتطبيق عبر F-1/المسارات المعتمدة.
+// كل كتابة + Audit داخل tx.immediate واحدة في الخدمة. الإشعارات بعد COMMIT
+// فقط وسقوطها آمن. لا Permission جديد — schedule.proposals.manage (M10/E-0).
+let proposalService = null;
+function getProposalService() {
+    if (!proposalService && db) {
+        const { ProposalService } = require('./services/schedule-engine/proposal-service');
+        proposalService = new ProposalService(db);
+    }
+    return proposalService;
+}
+
+// توليد عروض مسودة لشهر/فريق — J1/J2/J3/J6 (month + team)
+app.post('/api/schedule/proposals/generate', authenticate, authorizePerm('schedule.proposals.manage'), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const { month, team_id } = req.body || {};
+        const out = await getProposalService().generate({ month, teamId: team_id, user: req.user });
+        // بعد COMMIT فقط: إشعار شخصي لكل موظف وُضع له عرض — سقوط آمن بلا حساب مربوط
+        for (const offer of out.offers) {
+            try {
+                if (db.Notifications) {
+                    const ownerUserId = await resolveEmployeeUserId(offer.employee_id);
+                    if (ownerUserId) {
+                        await notificationService.notifyPersonal(ownerUserId, {
+                            title: 'عرض مناوبة تكميلية',
+                            message: `عُرضت عليك مناوبة تكميلية يوم ${offer.date} (${offer.shift_code}) — اقبل أو ارفض من بوابتك`,
+                            type: 'info'
+                        });
+                    }
+                }
+            } catch (nErr) { console.error('proposal offer notify error:', nErr.message); }
+        }
+        res.json({ success: true, ...out });
+    } catch (error) {
+        if (error && error.status && error.code) {
+            return res.status(error.status).json({ error: error.message, code: error.code });
+        }
+        console.error('[schedule] proposals generate error:', error);
+        res.status(500).json({ error: 'فشل في توليد الاقتراحات' });
+    }
+});
+
+app.get('/api/schedule/proposals', authenticate, authorizePerm('schedule.proposals.manage'), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const { month, team_id, status } = req.query || {};
+        const rows = await getProposalService().listByMonthTeam(month, team_id, status);
+        res.json({ success: true, proposals: rows });
+    } catch (error) {
+        if (error && error.status && error.code) {
+            return res.status(error.status).json({ error: error.message, code: error.code });
+        }
+        console.error('[schedule] proposals list error:', error);
+        res.status(500).json({ error: 'فشل في جلب الاقتراحات' });
+    }
+});
+
+app.get('/api/schedule/proposals/runs/:id', authenticate, authorizePerm('schedule.proposals.manage'), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const run = await getProposalService().getRun(req.params.id);
+        res.json({ success: true, run });
+    } catch (error) {
+        if (error && error.status && error.code) {
+            return res.status(error.status).json({ error: error.message, code: error.code });
+        }
+        console.error('[schedule] proposal run error:', error);
+        res.status(500).json({ error: 'فشل في جلب التشغيلة' });
+    }
+});
+
+// سحب عرض قائم + تسلسل J5 للمرشح التالي
+app.post('/api/schedule/proposals/:id/withdraw', authenticate, authorizePerm('schedule.proposals.manage'), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const out = await getProposalService().withdraw(req.user, req.params.id);
+        // بعد COMMIT فقط: إشعار الموظف التالي إن وُجد عرض جديد — سقوط آمن
+        if (out.next_employee_id) {
+            try {
+                if (db.Notifications) {
+                    const ownerUserId = await resolveEmployeeUserId(out.next_employee_id);
+                    if (ownerUserId) {
+                        await notificationService.notifyPersonal(ownerUserId, {
+                            title: 'عرض مناوبة تكميلية',
+                            message: `عُرضت عليك مناوبة تكميلية يوم ${out.proposal.date} (${out.proposal.shift_code}) — اقبل أو ارفض من بوابتك`,
+                            type: 'info'
+                        });
+                    }
+                }
+            } catch (nErr) { console.error('proposal next notify error:', nErr.message); }
+        }
+        res.json({ success: true, id: out.id, status: out.status, outcome: out.outcome, next_proposal_id: out.next_proposal_id });
+    } catch (error) {
+        if (error && error.status && error.code) {
+            return res.status(error.status).json({ error: error.message, code: error.code });
+        }
+        console.error('[schedule] proposal withdraw error:', error);
+        res.status(500).json({ error: 'فشل في سحب العرض' });
+    }
+});
+
+// عروضي — هوية الموظف مشتقة خادميًا (لا employee_id من العميل)
+app.get('/api/my/proposals', authenticate, authorizePerm('ops.my_portal'), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const emp = await getMyPortalService().resolveEmployee(req.user);
+        if (!emp) return res.status(404).json(MY_PORTAL_NO_EMPLOYEE);
+        const out = await getProposalService().getMine(emp, req.query.month || null);
+        res.json({ success: true, ...out });
+    } catch (error) {
+        console.error('[my-portal] proposals GET error:', error);
+        res.status(500).json({ error: 'فشل في جلب العروض' });
+    }
+});
+
+// رد الموظف: accept|decline — decline يطلق تسلسل J5 داخل الخدمة
+app.post('/api/my/proposals/:id/respond', authenticate, authorizePerm('ops.my_portal'), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const emp = await getMyPortalService().resolveEmployee(req.user);
+        if (!emp) return res.status(404).json(MY_PORTAL_NO_EMPLOYEE);
+        const { decision } = req.body || {};
+        const out = await getProposalService().respond(emp, req.user, req.params.id, decision);
+        // بعد COMMIT فقط — سقوط آمن في الإشعارين
+        try {
+            if (db.Notifications && out.status === 'accepted') {
+                // J4: لا Auto-Apply — القبول يُشعر حاملي schedule.proposals.manage
+                // والتطبيق عبر F-1/المسارات المعتمدة خارج E-5
+                await notificationService.notifyOperational({
+                    eventKey: 'schedule_proposal.accepted',
+                    title: 'عرض تكميلي مقبول يحتاج تطبيقًا',
+                    message: `${emp.name} قبل عرض يوم ${out.proposal.date} (${out.proposal.shift_code}) — طبّقه عبر المسارات المعتمدة`,
+                    push: true,
+                    permKey: 'schedule.proposals.manage'
+                });
+            }
+            if (db.Notifications && out.next_employee_id) {
+                const nextUserId = await resolveEmployeeUserId(out.next_employee_id);
+                if (nextUserId) {
+                    await notificationService.notifyPersonal(nextUserId, {
+                        title: 'عرض مناوبة تكميلية',
+                        message: `عُرضت عليك مناوبة تكميلية يوم ${out.proposal.date} (${out.proposal.shift_code}) — اقبل أو ارفض من بوابتك`,
+                        type: 'info'
+                    });
+                }
+            }
+        } catch (nErr) { console.error('proposal respond notify error:', nErr.message); }
+        res.json({ success: true, id: out.id, status: out.status, outcome: out.outcome, next_proposal_id: out.next_proposal_id });
+    } catch (error) {
+        if (error && error.status && error.code) {
+            return res.status(error.status).json({ error: error.message, code: error.code });
+        }
+        console.error('[my-portal] proposal respond error:', error);
+        res.status(500).json({ error: 'فشل في الرد على العرض' });
+    }
+});
+
 app.get('/api/permissions/catalog', authenticate, authorizePerm('admin.users_manage'), async (req, res) => {
     res.json({ success: true, permissions: PERMISSIONS_CATALOG, roles: ROLE_LABELS_MAP });
 });

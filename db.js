@@ -1826,6 +1826,61 @@ async function runMigrations() {
     logger.warn('unable_attend_requests: ' + err.message);
   }
 
+  // ═══ FSS E-5 (Design Revision 2 معتمد 2026-10-06): محرك الاقتراحات ═══
+  // تشغيلات التوليد + العروض المسودة. الحالات الحية للعرض: offered+accepted فقط.
+  // الفهرس الفريد الجزئي uq_proposals_live_emp_date هو الحارس البنيوي الأخير
+  // ضد عرضين حيّين لنفس الموظف في نفس اليوم (M7 — مناوبة واحدة في اليوم).
+  // قرار المالك 2026-10-06 (مراجعة E-5): لا يوجد UNIQUE رباعي — declined حالة
+  // نهائية تاريخية لا تُحيى أبدًا؛ التشغيلة الجديدة تنشئ Proposal جديدًا مستقلًا
+  // (Proposal #1 ← declined · Proposal #2 ← offered) فيبقى الـHistory واضحًا.
+  // M13: شهر published ⇒ توقف فوري بصفر كتابة؛ العروض offered لشهر منشور تبقى
+  // تاريخية ميتة (لا تُحدَّث)، وsuperseded محصور قبل النشر (gap_resolved/withdraw).
+  try {
+    await exec(`CREATE TABLE IF NOT EXISTS schedule_proposal_runs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      month TEXT NOT NULL,
+      team_id INTEGER NOT NULL REFERENCES teams(id),
+      status TEXT NOT NULL DEFAULT 'completed'
+        CHECK (status IN ('completed','aborted_published','failed')),
+      gap_summary TEXT,
+      candidates_summary TEXT,
+      created_by INTEGER NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`);
+    await exec('CREATE INDEX IF NOT EXISTS idx_proposal_runs_month_team ON schedule_proposal_runs(month, team_id)');
+    logger.info('schedule_proposal_runs table created');
+  } catch (err) {
+    logger.warn('schedule_proposal_runs: ' + err.message);
+  }
+  try {
+    await exec(`CREATE TABLE IF NOT EXISTS schedule_proposals (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      run_id INTEGER NOT NULL REFERENCES schedule_proposal_runs(id),
+      month TEXT NOT NULL,
+      team_id INTEGER NOT NULL REFERENCES teams(id),
+      employee_id INTEGER NOT NULL REFERENCES employees(id),
+      date TEXT NOT NULL,
+      shift_code TEXT NOT NULL,
+      period TEXT NOT NULL CHECK (period IN ('day','night')),
+      status TEXT NOT NULL DEFAULT 'offered'
+        CHECK (status IN ('offered','accepted','declined','withdrawn','superseded')),
+      rank_position INTEGER,
+      ranking_explanation TEXT,
+      coverage_snapshot TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      responded_at TEXT,
+      responded_by INTEGER
+    )`);
+    await exec('CREATE INDEX IF NOT EXISTS idx_proposals_month_team ON schedule_proposals(month, team_id)');
+    await exec('CREATE INDEX IF NOT EXISTS idx_proposals_emp_month ON schedule_proposals(employee_id, month)');
+    // M7 البنيوي: عرض حيٌّ واحد كحد أقصى لكل (موظف، يوم) — الحالات الحية فقط
+    await exec(`CREATE UNIQUE INDEX IF NOT EXISTS uq_proposals_live_emp_date
+      ON schedule_proposals(employee_id, date) WHERE status IN ('offered','accepted')`);
+    logger.info('schedule_proposals table created');
+  } catch (err) {
+    logger.warn('schedule_proposals: ' + err.message);
+  }
+
   // incidents (replaces incidents.json)
   try {
     await exec(`CREATE TABLE IF NOT EXISTS incidents (
@@ -4081,6 +4136,56 @@ const UnableAttendRequests = {
                    ORDER BY ta.is_primary DESC, ta.id DESC LIMIT 1) AS team_name
                 FROM unable_attend_requests uar JOIN employees e ON e.id = uar.employee_id
                 WHERE uar.status = ? ORDER BY uar.off_date, uar.id`, [status]);
+  }
+};
+
+// ============================================
+// CRUD: SCHEDULE MONTHS (FSS E-0) — قراءة فقط (إضافة E-5 مصرّح بها)
+// بوابة M13: شهر published ⇒ المحرك يتوقف بصفر كتابة في كل مساراته.
+// ============================================
+const ScheduleMonths = {
+  async get(month) {
+    return get('SELECT * FROM schedule_months WHERE month = ?', [month]);
+  }
+};
+
+// ============================================
+// CRUD: SCHEDULE PROPOSALS (FSS E-5) — قراءات فقط هنا
+// كل الكتابات (generate/respond/withdraw/تسلسل J5) داخل tx.immediate في
+// proposal-service مع قيد audit_log في نفس الترانزاكشن (نمط E-1/E-2).
+// «العروض الحية» = offered+accepted فقط (يقابل الفهرس الجزئي uq_proposals_live_emp_date).
+// ============================================
+const ScheduleProposalRuns = {
+  async getById(id) {
+    return get('SELECT * FROM schedule_proposal_runs WHERE id = ?', [id]);
+  }
+};
+
+const ScheduleProposals = {
+  async getById(id) {
+    return get('SELECT * FROM schedule_proposals WHERE id = ?', [id]);
+  },
+  async getByRun(runId) {
+    return all('SELECT * FROM schedule_proposals WHERE run_id = ? ORDER BY date, id', [runId]);
+  },
+  async getByMonthTeam(month, teamId, status) {
+    if (status) {
+      return all(`SELECT p.*, e.name AS employee_name, e.employee_code FROM schedule_proposals p
+                  JOIN employees e ON e.id = p.employee_id
+                  WHERE p.month = ? AND p.team_id = ? AND p.status = ? ORDER BY p.date, p.id`, [month, teamId, status]);
+    }
+    return all(`SELECT p.*, e.name AS employee_name, e.employee_code FROM schedule_proposals p
+                JOIN employees e ON e.id = p.employee_id
+                WHERE p.month = ? AND p.team_id = ? ORDER BY p.date, p.id`, [month, teamId]);
+  },
+  async getByEmployeeMonth(employeeId, month) {
+    return all('SELECT * FROM schedule_proposals WHERE employee_id = ? AND month = ? ORDER BY date, id', [employeeId, month]);
+  },
+  // العرض الحي (offered/accepted) لموظف في يوم — حارس M7 الثلاثي في الخدمة
+  // (الفحص على مستوى الموظف بغض النظر عن الفريق)، والفهرس الجزئي حارس بنيوي أخير.
+  async getLiveByEmployeeDate(employeeId, date) {
+    return get(`SELECT * FROM schedule_proposals WHERE employee_id = ? AND date = ?
+                AND status IN ('offered','accepted')`, [employeeId, date]);
   }
 };
 
@@ -6475,6 +6580,9 @@ module.exports = {
   AppSettings,
   EmployeePreferences,
   UnableAttendRequests,
+  ScheduleMonths,
+  ScheduleProposalRuns,
+  ScheduleProposals,
   Timeline,
   Employees,
   Teams,
