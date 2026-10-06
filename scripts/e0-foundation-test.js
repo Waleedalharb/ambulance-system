@@ -49,7 +49,7 @@ process.env.DB_PATH = path.join(TMP_ROOT, 'ambulance.db'); // قبل استير�
         await db.init(false); // جداول + ترحيلات مخطط + الزرع الخامل
 
         const keysInDb = await db.all('SELECT key, value FROM app_settings WHERE key LIKE ?', ['schedule_engine.%']);
-        check('ب1: الزرع أدرج المفاتيح الثمانية كلها', keysInDb.length === ENGINE_SETTING_KEYS.length && keysInDb.length === 8,
+        check('ب1: الزرع أدرج مفاتيح ENGINE_SETTING_KEYS كلها (' + ENGINE_SETTING_KEYS.length + ' — تشمل مفتاحي E-8 المعتمدين)', keysInDb.length === ENGINE_SETTING_KEYS.length,
             'found=' + keysInDb.length);
         const allDefaultsMatch = ENGINE_SETTING_KEYS.every(k => {
             const row = keysInDb.find(r => r.key === k);
@@ -66,7 +66,7 @@ process.env.DB_PATH = path.join(TMP_ROOT, 'ambulance.db'); // قبل استير�
         const afterReinit = await db.AppSettings.get('schedule_engine.min_rest_hours');
         check('ب4: الزرع خامل — القيمة المعدّلة يدويًا (10) لم تُستبدل بعد init ثانية', afterReinit === 10, 'got=' + afterReinit);
         const countAfter = await db.get('SELECT COUNT(*) c FROM app_settings WHERE key LIKE ?', ['schedule_engine.%']);
-        check('ب5: إعادة init لم تضف مفاتيح مكررة (ما زالت 8)', countAfter.c === 8, 'got=' + countAfter.c);
+        check('ب5: إعادة init لم تضف مفاتيح مكررة (ما زالت ' + ENGINE_SETTING_KEYS.length + ')', countAfter.c === ENGINE_SETTING_KEYS.length, 'got=' + countAfter.c);
 
         // schedule_months — المخطط والقيود
         const cols = await db.all("PRAGMA table_info(schedule_months)");

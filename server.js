@@ -3524,6 +3524,18 @@ function getSwapService() {
     return swapService;
 }
 
+// FSS E-8 (معتمد 2026-10-06): مرونة الموظف — مساران منفصلان (نقل الالتزام ≠
+// التغطية)، 8 ساعات قاعدة مستقلة، Fail-Closed للمفتاحين المعلّقين، تطبيق ذري
+// بنمط E-6، الإشعارات بعد COMMIT فقط. لا Permission جديد (L8).
+let flexService = null;
+function getFlexService() {
+    if (!flexService && db) {
+        const { FlexService } = require('./services/schedule-engine/flex-service');
+        flexService = new FlexService(db);
+    }
+    return flexService;
+}
+
 /** إشعارات/بث ما بعد التطبيق الناجح (auto_applied أو applied) — بعد COMMIT فقط. */
 async function _notifySwapApplied(out, actorUser) {
     const req_ = out.request;
@@ -3720,6 +3732,196 @@ app.post('/api/schedule/shift-swaps/:id/review', authenticate, authorizePerm('sc
         }
         console.error('[schedule] shift-swaps review error:', error);
         res.status(500).json({ error: 'فشل في مراجعة طلب التبديل' });
+    }
+});
+
+// ═══ FSS E-8: مرونة الموظف — APIs الخلفية فقط (L9: لا UI في هذه المرحلة) ═══
+
+app.post('/api/my/flex-requests', authenticate, authorizePerm('ops.my_portal'), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const emp = await getMyPortalService().resolveEmployee(req.user);
+        if (!emp) return res.status(404).json(MY_PORTAL_NO_EMPLOYEE);
+        const out = await getFlexService().submit(emp, req.user, req.body || {});
+        // بعد COMMIT فقط — سقوط الإشعار آمن ولا يُفقد الطلب (⑨)
+        try {
+            if (out.status === 'applied') {
+                await notificationService.notifyPersonal(req.user.id, {
+                    title: 'نُقلت مناوبتك بطلب المرونة',
+                    message: `نُقل التزامك من مناوبة ${(req.body || {}).orig_shift_date} إلى ${out.makeup_date} — التغطية لم تتأثر`,
+                    type: 'success'
+                });
+            } else if (out.status === 'offer_pending' && out.offer) {
+                const uid = await resolveEmployeeUserId(out.offer.employee_id);
+                if (uid) {
+                    await notificationService.notifyPersonal(uid, {
+                        title: 'عرض تغطية مناوبة',
+                        message: `${emp.name} لا يستطيع حضور مناوبته (${out.offer.cover_date} ${out.offer.shift_code}) — هل تغطيها؟ اقبل أو ارفض من بوابتك`,
+                        type: 'info'
+                    });
+                }
+            } else if (out.status === 'escalated') {
+                await notificationService.notifyOperational({
+                    eventKey: 'flex.escalated',
+                    title: 'طلب مرونة يحتاج مراجعة',
+                    message: `${emp.name}: نقل مناوبة ${(req.body || {}).orig_shift_date} — استُنفدت قنوات البحث الآلي عن بديل`,
+                    push: true,
+                    permKey: 'schedule.requests.review'
+                });
+            }
+        } catch (nErr) { console.error('flex submit notify error:', nErr.message); }
+        res.json({ success: true, ...out });
+    } catch (error) {
+        if (error && error.status && error.code) {
+            return res.status(error.status).json({ error: error.message, code: error.code });
+        }
+        console.error('[my-portal] flex-requests submit error:', error);
+        res.status(500).json({ error: 'فشل في تقديم طلب المرونة' });
+    }
+});
+
+app.get('/api/my/flex-requests', authenticate, authorizePerm('ops.my_portal'), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const emp = await getMyPortalService().resolveEmployee(req.user);
+        if (!emp) return res.status(404).json(MY_PORTAL_NO_EMPLOYEE);
+        const rows = await getFlexService().getMine(emp);
+        res.json({ success: true, requests: rows });
+    } catch (error) {
+        console.error('[my-portal] flex-requests list error:', error);
+        res.status(500).json({ error: 'فشل في جلب طلبات المرونة' });
+    }
+});
+
+app.post('/api/my/flex-requests/:id/cancel', authenticate, authorizePerm('ops.my_portal'), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const emp = await getMyPortalService().resolveEmployee(req.user);
+        if (!emp) return res.status(404).json(MY_PORTAL_NO_EMPLOYEE);
+        const out = await getFlexService().cancel(Number(req.params.id), emp, req.user);
+        // بعد COMMIT فقط: إشعار المرشح بسحب العرض إن وُجد
+        if (out.withdrawn_offer) {
+            try {
+                const uid = await resolveEmployeeUserId(out.withdrawn_offer.employee_id);
+                if (uid) {
+                    await notificationService.notifyPersonal(uid, {
+                        title: 'سُحب عرض التغطية',
+                        message: `ألغى ${emp.name} طلب المرونة — لم يعد عرض التغطية (${out.withdrawn_offer.cover_date}) قائمًا`,
+                        type: 'info'
+                    });
+                }
+            } catch (nErr) { console.error('flex cancel notify error:', nErr.message); }
+        }
+        res.json({ success: true, ...out });
+    } catch (error) {
+        if (error && error.status && error.code) {
+            return res.status(error.status).json({ error: error.message, code: error.code });
+        }
+        console.error('[my-portal] flex-requests cancel error:', error);
+        res.status(500).json({ error: 'فشل في إلغاء طلب المرونة' });
+    }
+});
+
+app.get('/api/my/flex-offers', authenticate, authorizePerm('ops.my_portal'), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const emp = await getMyPortalService().resolveEmployee(req.user);
+        if (!emp) return res.status(404).json(MY_PORTAL_NO_EMPLOYEE);
+        const rows = await getFlexService().getMyOffers(emp);
+        res.json({ success: true, offers: rows });
+    } catch (error) {
+        console.error('[my-portal] flex-offers list error:', error);
+        res.status(500).json({ error: 'فشل في جلب عروض التغطية' });
+    }
+});
+
+app.post('/api/my/flex-offers/:id/respond', authenticate, authorizePerm('ops.my_portal'), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const emp = await getMyPortalService().resolveEmployee(req.user);
+        if (!emp) return res.status(404).json(MY_PORTAL_NO_EMPLOYEE);
+        const { action } = req.body || {};
+        const out = await getFlexService().respondOffer(Number(req.params.id), emp, req.user, action);
+        // بعد COMMIT فقط
+        try {
+            if (out.status === 'applied') {
+                const uid = await resolveEmployeeUserId(out.requester_id);
+                if (uid) {
+                    await notificationService.notifyPersonal(uid, {
+                        title: 'قُبل عرض التغطية — نُقلت مناوبتك',
+                        message: `قبل ${emp.name} تغطية مناوبتك الأصلية، ونُقل التزامك إلى اليوم البديل بنجاح`,
+                        type: 'success'
+                    });
+                }
+            } else if (out.status === 'offer_pending' && out.next_offer) {
+                const uid = await resolveEmployeeUserId(out.next_offer.employee_id);
+                if (uid) {
+                    await notificationService.notifyPersonal(uid, {
+                        title: 'عرض تغطية مناوبة',
+                        message: `مطلوب تغطية مناوبة (${out.next_offer.cover_date} ${out.next_offer.shift_code}) — اقبل أو ارفض من بوابتك`,
+                        type: 'info'
+                    });
+                }
+            } else if (out.status === 'escalated') {
+                await notificationService.notifyOperational({
+                    eventKey: 'flex.escalated',
+                    title: 'طلب مرونة يحتاج مراجعة',
+                    message: 'استُنفدت قنوات البحث الآلي عن بديل لتغطية مناوبة — طلب مرونة بانتظار القرار',
+                    push: true,
+                    permKey: 'schedule.requests.review'
+                });
+            }
+        } catch (nErr) { console.error('flex respond notify error:', nErr.message); }
+        res.json({ success: true, ...out });
+    } catch (error) {
+        if (error && error.status && error.code) {
+            return res.status(error.status).json({ error: error.message, code: error.code });
+        }
+        console.error('[my-portal] flex-offers respond error:', error);
+        res.status(500).json({ error: 'فشل في الرد على عرض التغطية' });
+    }
+});
+
+app.get('/api/schedule/flex-requests', authenticate, authorizePerm('schedule.requests.review'), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const rows = await getFlexService().getReviewQueue(req.query.status || 'escalated');
+        const withOffers = [];
+        for (const r of rows) {
+            withOffers.push({ ...r, offers: await getFlexService().getOffersForRequest(r.id) });
+        }
+        res.json({ success: true, requests: withOffers });
+    } catch (error) {
+        console.error('[schedule] flex-requests queue error:', error);
+        res.status(500).json({ error: 'فشل في جلب طلبات المرونة' });
+    }
+});
+
+app.post('/api/schedule/flex-requests/:id/review', authenticate, authorizePerm('schedule.requests.review'), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const { action, note } = req.body || {};
+        const out = await getFlexService().review(Number(req.params.id), req.user, action, note);
+        // بعد COMMIT فقط: إشعار صاحب الطلب بالقرار
+        try {
+            const uid = await resolveEmployeeUserId(out.requester_id);
+            if (uid) {
+                await notificationService.notifyPersonal(uid, {
+                    title: out.status === 'applied' ? 'اعتُمد طلب المرونة وطُبّق' : 'رُفض طلب المرونة',
+                    message: out.status === 'applied'
+                        ? `اعتمد المسؤول طلب المرونة #${out.request_id} ونُقل التزامك إلى اليوم البديل`
+                        : `رفض المسؤول طلب المرونة #${out.request_id}${note ? ' — ' + String(note).slice(0, 200) : ''}`,
+                    type: out.status === 'applied' ? 'success' : 'warning'
+                });
+            }
+        } catch (nErr) { console.error('flex review notify error:', nErr.message); }
+        res.json({ success: true, ...out });
+    } catch (error) {
+        if (error && error.status && error.code) {
+            return res.status(error.status).json({ error: error.message, code: error.code });
+        }
+        console.error('[schedule] flex-requests review error:', error);
+        res.status(500).json({ error: 'فشل في مراجعة طلب المرونة' });
     }
 });
 

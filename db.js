@@ -1924,6 +1924,69 @@ async function runMigrations() {
     logger.warn('shift_swap_requests: ' + err.message);
   }
 
+  // ═══ FSS E-8 (معتمد 2026-10-06 — Final Schema Review): مرونة الموظف ═══
+  // flex_requests: نقل التزام الموظف فقط — نتيجة التغطية كلها في flex_offers
+  // (مراجعة ①: لا replacement_employee_id هنا). المفتاحان المعلّقان
+  // (max_flex_moves_per_month / flex_makeup_search_days) غير مزروعَين عمدًا —
+  // غيابهما = FLEX_CONFIG_MISSING (Fail-Closed)، وليس unlimited (مراجعة ⑥⑦).
+  try {
+    await exec(`CREATE TABLE IF NOT EXISTS flex_requests (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      employee_id INTEGER NOT NULL REFERENCES employees(id),
+      month TEXT NOT NULL,
+      roster_id INTEGER NOT NULL REFERENCES shift_roster(id),
+      orig_shift_date TEXT NOT NULL,
+      orig_shift_code TEXT NOT NULL,
+      orig_team_id INTEGER REFERENCES teams(id),
+      makeup_options_json TEXT NOT NULL,
+      makeup_date TEXT,
+      coverage_state TEXT CHECK(coverage_state IN ('holds','broken') OR coverage_state IS NULL),
+      status TEXT NOT NULL DEFAULT 'submitted' CHECK(status IN (
+        'submitted','pending_validation','replacement_search','offer_pending',
+        'ready','applied','escalated','approved','rejected','cancelled','expired')),
+      escalation_reason TEXT,
+      review_note TEXT,
+      reviewed_by INTEGER,
+      reviewed_at TEXT,
+      created_by INTEGER NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      applied_at TEXT,
+      updated_at TEXT
+    )`);
+    await exec(`CREATE TABLE IF NOT EXISTS flex_offers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      flex_request_id INTEGER NOT NULL REFERENCES flex_requests(id),
+      employee_id INTEGER NOT NULL REFERENCES employees(id),
+      team_id INTEGER NOT NULL REFERENCES teams(id),
+      cover_date TEXT NOT NULL,
+      shift_code TEXT NOT NULL,
+      tier TEXT NOT NULL CHECK(tier IN ('same_team','same_center','south_1_10','rapid')),
+      rank_position INTEGER NOT NULL,
+      m5_json TEXT,
+      status TEXT NOT NULL DEFAULT 'offered' CHECK(status IN (
+        'offered','accepted','declined','withdrawn','expired','invalidated')),
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      responded_at TEXT
+    )`);
+    await exec('CREATE INDEX IF NOT EXISTS idx_flex_req_emp_month ON flex_requests(employee_id, month)');
+    await exec('CREATE INDEX IF NOT EXISTS idx_flex_req_status ON flex_requests(status)');
+    // طلب حيٌّ واحد على صف roster (مراجعة ②⑧) — يتعايش مع حارسي E-6
+    // (employee,date): التنسيق تطبيقي + حارسان نهائيان شرطيان في الجهتين.
+    await exec(`CREATE UNIQUE INDEX IF NOT EXISTS uq_flex_live_roster ON flex_requests(roster_id)
+      WHERE status IN ('submitted','pending_validation','replacement_search','offer_pending','ready','escalated')`);
+    // عرض حيٌّ واحد لكل طلب — تسلسل واحدًا بعد الآخر بلا فقدان التاريخ (مراجعة ④)
+    await exec(`CREATE UNIQUE INDEX IF NOT EXISTS uq_flex_offer_live ON flex_offers(flex_request_id)
+      WHERE status = 'offered'`);
+    // حارس M7: مرشح = عرض حيٌّ واحد في اليوم عبر كل طلبات المرونة (مراجعة ⑧)
+    await exec(`CREATE UNIQUE INDEX IF NOT EXISTS uq_flex_offer_live_emp_date ON flex_offers(employee_id, cover_date)
+      WHERE status IN ('offered','accepted')`);
+    await exec('CREATE INDEX IF NOT EXISTS idx_flex_offers_req ON flex_offers(flex_request_id)');
+    await exec('CREATE INDEX IF NOT EXISTS idx_flex_offers_emp ON flex_offers(employee_id)');
+    logger.info('flex_requests/flex_offers tables created');
+  } catch (err) {
+    logger.warn('flex_requests/flex_offers: ' + err.message);
+  }
+
   // incidents (replaces incidents.json)
   try {
     await exec(`CREATE TABLE IF NOT EXISTS incidents (

@@ -33,7 +33,15 @@ const ENGINE_DEFAULTS = Object.freeze({
     // M9: حد التطبيق التلقائي للتبديل بالتراضي بالساعات قبل بداية المناوبة
     'schedule_engine.swap_auto_window_hours': 48,
     // M14: حد تفضيلات الزمالة الإيجابية لكل موظف (Soft Preference)
-    'schedule_engine.max_colleague_preferences': 3
+    'schedule_engine.max_colleague_preferences': 3,
+    // E-8 (معتمد 2026-10-06): نافذة إشعار المرونة — قاعدة مستقلة لا علاقة لها بـM9/48h.
+    // داخل النافذة ⇒ رفض آلي FLEX_NOTICE_WINDOW ولا يستهلك العدّاد (قرار §4-أ).
+    'schedule_engine.flex_notice_hours': 8,
+    // E-8 (L10): سقف الأيام البديلة المرتبة في طلب المرونة الواحد
+    'schedule_engine.flex_max_makeup_options': 3
+    // E-8: المفتاحان المعلّقان (max_flex_moves_per_month / flex_makeup_search_days)
+    // لا يُضافان هنا عمدًا — غيابهما من app_settings = FLEX_CONFIG_MISSING
+    // (Fail-Closed، مراجعة ⑥⑦) وليس unlimited ولا رقم صامت.
 });
 
 const ENGINE_SETTING_KEYS = Object.freeze(Object.keys(ENGINE_DEFAULTS));
