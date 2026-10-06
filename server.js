@@ -3202,6 +3202,120 @@ app.put('/api/my/schedule-preferences', authenticate, authorizePerm('ops.my_port
     }
 });
 
+// ═══ FSS E-2 (قرارات M1/M2 + د1/د2/د3 معتمدة 2026-10-06): طلبات عدم التمكّن ═══
+// كيان مستقل عن leave_requests. الهوية خادمية. كل كتابة + Audit في ترانزاكشن
+// واحدة داخل الخدمة. الإشعارات بعد COMMIT فقط وفشلها لا يُفقد الطلب.
+// لا كتابة في shift_roster إطلاقًا. المراجعة محروسة بـ schedule.requests.review (M10/E-0).
+let unableAttendService = null;
+function getUnableAttendService() {
+    if (!unableAttendService && db) {
+        const { UnableAttendService } = require('./services/schedule-engine/unable-attend-service');
+        unableAttendService = new UnableAttendService(db);
+    }
+    return unableAttendService;
+}
+
+app.get('/api/my/unable-attend', authenticate, authorizePerm('ops.my_portal'), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const emp = await getMyPortalService().resolveEmployee(req.user);
+        if (!emp) return res.status(404).json(MY_PORTAL_NO_EMPLOYEE);
+        const out = await getUnableAttendService().getMine(emp, req.query.month || null);
+        res.json({ success: true, ...out });
+    } catch (error) {
+        console.error('[my-portal] unable-attend GET error:', error);
+        res.status(500).json({ error: 'فشل في جلب طلبات عدم التمكّن' });
+    }
+});
+
+app.post('/api/my/unable-attend', authenticate, authorizePerm('ops.my_portal'), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const emp = await getMyPortalService().resolveEmployee(req.user);
+        if (!emp) return res.status(404).json(MY_PORTAL_NO_EMPLOYEE);
+        const { off_date, reason } = req.body || {};
+        const out = await getUnableAttendService().submit(emp, req.user, off_date, reason);
+        // بعد COMMIT فقط: تصعيد للمراجعين عند pending_review (M2) — فشله لا يُفقد الطلب
+        if (out.status === 'pending_review') {
+            try {
+                if (db.Notifications) {
+                    await notificationService.notifyOperational({
+                        eventKey: 'unable_attend.escalated',
+                        title: 'طلب عدم تمكّن يحتاج مراجعة',
+                        message: `${emp.name}: يوم ${out.off_date}` + (out.is_exception ? ' (تجاوز حد الأيام الشهري)' : ' (تعارض تغطية محتمل)'),
+                        push: true,
+                        permKey: 'schedule.requests.review'
+                    });
+                }
+            } catch (nErr) { console.error('unable-attend escalate notify error:', nErr.message); }
+        }
+        res.json({ success: true, ...out });
+    } catch (error) {
+        if (error && error.status && error.code) {
+            return res.status(error.status).json({ error: error.message, code: error.code });
+        }
+        console.error('[my-portal] unable-attend POST error:', error);
+        res.status(500).json({ error: 'فشل في تقديم الطلب' });
+    }
+});
+
+// د1: إلغاء المالك — الحالات الثلاث ما دام اليوم في المستقبل، بلا حذف فعلي، مع Audit
+app.post('/api/my/unable-attend/:id/cancel', authenticate, authorizePerm('ops.my_portal'), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const emp = await getMyPortalService().resolveEmployee(req.user);
+        if (!emp) return res.status(404).json(MY_PORTAL_NO_EMPLOYEE);
+        const out = await getUnableAttendService().cancelMine(emp, req.user, req.params.id);
+        res.json({ success: true, ...out });
+    } catch (error) {
+        if (error && error.status && error.code) {
+            return res.status(error.status).json({ error: error.message, code: error.code });
+        }
+        console.error('[my-portal] unable-attend cancel error:', error);
+        res.status(500).json({ error: 'فشل في إلغاء الطلب' });
+    }
+});
+
+app.get('/api/schedule/unable-attend', authenticate, authorizePerm('schedule.requests.review'), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const rows = await getUnableAttendService().getReviewQueue(req.query.status || 'pending_review');
+        res.json({ success: true, requests: rows });
+    } catch (error) {
+        console.error('[schedule] unable-attend queue error:', error);
+        res.status(500).json({ error: 'فشل في جلب قائمة المراجعة' });
+    }
+});
+
+app.post('/api/schedule/unable-attend/:id/review', authenticate, authorizePerm('schedule.requests.review'), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const { decision, note } = req.body || {};
+        const out = await getUnableAttendService().review(req.params.id, req.user, decision, note);
+        // بعد COMMIT فقط: إشعار شخصي لصاحب الطلب بنتيجة المراجعة — سقوط آمن بلا حساب مربوط
+        try {
+            if (db.Notifications) {
+                const ownerUserId = await resolveEmployeeUserId(out.request.employee_id);
+                if (ownerUserId) {
+                    const approved = out.status === 'approved';
+                    await notificationService.notifyPersonal(ownerUserId, {
+                        title: approved ? 'تمت الموافقة على طلب عدم التمكّن' : 'تم رفض طلب عدم التمكّن',
+                        message: `يوم ${out.request.off_date}: ${approved ? 'تمت الموافقة على' : 'تم رفض'} طلب عدم التمكّن من الحضور`,
+                        type: approved ? 'success' : 'warning'
+                    });
+                }
+            }
+        } catch (nErr) { console.error('unable-attend review notify error:', nErr.message); }
+        res.json({ success: true, id: out.id, status: out.status });
+    } catch (error) {
+        if (error && error.status && error.code) {
+            return res.status(error.status).json({ error: error.message, code: error.code });
+        }
+        console.error('[schedule] unable-attend review error:', error);
+        res.status(500).json({ error: 'فشل في مراجعة الطلب' });
+    }
+});
+
 app.get('/api/permissions/catalog', authenticate, authorizePerm('admin.users_manage'), async (req, res) => {
     res.json({ success: true, permissions: PERMISSIONS_CATALOG, roles: ROLE_LABELS_MAP });
 });

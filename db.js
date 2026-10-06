@@ -1794,6 +1794,38 @@ async function runMigrations() {
     logger.warn('employee_preferences: ' + err.message);
   }
 
+  // ═══ FSS E-2 (قرارات M1/M2 معتمدة 2026-10-06): طلبات عدم التمكّن من الحضور ═══
+  // كيان مستقل تمامًا عن leave_requests — لا يُخصم من أي رصيد ولا يُعامل كإجازة.
+  // يوم واحد لكل طلب. الحالات: auto_approved (فحص M2 نظيف) · pending_review
+  // (تصعيد — تعارض تغطية أو تجاوز حد الأيام، وليس رفضًا) · approved/rejected
+  // (قرار مراجع) · cancelled (إلغاء مالك — د1: المستقبل فقط، بلا حذف فعلي).
+  // is_exception=1: الطلب الخامس+ في الشهر ⇒ مراجعة إجبارية (M1).
+  // لا كاتب له في shift_roster — E-2 لا يغيّر الجدول إطلاقًا.
+  try {
+    await exec(`CREATE TABLE IF NOT EXISTS unable_attend_requests (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      employee_id INTEGER NOT NULL REFERENCES employees(id),
+      month TEXT NOT NULL,
+      off_date TEXT NOT NULL,
+      reason TEXT,
+      status TEXT NOT NULL DEFAULT 'pending_review'
+        CHECK (status IN ('auto_approved','pending_review','approved','rejected','cancelled')),
+      is_exception INTEGER NOT NULL DEFAULT 0,
+      reviewed_by INTEGER,
+      reviewed_at TEXT,
+      review_note TEXT,
+      created_by INTEGER NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT,
+      UNIQUE (employee_id, off_date)
+    )`);
+    await exec('CREATE INDEX IF NOT EXISTS idx_unable_attend_emp_month ON unable_attend_requests(employee_id, month)');
+    await exec('CREATE INDEX IF NOT EXISTS idx_unable_attend_status ON unable_attend_requests(status)');
+    logger.info('unable_attend_requests table created');
+  } catch (err) {
+    logger.warn('unable_attend_requests: ' + err.message);
+  }
+
   // incidents (replaces incidents.json)
   try {
     await exec(`CREATE TABLE IF NOT EXISTS incidents (
@@ -4013,6 +4045,42 @@ const AppSettings = {
 const EmployeePreferences = {
   async getByEmployeeMonth(employeeId, month) {
     return all('SELECT * FROM employee_preferences WHERE employee_id = ? AND month = ? ORDER BY pref_type, pref_value', [employeeId, month]);
+  }
+};
+
+// ============================================
+// CRUD: UNABLE-ATTEND REQUESTS (FSS E-2 — قرارات M1/M2)
+// قراءات فقط هنا — كل الكتابات (submit/cancel/review) تتم داخل tx.immediate
+// في unable-attend-service مع قيد audit_log في نفس الترانزاكشن (نمط E-1).
+// «الطلبات الحية» = كل الحالات عدا rejected/cancelled (لعدّ M1 الشهري).
+// ============================================
+const UnableAttendRequests = {
+  async getById(id) {
+    return get('SELECT * FROM unable_attend_requests WHERE id = ?', [id]);
+  },
+  async getByEmployeeMonth(employeeId, month) {
+    return all('SELECT * FROM unable_attend_requests WHERE employee_id = ? AND month = ? ORDER BY off_date', [employeeId, month]);
+  },
+  async getLiveByEmployeeMonth(employeeId, month) {
+    return all("SELECT * FROM unable_attend_requests WHERE employee_id = ? AND month = ? AND status IN ('auto_approved','pending_review','approved') ORDER BY off_date", [employeeId, month]);
+  },
+  async getByEmployeeDate(employeeId, offDate) {
+    return get('SELECT * FROM unable_attend_requests WHERE employee_id = ? AND off_date = ?', [employeeId, offDate]);
+  },
+  // الطلبات المعتمدة لفريق في يوم (لفحص التغطية M2/M4): عضوية الفريق من سطر
+  // roster نفسه لذلك اليوم — team-centric بلا أي تعريف تغطية مستقل.
+  async getApprovedForTeamDate(teamId, offDate) {
+    return all(`SELECT uar.* FROM unable_attend_requests uar
+                JOIN shift_roster sr ON sr.employee_id = uar.employee_id AND sr.shift_date = uar.off_date
+                WHERE sr.team_id = ? AND uar.off_date = ? AND uar.status IN ('auto_approved','approved')`, [teamId, offDate]);
+  },
+  async getReviewQueue(status) {
+    return all(`SELECT uar.*, e.name AS employee_name, e.employee_code, e.job_title,
+                  (SELECT t.name FROM team_assignments ta JOIN teams t ON t.id = ta.team_id
+                   WHERE ta.employee_id = uar.employee_id AND (ta.end_date IS NULL OR ta.end_date = '' OR ta.end_date >= date('now'))
+                   ORDER BY ta.is_primary DESC, ta.id DESC LIMIT 1) AS team_name
+                FROM unable_attend_requests uar JOIN employees e ON e.id = uar.employee_id
+                WHERE uar.status = ? ORDER BY uar.off_date, uar.id`, [status]);
   }
 };
 
@@ -6406,6 +6474,7 @@ module.exports = {
   References,
   AppSettings,
   EmployeePreferences,
+  UnableAttendRequests,
   Timeline,
   Employees,
   Teams,
