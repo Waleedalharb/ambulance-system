@@ -56,11 +56,28 @@ function _result(checks, extra) {
 
 /**
  * تحقق شامل لعملية على مناوبة موظف في يوم — بلا أي كتابة.
- * @param {object} p { employeeId, date, shiftCode, operation: 'add'|'remove'|'change', teamId? }
+ * @param {object} p { employeeId, date, shiftCode, operation: 'add'|'remove'|'change', teamId?, context? }
  *   teamId اختياري: يُشتق من العضوية الحية عند غيابه؛ إن مُرّر وخالف العضوية = FAIL
  *   (لا يُقبل كمدخل موثوق من عميل — المستدعي خادم داخلي فقط).
+ *   context اختياري (قرار المالك 2026-10-08 — أ): القيمة الوحيدة المعروفة
+ *   'supplementary' وتسمح وحدها بفحص رموز status='تكميل' ذات الأوقات الفعلية
+ *   (CPD/CPN وما يستجد) كمناوبات عمل. غيابه = السلوك الأصلي حرفيًا («دوام»
+ *   فقط) — E-8/E-5/E-6 وكل مستدعٍ قائم لا يمررونه فلا يتأثرون إطلاقًا.
  */
-async function validateAssignment(db, { employeeId, date, shiftCode, operation = 'add', teamId = null }) {
+/** تعريف الليلة = M4 حرفيًا (time_start ≥ 12:00). coverage-service.periodOf لا
+ *  يتعرف إلا على «دوام»؛ في سياق supplementary نشتقها من الأوقات الفعلية
+ *  للرمز التكميلي حتى يعمل M6 عليه (قرار المالك 2026-10-08 — أ). لا تُستخدم
+ *  لعدّ التغطية إطلاقًا — التكميلية لا تدخل الحد الأدنى (قرار ب). */
+function _periodOfCtx(code, isSupp) {
+    const p = coverageService.periodOf(code);
+    if (p) return p;
+    if (isSupp && code && code.status === 'تكميل' && code.time_start) {
+        return Number(String(code.time_start).slice(0, 2)) >= 12 ? 'night' : 'day';
+    }
+    return null;
+}
+async function validateAssignment(db, { employeeId, date, shiftCode, operation = 'add', teamId = null, context = null }) {
+    const isSupp = context === 'supplementary';
     const checks = [];
     const add = (code, status, reason, detail) =>
         checks.push(Object.assign({ code, status },
@@ -98,7 +115,9 @@ async function validateAssignment(db, { employeeId, date, shiftCode, operation =
     const code = codeMap.get(String(shiftCode));
     if (!code) {
         add('SHIFT_CODE', 'fail', 'UNKNOWN_SHIFT_CODE', { shift_code: shiftCode });
-    } else if (code.status !== 'دوام') {
+    } else if (code.status !== 'دوام' && !(isSupp && code.status === 'تكميل' && code.time_start && code.time_end)) {
+        // سياق supplementary (قرار أ 2026-10-08): رموز «تكميل» بأوقات فعلية = مناوبات عمل
+        // في هذا السياق فقط؛ بلا أوقات ⇒ لا يمكن حساب الراحة/النافذة فتُرفض كغيرها.
         add('SHIFT_CODE', 'fail', 'NOT_A_WORK_SHIFT', { shift_code: shiftCode, status: code.status });
     } else {
         add('SHIFT_CODE', 'pass');
@@ -194,17 +213,17 @@ async function validateAssignment(db, { employeeId, date, shiftCode, operation =
     const maxNights = await getEngineSetting('schedule_engine.max_consecutive_nights');
     if (isRemove) {
         add('CONSECUTIVE_NIGHTS', 'skip', null, { note: 'remove لا يُنشئ تتابع ليالٍ' });
-    } else if (coverageService.periodOf(code) !== 'night') {
+    } else if (_periodOfCtx(code, isSupp) !== 'night') {
         add('CONSECUTIVE_NIGHTS', 'pass', null, { candidate_night: false });
     } else {
         let back = 0, fwd = 0;
         for (let i = 1; i <= maxNights; i++) {
             const r = await db.get('SELECT shift_code FROM shift_roster WHERE employee_id = ? AND shift_date = ?', [employeeId, _shiftDate(date, -i)]);
-            if (r && coverageService.periodOf(codeMap.get(String(r.shift_code))) === 'night') back++; else break;
+            if (r && _periodOfCtx(codeMap.get(String(r.shift_code)), isSupp) === 'night') back++; else break;
         }
         for (let i = 1; i <= maxNights; i++) {
             const r = await db.get('SELECT shift_code FROM shift_roster WHERE employee_id = ? AND shift_date = ?', [employeeId, _shiftDate(date, i)]);
-            if (r && coverageService.periodOf(codeMap.get(String(r.shift_code))) === 'night') fwd++; else break;
+            if (r && _periodOfCtx(codeMap.get(String(r.shift_code)), isSupp) === 'night') fwd++; else break;
         }
         const run = back + 1 + fwd;
         if (run > maxNights) {
