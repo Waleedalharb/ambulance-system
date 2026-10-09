@@ -247,7 +247,7 @@ final class ScheduleViewModel: ObservableObject {
     /// اسم اليوم كاملًا: «الثلاثاء».
     func weekdayName(_ dateStr: String?) -> String {
         guard let date = parseDay(dateStr) else { return "—" }
-        let names = ["الأحد", "الاثنين", "الأربعاء", "الخميس", "الجمعة", "السبت"]
+        let names = ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"]
         let w = riyadhCalendar.component(.weekday, from: date)
         return names[max(0, min(6, w - 1))]
     }

@@ -408,7 +408,13 @@ actor APIClient {
             let msg = (try? JSONDecoder().decode([String: String].self, from: data))?["error"] ?? ""
             throw APIError.badRequest(msg)
         default:
-            let msg = (try? JSONDecoder().decode([String: String].self, from: data))?["error"] ?? "HTTP \(http.statusCode)"
+            let body = try? JSONDecoder().decode([String: String].self, from: data)
+            let msg = body?["error"] ?? "HTTP \(http.statusCode)"
+            // عقود تحمل code تعاقديًا (مثل المناوبة التكميلية: SUPP_CONFIG_MISSING) —
+            // يُحفظ للواجهة بدل إسقاطه في رسالة عامة.
+            if let code = body?["code"], !code.isEmpty {
+                throw APIError.serverWithCode(msg, code)
+            }
             throw APIError.server(msg)
         }
     }
