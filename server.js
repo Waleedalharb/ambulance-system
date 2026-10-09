@@ -3536,6 +3536,19 @@ function getFlexService() {
     return flexService;
 }
 
+// المناوبة التكميلية (معتمد 2026-10-08): capability مستقلة عن E-8 — إضافة
+// مناوبة اختيارية بمراجعة بشرية حتمية (لا اعتماد آلي)، اعتماد+تطبيق ذريان،
+// Fail-Closed للإعدادين المعلّقين، الإشعارات بعد COMMIT فقط. صلاحيات قائمة
+// فقط: ops.my_portal + schedule.requests.review (لا Permission جديد).
+let supplementaryService = null;
+function getSupplementaryService() {
+    if (!supplementaryService && db) {
+        const { SupplementaryService } = require('./services/schedule-engine/supplementary-service');
+        supplementaryService = new SupplementaryService(db);
+    }
+    return supplementaryService;
+}
+
 /** إشعارات/بث ما بعد التطبيق الناجح (auto_applied أو applied) — بعد COMMIT فقط. */
 async function _notifySwapApplied(out, actorUser) {
     const req_ = out.request;
@@ -3879,6 +3892,127 @@ app.post('/api/my/flex-offers/:id/respond', authenticate, authorizePerm('ops.my_
         }
         console.error('[my-portal] flex-offers respond error:', error);
         res.status(500).json({ error: 'فشل في الرد على عرض التغطية' });
+    }
+});
+
+// ═══ المناوبة التكميلية (معتمد 2026-10-08) — مسارات البوابة ═══
+
+// مقترحات الموظف: أيام بقية الشهر × رموز «دوام» بعد E-4 + حدود الشهر وساعاته
+// (عرض فقط — ليست بوابة أهلية). قراءة صِرفة بلا أي كتابة.
+app.get('/api/my/supplementary-candidates', authenticate, authorizePerm('ops.my_portal'), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const emp = await getMyPortalService().resolveEmployee(req.user);
+        if (!emp) return res.status(404).json(MY_PORTAL_NO_EMPLOYEE);
+        const out = await getSupplementaryService().getCandidates(emp, String(req.query.month || ''));
+        res.json({ success: true, ...out });
+    } catch (error) {
+        if (error && error.status && error.code) {
+            return res.status(error.status).json({ error: error.message, code: error.code });
+        }
+        console.error('[my-portal] supplementary-candidates error:', error);
+        res.status(500).json({ error: 'فشل في جلب مقترحات المناوبة التكميلية' });
+    }
+});
+
+// تقديم طلب — الفريق يُشتق سيرفريًا من العضوية الحية؛ لا اعتماد آلي إطلاقًا.
+app.post('/api/my/supplementary-requests', authenticate, authorizePerm('ops.my_portal'), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const emp = await getMyPortalService().resolveEmployee(req.user);
+        if (!emp) return res.status(404).json(MY_PORTAL_NO_EMPLOYEE);
+        const out = await getSupplementaryService().submit(emp, req.user, req.body || {});
+        // بعد COMMIT فقط — سقوط الإشعار آمن ولا يُفقد الطلب
+        if (out.status === 'pending_review') {
+            try {
+                await notificationService.notifyOperational({
+                    eventKey: 'supplementary.submitted',
+                    title: 'طلب مناوبة تكميلية بانتظار المراجعة',
+                    message: `${emp.name}: مناوبة تكميلية ${(req.body || {}).target_date} ${(req.body || {}).shift_code} — بانتظار القرار`,
+                    push: true,
+                    permKey: 'schedule.requests.review'
+                });
+            } catch (nErr) { console.error('supplementary submit notify error:', nErr.message); }
+        }
+        res.json({ success: true, ...out });
+    } catch (error) {
+        if (error && error.status && error.code) {
+            return res.status(error.status).json({ error: error.message, code: error.code });
+        }
+        console.error('[my-portal] supplementary-requests submit error:', error);
+        res.status(500).json({ error: 'فشل في تقديم طلب المناوبة التكميلية' });
+    }
+});
+
+app.get('/api/my/supplementary-requests', authenticate, authorizePerm('ops.my_portal'), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const emp = await getMyPortalService().resolveEmployee(req.user);
+        if (!emp) return res.status(404).json(MY_PORTAL_NO_EMPLOYEE);
+        const rows = await getSupplementaryService().getMine(emp);
+        res.json({ success: true, requests: rows });
+    } catch (error) {
+        console.error('[my-portal] supplementary-requests list error:', error);
+        res.status(500).json({ error: 'فشل في جلب طلبات المناوبة التكميلية' });
+    }
+});
+
+app.post('/api/my/supplementary-requests/:id/cancel', authenticate, authorizePerm('ops.my_portal'), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const emp = await getMyPortalService().resolveEmployee(req.user);
+        if (!emp) return res.status(404).json(MY_PORTAL_NO_EMPLOYEE);
+        const out = await getSupplementaryService().cancel(Number(req.params.id), emp, req.user);
+        res.json({ success: true, ...out });
+    } catch (error) {
+        if (error && error.status && error.code) {
+            return res.status(error.status).json({ error: error.message, code: error.code });
+        }
+        console.error('[my-portal] supplementary-requests cancel error:', error);
+        res.status(500).json({ error: 'فشل في إلغاء طلب المناوبة التكميلية' });
+    }
+});
+
+// ═══ المناوبة التكميلية — مسارات المراجعة (schedule.requests.review القائمة) ═══
+
+app.get('/api/schedule/supplementary-requests', authenticate, authorizePerm('schedule.requests.review'), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const rows = await getSupplementaryService().getReviewQueue(req.query.status ? String(req.query.status) : null);
+        res.json({ success: true, requests: rows });
+    } catch (error) {
+        console.error('[schedule] supplementary-requests queue error:', error);
+        res.status(500).json({ error: 'فشل في جلب قائمة طلبات المناوبة التكميلية' });
+    }
+});
+
+app.post('/api/schedule/supplementary-requests/:id/review', authenticate, authorizePerm('schedule.requests.review'), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const { action, note } = req.body || {};
+        const out = await getSupplementaryService().review(Number(req.params.id), req.user, action, note);
+        // بعد COMMIT فقط: إشعار صاحب الطلب بالقرار
+        try {
+            const uid = await resolveEmployeeUserId(out.requester_id);
+            if (uid) {
+                await notificationService.notifyPersonal(uid, {
+                    title: out.status === 'applied' ? 'اعتُمدت مناوبتك التكميلية' : (out.status === 'rejected' ? 'رُفض طلب المناوبة التكميلية' : 'طلب المناوبة التكميلية يحتاج مراجعة إضافية'),
+                    message: out.status === 'applied'
+                        ? `اعتمد المسؤول طلبك #${out.request_id} وأُضيفت المناوبة التكميلية إلى جدولك الرسمي`
+                        : out.status === 'rejected'
+                            ? `رفض المسؤول طلب المناوبة التكميلية #${out.request_id}${note ? ' — ' + String(note).slice(0, 200) : ''}`
+                            : `طلب المناوبة التكميلية #${out.request_id} صُعّد لمراجعة الإدارة`,
+                    type: out.status === 'applied' ? 'success' : (out.status === 'rejected' ? 'warning' : 'info')
+                });
+            }
+        } catch (nErr) { console.error('supplementary review notify error:', nErr.message); }
+        res.json({ success: true, ...out });
+    } catch (error) {
+        if (error && error.status && error.code) {
+            return res.status(error.status).json({ error: error.message, code: error.code });
+        }
+        console.error('[schedule] supplementary-requests review error:', error);
+        res.status(500).json({ error: 'فشل في مراجعة طلب المناوبة التكميلية' });
     }
 });
 

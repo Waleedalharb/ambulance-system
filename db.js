@@ -1987,6 +1987,40 @@ async function runMigrations() {
     logger.warn('flex_requests/flex_offers: ' + err.message);
   }
 
+  // supplementary_requests: المناوبة التكميلية (معتمد 2026-10-08) — capability
+  // مستقلة كليًا عن E-8: إضافة مناوبة اختيارية بمراجعة بشرية حتمية وتطبيق ذري.
+  // لا تكتب shift_roster إلا عبر supplementary-service._applyInTx.
+  try {
+    await exec(`CREATE TABLE IF NOT EXISTS supplementary_requests (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      employee_id INTEGER NOT NULL REFERENCES employees(id),
+      month TEXT NOT NULL,
+      target_date TEXT NOT NULL,
+      shift_code TEXT NOT NULL,
+      team_id INTEGER REFERENCES teams(id),
+      validation_json TEXT,
+      status TEXT NOT NULL DEFAULT 'pending_review' CHECK(status IN (
+        'pending_review','approved','applied','rejected','cancelled','expired','escalated')),
+      escalation_reason TEXT,
+      review_note TEXT,
+      reviewed_by INTEGER,
+      reviewed_at TEXT,
+      roster_id INTEGER REFERENCES shift_roster(id),
+      created_by INTEGER NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      applied_at TEXT,
+      updated_at TEXT
+    )`);
+    await exec('CREATE INDEX IF NOT EXISTS idx_supp_emp_month ON supplementary_requests(employee_id, month)');
+    await exec('CREATE INDEX IF NOT EXISTS idx_supp_status ON supplementary_requests(status)');
+    // طلب حيٌّ واحد لكل موظف لكل يوم (نمط uq_flex_offer_live_emp_date) — حارس بنيوي أخير
+    await exec(`CREATE UNIQUE INDEX IF NOT EXISTS uq_supp_live_emp_date ON supplementary_requests(employee_id, target_date)
+      WHERE status IN ('pending_review','approved','escalated')`);
+    logger.info('supplementary_requests table created');
+  } catch (err) {
+    logger.warn('supplementary_requests: ' + err.message);
+  }
+
   // incidents (replaces incidents.json)
   try {
     await exec(`CREATE TABLE IF NOT EXISTS incidents (
