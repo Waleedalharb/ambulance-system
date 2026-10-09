@@ -118,6 +118,11 @@
 		5E400000000000000000004D /* ArchiveOpsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E300000000000000000004D /* ArchiveOpsView.swift */; };
 		5E40000000000000000000E1 /* EMSOperationsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000E1 /* EMSOperationsTests.swift */; };
 		5E40000000000000000000E2 /* BalootModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000E2 /* BalootModelsTests.swift */; };
+		5E4000000000000000000100 /* SupplementaryDTO.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000100 /* SupplementaryDTO.swift */; };
+		5E4000000000000000000101 /* SupplementaryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000101 /* SupplementaryViewModel.swift */; };
+		5E4000000000000000000102 /* SupplementarySectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000102 /* SupplementarySectionView.swift */; };
+		5E4000000000000000000103 /* SupplementaryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000103 /* SupplementaryTests.swift */; };
+		5E4000000000000000000104 /* SupplementaryUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000104 /* SupplementaryUITests.swift */; };
 		5E40000000000000000000B1 /* BalootModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000B1 /* BalootModels.swift */; };
 		5E40000000000000000000B2 /* BalootService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000B2 /* BalootService.swift */; };
 		5E40000000000000000000B3 /* BalootSocket.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000B3 /* BalootSocket.swift */; };
@@ -149,6 +154,13 @@
 
 /* Begin PBXContainerItemProxy section */
 		5E8000000000000000000002 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 5E0000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 5E1000000000000000000001;
+			remoteInfo = EMSOperations;
+		};
+		5E8000000000000000000105 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 5E0000000000000000000001 /* Project object */;
 			proxyType = 1;
@@ -274,6 +286,12 @@
 		5E30000000000000000000F2 /* EMSOperations.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = EMSOperations.entitlements; sourceTree = "<group>"; };
 		5E30000000000000000000F3 /* RefreshNoticeCenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RefreshNoticeCenter.swift; sourceTree = "<group>"; };
 		5E30000000000000000000E2 /* BalootModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalootModelsTests.swift; sourceTree = "<group>"; };
+		5E3000000000000000000100 /* SupplementaryDTO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupplementaryDTO.swift; sourceTree = "<group>"; };
+		5E3000000000000000000101 /* SupplementaryViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupplementaryViewModel.swift; sourceTree = "<group>"; };
+		5E3000000000000000000102 /* SupplementarySectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupplementarySectionView.swift; sourceTree = "<group>"; };
+		5E3000000000000000000103 /* SupplementaryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupplementaryTests.swift; sourceTree = "<group>"; };
+		5E3000000000000000000104 /* SupplementaryUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupplementaryUITests.swift; sourceTree = "<group>"; };
+		5E3000000000000000000105 /* EMSOperationsUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = EMSOperationsUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		5E30000000000000000000B1 /* BalootModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalootModels.swift; sourceTree = "<group>"; };
 		5E30000000000000000000B2 /* BalootService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalootService.swift; sourceTree = "<group>"; };
 		5E30000000000000000000B3 /* BalootSocket.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalootSocket.swift; sourceTree = "<group>"; };
@@ -310,6 +328,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		5E5000000000000000000105 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		5E5000000000000000000012 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -325,8 +350,17 @@
 			children = (
 				5E2000000000000000000010 /* EMSOperations */,
 				5E2000000000000000000040 /* EMSOperationsTests */,
+				5E2000000000000000000104 /* EMSOperationsUITests */,
 				5E2000000000000000000002 /* Products */,
 			);
+			sourceTree = "<group>";
+		};
+		5E2000000000000000000104 /* EMSOperationsUITests */ = {
+			isa = PBXGroup;
+			children = (
+				5E3000000000000000000104 /* SupplementaryUITests.swift */,
+			);
+			path = EMSOperationsUITests;
 			sourceTree = "<group>";
 		};
 		5E2000000000000000000002 /* Products */ = {
@@ -334,6 +368,7 @@
 			children = (
 				5E30000000000000000000D0 /* EMSOperations.app */,
 				5E30000000000000000000D1 /* EMSOperationsTests.xctest */,
+				5E3000000000000000000105 /* EMSOperationsUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -467,6 +502,7 @@
 				5E3000000000000000000060 /* ChatDTO.swift */,
 				5E3000000000000000000062 /* IndicatorsDTO.swift */,
 				5E3000000000000000000064 /* RequestsDTO.swift */,
+				5E3000000000000000000100 /* SupplementaryDTO.swift */,
 				5E3000000000000000000068 /* FilesOpsDTO.swift */,
 				5E300000000000000000006A /* PermissionsAdminDTO.swift */,
 			);
@@ -763,6 +799,8 @@
 			children = (
 				5E3000000000000000000018 /* ScheduleView.swift */,
 				5E3000000000000000000019 /* ScheduleViewModel.swift */,
+				5E3000000000000000000101 /* SupplementaryViewModel.swift */,
+				5E3000000000000000000102 /* SupplementarySectionView.swift */,
 			);
 			path = Schedule;
 			sourceTree = "<group>";
@@ -864,6 +902,7 @@
 			children = (
 				5E30000000000000000000E1 /* EMSOperationsTests.swift */,
 				5E30000000000000000000E2 /* BalootModelsTests.swift */,
+				5E3000000000000000000103 /* SupplementaryTests.swift */,
 			);
 			path = EMSOperationsTests;
 			sourceTree = "<group>";
@@ -906,6 +945,24 @@
 			productReference = 5E30000000000000000000D1 /* EMSOperationsTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
+		5E1000000000000000000104 /* EMSOperationsUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 5E7000000000000000000104 /* Build configuration list for PBXNativeTarget "EMSOperationsUITests" */;
+			buildPhases = (
+				5E5000000000000000000104 /* Sources */,
+				5E5000000000000000000105 /* Frameworks */,
+				5E5000000000000000000106 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				5E8000000000000000000104 /* PBXTargetDependency */,
+			);
+			name = EMSOperationsUITests;
+			productName = EMSOperationsUITests;
+			productReference = 5E3000000000000000000105 /* EMSOperationsUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -920,6 +977,10 @@
 						CreatedOnToolsVersion = 15.0;
 					};
 					5E1000000000000000000002 = {
+						CreatedOnToolsVersion = 15.0;
+						TestTargetID = 5E1000000000000000000001;
+					};
+					5E1000000000000000000104 = {
 						CreatedOnToolsVersion = 15.0;
 						TestTargetID = 5E1000000000000000000001;
 					};
@@ -941,6 +1002,7 @@
 			targets = (
 				5E1000000000000000000001 /* EMSOperations */,
 				5E1000000000000000000002 /* EMSOperationsTests */,
+				5E1000000000000000000104 /* EMSOperationsUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -969,6 +1031,13 @@
 				5E4000000000000000000073 /* say_khamsin.mp3 in Resources */,
 				5E4000000000000000000074 /* say_miya.mp3 in Resources */,
 				5E4000000000000000000075 /* say_arba.mp3 in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5E5000000000000000000106 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1012,6 +1081,8 @@
 				5E4000000000000000000017 /* ShiftMatesView.swift in Sources */,
 				5E4000000000000000000018 /* ScheduleView.swift in Sources */,
 				5E4000000000000000000019 /* ScheduleViewModel.swift in Sources */,
+				5E4000000000000000000101 /* SupplementaryViewModel.swift in Sources */,
+				5E4000000000000000000102 /* SupplementarySectionView.swift in Sources */,
 				5E400000000000000000001A /* ScheduleChangesView.swift in Sources */,
 				5E400000000000000000001B /* NotificationsView.swift in Sources */,
 				5E400000000000000000001C /* ProfileView.swift in Sources */,
@@ -1085,6 +1156,7 @@
 				5E4000000000000000000062 /* IndicatorsDTO.swift in Sources */,
 				5E4000000000000000000063 /* IndicatorsOpsView.swift in Sources */,
 				5E4000000000000000000064 /* RequestsDTO.swift in Sources */,
+				5E4000000000000000000100 /* SupplementaryDTO.swift in Sources */,
 				5E4000000000000000000065 /* MyRequestsView.swift in Sources */,
 				5E4000000000000000000066 /* RequestsAdminView.swift in Sources */,
 				5E4000000000000000000067 /* SignoutsOpsView.swift in Sources */,
@@ -1112,6 +1184,15 @@
 			files = (
 				5E40000000000000000000E1 /* EMSOperationsTests.swift in Sources */,
 				5E40000000000000000000E2 /* BalootModelsTests.swift in Sources */,
+				5E4000000000000000000103 /* SupplementaryTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5E5000000000000000000104 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5E4000000000000000000104 /* SupplementaryUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1122,6 +1203,11 @@
 			isa = PBXTargetDependency;
 			target = 5E1000000000000000000001 /* EMSOperations */;
 			targetProxy = 5E8000000000000000000002 /* PBXContainerItemProxy */;
+		};
+		5E8000000000000000000104 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 5E1000000000000000000001 /* EMSOperations */;
+			targetProxy = 5E8000000000000000000105 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -1308,6 +1394,48 @@
 			};
 			name = Debug;
 		};
+		5E6000000000000000000104 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = online.emsoperations.app.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_TARGET_NAME = EMSOperations;
+			};
+			name = Debug;
+		};
+		5E6000000000000000000105 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = online.emsoperations.app.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_TARGET_NAME = EMSOperations;
+			};
+			name = Release;
+		};
 		5E6000000000000000000022 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -1347,6 +1475,15 @@
 			buildConfigurations = (
 				5E6000000000000000000011 /* Debug */,
 				5E6000000000000000000012 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		5E7000000000000000000104 /* Build configuration list for PBXNativeTarget "EMSOperationsUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5E6000000000000000000104 /* Debug */,
+				5E6000000000000000000105 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

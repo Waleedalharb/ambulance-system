@@ -45,6 +45,9 @@ struct ScheduleView: View {
                     }
                     calendarCard
                     upcomingCard
+                    // «الجدول المرن» (معتمد 2026-10-08) — قسم مستقل بـVM خاص،
+                    // أسفل «المناوبات القادمة» مباشرة؛ لا يمس أقسام الجدول الرسمي.
+                    SupplementarySectionView()
                     monthStatsSection
                 }
             }
