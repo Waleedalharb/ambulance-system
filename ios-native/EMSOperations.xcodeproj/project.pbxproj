@@ -123,6 +123,7 @@
 		5E4000000000000000000102 /* SupplementarySectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000102 /* SupplementarySectionView.swift */; };
 		5E4000000000000000000103 /* SupplementaryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000103 /* SupplementaryTests.swift */; };
 		5E4000000000000000000104 /* SupplementaryUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000104 /* SupplementaryUITests.swift */; };
+		5E4000000000000000000106 /* AdminNavUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3000000000000000000106 /* AdminNavUITests.swift */; };
 		5E40000000000000000000B1 /* BalootModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000B1 /* BalootModels.swift */; };
 		5E40000000000000000000B2 /* BalootService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000B2 /* BalootService.swift */; };
 		5E40000000000000000000B3 /* BalootSocket.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E30000000000000000000B3 /* BalootSocket.swift */; };
@@ -291,6 +292,7 @@
 		5E3000000000000000000102 /* SupplementarySectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupplementarySectionView.swift; sourceTree = "<group>"; };
 		5E3000000000000000000103 /* SupplementaryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupplementaryTests.swift; sourceTree = "<group>"; };
 		5E3000000000000000000104 /* SupplementaryUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupplementaryUITests.swift; sourceTree = "<group>"; };
+		5E3000000000000000000106 /* AdminNavUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminNavUITests.swift; sourceTree = "<group>"; };
 		5E3000000000000000000105 /* EMSOperationsUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = EMSOperationsUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		5E30000000000000000000B1 /* BalootModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalootModels.swift; sourceTree = "<group>"; };
 		5E30000000000000000000B2 /* BalootService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalootService.swift; sourceTree = "<group>"; };
@@ -359,6 +361,7 @@
 			isa = PBXGroup;
 			children = (
 				5E3000000000000000000104 /* SupplementaryUITests.swift */,
+				5E3000000000000000000106 /* AdminNavUITests.swift */,
 			);
 			path = EMSOperationsUITests;
 			sourceTree = "<group>";
@@ -1193,6 +1196,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				5E4000000000000000000104 /* SupplementaryUITests.swift in Sources */,
+				5E4000000000000000000106 /* AdminNavUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

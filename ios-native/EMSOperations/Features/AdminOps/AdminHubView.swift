@@ -13,7 +13,7 @@ import SwiftUI
 struct AdminHubView: View {
     @EnvironmentObject private var session: SessionStore
 
-    private enum AdminModule: Hashable, Identifiable {
+    enum AdminModule: Hashable, Identifiable {
         case users, employees, refs, symbols, notifications, system, requests, permissions
         var id: Self { self }
 
@@ -92,7 +92,14 @@ struct AdminHubView: View {
                 }
 
                 ForEach(modules) { module in
-                    NavigationLink(value: module) {
+                    // روابط destination مباشرة (إصلاح Navigation — 2026-10-13):
+                    // NavigationLink(value:) مع تسجيل الوجهة في جذر الستاك كان
+                    // يدفع مرتين/يرتد ويقفز بالرجوع مستويين إلى «ملفي» على
+                    // iOS 26+ — نفس آلية بطاقة المركز في ProfileView التي ثبت
+                    // فتحها من أول ضغطة. لا تغيير بصري: البطاقة كما هي حرفيًا.
+                    NavigationLink {
+                        AdminHubView.destination(for: module)
+                    } label: {
                         EMSCard {
                             HStack(spacing: 12) {
                                 Image(systemName: module.icon)
@@ -121,17 +128,20 @@ struct AdminHubView: View {
             .padding(EMSTheme.pagePadding)
         }
         .emsPage("الإدارة")
-        .navigationDestination(for: AdminModule.self) { module in
-            switch module {
-            case .users: AdminUsersView()
-            case .employees: AdminEmployeesView()
-            case .refs: AdminRefsView()
-            case .symbols: AdminSymbolsView()
-            case .notifications: AdminNotificationsView()
-            case .system: AdminSystemView()
-            case .requests: RequestsAdminView()
-            case .permissions: AdminPermissionsView()
-            }
+    }
+
+    /// بناء شاشة كل موديول — تُستدعى مباشرة من NavigationLink(destination:)
+    /// أعلاه (لا تسجيل وجهات في أي مستوى — إصلاح Navigation 2026-10-13).
+    @ViewBuilder static func destination(for module: AdminModule) -> some View {
+        switch module {
+        case .users: AdminUsersView()
+        case .employees: AdminEmployeesView()
+        case .refs: AdminRefsView()
+        case .symbols: AdminSymbolsView()
+        case .notifications: AdminNotificationsView()
+        case .system: AdminSystemView()
+        case .requests: RequestsAdminView()
+        case .permissions: AdminPermissionsView()
         }
     }
 }

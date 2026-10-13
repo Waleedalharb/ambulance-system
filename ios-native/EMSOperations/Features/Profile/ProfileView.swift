@@ -37,6 +37,7 @@ struct ProfileView: View {
         }
         .refreshable { await vm.load() }
         .emsPage("ملفي")
+        .background(OverflowTabBarHider())
         .task { await vm.load() }
         .confirmationDialog(
             "تسجيل الخروج",
@@ -258,6 +259,58 @@ struct ProfileView: View {
             .foregroundStyle(EMSTheme.Colors.textMuted)
             .frame(maxWidth: .infinity)
             .padding(.top, 4)
+    }
+}
+
+// MARK: - إخفاء شريط «المزيد» الخارجي (إصلاح تنقل مركز الإدارة — 2026-10-13)
+// تبويب «حسابي» يقع ضمن قائمة «المزيد» الفائضة في UITabBarController (ثمانية
+// تبويبات)، فيُرسم شريط التنقل الخاص بها فوق شريط NavigationStack الداخلي —
+// شريطان متكدسان وزرا رجوع متطابقان (تأكد بصريًا وعبر PROBE-HUB-BARS: 2).
+// زر «المزيد» الخارجي يقفز من شاشة الموديول إلى قائمة «المزيد» متخطيًا مركز
+// الإدارة — وهذا فشل الرجوع المُبلغ عنه. الحل: إخفاء الشريط الخارجي فقط طالما
+// نحن داخل قسم «حسابي» وإعادته عند العودة لقائمة «المزيد» — الشريط الداخلي
+// (ملفي → الإدارة → الموديول) يبقى بلا أي تغيير بصري أو في التنقل. لا يفعل
+// شيئًا إن لم يوجد ستاك خارجي أصلًا (تبويب مرئي مباشرة / مستقبلًا).
+
+private struct OverflowTabBarHider: UIViewControllerRepresentable {
+    func makeUIViewController(context: Context) -> Controller { Controller() }
+    func updateUIViewController(_ uiViewController: Controller, context: Context) {}
+
+    final class Controller: UIViewController {
+        /// أبعد UINavigationController في السلسلة = ستاك «المزيد» الخارجي —
+        /// شرط وجود ستاك داخلي تحته حتى لا نخفي شريطنا الوحيد.
+        private var overflowNavigationController: UINavigationController? {
+            var navs: [UINavigationController] = []
+            var node = parent
+            while let current = node {
+                if let nav = current as? UINavigationController { navs.append(nav) }
+                node = current.parent
+            }
+            return navs.count > 1 ? navs.last : nil
+        }
+
+        /// خروج فعلي من قسم «حسابي» (رجوع لقائمة «المزيد») وليس مجرد دفع
+        /// شاشة داخل الستاك الداخلي (المركز/الموديولات تغطي ملفي دون إزالته).
+        private var isLeavingSection: Bool {
+            var node = parent
+            while let current = node {
+                if current.isMovingFromParent || current.isBeingDismissed { return true }
+                node = current.parent
+            }
+            return false
+        }
+
+        override func viewWillAppear(_ animated: Bool) {
+            super.viewWillAppear(animated)
+            overflowNavigationController?.setNavigationBarHidden(true, animated: false)
+        }
+
+        override func viewWillDisappear(_ animated: Bool) {
+            super.viewWillDisappear(animated)
+            if isLeavingSection {
+                overflowNavigationController?.setNavigationBarHidden(false, animated: false)
+            }
+        }
     }
 }
 
