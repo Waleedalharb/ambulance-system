@@ -74,7 +74,10 @@ struct LeaveRequestDTO: Decodable, Identifiable {
     let type: String?
     let status: String?
     let reason: String?
-    let approvedBy: Int?
+    /// معرّف المستخدم المعتمِد — الخادم يكتب users.json id نصيًا ("emp-4252")،
+    /// والبيانات القديمة قد تكون عددًا. فك مرن (إصلاح 2026-10-14 — سجل الجهاز:
+    /// requests[0].approved_by: Expected to decode Int but found a string).
+    let approvedBy: String?
     let approvedAt: String?
     let createdAt: String?
     let employeeName: String?
@@ -91,6 +94,29 @@ struct LeaveRequestDTO: Decodable, Identifiable {
         case createdAt = "created_at"
         case employeeName = "employee_name"
         case employeeCode = "employee_code"
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(Int.self, forKey: .id)
+        employeeId = try c.decodeIfPresent(Int.self, forKey: .employeeId)
+        startDate = try c.decodeIfPresent(String.self, forKey: .startDate)
+        endDate = try c.decodeIfPresent(String.self, forKey: .endDate)
+        type = try c.decodeIfPresent(String.self, forKey: .type)
+        status = try c.decodeIfPresent(String.self, forKey: .status)
+        reason = try c.decodeIfPresent(String.self, forKey: .reason)
+        // نص → كما هو؛ عدد صحيح (بيانات قديمة) → نص؛ null/غياب/نوع آخر → nil
+        if let s = try? c.decode(String.self, forKey: .approvedBy) {
+            approvedBy = s
+        } else if let n = try? c.decode(Int.self, forKey: .approvedBy) {
+            approvedBy = String(n)
+        } else {
+            approvedBy = nil
+        }
+        approvedAt = try c.decodeIfPresent(String.self, forKey: .approvedAt)
+        createdAt = try c.decodeIfPresent(String.self, forKey: .createdAt)
+        employeeName = try c.decodeIfPresent(String.self, forKey: .employeeName)
+        employeeCode = try c.decodeIfPresent(String.self, forKey: .employeeCode)
     }
 
     var isPending: Bool { status == "pending" }

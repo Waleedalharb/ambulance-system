@@ -1752,3 +1752,64 @@ final class MyRequestsViewModelTests: XCTestCase {
         XCTAssertNotNil(RefreshNoticeCenter.shared.message)
     }
 }
+
+
+// MARK: - approved_by مرن (إصلاح 2026-10-14)
+// الخادم يكتب users.json id نصيًا في leave_requests.approved_by ("emp-4252") —
+// سجل الجهاز: requests[0].approved_by: Expected to decode Int but found a string.
+final class LeaveRequestApprovedByDTOTests: XCTestCase {
+
+    /// طلب كامل الشكل؛ fragment يحدد قيمة approved_by (أو غيابها).
+    private func decodeRequest(approvedByFragment: String) throws -> LeaveRequestDTO {
+        let json = #"{"id": 1, "employee_id": 2, "start_date": "2026-12-01", "end_date": "2026-12-02", "type": "إجازة", "status": "approved", "reason": null, "approved_at": "2026-12-01 10:00:00", "created_at": "2026-11-30 09:00:00", "employee_name": "موظف تجريبي", "employee_code": "99101""#
+            + approvedByFragment + "}"
+        return try JSONDecoder().decode(LeaveRequestDTO.self, from: Data(json.utf8))
+    }
+
+    /// حالة الإنتاج الفعلية: معرّف مستخدم نصي غير رقمي.
+    func testApprovedByDecodesNonNumericString() throws {
+        let r = try decodeRequest(approvedByFragment: #", "approved_by": "emp-4252""#)
+        XCTAssertEqual(r.approvedBy, "emp-4252")
+        XCTAssertEqual(r.status, "approved")
+    }
+
+    /// بيانات قديمة محتملة: عدد صحيح يُحوَّل إلى نص دون فقدان.
+    func testApprovedByDecodesInteger() throws {
+        let r = try decodeRequest(approvedByFragment: #", "approved_by": 7"#)
+        XCTAssertEqual(r.approvedBy, "7")
+    }
+
+    /// طلب قيد المراجعة: null.
+    func testApprovedByDecodesNull() throws {
+        let r = try decodeRequest(approvedByFragment: #", "approved_by": null"#)
+        XCTAssertNil(r.approvedBy)
+    }
+
+    /// مفتاح غائب كليًا.
+    func testApprovedByAbsentKey() throws {
+        let r = try decodeRequest(approvedByFragment: "")
+        XCTAssertNil(r.approvedBy)
+    }
+
+    /// نص رقمي (تسامح إضافي — SQLite يحوّله عددًا عادة لكن لا ضرر من قبوله).
+    func testApprovedByDecodesNumericString() throws {
+        let r = try decodeRequest(approvedByFragment: #", "approved_by": "7""#)
+        XCTAssertEqual(r.approvedBy, "7")
+    }
+
+    /// استجابة كاملة تحاكي الإنتاج: مفاتيح إضافية يرسلها الخادم فعلًا
+    /// (denial_reason/cancelled_by/created_by/updated_at) + طلب معتمَد بنص وطلب pending بـnull.
+    func testFullResponseDecodesWithProductionLikePayload() throws {
+        let json = #"""
+        {"success": true, "requests": [
+            {"id": 9, "employee_id": 2, "start_date": "2026-12-01", "end_date": "2026-12-02", "type": "إجازة", "status": "approved", "reason": "ظرف", "approved_by": "emp-4252", "approved_at": "2026-12-01 10:00:00", "created_at": "2026-11-30 09:00:00", "employee_name": "موظف تجريبي", "employee_code": "99101", "denial_reason": null, "cancelled_by": null, "cancelled_at": null, "cancel_reason": null, "created_by": "emp-99101", "updated_at": "2026-12-01 10:00:00"},
+            {"id": 10, "employee_id": 2, "start_date": "2027-01-05", "end_date": "2027-01-06", "type": "مرضية", "status": "pending", "reason": null, "approved_by": null, "approved_at": null, "created_at": "2026-12-28 08:00:00", "employee_name": "موظف تجريبي", "employee_code": "99101"}
+        ]}
+        """#
+        let res = try JSONDecoder().decode(LeaveRequestsResponseDTO.self, from: Data(json.utf8))
+        XCTAssertEqual(res.requests?.count, 2)
+        XCTAssertEqual(res.requests?[0].approvedBy, "emp-4252")
+        XCTAssertNil(res.requests?[1].approvedBy)
+        XCTAssertEqual(res.requests?[1].status, "pending")
+    }
+}
