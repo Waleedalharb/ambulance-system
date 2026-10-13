@@ -1665,3 +1665,90 @@ final class EMSOperationsTests: XCTestCase {
         XCTAssertEqual(OpsMapViewModel.missingCenterNames(centers.integrity), ["الحائر"])
     }
 }
+
+
+// MARK: - إصلاح الهياكل الرمادية الأبدية في «طلباتي» (2026-10-13)
+
+/// بديل MyRequestsServicing للاختبارات: ينجح بفك JSON معدّ أو يرمي الخطأ المحدد للمسار.
+private final class MyRequestsStub: MyRequestsServicing {
+    var responses: [String: Result<Data, APIError>]
+
+    init(responses: [String: Result<Data, APIError>]) {
+        self.responses = responses
+    }
+
+    func get<T: Decodable>(_ path: String, query: [String: String]) async throws -> T {
+        switch responses[path] {
+        case .success(let data):
+            do { return try JSONDecoder().decode(T.self, from: data) }
+            catch { throw APIError.decoding }
+        case .failure(let error):
+            throw error
+        case .none:
+            throw APIError.notFound
+        }
+    }
+
+    func post<T: Decodable, B: Encodable>(_ path: String, body: B?) async throws -> T {
+        throw APIError.notFound
+    }
+
+    func delete<T: Decodable>(_ path: String) async throws -> T {
+        throw APIError.notFound
+    }
+}
+
+@MainActor
+final class MyRequestsViewModelTests: XCTestCase {
+
+    // jobTitle «مسعف» ليس من vacationsViewerTitles — لا طلب vacations إطلاقًا.
+    private static let profileJSON = #"{"employee":{"id":2,"name":"مشرف تجريبي","jobTitle":"مسعف"}}"#
+    private static let announcementsJSON = #"{"success":true,"data":[{"id":"a1","title":"إعلان تجريبي"}]}"#
+    private static let leaveJSON = #"{"success":true,"requests":[]}"#
+
+    override func setUp() {
+        RefreshNoticeCenter.shared.dismiss()
+    }
+
+    override func tearDown() {
+        RefreshNoticeCenter.shared.dismiss()
+    }
+
+    /// فشل أول تحميل بعد نجاح جلب الملف الشخصي: حالة خطأ واضحة، لا هياكل تحميل أبدية.
+    func testFirstLoadFailureAfterProfileShowsErrorState() async {
+        let stub = MyRequestsStub(responses: [
+            "/api/my/profile": .success(Data(Self.profileJSON.utf8)),
+            "/api/announcements": .failure(.decoding),
+            "/api/leave-requests": .success(Data(Self.leaveJSON.utf8)),
+        ])
+        let vm = MyRequestsViewModel(api: stub)
+
+        await vm.load()
+
+        XCTAssertEqual(vm.state, .failed(APIError.decoding.userMessage))
+        // لا تنبيه «أبقينا المحتوى» — لا محتوى أصلًا
+        XCTAssertNil(RefreshNoticeCenter.shared.message)
+    }
+
+    /// فشل تحديث محتوى محمّل سابقًا: يبقى المحتوى والحالة loaded، مع تنبيه عابر فقط.
+    func testRefreshFailureKeepsLoadedContent() async {
+        let stub = MyRequestsStub(responses: [
+            "/api/my/profile": .success(Data(Self.profileJSON.utf8)),
+            "/api/announcements": .success(Data(Self.announcementsJSON.utf8)),
+            "/api/leave-requests": .success(Data(Self.leaveJSON.utf8)),
+        ])
+        let vm = MyRequestsViewModel(api: stub)
+
+        await vm.load()
+        XCTAssertEqual(vm.state, .loaded)
+        XCTAssertEqual(vm.announcements.count, 1)
+
+        // التحديث التالي يفشل — المحتوى السابق يجب أن يبقى كما هو
+        stub.responses["/api/announcements"] = .failure(.decoding)
+        await vm.load()
+
+        XCTAssertEqual(vm.state, .loaded)
+        XCTAssertEqual(vm.announcements.count, 1)
+        XCTAssertNotNil(RefreshNoticeCenter.shared.message)
+    }
+}

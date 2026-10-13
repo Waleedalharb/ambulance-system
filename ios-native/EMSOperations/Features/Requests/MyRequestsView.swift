@@ -223,6 +223,16 @@ struct MyRequestsView: View {
 }
 
 // MARK: - ViewModel
+
+/// واجهة ضيقة فوق APIClient تسمح بحقن بديل في اختبارات الوحدة
+/// (إصلاح الهياكل الرمادية الأبدية 2026-10-13 — كانت الاختبارات مستحيلة بلاها).
+protocol MyRequestsServicing {
+    func get<T: Decodable>(_ path: String, query: [String: String]) async throws -> T
+    func post<T: Decodable, B: Encodable>(_ path: String, body: B?) async throws -> T
+    func delete<T: Decodable>(_ path: String) async throws -> T
+}
+extension APIClient: MyRequestsServicing {}
+
 @MainActor
 final class MyRequestsViewModel: ObservableObject {
     enum LoadState: Equatable { case loading, loaded, failed(String) }
@@ -268,9 +278,13 @@ final class MyRequestsViewModel: ObservableObject {
     @Published var showSuccess = false
     @Published var successMessage = ""
 
-    private let api = APIClient.shared
+    private let api: any MyRequestsServicing
     private var myEmployeeId: Int?
     private var isAdminDirector = false
+
+    init(api: any MyRequestsServicing = APIClient.shared) {
+        self.api = api
+    }
 
     var canSubmitLeave: Bool {
         Self.leaveTypes.contains(leaveType)
@@ -284,21 +298,25 @@ final class MyRequestsViewModel: ObservableObject {
     func load(isAdminDirector: Bool = false) async {
         // يُحفظ لإعادات التحميل الداخلية بعد الإرسال/الإلغاء
         if isAdminDirector { self.isAdminDirector = true }
-        if state != .loaded { state = .loading }
+        // إصلاح 2026-10-13: معيار «يوجد محتوى» هو اكتمال تحميل سابق فعلًا (state == .loaded)،
+        // لا نجاح جلب الملف الشخصي وحده. قبل هذا الإصلاح كان فشل أول تحميل بعد نجاح profile
+        // يبقي الشاشة على هياكل التحميل إلى أجل غير محدد.
+        let hadLoadedContent = (state == .loaded)
+        if !hadLoadedContent { state = .loading }
         do {
             // معرف الموظف من ملفي — المصدر الوحيد لربط الطلبات بصاحبها.
-            let profile: ProfileDTO = try await api.get("/api/my/profile")
+            let profile: ProfileDTO = try await api.get("/api/my/profile", query: [:])
             myEmployeeId = profile.employee.id
             canViewVacations = self.isAdminDirector
                 || Self.vacationsViewerTitles.contains(profile.employee.jobTitle ?? "")
 
-            async let annReq: AnnouncementsResponseDTO = api.get("/api/announcements")
+            async let annReq: AnnouncementsResponseDTO = api.get("/api/announcements", query: [:])
             let ann = try await annReq
             announcements = ann.data ?? []
 
             // العزل من المصدر: الموظف الميداني لا يجلب إجازات العمليات إطلاقًا
             if canViewVacations {
-                let vac: [VacationEntryDTO]? = try? await api.get("/api/vacations")
+                let vac: [VacationEntryDTO]? = try? await api.get("/api/vacations", query: [:])
                 vacations = vac ?? []
             } else {
                 vacations = []
@@ -313,9 +331,9 @@ final class MyRequestsViewModel: ObservableObject {
             }
             state = .loaded
         } catch let e as APIError {
-            if !RefreshFailurePolicy.keepContent(hasContent: myEmployeeId != nil, message: e.userMessage) { state = .failed(e.userMessage) }
+            if !RefreshFailurePolicy.keepContent(hasContent: hadLoadedContent, message: e.userMessage) { state = .failed(e.userMessage) }
         } catch {
-            if !RefreshFailurePolicy.keepContent(hasContent: myEmployeeId != nil, message: APIError.unknown.userMessage) { state = .failed(APIError.unknown.userMessage) }
+            if !RefreshFailurePolicy.keepContent(hasContent: hadLoadedContent, message: APIError.unknown.userMessage) { state = .failed(APIError.unknown.userMessage) }
         }
     }
 
