@@ -2183,6 +2183,7 @@ function renderCard(teamId, name, type, d) {
                 '<span class="pm-av">' + escapeHtml((m.name || '؟')[0]) + '</span><div class="pm-info">' +
                 (m.jobTitle ? '<div class="pm-job">' + jobIcon(m.jobTitle) + ' ' + escapeHtml(m.jobTitle) + '</div>' : '') +
                 '<div class="pm-name">🤝 ' + escapeHtml(m.name) + ' <span class="pm-role-badge ' + (m.state === 'assignment' ? 'rb-assigned">مكلَّف' : 'rb-support">' + escapeHtml(supportTypeLabel(m))) + '</span></div>' +
+                ((m.state === 'late' || m.state === 'absence') ? '<div class="pm-code pm-state-late">⚠️ ' + (m.state === 'late' ? 'متأخر — لم يحضر بعد' : 'غائب — لم يحضر بعد') + '</div>' : '') +
                 '<div class="pm-phone">' + (m.phone ? '<a href="tel:' + escapeHtml(m.phone) + '"><i class="fas fa-phone"></i> ' + escapeHtml(m.phone) + '</a>' : '—') + '</div>' +
                 ((m.code || m.employeeCode) ? '<div class="pm-code">الكود الوظيفي: ' + escapeHtml(String(m.code || m.employeeCode)) + '</div>' : '') +
                 (m.fromCenter ? '<div class="pm-code">قادم من: ' + escapeHtml(m.fromCenter) + '</div>' : '') +
@@ -3782,7 +3783,10 @@ function edStateLabel(live) {
     if (!live) return 'خارج مناوبة اليوم';
     if (live.pool) return live.person.volunteer ? 'متطوع — غير مفعّل' : 'في القوة المتاحة';
     if (live.role === 'activation') return 'مفعَّل على الفرقة';
-    if (live.role === 'support') return live.state === 'assignment' ? 'مكلَّف إلى الفرقة' : 'داعم — ' + supportTypeLabel(live.member);
+    if (live.role === 'support') return live.state === 'assignment' ? 'مكلَّف إلى الفرقة'
+        : live.state === 'late' ? 'متأخر — لم يحضر بعد'
+        : live.state === 'absence' ? 'غائب — لم يحضر بعد'
+        : 'داعم — ' + supportTypeLabel(live.member);
     if (live.state === 'active') return 'نشط في فرقته';
     if (live.state === 'assignment') return 'مكلَّف خارج فرقته';
     if (live.state === 'late') return 'متأخر';
@@ -3849,11 +3853,19 @@ function renderEmployeeDrawer() {
     if (live && !live.pool && isSupport && live.state !== 'assignment') {
         acts.push('<button class="ed-danger" onclick="drawerEndCoverage(\'' + tm + '\', \'' + nm + '\')">⛔ إنهاء التغطية</button>');
         acts.push('<button class="ed-primary" onclick="startMoveMode(\'' + nm + '\', \'' + tm + '\')">🔀 توزيع الموظف</button>');
+        // تشخيص حالة الداعم (غياب/تأخير/تكليف/إجازة) — نفس عقد تسجيل الحالة
+        // السريع للمجدول النشط حرفيًا (MISSING_REASON_EVENT + postPersonEvents)
+        if (live.state !== 'absence' && live.state !== 'late') {
+            acts.push('<div class="ed-quick"><span class="ed-quick-lbl">تسجيل حالة:</span>' +
+                MISSING_REASONS.map(function(r) {
+                    return '<button class="ed-quick-btn" onclick="drawerQuickAbsence(\'' + tm + '\', \'' + nm + '\', \'' + r + '\')">' + r + '</button>';
+                }).join('') + '</div>');
+        }
     }
     if (live && !live.pool && live.role === 'activation') {
         acts.push('<button class="ed-danger" onclick="drawerEndActivation(\'' + tm + '\', \'' + nm + '\')">⛔ إنهاء التفعيل</button>');
     }
-    if (live && !live.pool && isBase && (live.state === 'absence' || live.state === 'late')) {
+    if (live && !live.pool && (isBase || isSupport) && (live.state === 'absence' || live.state === 'late')) {
         acts.push('<button class="ed-gold" onclick="drawerPersonArrived(\'' + tm + '\', \'' + nm + '\')">✋ حضر</button>');
     }
     if (live && live.pool) {
