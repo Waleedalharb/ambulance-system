@@ -1387,7 +1387,19 @@ class StaffingEventsService {
                         const pl = payloadOf(o) || {};
                         // state يبقى 'external_support' للنوعين القائمين (سلوك محفوظ حرفيًا —
                         // مجموعة الانشغال والحوض مبنية عليه)، و'overlap' لدعم الأوفرلاب فقط.
-                        supporters.push({ name: f.entityId, jobTitle: pi.jobTitle || pl.jobTitle || null, code: pi.code || pl.employeeNumber || null, phone: canPhone ? (pi.phone || null) : null, role: 'support', state: o.event_type === 'overlap' ? 'overlap' : 'external_support', supportType: o.event_type, coverageType: pl.coverageType || null, since: o.created_at, recordedBy: o.actor_name || null, fromCenter: o.center || null });
+                        // تشخيص الداعم (2026-10-22): داعم عليه غياب/تأخير مفتوح يُعرض
+                        // بحالته المشخَّصة (absence/late) ويدخل قائمة الغائبين بزر «حضر»
+                        // — نفس معاملة الأساسي حرفيًا — ولا يُحسب ضمن الحاضرين.
+                        const openAbsSup = (openByEntity[f.entityId] || []).find(x => x.event_type === 'absence' || x.event_type === 'late');
+                        supporters.push({ name: f.entityId, jobTitle: pi.jobTitle || pl.jobTitle || null, code: pi.code || pl.employeeNumber || null, phone: canPhone ? (pi.phone || null) : null, role: 'support', state: openAbsSup ? openAbsSup.event_type : (o.event_type === 'overlap' ? 'overlap' : 'external_support'), supportType: o.event_type, coverageType: pl.coverageType || null, since: o.created_at, recordedBy: o.actor_name || null, fromCenter: o.center || null });
+                        if (openAbsSup) {
+                            absentees.push({
+                                name: f.entityId, jobTitle: pi.jobTitle || pl.jobTitle || null, code: pi.code || pl.employeeNumber || null, phone: canPhone ? (pi.phone || null) : null,
+                                reason: openAbsSup.reason || null,
+                                since: openAbsSup.created_at, recordedBy: openAbsSup.actor_name || null,
+                                type: openAbsSup.event_type
+                            });
+                        }
                     } else if (o.event_type === 'assignment' && canonicalTeamId(o.team_id) === t.name && !crewNames.has(f.entityId)) {
                         if (seenSupport.has(f.entityId)) continue;
                         seenSupport.add(f.entityId);
@@ -1397,7 +1409,8 @@ class StaffingEventsService {
                     }
                 }
             }
-            activeCount += supporters.length;
+            // الداعم الغائب/المتأخر لا يُحسب ضمن الحاضرين (نفس معاملة الأساسي)
+            activeCount += supporters.filter(s => s.state !== 'absence' && s.state !== 'late').length;
             members.push(...supporters);
 
             // مرحلة الأوفرلاب 4 (التفعيل): المفعَّلون لهذا الفريق (تفعيل مفتوح،

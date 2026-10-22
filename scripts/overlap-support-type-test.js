@@ -174,6 +174,41 @@ async function main() {
         record('④ منع التكرار: overlap مكرر مفتوح لنفس الفريق يُتخطى (appended=0 · حدث واحد فقط)',
             t4, `appended=${r2.data && r2.data.appended} أحداث=${ovlCount}`);
 
+        // ═══ ④ب تشخيص الداعم الأوفرلاب (غياب/تأخير) — مثل الأسماء المجدولة حرفيًا ═══
+        // غياب ⇒ حالة العضو absence · يدخل absentees (زر «حضر») · لا يُحسب حاضرًا
+        const rAbs = await postEvents([{
+            type: 'absence', employeeName: 'داعم أوفرلاب', reason: 'غياب', teamId: 'جنوب 15'
+        }]);
+        const stAbs = await getState();
+        const t15a = (stAbs.data.teams || {})['جنوب 15'];
+        const mAbs = t15a && (t15a.members || []).find(m => m.name === 'داعم أوفرلاب');
+        const inAbsentees = t15a && (t15a.absentees || []).some(a => a.name === 'داعم أوفرلاب' && a.type === 'absence');
+        const t4b = rAbs.status === 200 && rAbs.data && rAbs.data.appended === 1 &&
+            mAbs && mAbs.state === 'absence' && mAbs.supportType === 'overlap' && inAbsentees;
+        record('④ب تشخيص الداعم: غياب ⇒ state=absence على البطاقة · يدخل قائمة الغائبين (زر حضر) · وسم overlap محفوظ',
+            t4b, `appended=${rAbs.data && rAbs.data.appended} حالة=${mAbs && mAbs.state} غائبين=${!!inAbsentees}`);
+
+        // حضر ⇒ يعود state=overlap ويغادر قائمة الغائبين
+        const rArr = await postEvents([{
+            type: 'arrival', employeeName: 'داعم أوفرلاب', teamId: 'جنوب 15'
+        }]);
+        const stArr = await getState();
+        const t15b = (stArr.data.teams || {})['جنوب 15'];
+        const mArr = t15b && (t15b.members || []).find(m => m.name === 'داعم أوفرلاب');
+        const outAbsentees = t15b && !(t15b.absentees || []).some(a => a.name === 'داعم أوفرلاب');
+        const t4c = rArr.status === 200 && rArr.data && rArr.data.appended === 1 &&
+            mArr && mArr.state === 'overlap' && outAbsentees;
+        record('④ج «حضر» ⇒ يعود الداعم بحالة overlap ويغادر قائمة الغائبين',
+            t4c, `appended=${rArr.data && rArr.data.appended} حالة=${mArr && mArr.state} خارج_الغائبين=${!!outAbsentees}`);
+
+        // الواجهة ساكنًا: أزرار التشخيص للداعم + زر حضر الموسَّع + شارة الحالة على البطاقة
+        const supportBlock = (html.match(/if \(live && !live\.pool && isSupport && live\.state !== 'assignment'\) \{[\s\S]*?\n    \}/) || [''])[0];
+        const uiDiag = /drawerQuickAbsence/.test(supportBlock);
+        const uiArrived = /\(isBase \|\| isSupport\) && \(live\.state === 'absence'/.test(html);
+        const uiBadge = /m\.state === 'late' \? 'متأخر — لم يحضر بعد' : 'غائب — لم يحضر بعد'/.test(html);
+        record('④د الواجهة: أزرار «تسجيل حالة» للداعم في الدرج · «حضر» يشمل الداعم · شارة متأخر/غائب على البطاقة',
+            uiDiag && uiArrived && uiBadge, `تشخيص=${uiDiag} حضر=${uiArrived} شارة=${uiBadge}`);
+
         // ═══ ⑥ا عدم كسر الأنواع القائمة: volunteer_support وexternal_support
         // على فريق مجدول (جنوب 3) — نفس سلوك ما قبل التعديل حرفيًا ═══
         const rV = await postEvents([{
