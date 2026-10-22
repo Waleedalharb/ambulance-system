@@ -21,7 +21,7 @@ const DOMAIN_REGISTRY = {
         closureRules: {
             arrival: ['absence', 'late'],
             return: ['exit'],
-            support_end: ['external_support', 'volunteer_support'],
+            support_end: ['external_support', 'volunteer_support', 'overlap'],
             // مرحلة الأوفرلاب 4 (التفعيل): إنهاء التفعيل يُغلق دلاليًا التفعيل المفتوح
             activation_end: ['activation'],
             // W1-B: عودة الفريق «جاهزًا» تُغلق دلاليًا نقصه/خروجه من الخدمة

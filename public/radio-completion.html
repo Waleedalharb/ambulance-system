@@ -1610,6 +1610,7 @@ function navigateToPage(url) {
         <select id="supportType">
             <option value="volunteer">تطوع</option>
             <option value="external">خلافة (قادم من موقع آخر)</option>
+            <option value="overlap">أوفرلاب</option>
         </select>
         <label for="supportTargetTeam"><i class="fas fa-users"></i> الفريق المدعوم</label>
         <select id="supportTargetTeam"></select>
@@ -1799,8 +1800,8 @@ var MISSING_REASON_EVENT = { 'غياب': 'absence', 'تأخير': 'late', 'تك�
 
 var W1D_EVENT_LABELS = { absence: 'غياب', late: 'تأخير', arrival: 'حضر', exit: 'خروج', return: 'عودة', ready: 'جاهز', missing: 'ناقص', offline: 'خارج الخدمة', correction: 'تصحيح', note: 'ملاحظة', assignment: 'تكليف', overlap: 'أوفرلاب', external_support: 'دعم', volunteer_support: 'تطوع', support_end: 'نهاية دعم', activation: 'تفعيل فرقة', activation_end: 'إنهاء تفعيل' };
 // وسما نوع الدعم في سجل التغطية — عرض فقط فوق supportType/coverageType القادمين من الخادم
-var SUPPORT_TYPE_LABELS = { volunteer_support: 'تطوع', external_support: 'دعم من مركز آخر', assignment: 'تكليف' };
-var COVERAGE_TYPE_LABELS = { volunteer: 'تطوع', external: 'دعم من مركز آخر', assignment: 'تكليف', reserve: 'احتياط' };
+var SUPPORT_TYPE_LABELS = { volunteer_support: 'تطوع', external_support: 'دعم من مركز آخر', overlap: 'أوفرلاب', assignment: 'تكليف' };
+var COVERAGE_TYPE_LABELS = { volunteer: 'تطوع', external: 'دعم من مركز آخر', overlap: 'أوفرلاب', assignment: 'تكليف', reserve: 'احتياط' };
 function supportTypeLabel(m) {
     return COVERAGE_TYPE_LABELS[m.coverageType] || SUPPORT_TYPE_LABELS[m.supportType] || SUPPORT_TYPE_LABELS[m.state] || 'دعم';
 }
@@ -2866,6 +2867,16 @@ function renderAvailableSupport() {
     applyPoolFilter(); // ⑥ إعادة تطبيق التبويب النشط بعد كل إعادة رسم
 }
 var supportCtx = null; // { person }
+function fillSupportTeams() {
+    // أوفرلاب (2026-10-22): الفرق المستهدفة = كل فرق القطاع النشطة من /api/teams
+    // (vbTeamsCache — مجدولة اليوم أو غير مجدولة، بما فيها الفرق الإضافية)،
+    // بالاسم + المركز — نفس قاعدة نافذة «تفعيل فرقة» المعتمدة حرفيًا.
+    // لم يعد الاختيار محصورًا بالفرق ذات المناوبة المجدولة (serverTeamIds).
+    var teams = (vbTeamsCache || []).filter(function(t) { return Number(t.is_active) === 1; });
+    document.getElementById('supportTargetTeam').innerHTML = teams.map(function(t) {
+        return '<option value="' + escapeHtml(t.name) + '">' + escapeHtml(t.name) + (t.center ? ' — ' + escapeHtml(t.center) : '') + '</option>';
+    }).join('');
+}
 function openSupportModal(idx) {
     var p = (availableSupport || [])[idx];
     if (!p) return;
@@ -2875,12 +2886,15 @@ function openSupportModal(idx) {
         escapeHtml(p.name) +
         (p.employeeCode ? '<br>الكود الوظيفي: ' + escapeHtml(String(p.employeeCode)) : '') +
         '<br>الموقع الحالي: ' + escapeHtml(supportLocationLabel(p));
-    // الفرق المستهدفة = فرق الحالة المشتقة من الخادم (بترتيبه) — لا قائمة ثابتة
-    document.getElementById('supportTargetTeam').innerHTML = serverTeamIds().map(function(t) {
-        return '<option value="' + t + '">' + escapeHtml(t) + '</option>';
-    }).join('');
+    // الفرق المستهدفة = كل فرق القطاع النشطة (لا قائمة الفرق المجدولة فقط) —
+    // إن لم تُحمَّل بعد تُجلب أولًا ثم تُفتح النافذة
+    if (vbTeamsCache === null) {
+        loadTeams().then(function() { fillSupportTeams(); document.getElementById('supportModal').classList.add('active'); });
+    } else {
+        fillSupportTeams();
+        document.getElementById('supportModal').classList.add('active');
+    }
     document.getElementById('supportType').value = 'volunteer';
-    document.getElementById('supportModal').classList.add('active');
 }
 function closeSupportModal() {
     document.getElementById('supportModal').classList.remove('active');
@@ -2892,9 +2906,9 @@ function confirmSupport() {
     var teamId = document.getElementById('supportTargetTeam').value;
     var ctype = document.getElementById('supportType').value;
     if (!teamId) { showToast('⚠️ اختر الفريق المدعوم', 'error'); return; }
-    // نفس عقد أحداث التغطية المعتمد — لا تغيير سيرفري: تطوع ← volunteer_support · خلافة ← external_support
+    // نفس عقد أحداث التغطية المعتمد: تطوع ← volunteer_support · خلافة ← external_support · أوفرلاب ← overlap
     var ev = {
-        type: ctype === 'volunteer' ? 'volunteer_support' : 'external_support',
+        type: ctype === 'volunteer' ? 'volunteer_support' : (ctype === 'overlap' ? 'overlap' : 'external_support'),
         employeeName: p.name,
         teamId: teamId,
         coverageType: ctype,

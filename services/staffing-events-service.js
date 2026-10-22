@@ -327,7 +327,7 @@ function deriveLateRecords(events, shiftType, shiftDate, startByEmployee) {
 // ─── بند 17: اشتقاق سجلات التغطية التشغيلية — سيرفري بالكامل ───
 // يربط support_end بأقدم دعم مفتوح (external_support/volunteer_support) لنفس الموظف.
 // نوع التغطية من payload.coverageType: volunteer/external/assignment/reserve.
-const COVERAGE_TYPE_LABELS = { volunteer: 'تطوع', external: 'دعم من مركز آخر', assignment: 'تكليف', reserve: 'احتياط' };
+const COVERAGE_TYPE_LABELS = { volunteer: 'تطوع', external: 'دعم من مركز آخر', assignment: 'تكليف', reserve: 'احتياط', overlap: 'أوفرلاب' };
 function deriveCoverageRecords(events) {
     const sorted = (events || []).slice().sort((a, b) =>
         String(a.created_at).localeCompare(String(b.created_at)) || ((a.id || 0) - (b.id || 0)));
@@ -335,7 +335,8 @@ function deriveCoverageRecords(events) {
     const records = [];
     const pushRec = (s, endedAt) => {
         const p = parsePayload(s.payload);
-        const coverageType = p.coverageType || (s.event_type === 'volunteer_support' ? 'volunteer' : 'external');
+        // أوفرلاب (2026-10-22): النوع الافتراضي لحدث overlap بلا coverageType صريح هو overlap
+        const coverageType = p.coverageType || (s.event_type === 'volunteer_support' ? 'volunteer' : s.event_type === 'overlap' ? 'overlap' : 'external');
         records.push({
             employee: s.entity_id,
             employeeNumber: p.employeeNumber || null,
@@ -353,7 +354,8 @@ function deriveCoverageRecords(events) {
     for (const e of sorted) {
         const ent = e.entity_id;
         if (!ent) continue;
-        if (e.event_type === 'external_support' || e.event_type === 'volunteer_support') {
+        // أوفرلاب (2026-10-22): حدث overlap فاتحٌ لسجل تغطية مثل الدعم الخارجي/التطوع
+        if (e.event_type === 'external_support' || e.event_type === 'volunteer_support' || e.event_type === 'overlap') {
             (open[ent] = open[ent] || []).push(e);
         } else if (e.event_type === 'support_end') {
             const q = open[ent];
@@ -990,9 +992,12 @@ class StaffingEventsService {
         const actorName = (actor && (actor.name || actor.username)) || 'system';
         const at = createdAt || new Date().toISOString();
 
-        const ALLOWED = ['absence', 'late', 'assignment', 'arrival', 'external_support', 'volunteer_support', 'support_end', 'offline', 'ready', 'missing', 'correction', 'activation', 'activation_end'];
+        // «أوفرلاب» كنوع دعم مستقل للفرق الإضافية (قرار المالك 2026-10-22):
+        // نوع مسجَّل أصلًا في سجل النطاق (operational-events-core) ويُقبل هنا
+        // الآن من شاشة التكميل — مرتبط بفريق هدف إلزامًا ولا يشترط مناوبة مجدولة.
+        const ALLOWED = ['absence', 'late', 'assignment', 'arrival', 'external_support', 'volunteer_support', 'overlap', 'support_end', 'offline', 'ready', 'missing', 'correction', 'activation', 'activation_end'];
         const NEEDS_REASON = ['absence', 'late', 'offline'];
-        const NEEDS_EMPLOYEE = ['absence', 'late', 'arrival', 'external_support', 'volunteer_support', 'support_end', 'assignment', 'correction', 'activation', 'activation_end'];
+        const NEEDS_EMPLOYEE = ['absence', 'late', 'arrival', 'external_support', 'volunteer_support', 'overlap', 'support_end', 'assignment', 'correction', 'activation', 'activation_end'];
 
         // التحقق الكامل قبل أي كتابة (القرار لا يسبق البيانات)
         for (const ev of events) {
@@ -1074,10 +1079,13 @@ class StaffingEventsService {
                 const open = openOf(employee);
                 if (['absence', 'late'].includes(type) && open.some(o => o.event_type === type)) continue;
                 if ((type === 'external_support' || type === 'volunteer_support') && open.some(o => (o.event_type === 'external_support' || o.event_type === 'volunteer_support') && canonicalTeamId(o.team_id) === teamId)) continue;
+                // أوفرلاب مكرر مفتوح لنفس الفريق يُتخطى — نفس قاعدة الدعم حرفيًا
+                if (type === 'overlap' && open.some(o => o.event_type === 'overlap' && canonicalTeamId(o.team_id) === teamId)) continue;
                 if (type === 'assignment' && open.some(o => o.event_type === 'assignment' && canonicalTeamId(o.team_id) === teamId)) continue;
                 if (type === 'arrival' && !open.some(o => o.event_type === 'absence' || o.event_type === 'late')) continue;
                 // T3: يُقبل «إنهاء التكليف» — support_end صالح أيضًا عند وجود تكليف مفتوح
-                if (type === 'support_end' && !open.some(o => o.event_type === 'external_support' || o.event_type === 'volunteer_support' || o.event_type === 'assignment')) continue;
+                // أوفرلاب (2026-10-22): support_end يُقبل أيضًا عند وجود أوفرلاب مفتوح
+                if (type === 'support_end' && !open.some(o => o.event_type === 'external_support' || o.event_type === 'volunteer_support' || o.event_type === 'assignment' || o.event_type === 'overlap')) continue;
                 // مرحلة الأوفرلاب 4 (التفعيل): تفعيل مكرر مفتوح لنفس الفريق يُتخطى،
                 // وإنهاء بلا تفعيل مفتوح يُتخطى — نفس قاعدة الدعم/التكليف حرفيًا
                 if (type === 'activation' && open.some(o => o.event_type === 'activation' && canonicalTeamId(o.team_id) === teamId)) continue;
@@ -1112,7 +1120,7 @@ class StaffingEventsService {
                 teamId, center: ev.center || null,
                 eventType: type,
                 reason: ev.reason || null,
-                readinessBasis: (type === 'external_support' || type === 'volunteer_support') ? type : null,
+                readinessBasis: (type === 'external_support' || type === 'volunteer_support' || type === 'overlap') ? type : null,
                 payload,
                 actorId, actorName, createdAt: at
             });
@@ -1125,7 +1133,8 @@ class StaffingEventsService {
                 folded.push(f);
             }
             // T3: support_end يُغلق التكليف أيضًا (طيّ الدفعة المحلي — المرجع الدائم: closureRules أعلى الملف)
-            const CLOSES = { arrival: ['absence', 'late'], support_end: ['external_support', 'volunteer_support', 'assignment'], activation_end: ['activation'] };
+            // أوفرلاب (2026-10-22): support_end يُغلق الأوفرلاب المفتوح أيضًا
+            const CLOSES = { arrival: ['absence', 'late'], support_end: ['external_support', 'volunteer_support', 'assignment', 'overlap'], activation_end: ['activation'] };
             const closes = CLOSES[type];
             if (closes) {
                 const idx = f.open.findIndex(o => closes.includes(o.event_type));
@@ -1262,6 +1271,21 @@ class StaffingEventsService {
             }
         }
 
+        // «أوفرلاب» كنوع دعم للفرق الإضافية (قرار المالك 2026-10-22): خريطة
+        // الفريق ← دعم أوفرلاب مفتوح. فريق بلا كادر مجدول لكن عليه أوفرلاب
+        // مفتوح يدخل الحالة (نفس استثناء التفعيل حرفيًا) — وإلا بقي الحدث
+        // محفوظًا لكنه غير مرئي على بطاقة الفريق المدعوم.
+        const overlapSupportByTeam = {};
+        for (const f of folded) {
+            if (!f.entityId) continue;
+            for (const o of f.open) {
+                if (o.event_type !== 'overlap') continue;
+                const tn = canonicalTeamId(o.team_id);
+                if (!tn) continue;
+                (overlapSupportByTeam[tn] = overlapSupportByTeam[tn] || []).push({ entityId: f.entityId, event: o });
+            }
+        }
+
         // المركبات: تعيين مفتوح + آخر حالة (خط المركبة كاملًا — ليس محصورًا بالمناوبة)
         const vehAssignByVeh = {};
         const vehStatus = {};
@@ -1314,7 +1338,9 @@ class StaffingEventsService {
             // ولا سير العمل الرسمي — حتى لو كان نشطًا في جدول الفرق.
             // مرحلة الأوفرلاب 4: استثناء وحيد — فريق بلا كادر لكن عليه تفعيل
             // مفتوح يدخل الحالة (المفعَّلون طاقمه الفعلي لهذه المناوبة).
-            if (crew.length === 0 && activations.length === 0) continue;
+            // أوفرلاب (2026-10-22): الاستثناء ذاته لدعم الأوفرلاب المفتوح —
+            // الداعمون المسجلون على الفريق يجب أن يظهروا على بطاقته.
+            if (crew.length === 0 && activations.length === 0 && !(overlapSupportByTeam[t.name] || []).length) continue;
             const crewNames = new Set(crew.map(c => c.name));
             const members = [];
             const absentees = [];
@@ -1351,12 +1377,17 @@ class StaffingEventsService {
             for (const f of folded) {
                 if (!f.entityId) continue;
                 for (const o of f.open) {
-                    if ((o.event_type === 'external_support' || o.event_type === 'volunteer_support') && canonicalTeamId(o.team_id) === t.name) {
+                    // أوفرلاب (2026-10-22): دعم الأوفرلاب المفتوح يظهر على بطاقة
+                    // الفريق المدعوم مثل الدعم الخارجي/التطوع — بدور support
+                    // وحالة overlap (تسميتها «أوفرلاب» عبر خرائط الوسوم القائمة)
+                    if ((o.event_type === 'external_support' || o.event_type === 'volunteer_support' || o.event_type === 'overlap') && canonicalTeamId(o.team_id) === t.name) {
                         if (seenSupport.has(f.entityId)) continue;
                         seenSupport.add(f.entityId);
                         const pi = personInfo[f.entityId] || {};
                         const pl = payloadOf(o) || {};
-                        supporters.push({ name: f.entityId, jobTitle: pi.jobTitle || pl.jobTitle || null, code: pi.code || pl.employeeNumber || null, phone: canPhone ? (pi.phone || null) : null, role: 'support', state: 'external_support', supportType: o.event_type, coverageType: pl.coverageType || null, since: o.created_at, recordedBy: o.actor_name || null, fromCenter: o.center || null });
+                        // state يبقى 'external_support' للنوعين القائمين (سلوك محفوظ حرفيًا —
+                        // مجموعة الانشغال والحوض مبنية عليه)، و'overlap' لدعم الأوفرلاب فقط.
+                        supporters.push({ name: f.entityId, jobTitle: pi.jobTitle || pl.jobTitle || null, code: pi.code || pl.employeeNumber || null, phone: canPhone ? (pi.phone || null) : null, role: 'support', state: o.event_type === 'overlap' ? 'overlap' : 'external_support', supportType: o.event_type, coverageType: pl.coverageType || null, since: o.created_at, recordedBy: o.actor_name || null, fromCenter: o.center || null });
                     } else if (o.event_type === 'assignment' && canonicalTeamId(o.team_id) === t.name && !crewNames.has(f.entityId)) {
                         if (seenSupport.has(f.entityId)) continue;
                         seenSupport.add(f.entityId);
@@ -1584,7 +1615,8 @@ class StaffingEventsService {
         for (const tName of Object.keys(derived.teams)) {
             for (const m of derived.teams[tName].members) {
                 // مرحلة الأوفرلاب 4: «activation» حالة انشغال — المفعَّل يغادر الحوض
-                if (m.state === 'active' || m.state === 'external_support' || m.state === 'assignment' || m.state === 'activation') busy.add(m.name);
+                // أوفرلاب (2026-10-22): داعم الأوفرلاب حالة انشغال — يغادر حوض الدعم المتاح
+                if (m.state === 'active' || m.state === 'external_support' || m.state === 'assignment' || m.state === 'activation' || m.state === 'overlap') busy.add(m.name);
             }
         }
 
