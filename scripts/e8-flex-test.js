@@ -168,7 +168,14 @@ async function main() {
         JSON.stringify(reqs));
 
     console.log('\n── فحوص ستاتيكية: المسارات والصلاحيات ──');
-    const flexRoutes = srvSrc.slice(srvSrc.indexOf("app.post('/api/my/flex-requests'"), srvSrc.indexOf("app.get('/api/permissions/catalog'"));
+    // T0 (2026-10-24): نطاق المرنة = مقطعان، لا مقطع واحد حتى /api/permissions/catalog.
+    // بعد دمج PR #30 صار الترتيب: بوابة المرنة ← بوابة التكميلية ← مراجعة التكميلية
+    // ← مراجعة المرنة ← الكتالوج؛ فأصبح المقطع القديم يقيس صلاحيات المنظومتين
+    // معًا (9/4 بدل 5/2). نية الفحص الأصلية: عزل صلاحيات مسارات المرنة السبعة —
+    // تُستعاد بجمع مقطع البوابة (قبل التكميلية) ومقطع المراجعة (بعدها) فقط.
+    const flexEmployeeRoutes = srvSrc.slice(srvSrc.indexOf("app.post('/api/my/flex-requests'"), srvSrc.indexOf("app.get('/api/my/supplementary-candidates'"));
+    const flexAdminRoutes = srvSrc.slice(srvSrc.indexOf("app.get('/api/schedule/flex-requests'"), srvSrc.indexOf("app.get('/api/permissions/catalog'"));
+    const flexRoutes = flexEmployeeRoutes + flexAdminRoutes;
     check('server.js: المسارات السبعة موجودة (5 بوابة + 2 مسؤول)',
         ["app.post('/api/my/flex-requests'", "app.get('/api/my/flex-requests'", "app.post('/api/my/flex-requests/:id/cancel'",
          "app.get('/api/my/flex-offers'", "app.post('/api/my/flex-offers/:id/respond'",

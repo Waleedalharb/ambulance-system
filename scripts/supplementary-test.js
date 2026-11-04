@@ -209,26 +209,31 @@ async function main() {
     const adminUser = users.find(u => u.username === '4252');
     if (!adminUser) throw new Error('المستخدم الإداري 4252 غير موجود في users.json المصدر');
     adminUser.password = hash;
-    // القاعدة المصدر مخطط فقط (employees فارغة) — بذر ذاتي محكم لموظفي الاختبار
-    // وربطهم بمستخدمين جدد (employee_code = username — نمط resolveEmployee)
-    for (const [code, name] of [['DEMO101', 'موظف تجريبي 101'], ['DEMO102', 'موظف تجريبي 102'], ['DEMO103', 'موظف تجريبي 103']]) {
+    // T0 (2026-10-24): بادئة فريدة لكل ركضة بدل الرموز الثابتة DEMO101–103 —
+    // القاعدة المصدر لم تعد «مخططًا فقط» كما يفترض التعليق الأصلي (تحوي
+    // DEMO101–108 من حقبة سابقة)، فكان الإدراج يسقط بـ SQLITE_CONSTRAINT_UNIQUE
+    // قبل بدء الاختبار. النية محفوظة: بذر ذاتي محكم لثلاثة موظفين وربطهم
+    // بمستخدمين جدد (employee_code = username — نمط resolveEmployee).
+    const RUN_TAG = 'S' + String(Date.now()).slice(-6);
+    const [C1, C2, C3] = [RUN_TAG + 'A', RUN_TAG + 'B', RUN_TAG + 'C'];
+    for (const [code, name] of [[C1, 'موظف تجريبي 101'], [C2, 'موظف تجريبي 102'], [C3, 'موظف تجريبي 103']]) {
         dbRun("INSERT INTO employees (employee_code, name, job_title, is_active) VALUES (?, ?, 'مسعف', 1)", [code, name]);
         users.push({ id: 'test-' + code, username: code, name, password: hash, role: 'user', isActive: true });
     }
     fs.writeFileSync(path.join(TMP_DATA, 'users.json'), JSON.stringify(users, null, 2));
-    for (const un of ['DEMO101', 'DEMO102', 'DEMO103']) {
+    for (const un of [C1, C2, C3]) {
         dbRun("INSERT INTO user_permissions (user_id, permission_key, granted, granted_by) VALUES (?, 'ops.my_portal', 1, 'supp-test')", ['test-' + un]);
     }
-    const U1 = 'test-DEMO101';
-    const U2 = 'test-DEMO102';
+    const U1 = 'test-' + C1;
+    const U2 = 'test-' + C2;
     const UADMIN = String(adminUser.id);
 
-    const EMP1 = dbAll("SELECT id FROM employees WHERE employee_code = 'DEMO101'")[0].id;
-    const EMP2 = dbAll("SELECT id FROM employees WHERE employee_code = 'DEMO102'")[0].id;
-    const EMP3 = dbAll("SELECT id FROM employees WHERE employee_code = 'DEMO103'")[0].id;
+    const EMP1 = dbAll("SELECT id FROM employees WHERE employee_code = ?", [C1])[0].id;
+    const EMP2 = dbAll("SELECT id FROM employees WHERE employee_code = ?", [C2])[0].id;
+    const EMP3 = dbAll("SELECT id FROM employees WHERE employee_code = ?", [C3])[0].id;
     const TEAM = dbAll("SELECT id FROM teams WHERE name = 'جنوب 1'")[0].id;
 
-    dbRun("UPDATE employees SET is_active = 0 WHERE employee_code NOT IN ('DEMO101','DEMO102','DEMO103')");
+    dbRun("UPDATE employees SET is_active = 0 WHERE employee_code NOT IN (?, ?, ?)", [C1, C2, C3]);
     dbRun('DELETE FROM team_assignments WHERE employee_id IN (?, ?, ?)', [EMP1, EMP2, EMP3]);
     const insTA = 'INSERT INTO team_assignments (employee_id, team_id, assigned_date, end_date, is_primary, source) VALUES (?, ?, ?, ?, ?, ?)';
     for (const e of [EMP1, EMP2, EMP3]) dbRun(insTA, [e, TEAM, '2026-01-01', null, 1, 'supp-test']);
@@ -245,9 +250,9 @@ async function main() {
     console.log('\n— الخادم يعمل على :' + PORT + ' —');
     dbRun('DELETE FROM unable_attend_requests WHERE employee_id IN (?, ?, ?)', [EMP1, EMP2, EMP3]);
     dbRun('DELETE FROM leave_requests WHERE employee_id IN (?, ?, ?)', [EMP1, EMP2, EMP3]);
-    const demo1 = await login('DEMO101', 'test123');
-    const demo2 = await login('DEMO102', 'test123');
-    const demo3 = await login('DEMO103', 'test123');
+    const demo1 = await login(C1, 'test123');
+    const demo2 = await login(C2, 'test123');
+    const demo3 = await login(C3, 'test123');
     const admin = await login('4252', 'test123');
 
     // ═══ 3) حيًا: Migration + Fail-Closed ═══

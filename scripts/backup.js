@@ -46,6 +46,21 @@ const BACKUP_ITEMS = [
     'announcements.json',
     'audit-log.json',
     'archive-audit-log.json',
+    'monthly-table.xlsx',
+    'identity.pdf',
+    'report-entry.json',
+    'dashboard.json',
+    'hospitals.json',
+    'references.json',
+    'timeline.json',
+    'map-locations.json',
+    'unit-location-addresses.json',
+    'unit-locations.json',
+    'integration-keys.json',
+    'hospital-monitor.json',
+    'asset-import-payload.json',
+    'exports',
+    'reports',
     'archives',
     'uploads'
 ];
@@ -114,7 +129,7 @@ async function createBackup() {
     const usage = await checkDiskUsage();
     
     // Verify items exist before backup
-    const existingItems = [];
+    let existingItems = [];
     for (const item of BACKUP_ITEMS) {
         const itemPath = path.join(STORAGE_PATH, item);
         try {
@@ -131,29 +146,31 @@ async function createBackup() {
         throw new Error('ambulance.db missing from backup source: ' + STORAGE_PATH);
     }
 
-    // لقطة متسقة للقاعدة (VACUUM INTO) بجانب الأرشيف — نسخ الملفات الخام أثناء عمل
-    // الخادم قد يلتقط حالة WAL وسطية؛ اللقطة متسقة معاملاتيًا بالضرورة.
-    let snapshotPath = null;
-    try {
-        const Database = require('better-sqlite3');
-        snapshotPath = path.join(BACKUP_DIR, `ambulance-snapshot-${timestamp}.db`);
-        const srcDb = new Database(path.join(STORAGE_PATH, 'ambulance.db'), { readonly: true, fileMustExist: true });
-        srcDb.exec(`VACUUM INTO '${snapshotPath.replace(/'/g, "''")}'`);
-        srcDb.close();
-        console.log(`📸 Consistent DB snapshot: ${snapshotPath}`);
-    } catch (e) {
-        console.warn('⚠️  تعذرت اللقطة المتسقة (يبقى النسخ الخام داخل الأرشيف):', e.message);
-        snapshotPath = null;
-    }
-
-    // Create tar.gz using Node.js streams
+    // الأرشيف نفسه يحتوي لقطة VACUUM INTO المتسقة باسم ambulance.db؛
+    // لا تُضمّن ملفات WAL/SHM الخام لأن استعادتها مع لقطة أخرى غير آمنة.
+    const Database = require('better-sqlite3');
+    const snapshotPath = path.join(BACKUP_DIR, `ambulance-snapshot-${timestamp}.db`);
+    const stagingPath = path.join(BACKUP_DIR, `staging-${timestamp}`);
     const tar = require('tar');
+    let srcDb;
+    try {
+        srcDb = new Database(path.join(STORAGE_PATH, 'ambulance.db'), { readonly: true, fileMustExist: true });
+        srcDb.exec(`VACUUM INTO '${snapshotPath.replace(/'/g, "''")}'`);
+        srcDb.close(); srcDb = null;
+        await ensureDir(stagingPath);
+        existingItems = existingItems.filter(item => !['ambulance.db', 'ambulance.db-shm', 'ambulance.db-wal'].includes(item));
+        for (const item of existingItems) {
+            await fs.cp(path.join(STORAGE_PATH, item), path.join(stagingPath, item), { recursive: true });
+        }
+        await fs.copyFile(snapshotPath, path.join(stagingPath, 'ambulance.db'));
+        existingItems.push('ambulance.db');
+        console.log(`📸 Consistent DB snapshot: ${snapshotPath}`);
 
-    await tar.create({
-        gzip: true,
-        file: backupPath,
-        cwd: STORAGE_PATH
-    }, existingItems);
+        await tar.create({ gzip: true, file: backupPath, cwd: stagingPath }, existingItems);
+    } finally {
+        if (srcDb) srcDb.close();
+        await fs.rm(stagingPath, { recursive: true, force: true });
+    }
 
     // تحقق إلزامي بعد الإنشاء: محتويات الأرشيف فعلًا + وجود ambulance.db صراحة
     const entries = [];
@@ -214,46 +231,32 @@ async function restoreBackup(backupFile) {
         process.exit(1);
     }
     
-    // Create restore timestamp
-    const restoreTimestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const preRestoreDir = path.join(BACKUP_DIR, `pre-restore-${restoreTimestamp}`);
-    await ensureDir(preRestoreDir);
+    // نسخة كاملة ومتحقق منها قبل الاستعادة، بما فيها المجلدات والقاعدة.
+    // يجب إيقاف خادم التطبيق قبل الاستعادة حتى لا يعيد فتح/كتابة ملفات SQLite.
+    console.log('📦 Creating full pre-restore backup...');
+    const preRestoreBackup = await createBackup();
     
-    // Backup current data before restoring
-    console.log('📦 Creating pre-restore backup...');
-    const existingItems = [];
-    for (const item of BACKUP_ITEMS) {
-        const srcPath = path.join(STORAGE_PATH, item);
-        try {
-            await fs.access(srcPath);
-            const destPath = path.join(preRestoreDir, item);
-            const stat = await fs.stat(srcPath);
-            if (stat.isDirectory()) {
-                await fs.mkdir(destPath, { recursive: true });
-                // Copy directory contents (simplified - just log)
-                console.log(`   📁 ${item} (directory)`);
-            } else {
-                await fs.copyFile(srcPath, destPath);
-            }
-            existingItems.push(item);
-        } catch (e) {
-            // File may not exist, that's ok
-        }
-    }
-    
-    console.log(`✅ Pre-restore backup saved to ${preRestoreDir}`);
-    console.log(`   Items: ${existingItems.join(', ')}`);
-    
-    // Extract backup
+    // تحقق من وجود القاعدة داخل الأرشيف قبل لمس بيانات التشغيل.
     const tar = require('tar');
-    await tar.extract({
-        file: backupPath,
-        cwd: STORAGE_PATH,
-        gzip: true
-    });
-    
+    const entries = [];
+    await tar.list({ file: backupPath, onentry: entry => entries.push(String(entry.path)) });
+    if (!entries.includes('ambulance.db')) throw new Error('ambulance.db missing from restore archive');
+
+    // ملفات WAL/SHM/Journal القديمة لا تنتمي إلى اللقطة المستعادة؛ إبقاؤها قد
+    // يعيد تطبيق سجلات من قاعدة أخرى. تُحذف بعد اكتمال نسخة ما قبل الاستعادة.
+    for (const suffix of ['-wal', '-shm', '-journal']) {
+        await fs.rm(path.join(STORAGE_PATH, 'ambulance.db' + suffix), { force: true });
+    }
+    await tar.extract({ file: backupPath, cwd: STORAGE_PATH, gzip: true });
+
+    const Database = require('better-sqlite3');
+    const restoredDb = new Database(path.join(STORAGE_PATH, 'ambulance.db'), { readonly: true, fileMustExist: true });
+    const quick = restoredDb.pragma('quick_check', { simple: true });
+    restoredDb.close();
+    if (quick !== 'ok') throw new Error('Restored database failed quick_check: ' + quick);
+    console.log('🔎 Restored database quick_check: ok');
     console.log(`✅ Restored from ${backupPath}`);
-    console.log(`⚠️  Current data was backed up to ${preRestoreDir} before restore`);
+    console.log(`⚠️  Current data was backed up to ${preRestoreBackup} before restore`);
 }
 
 async function cleanupOldBackups() {

@@ -1,11 +1,11 @@
 /**
  * ═══ اختبار تفكيك صلاحيات الجداول — schedule-permissions-test.js ═══
  * (معتمد 2026-08-17) يثبت على حسابات تجريبية معزولة:
- *  1) الـ31 مسارًا المربوطة كلها 403 لمن لا منحة له (authorizePerm هو البوابة)
+ *  1) كل مسارات BOUND مربوطة وتعيد 403 لمن لا منحة له (authorizePerm هو البوابة)
  *  2) كل منحة تفتح مسارها فقط: view/import/edit_cell/employees/export/clear
  *  3) schedule.employees منفصلة عن schedule.edit_cell (الاتجاهان)
  *  4) schedule.clear لا يحملها أي دور، وتعمل بالمنحة اليدوية فقط
- *  5) get-monthly-table يبقى الاستثناء الانتقالي الوحيد (متاح للموثّق)
+ *  5) check/get-monthly-table مربوطان بـ schedule.view بلا استثناء
  *  6) schedule.print لا مسار خادمي لها — تحكم واجهة موثّق فقط
  * العزل: VACUUM INTO + DATA_DIR مؤقت — لا يمس القاعدة ولا users.json الأصليين.
  * التشغيل: node scripts/schedule-permissions-test.js
@@ -47,7 +47,7 @@ async function waitReady(tries = 60) {
     return false;
 }
 
-// المسارات الـ31 المربوطة: [method, path, المفتاح]
+// المسارات المربوطة: [method, path, المفتاح] — العدد مشتق من المصفوفة.
 const BOUND = [
     ['GET', '/api/shift-roster', 'schedule.view'],
     ['GET', '/api/shift-roster/months', 'schedule.view'],
@@ -60,6 +60,8 @@ const BOUND = [
     ['GET', '/api/schedule/files', 'schedule.view'],
     ['GET', '/api/schedule/employees', 'schedule.view'],
     ['POST', '/api/shift-roster/validate', 'schedule.view'],
+    ['GET', '/api/check-monthly-table', 'schedule.view'],
+    ['GET', '/api/get-monthly-table', 'schedule.view'],
     ['POST', '/api/upload-monthly-table', 'schedule.import'],
     ['POST', '/api/shift-roster/import', 'schedule.import'],
     ['POST', '/api/schedule/official-import', 'schedule.import'],
@@ -100,11 +102,28 @@ const BOUND = [
     const count = (t) => dbw.prepare(`SELECT COUNT(*) c FROM ${t}`).get().c;
     const beforeCounts = { shift_roster: count('shift_roster'), employees: count('employees') };
 
+    // بصمة المصدر قبل الاختبار وبعده: المطلوب إثبات أن هذه البطارية لم تغيّر
+    // الحسابات أو المنح القائمة، لا فرض لقطة تاريخية تتعارض مع البيانات المعتمدة.
+    const crypto = require('crypto');
+    const sha256 = value => crypto.createHash('sha256').update(value).digest('hex');
+    const sourceUsersPath = path.join(ROOT, 'data', 'users.json');
+    const sourceUsersHash = () => sha256(fs.readFileSync(sourceUsersPath));
+    const sourcePermsHash = () => {
+        const source = new Database(SRC_DB, { readonly: true });
+        const hasTable = source.prepare("SELECT COUNT(*) c FROM sqlite_master WHERE type='table' AND name='user_permissions'").get().c > 0;
+        const rows = hasTable ? source.prepare('SELECT * FROM user_permissions ORDER BY id').all() : [];
+        source.close();
+        return sha256(JSON.stringify(rows));
+    };
+    const usersHashBefore = sourceUsersHash();
+    const permsHashBefore = sourcePermsHash();
+
     // ── وحدات الكتالوج ──
     const { PERMISSION_KEYS, ROLES_PERMISSIONS } = require(path.join(ROOT, 'config', 'permissions.js'));
     console.log('\n🧪 الكتالوج:');
     const SCHED_KEYS = ['schedule.view', 'schedule.import', 'schedule.edit_cell', 'schedule.employees', 'schedule.generate', 'schedule.swap', 'schedule.bulk_update', 'schedule.sync', 'schedule.export', 'schedule.print', 'schedule.clear'];
-    check('الكتالوج 40 مفتاحًا (37 + 3 العهد 2026-08-23؛ جولة تنظيم الوصول 2026-08-30 أضافت صفر مفاتيح)', PERMISSION_KEYS.length === 40, 'keys=' + PERMISSION_KEYS.length);
+    check('الكتالوج 61 مفتاحًا معتمدًا في الإصدار الحالي وبلا مفاتيح مكررة',
+        PERMISSION_KEYS.length === 61 && new Set(PERMISSION_KEYS).size === 61, 'keys=' + PERMISSION_KEYS.length);
     check('مفاتيح الجداول الـ11 كلها موجودة', SCHED_KEYS.every(k => PERMISSION_KEYS.indexOf(k) !== -1));
     check('لا دور يحمل أي schedule.* إطلاقًا', Object.keys(ROLES_PERMISSIONS).every(r => !ROLES_PERMISSIONS[r].some(k => k.indexOf('schedule.') === 0)));
     check('schedule.clear ممنوعة من كل دور تحديدًا', Object.keys(ROLES_PERMISSIONS).every(r => ROLES_PERMISSIONS[r].indexOf('schedule.clear') === -1));
@@ -152,17 +171,17 @@ const BOUND = [
         const T_VE = tok('probe-ve', 'viewer');      // view + employees
         const T_NONE = tok('probe-none', 'viewer');
 
-        console.log('\n🚫 البوابة: director بلا منح على كل المسارات الـ32:');
+        console.log('\n🚫 البوابة: director بلا منح على كل المسارات (' + BOUND.length + '):');
         let deniedCount = 0, wrongCodes = [];
         for (const [m, p] of BOUND) {
             const r = await api(p, { method: m, token: T_DIR, body: m === 'GET' || m === 'DELETE' ? undefined : {} });
             if (r.status === 403 && r.data && r.data.code === 'PERMISSION_DENIED') deniedCount++;
             else wrongCodes.push(m + ' ' + p + '=' + r.status);
         }
-        check('الـ32 مسارًا كلها ← 403 PERMISSION_DENIED (authorizePerm هو البوابة)', deniedCount === 32, wrongCodes.join(' | '));
+        check('كل المسارات (' + BOUND.length + ') ← 403 PERMISSION_DENIED (authorizePerm هو البوابة)', deniedCount === BOUND.length, wrongCodes.join(' | '));
         // المرفوض لا يكتب: العدّادات بعد موجة الرفض الكاملة يجب أن تطابق قبلها
         const afterDenied = { shift_roster: count('shift_roster'), employees: count('employees') };
-        check('موجة الـ403 الـ31 لم تكتب شيئًا (صفر تغيير)', JSON.stringify(beforeCounts) === JSON.stringify(afterDenied), JSON.stringify(afterDenied));
+        check('موجة الـ403 (' + BOUND.length + ') لم تكتب شيئًا (صفر تغيير)', JSON.stringify(beforeCounts) === JSON.stringify(afterDenied), JSON.stringify(afterDenied));
 
         console.log('\n🔑 كل منحة تفتح مسارها فقط:');
         // view فقط
@@ -224,11 +243,18 @@ const BOUND = [
         });
         check('استيراد فعلي حقيقي بمنحة import وحدها: success + rosterSync', realImp.status === 200 && realImp.data && realImp.data.success === true && !!realImp.data.rosterSync, JSON.stringify(realImp.data || {}).slice(0, 160));
 
-        console.log('\n⚠️ الاستثناء الانتقالي الوحيد:');
-        const g1 = await api('/api/get-monthly-table', { token: T_NONE });
-        const g2 = await api('/api/get-monthly-table', { token: T_DIR });
-        // في العزل لا يوجد monthly-table.xlsx ← 404 طبيعي؛ المهم: لا 403 (لم تُربط بالصلاحية)
-        check('get-monthly-table لم تُربط بـ schedule.view (≠403 للموثّق — انتقالي موثّق)', g1.status !== 403 && g1.status !== 401 && g2.status !== 403, 'status=' + g1.status);
+        console.log('\n🔒 فحص/تنزيل الجدول الشهري: schedule.view بلا استثناء:');
+        const checkNoAuth = await api('/api/check-monthly-table');
+        const getNoAuth = await api('/api/get-monthly-table');
+        check('المساران بلا توكن ← 401 قبل أي قراءة أو تنزيل', checkNoAuth.status === 401 && getNoAuth.status === 401,
+            'check=' + checkNoAuth.status + ' get=' + getNoAuth.status);
+        const checkView = await api('/api/check-monthly-table', { token: T_VIEW });
+        const getView = await api('/api/get-monthly-table', { token: T_VIEW });
+        // في العزل قد لا يوجد ملف Excel: 404 نتيجة وجود صادقة بعد اجتياز الصلاحية، وليست رفضًا.
+        check('schedule.view وحدها تفتح الفحص والتنزيل (check=200 وexists منطقي؛ get=200/404)',
+            checkView.status === 200 && checkView.data && typeof checkView.data.exists === 'boolean'
+            && (getView.status === 200 || getView.status === 404) && getView.status !== 401 && getView.status !== 403,
+            'check=' + checkView.status + ' exists=' + (checkView.data && checkView.data.exists) + ' get=' + getView.status);
 
         console.log('\n👑 عدم كسر الحاليين + سلامة الملفات:');
         const login = await api('/api/auth/login', { method: 'POST', body: { username: '4252', password: '4252' } });
@@ -238,13 +264,8 @@ const BOUND = [
         check('admin الحالي (*) يمر على المسارات المربوطة — لا كسر', a1.status === 200 && a2.status === 200);
         // ملاحظة: مجسات المنح (clear/import) نُفذت فعليًا على القاعدة المعزولة بإثبات فتح البوابة —
         // إثبات «المرفوض لا يكتب» قيس بعد موجة الرفض أعلاه مباشرة.
-        const realUsers = JSON.parse(fs.readFileSync(path.join(ROOT, 'data', 'users.json'), 'utf8'));
-        check('users.json الأصلي لم يُمس', realUsers.every(u => u.role === 'admin'));
-        const realProbe = new Database(SRC_DB, { readonly: true });
-        const hasTable = realProbe.prepare("SELECT COUNT(*) c FROM sqlite_master WHERE type='table' AND name='user_permissions'").get().c > 0;
-        const realPerms = hasTable ? realProbe.prepare("SELECT COUNT(*) c FROM user_permissions").get().c : 0;
-        realProbe.close();
-        check('القاعدة الأصلية لم يُضف إليها أي منحة (المجسات على النسخة فقط)', realPerms === 0, 'rows=' + realPerms);
+        check('users.json الأصلي لم يتغير أثناء الاختبار (SHA-256)', sourceUsersHash() === usersHashBefore);
+        check('منح user_permissions في القاعدة الأصلية لم تتغير أثناء الاختبار (SHA-256)', sourcePermsHash() === permsHashBefore);
     } finally {
         server.kill('SIGTERM');
         await new Promise(r => setTimeout(r, 1500));

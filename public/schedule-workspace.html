@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#09111f">
+    <title>مركز إدارة دورة الجدول | منصة الجنوب</title>
+    <link rel="icon" href="logo.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="css/platform-identity.css">
+    <link rel="stylesheet" href="css/schedule-workspace.css">
+</head>
+<body>
+<a class="skip-link" href="#workspaceMain">تجاوز إلى المحتوى</a>
+<header class="app-header">
+    <div class="brand">
+        <img src="logo.png" alt="شعار منصة الجنوب">
+        <div><h1>مركز إدارة دورة الجدول</h1><p>من الاعتماد المرجعي إلى النشر المنطقي — دون تطبيق على الجدول الرسمي</p></div>
+    </div>
+    <div class="header-actions">
+        <span id="currentUser" class="user-chip">جارٍ التحقق من المستخدم…</span>
+        <a class="button secondary" href="smart-schedule.html"><i class="fas fa-calendar-days"></i> نظام الجداول</a>
+        <a class="button ghost" href="index.html"><i class="fas fa-house"></i> الرئيسية</a>
+    </div>
+</header>
+<main id="workspaceMain" class="workspace">
+    <section class="command-bar" aria-label="اختيار شهر الجدول">
+        <label for="targetMonth">الشهر الهدف</label>
+        <input id="targetMonth" type="month" required>
+        <button id="loadWorkspace" class="button primary" type="button"><i class="fas fa-rotate"></i> تحديث</button>
+        <span id="loadingState" class="loading" role="status" aria-live="polite"></span>
+    </section>
+
+    <div id="globalMessage" class="message hidden" role="alert"></div>
+
+    <section id="summaryCards" class="summary-grid" aria-label="ملخص الشهر">
+        <article class="metric"><span>حالة الشهر</span><strong id="metricStatus">—</strong><small id="metricVersion">لا توجد نسخة محددة</small></article>
+        <article class="metric"><span>المرجع المعتمد</span><strong id="metricReference">—</strong><small id="metricReferenceDetail">—</small></article>
+        <article class="metric"><span>آخر توليد</span><strong id="metricRun">—</strong><small id="metricRunDetail">—</small></article>
+        <article class="metric warning"><span>تغطية غير محسومة</span><strong id="metricUnresolved">—</strong><small>لا قيم بديلة أو مستنتجة</small></article>
+    </section>
+
+    <nav class="tabs" role="tablist" aria-label="أقسام دورة الجدول">
+        <button id="tab-overview" class="tab active" role="tab" aria-selected="true" aria-controls="panel-overview" data-tab="overview"><i class="fas fa-gauge"></i> نظرة عامة</button>
+        <button id="tab-imports" class="tab" role="tab" aria-selected="false" aria-controls="panel-imports" data-tab="imports"><i class="fas fa-file-import"></i> الاستيراد الذكي</button>
+        <button id="tab-reference" class="tab" role="tab" aria-selected="false" aria-controls="panel-reference" data-tab="reference"><i class="fas fa-link"></i> المرجع والاستمرارية</button>
+        <button id="tab-versions" class="tab" role="tab" aria-selected="false" aria-controls="panel-versions" data-tab="versions"><i class="fas fa-code-branch"></i> الإصدارات والفروقات</button>
+        <button id="tab-review" class="tab" role="tab" aria-selected="false" aria-controls="panel-review" data-tab="review"><i class="fas fa-clipboard-check"></i> المراجعة والاعتماد</button>
+        <button id="tab-employees" class="tab" role="tab" aria-selected="false" aria-controls="panel-employees" data-tab="employees"><i class="fas fa-user-nurse"></i> الموظفون</button>
+        <button id="tab-exceptions" class="tab" role="tab" aria-selected="false" aria-controls="panel-exceptions" data-tab="exceptions"><i class="fas fa-triangle-exclamation"></i> الاستثناءات</button>
+        <button id="tab-coverage" class="tab" role="tab" aria-selected="false" aria-controls="panel-coverage" data-tab="coverage"><i class="fas fa-shield-halved"></i> التغطية الرسمية</button>
+        <button id="tab-audit" class="tab" role="tab" aria-selected="false" aria-controls="panel-audit" data-tab="audit"><i class="fas fa-clock-rotate-left"></i> التدقيق</button>
+    </nav>
+
+    <section id="panel-overview" class="panel active" role="tabpanel" aria-labelledby="tab-overview">
+        <div class="panel-heading"><div><h2>دورة الشهر الحالية</h2><p>الإجراءات تُحسم في الخادم حسب الصلاحيات الفعلية.</p></div><button id="generateDraft" class="button primary permission-action" type="button"><i class="fas fa-wand-magic-sparkles"></i> توليد مسودة</button></div>
+        <div class="two-columns">
+            <article class="card"><h3>النسخة الحالية</h3><div id="overviewVersion" class="detail-list empty">لا توجد بيانات</div><div class="actions"><button id="openCurrentReview" class="button secondary" type="button">فتح المراجعة</button><button id="regenerateDraft" class="button secondary permission-action" type="button">إعادة توليد minimal-diff</button></div></article>
+            <article class="card"><h3>آخر تشغيل</h3><div id="overviewRun" class="detail-list empty">لا توجد بيانات</div><p class="notice">النشر هنا انتقال حالة منطقي فقط، وليس تطبيقًا في <code>shift_roster</code> أو <code>schedule_months</code>.</p></article>
+        </div>
+        <article class="card"><div class="panel-heading"><div><h3>تهيئة مرجع من الجدول المستورد</h3><p>قراءة فقط من الجدول المستورد؛ لا تعديل على المصدر.</p></div></div>
+            <form id="importReferenceForm" class="inline-form">
+                <label>شهر المرجع<input id="referenceMonth" type="month" required></label>
+                <label class="grow">ملاحظة المصدر<input id="referenceSourceNote" type="text" maxlength="500" placeholder="وصف مصدر الاستيراد"></label>
+                <button class="button secondary permission-action" type="submit">إنشاء مرجع مستورد</button>
+            </form>
+        </article>
+    </section>
+
+    <section id="panel-imports" class="panel" role="tabpanel" aria-labelledby="tab-imports" hidden>
+        <div class="panel-heading"><div><h2>الاستيراد الذكي متعدد الصيغ</h2><p>XLSX/XLS/XLSM/CSV/PDF النصي والممسوح وPNG/JPG/JPEG — لا كتابة في الجدول الرسمي.</p></div><span id="smartImportState" class="status-badge">لم تُختر دفعة</span></div>
+        <ol class="import-flow" aria-label="دورة الاستيراد"><li>رفع</li><li>تحليل</li><li>خريطة</li><li>تحقق</li><li>معاينة</li><li>مراجعة بشرية</li><li>إنشاء مرجع</li></ol>
+        <article class="card"><h3>1. رفع الملف وتحليله</h3><form id="smartImportUploadForm" class="inline-form">
+            <label class="grow">الملف الأصلي<input id="smartImportFile" type="file" accept=".xlsx,.xls,.xlsm,.csv,.pdf,.png,.jpg,.jpeg" required></label>
+            <label>الشهر (إن لم يُكتشف)<input id="smartImportMonth" type="month"></label>
+            <button class="button primary" type="submit"><i class="fas fa-upload"></i> رفع وتحليل</button>
+        </form><p class="notice">يُحفظ الأصل وبصمة SHA-256 خارج المجلد العام. لا يتعلم النظام معنى رمز جديد، والفراغ لا يتحول إلى راحة.</p></article>
+        <div id="smartImportMessage" class="message hidden" role="alert"></div>
+        <div class="two-columns"><article class="card"><h3>دفعات محفوظة</h3><div id="smartImportBatches" class="record-list empty">لا توجد دفعات</div></article>
+        <article class="card"><h3>الأصل والبصمات</h3><div id="smartImportDetails" class="detail-list empty">اختر دفعة لعرض التحليل</div><button id="smartImportDownload" class="button secondary" type="button" disabled>تنزيل الأصل الموثق</button></article></div>
+        <article class="card"><h3>2. خريطة القالب</h3><form id="smartImportMapForm" class="form-grid">
+            <label>الشهر المعتمد للملف<input id="smartImportMapMonth" type="month" required></label>
+            <label class="full">خرائط بشرية اختيارية للأجزاء غير المعروفة (JSON)<textarea id="smartImportMappings" dir="ltr" placeholder='[{"block_id":"...","orientation":"long","header_row":1,"mapping":{"employee":0,"date":1,"shift":2}}]'></textarea></label>
+            <button class="button secondary" type="submit">تطبيق الخريطة وإعادة التحليل</button>
+        </form><div id="smartImportStructures" class="table-wrap empty">لا توجد بنية محللة</div></article>
+        <div class="summary-grid compact"><article class="metric"><span>العناصر</span><strong id="smartImportAssignmentsCount">—</strong></article><article class="metric"><span>الموظفون</span><strong id="smartImportEmployeesCount">—</strong></article><article class="metric warning"><span>الموانع</span><strong id="smartImportBlockersCount">—</strong></article><article class="metric warning"><span>التحذيرات</span><strong id="smartImportWarningsCount">—</strong></article></div>
+        <article class="card"><h3>3. التحقق والمراجعة البشرية</h3><label>سبب القرار (إلزامي ويُحفظ في التدقيق)<input id="smartImportReviewReason" maxlength="1000" placeholder="مثال: مطابقة الرقم الوظيفي مع سجل الكادر"></label>
+            <div id="smartImportIssues" class="table-wrap empty">لا توجد قضايا</div>
+            <div class="actions"><button id="smartImportConfirm" class="button primary" type="button" disabled>تأكيد اكتمال المراجعة</button><button id="smartImportFinalize" class="button success" type="button" disabled>إنشاء مرجع imported</button></div>
+        </article>
+        <article class="card"><h3>4. معاينة ما فُهم وسبب التفسير</h3><div id="smartImportAssignments" class="table-wrap empty">لا توجد عناصر</div></article>
+        <article class="card"><h3>الفروقات عن المرجع السابق</h3><p class="notice">غياب الصف عن الملف ليس حذفًا أو راحة تلقائية.</p><div id="smartImportDiffs" class="table-wrap empty">لا توجد فروقات</div></article>
+        <article class="card"><h3>الأوراق والخلايا الأصلية المقروءة</h3><div id="smartImportOriginal" class="record-list empty">لا توجد معاينة</div></article>
+        <article class="card"><h3>سجل قرارات المراجعة</h3><div id="smartImportReviews" class="table-wrap empty">لا توجد قرارات</div></article>
+    </section>
+
+    <section id="panel-reference" class="panel" role="tabpanel" aria-labelledby="tab-reference" hidden>
+        <div class="panel-heading"><div><h2>المرجع ولقطات الاستمرارية</h2><p id="referenceStatus">اختر شهرًا لعرض المرجع المباشر.</p></div><div class="actions"><button id="openReferenceDraft" class="button secondary permission-action" type="button">فتح كمسودة</button><button id="deriveContinuity" class="button primary permission-action" type="button">اشتقاق الاستمرارية</button><button id="approveReference" class="button success permission-action" type="button">اعتماد المرجع بالبصمة</button></div></div>
+        <div class="two-columns"><article class="card"><h3>بيانات المرجع</h3><div id="referenceDetails" class="detail-list empty">لا يوجد مرجع</div></article><article class="card"><h3>اللقطات</h3><div id="snapshotList" class="table-wrap empty">لا توجد لقطات</div></article></div>
+        <article class="card"><h3>مراجعة الأيام الفارغة</h3><p class="notice">لا تُعتبر الفراغات راحة إلا بقرار موثق. الدلالات الأخرى تتطلب سببًا.</p><form id="gapsForm"><div id="gapReviews" class="table-wrap empty">لا توجد فراغات</div><button class="button secondary permission-action" type="submit">حفظ مراجعات الفراغات</button></form></article>
+        <article class="card"><h3>الإسناد اليدوي للاستمرارية</h3><form id="continuityForm" class="form-grid">
+            <label>الموظف<select id="continuityEmployee" required></select></label>
+            <label>الحالة<select id="continuityStatus"><option value="resolved">محسوم</option><option value="excluded">مستبعد</option></select></label>
+            <label>النمط<select id="continuityPattern"></select></label>
+            <label>الطور التالي<input id="continuityPhase" type="number" min="0" value="0"></label>
+            <label>الفريق<select id="continuityTeam"></select></label>
+            <label>تاريخ السريان<input id="continuityEffectiveDate" type="date" required></label>
+            <label class="full">السبب الإداري<textarea id="continuityReason" required maxlength="1000"></textarea></label>
+            <button class="button secondary permission-action" type="submit">حفظ الإسناد الموثق</button>
+        </form><div id="continuityEntries" class="table-wrap empty">لا توجد لقطة حالية</div></article>
+    </section>
+
+    <section id="panel-versions" class="panel" role="tabpanel" aria-labelledby="tab-versions" hidden>
+        <div class="panel-heading"><div><h2>الإصدارات والتصحيحات</h2><p>سلسلة النسخ محفوظة بالبصمات والآباء؛ لا تعديل على المعتمد أو المنشور.</p></div></div>
+        <div id="versionsTable" class="table-wrap empty">لا توجد إصدارات</div>
+        <article class="card"><h3>مقارنة نسختين</h3><form id="compareForm" class="inline-form"><label>الإصدار الأساسي<select id="compareBase" required></select></label><label>الإصدار الهدف<select id="compareTarget" required></select></label><button class="button primary" type="submit">عرض الفروقات</button></form><div id="comparisonResult" class="table-wrap empty">لم تُنفذ مقارنة بعد</div></article>
+    </section>
+
+    <section id="panel-review" class="panel" role="tabpanel" aria-labelledby="tab-review" hidden>
+        <div class="panel-heading"><div><h2>مراجعة المسودة ودورة الحياة</h2><p id="reviewVersionLabel">اختر مسودة مولدة من الإصدارات.</p></div><div class="actions"><button id="reviewDraft" class="button primary permission-action" type="button">إجراء مراجعة</button><button id="approveDraft" class="button success permission-action" type="button">اعتماد</button><button id="publishDraft" class="button success permission-action" type="button">نشر منطقي</button><button id="createCorrection" class="button danger permission-action" type="button">إنشاء تصحيح</button></div></div>
+        <div id="lifecycleMessage" class="message hidden"></div>
+        <div class="summary-grid compact"><article class="metric"><span>الحالة</span><strong id="reviewStatus">—</strong></article><article class="metric"><span>الموانع</span><strong id="reviewBlockers">—</strong></article><article class="metric"><span>النواقص</span><strong id="reviewShortages">—</strong></article><article class="metric"><span>مخالفات E-4</span><strong id="reviewE4">—</strong></article></div>
+        <article class="card"><h3>بصمات الربط</h3><div id="hashDetails" class="hash-list empty">لا توجد نسخة</div></article>
+        <div class="two-columns"><article class="card"><h3>الموانع والتعارضات</h3><div id="blockersList" class="record-list empty">لا توجد بيانات</div></article><article class="card"><h3>الفرق غير المحسومة</h3><div id="unresolvedList" class="record-list empty">لا توجد بيانات</div></article></div>
+        <article class="card"><h3>التغطية والنواقص</h3><div id="coverageDetails" class="table-wrap empty">لا توجد مراجعة</div></article>
+        <article class="card"><h3>مخالفات E-4 والتحذيرات</h3><div id="e4Details" class="record-list empty">لا توجد مراجعة</div></article>
+        <article class="card"><h3>سجل المراجعات</h3><div id="reviewHistory" class="table-wrap empty">لا توجد مراجعات</div></article>
+    </section>
+
+    <section id="panel-employees" class="panel" role="tabpanel" aria-labelledby="tab-employees" hidden>
+        <div class="panel-heading"><div><h2>تفاصيل الموظف واستمرارية الدورة</h2><p>المناوبات والإجازات والاستثناءات والفروقات في النسخة المحددة.</p></div><label>الموظف<select id="employeeSelector"></select></label></div>
+        <div id="employeeProfile" class="detail-list empty">اختر موظفًا ونسخة</div>
+        <div class="two-columns"><article class="card"><h3>الاستمرارية</h3><div id="employeeContinuity" class="detail-list empty">—</div></article><article class="card"><h3>الإجازات والاستثناءات</h3><div id="employeeLeaves" class="record-list empty">—</div></article></div>
+        <article class="card"><h3>مناوبات النسخة</h3><div id="employeeDays" class="table-wrap empty">—</div></article>
+        <article class="card"><h3>الفروقات المسجلة للموظف</h3><div id="employeeDiffs" class="table-wrap empty">—</div></article>
+    </section>
+
+    <section id="panel-exceptions" class="panel" role="tabpanel" aria-labelledby="tab-exceptions" hidden>
+        <div class="panel-heading"><div><h2>الاستثناءات المؤقتة الموثقة</h2><p>كل استثناء محدد المدة والسند، ولا يغيّر دورة الموظف الأساسية.</p></div></div>
+        <article class="card"><h3>إضافة استثناء</h3><form id="exceptionForm" class="form-grid">
+            <label>النوع<select id="exceptionType"><option value="temporary_assignment">تكليف مؤقت</option><option value="temporary_change">تغيير مناوبة مؤقت</option><option value="operational_note">ملاحظة تشغيلية</option></select></label>
+            <label>الموظف<select id="exceptionEmployee"><option value="">— بدون موظف —</option></select></label>
+            <label>الفريق محل الاستثناء<select id="exceptionScopeTeam"><option value="">— بدون فريق —</option></select></label>
+            <label>من تاريخ<input id="exceptionStart" type="date" required></label><label>إلى تاريخ<input id="exceptionEnd" type="date" required></label>
+            <label>فريق الأثر<select id="exceptionEffectTeam"><option value="">— بدون تغيير فريق —</option></select></label>
+            <label>رمز الأثر<select id="exceptionEffectCode"><option value="">— بدون تغيير رمز —</option></select></label>
+            <label class="full">السبب<textarea id="exceptionReason" required></textarea></label>
+            <label>مصدر الاعتماد<input id="exceptionApprovalSource" required></label><label>الجهة المخولة<input id="exceptionApprovalAuthority" required></label><label>المعتمد<input id="exceptionApprovedBy" required></label><label>تاريخ الاعتماد<input id="exceptionApprovedAt" type="datetime-local" required></label><label>مرجع المستند<input id="exceptionDocumentRef"></label>
+            <button class="button primary permission-action" type="submit">حفظ الاستثناء الموثق</button>
+        </form></article>
+        <div id="exceptionsTable" class="table-wrap empty">لا توجد استثناءات</div>
+    </section>
+
+    <section id="panel-coverage" class="panel" role="tabpanel" aria-labelledby="tab-coverage" hidden>
+        <div class="panel-heading"><div><h2>مصفوفة التغطية الرسمية</h2><p>لكل فريق نشط قرار: مطلوب، غير منطبق، أو غير محسوم. لا توجد قيم افتراضية بديلة.</p></div><span id="coverageSummary" class="status-badge">—</span></div>
+        <div class="notice warning">الحفظ يسجّل إثباتات جديدة مرتبطة ببصمتي الإعدادات. تغيير التجاوزات قد يجعل الإثباتات السابقة غير صالحة؛ لذلك تُراجع المصفوفة كاملة وتُرسل دفعة واحدة.</div>
+        <form id="coverageForm">
+            <article class="card"><h3>سند الاعتماد الموحد للدفعة</h3><div class="form-grid">
+                <label>مصدر الاعتماد الرسمي<input id="coverageSource" required></label><label>الجهة المخولة<input id="coverageAuthority" required></label><label>المعتمد<input id="coverageApprovedBy" required></label><label>تاريخ الاعتماد<input id="coverageApprovedAt" type="datetime-local" required></label>
+                <label>ساري من<input id="coverageEffectiveFrom" type="date" required></label><label>ساري إلى (اختياري)<input id="coverageEffectiveTo" type="date"></label>
+                <label class="checkbox full"><input id="coverageOfficialConfirmation" type="checkbox" required> أؤكد أن القيم والسند رسميان ومعتمدان من الجهة المختصة، وليسا مستنتجين من التاريخ أو القيم التقنية.</label>
+            </div></article>
+            <div id="coverageMatrix" class="table-wrap empty">لا توجد فرق</div>
+            <button class="button primary permission-action" type="submit">حفظ المصفوفة والإثباتات</button>
+        </form>
+    </section>
+
+    <section id="panel-audit" class="panel" role="tabpanel" aria-labelledby="tab-audit" hidden>
+        <div class="panel-heading"><div><h2>سجل تدقيق الجدولة</h2><p>المستخدم والإجراء والتفاصيل والتوقيت كما سُجلت في الخادم.</p></div><button id="refreshAudit" class="button secondary" type="button">تحديث السجل</button></div>
+        <div id="auditTable" class="table-wrap empty">لا توجد سجلات</div>
+    </section>
+</main>
+<footer class="app-footer">النشر المنطقي ≠ الاعتماد ≠ التطبيق الرسمي. لا تُطبق أي نسخة على التشغيل من هذه الواجهة.</footer>
+<script src="js/core/core-auth.js"></script>
+<script src="js/core/core-toast.js"></script>
+<script src="js/schedule-workspace.js"></script>
+<script src="js/schedule-import-workspace.js"></script>
+</body>
+</html>

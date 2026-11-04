@@ -29,14 +29,18 @@ console.log('vacuum ok');
 `], { stdio: 'inherit', env: process.env });
 init.on('exit', (code) => {
     if (code !== 0) { console.error('[iso] VACUUM failed'); process.exit(1); }
-    // 2) نسخ users.json إلى DATA_DIR المؤقت
+    // 2) نسخ ملفات الحالة التي يقرأها الانحدار إلى DATA_DIR المؤقت.
+    // SCHEDULE_FILE صريح للخادم والعميل حتى لا يقرأ SR-2 ⑤ ملف الشجرة الأصلي.
     fs.copyFileSync(path.join(ROOT, 'data', 'users.json'), path.join(TMP_DATA, 'users.json'));
+    const TMP_SCHEDULE = path.join(TMP_DATA, 'schedule-employees.json');
+    fs.copyFileSync(path.join(ROOT, 'data', 'schedule-employees.json'), TMP_SCHEDULE);
 
     // 3) تشغيل الخادم معزولًا
     const serverEnv = Object.assign({}, process.env, {
         PORT: '3080',
         DB_PATH: TMP_DB,
         DATA_DIR: TMP_DATA,
+        SCHEDULE_FILE: TMP_SCHEDULE,
         NODE_ENV: 'test'
     });
     const server = spawn(process.execPath, [path.join(ROOT, 'server.js')], { env: serverEnv, stdio: ['ignore', 'pipe', 'pipe'] });
@@ -63,11 +67,12 @@ init.on('exit', (code) => {
 
     function startTests() {
         console.log('[iso] server ready, running regression...');
-        // 4) تشغيل عميل الانحدار — يحتاج DB_PATH أيضًا لخطوات تجهيز WF-3
+        // 4) تشغيل عميل الانحدار — يحتاج DB_PATH وSCHEDULE_FILE أيضًا لخطوات التجهيز والاستعادة
         const clientEnv = Object.assign({}, process.env, {
             BASE_URL: 'http://localhost:3080',
             DB_PATH: TMP_DB,
             DATA_DIR: TMP_DATA,
+            SCHEDULE_FILE: TMP_SCHEDULE,
             NODE_ENV: 'test'
         });
         const client = spawn(process.execPath, [path.join(ROOT, 'scripts', 'regression-test.js')], { env: clientEnv, stdio: ['ignore', 'pipe', 'pipe'] });

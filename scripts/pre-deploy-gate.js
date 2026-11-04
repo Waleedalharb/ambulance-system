@@ -5,6 +5,7 @@
 // الاستخدام:
 //   node scripts/pre-deploy-gate.js --target scripts/peak-ssot-test.js
 //        [--target scripts/another-test.js] [--regression-output file.txt]
+//        [--isolated-source-archive: أرشيف بلا .git مع توثيق ذلك وإثبات البصمات]
 // القاعدة: لا نشر إلا بـ GATE: PASS — أي FAIL يوقف القرار فورًا مع السبب.
 // ═══════════════════════════════════════════════════════════════════
 const { spawn, spawnSync, execSync } = require('child_process');
@@ -17,21 +18,13 @@ const ROOT = path.join(__dirname, '..');
 const NODE = process.execPath;
 
 // ─── الـ baseline الثابت المعتمد (يُحدَّث فقط بقرار مالك المنصة) ───
-// محدَّث 2026-10-05 (قرار المالك): 160/12 بعد دخول 3cdf0b7 إلى origin/main —
-// CHAT_DISABLED=true (قرار مالك موثق في server.js: «تعطيل المحادثة الخاصة»)
-// يُفشل فحصَي المحادثة عمدًا: بطارية القراءة على /api/chat/* ← 403 CHAT_DISABLED،
-// و«إنشاء/فتح محادثة خاصة» تبعًا لها. الفشلون العشرة الأوائل أقدم من ذلك وثابتون.
+// P5 (قرار المالك 2026-11-04): إغلاق الإخفاقات الإحدى عشرة واستثناء الجدول الشهري.
+// المرجع الجديد 209/209 وصفر إخفاقات معروفة أو مستثناة؛ تعطيل المحادثات يُختبر
+// كسلوك مقصود (403 CHAT_DISABLED) ولا يُحسب فشلًا، ولا يعاد تفعيلها.
 const BASELINE = {
-    pass: 160,
-    knownFailures: ['W1-B ①', 'W1-B ②', 'W1-B ④', 'V-B ⑪', 'V-B ⑫', 'V-B ②④', 'V-B ②⑦', 'F6 ④', 'SR-1 ①', 'SR-1 ⑨'],
-    knownCrash: 'EMPTY_PERIODS_GUARD',
-    // فشلا CHAT_DISABLED بأنماط مثبتة من الطرفين: أي فشل إضافي داخل بطارية
-    // القراءة (غير مسارات /api/chat/* الثلاثة بالضبط) أو تغيّر سبب فشل المحادثة
-    // يكسر التطابق ويُحسب فشلًا جديدًا — لا تبييض صامت لأعطال مستقبلية.
-    knownFailurePatterns: [
-        /^بطارية القراءة \(\d+\/\d+\) — \/api\/chat\/users→403 \| \/api\/chat\/conversations→403 \| \/api\/chat\/online→403$/,
-        /^إنشاء\/فتح محادثة خاصة — لا يوجد مستخدم آخر$/
-    ]
+    pass: 209,
+    knownFailures: [],
+    knownFailurePatterns: []
 };
 
 // المخازن المُرحَّلة إلى SQLite SSOT (JSON الخاص بها مجمّد: لا قراءة حية ولا كتابة)
@@ -60,9 +53,11 @@ const REQUIRED_TABLES = ['shifts', 'users', 'reports', 'announcements', 'peak_mi
 const args = process.argv.slice(2);
 const targets = [];
 let regressionOutputFile = null;
+let isolatedSourceArchive = false;
 for (let i = 0; i < args.length; i++) {
     if (args[i] === '--target' && args[i + 1]) targets.push(path.resolve(ROOT, args[++i]));
     else if (args[i] === '--regression-output' && args[i + 1]) regressionOutputFile = path.resolve(ROOT, args[++i]);
+    else if (args[i] === '--isolated-source-archive') isolatedSourceArchive = true;
 }
 
 const results = [];
@@ -79,15 +74,19 @@ async function main() {
     console.log('═══ PRE-DEPLOY GATE — ' + new Date().toISOString() + ' ═══\n');
 
     // ─── 1) Git status ───
-    try {
-        const st = execSync('git status --short', { cwd: ROOT, encoding: 'utf8' });
-        const lines = st.split('\n').filter(Boolean);
-        const forbidden = lines.filter(l => /database\.js|db\/migrate\.js/.test(l));
-        report('1 GIT_STATUS', forbidden.length === 0,
-            lines.length + ' ملفًا متغيرًا/غير متتبع (موثق أدناه)' + (forbidden.length ? ' — ممنوع: ' + forbidden.join(',') : ''));
-        lines.forEach(l => console.log('    ' + l));
-    } catch (e) {
-        report('1 GIT_STATUS', false, 'فشل git: ' + e.message);
+    if (isolatedSourceArchive && !fs.existsSync(path.join(ROOT, '.git'))) {
+        report('1 GIT_STATUS', true, 'أرشيف مصدر معزول بلا .git؛ وُثق الوضع صراحة وتُثبت سلامة الملفات ببصمات P5');
+    } else {
+        try {
+            const st = execSync('git status --short', { cwd: ROOT, encoding: 'utf8' });
+            const lines = st.split('\n').filter(Boolean);
+            const forbidden = lines.filter(l => /database\.js|db\/migrate\.js/.test(l));
+            report('1 GIT_STATUS', forbidden.length === 0,
+                lines.length + ' ملفًا متغيرًا/غير متتبع (موثق أدناه)' + (forbidden.length ? ' — ممنوع: ' + forbidden.join(',') : ''));
+            lines.forEach(l => console.log('    ' + l));
+        } catch (e) {
+            report('1 GIT_STATUS', false, 'فشل git: ' + e.message);
+        }
     }
 
     // ─── 2) Targeted tests ───
@@ -98,7 +97,8 @@ async function main() {
             if (!fs.existsSync(t)) { report('2 TARGETED_TESTS', false, 'سكربت مفقود: ' + t); continue; }
             console.log('  … تشغيل ' + path.basename(t));
             const r = runNode(t);
-            const m = r.out.match(/نجح: (\d+) \| ❌ فشل: (\d+)/);
+            const m = r.out.match(/نجح: (\d+) \| ❌ فشل: (\d+)/)
+                || r.out.match(/النتيجة:\s*(\d+)\s*✅\s*\/\s*(\d+)\s*❌/);
             report('2 TARGETED_TESTS', r.code === 0 && !!m && m[2] === '0',
                 path.basename(t) + (m ? ` — ${m[1]} نجح / ${m[2]} فشل` : ' — exit=' + r.code));
         }
@@ -125,10 +125,9 @@ async function main() {
             .map(l => l.replace(/^.*?❌\s*/, '').split(':')[0].trim())
             .filter(name => !BASELINE.knownFailures.some(k => name.startsWith(k)))
             .filter(name => !(BASELINE.knownFailurePatterns || []).some(rx => rx.test(name)));
-        const crashKnown = regOut.includes(BASELINE.knownCrash);
-        const ok = passCount >= BASELINE.pass && newFailures.length === 0 && crashKnown;
+        const ok = passCount === BASELINE.pass && failLines.length === 0 && newFailures.length === 0;
         report('4 BASELINE_COMPARE', ok,
-            `pass=${passCount}/${BASELINE.pass} · إخفاقات جديدة=${newFailures.length ? newFailures.join(' | ') : 'لا شيء'} · تعطل ${BASELINE.knownCrash}=${crashKnown ? 'كما هو معروف' : 'غائب!'}`);
+            `pass=${passCount}/${BASELINE.pass} · إخفاقات=${failLines.length} · إخفاقات جديدة=${newFailures.length ? newFailures.join(' | ') : 'لا شيء'} · استثناءات=0`);
     }
 
     // ─── 5) SQLite schema ───

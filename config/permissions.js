@@ -51,7 +51,16 @@ const PERMISSIONS = {
     'schedule.import':      { label: 'استيراد الجداول (منح فردي فقط — لا دور يمنحها)', domain: 'schedule' },
     'schedule.edit_cell':   { label: 'تعديل خلية جدول (منح فردي فقط)', domain: 'schedule' },
     'schedule.employees':   { label: 'إدارة موظفي الجدول: إضافة/حذف/ترتيب (منح فردي فقط)', domain: 'schedule' },
-    'schedule.generate':    { label: 'توليد الجدول الذكي (منح فردي فقط)', domain: 'schedule' },
+    'schedule.generate':    { label: 'توليد الجدول الذكي (admin حصرًا + امتلاك المفتاح فعليًا)', domain: 'schedule' },
+    // P1-A: تهيئة المرجع والاستمرارية — مفاتيح مستقلة، منح فردي فقط ولا حصر admin إلا للتوليد.
+    'schedule.draft.edit':  { label: 'تهيئة ومراجعة مسودات الجدولة وإسناد الاستمرارية (منح فردي فقط)', domain: 'schedule' },
+    'schedule.gaps.review': { label: 'مراجعة فراغات المرجع وتوثيق دلالتها (منح فردي فقط)', domain: 'schedule' },
+    'schedule.approve':     { label: 'اعتماد إصدار مرجعي أو مسودة جاهزة بنفس البصمة (منح فردي فقط)', domain: 'schedule' },
+    // P1-B: المفتاح معتمد في D5-K؛ إدخال موثق فقط ولا سير مراجعة موازٍ ولا منح تلقائي.
+    'schedule.exceptions.manage': { label: 'إدارة استثناءات الجدولة المؤقتة الموثقة (منح فردي فقط)', domain: 'schedule' },
+    // P2: الاعتماد ≠ النشر ≠ إنشاء تصحيح للمنشور؛ منح فردي مستقل لكل مفتاح.
+    'schedule.publish':     { label: 'نشر الإصدار المعتمد منطقيًا دون وراثة صلاحية الاعتماد (منح فردي فقط)', domain: 'schedule' },
+    'schedule.published.edit': { label: 'إنشاء إصدار تصحيحي من معتمد/منشور دون تعديل الأصل (منح فردي فقط)', domain: 'schedule' },
     'schedule.swap':        { label: 'استبدال/تراجع/إعادة بالجداول (منح فردي فقط)', domain: 'schedule' },
     'schedule.bulk_update': { label: 'تحديث جماعي ومسودات الجداول (منح فردي فقط)', domain: 'schedule' },
     'schedule.sync':        { label: 'مزامنة الجدول مع الخادم/حفظه (منح فردي فقط)', domain: 'schedule' },

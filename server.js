@@ -1005,6 +1005,103 @@ function getPermissionService() {
     return permissionService;
 }
 
+// توليد الجدول الشهري استثناء صريح: الدور admin حرفيًا + schedule.generate فعليًا.
+// النجمة في sysadmin لا تجتاز شرط الدور، والمنحة الفردية لا تفتح التوليد لغير admin.
+const {
+    assertScheduleGenerationAccess,
+    authorizeScheduleGeneration
+} = require('./services/schedule-generation-access');
+const scheduleGenerationGuard = authorizeScheduleGeneration(getPermissionService);
+
+// P1-A: خدمة المرجع والاستمرارية — تركيب كسول، بلا توليد أو نشر.
+let continuityService = null;
+function getContinuityService() {
+    if (!continuityService && db) {
+        const { ContinuityService } = require('./services/schedule-engine/continuity-service');
+        continuityService = new ContinuityService(db);
+    }
+    return continuityService;
+}
+function handleContinuityError(res, error) {
+    if (error && error.name === 'ContinuityError') {
+        return res.status(error.status).json({ error: error.message, code: error.code });
+    }
+    console.error('Schedule continuity error:', error && (error.stack || error.message));
+    return res.status(500).json({ error: 'فشل إجراء مرجع الجدولة', code: 'CONTINUITY_INTERNAL_ERROR' });
+}
+
+// P6: الاستيراد الذكي — قناة مستقلة عن الاستيراد القديم؛ الناتج مرجع imported فقط.
+let scheduleImportService = null;
+function getScheduleImportService() {
+    if (!scheduleImportService && db) {
+        const { ScheduleImportService } = require('./services/schedule-engine/schedule-import-service');
+        scheduleImportService = new ScheduleImportService(db, { storageDir: STORAGE_PATH });
+    }
+    return scheduleImportService;
+}
+function handleScheduleImportError(res, error) {
+    if (error && error.name === 'ScheduleImportError') {
+        return res.status(error.status).json({ error: error.message, code: error.code });
+    }
+    console.error('Smart schedule import error:', error && (error.stack || error.message));
+    return res.status(500).json({ error: 'فشل إجراء الاستيراد الذكي', code: 'SMART_IMPORT_INTERNAL_ERROR' });
+}
+
+// P1-B: توليد المسودات والاستثناءات — لا اعتماد/نشر ولا كتابة في roster هنا.
+let scheduleGenerationService = null;
+function getScheduleGenerationService() {
+    if (!scheduleGenerationService && db) {
+        const { ScheduleGenerationService } = require('./services/schedule-engine/generation-service');
+        scheduleGenerationService = new ScheduleGenerationService(db, getPermissionService);
+    }
+    return scheduleGenerationService;
+}
+let scheduleExceptionService = null;
+function getScheduleExceptionService() {
+    if (!scheduleExceptionService && db) {
+        const { ScheduleExceptionService } = require('./services/schedule-engine/exception-service');
+        scheduleExceptionService = new ScheduleExceptionService(db);
+    }
+    return scheduleExceptionService;
+}
+// P2: دورة حياة المسودة — النشر منطقي فقط ولا يكتب في الجدول الرسمي.
+let scheduleLifecycleService = null;
+function getScheduleLifecycleService() {
+    if (!scheduleLifecycleService && db) {
+        const { ScheduleLifecycleService } = require('./services/schedule-engine/lifecycle-service');
+        scheduleLifecycleService = new ScheduleLifecycleService(db, getPermissionService);
+    }
+    return scheduleLifecycleService;
+}
+// P3: مركز دورة الجدول وإدارة إثباتات التغطية الرسمية — لا منح ولا roster.
+let scheduleWorkspaceService = null;
+function getScheduleWorkspaceService() {
+    if (!scheduleWorkspaceService && db) {
+        const { ScheduleWorkspaceService } = require('./services/schedule-engine/workspace-service');
+        scheduleWorkspaceService = new ScheduleWorkspaceService(db);
+    }
+    return scheduleWorkspaceService;
+}
+let coverageApprovalService = null;
+function getCoverageApprovalService() {
+    if (!coverageApprovalService && db) {
+        const { CoverageApprovalService } = require('./services/schedule-engine/coverage-approval-service');
+        coverageApprovalService = new CoverageApprovalService(db);
+    }
+    return coverageApprovalService;
+}
+function handleGenerationError(res, error) {
+    if (error && error.code === 'PERMISSION_DENIED') {
+        return res.status(403).json({ error: error.message, code: error.code, permission: 'schedule.generate' });
+    }
+    if (error && error.name === 'ScheduleGenerationError') {
+        return res.status(error.status).json({ error: error.message, code: error.code });
+    }
+    if (error && error.name === 'ContinuityError') return handleContinuityError(res, error);
+    console.error('Schedule generation error:', error && (error.stack || error.message));
+    return res.status(500).json({ error: 'فشل إجراء توليد الجدولة', code: 'GENERATION_INTERNAL_ERROR' });
+}
+
 // استعادة كلمة المرور عبر الجوال الموثّق (معتمدة 2026-09-04) — تركيب كسول:
 // المزوّد من OTP_PROVIDER (disabled افتراضيًا في الإنتاج حتى تُضبط بيانات Unifonic)
 let authResetService = null;
@@ -1040,7 +1137,7 @@ function authorizePerm(permissionKey) {
             if (!ok) return res.status(403).json({ error: 'ليس لديك الصلاحية', code: 'PERMISSION_DENIED', permission: permissionKey });
             next();
         } catch (e) {
-            console.error('authorizePerm error:', e.message);
+            console.error('authorizePerm error:', e && (e.stack || e.message) || e);
             return res.status(500).json({ error: 'فشل فحص الصلاحية' });
         }
     };
@@ -4596,6 +4693,18 @@ const uploadExcel = multer({
         } else {
             cb(new Error('نوع الملف غير مسموح. يُسمح فقط بملفات Excel (.xlsx, .xls). نوع الملف المستلم: ' + file.mimetype + ', الامتداد: ' + ext));
         }
+    }
+});
+
+// P6: رفع الاستيراد الذكي في الذاكرة فقط؛ الأصل الدائم يُحفظ بالخدمة خارج public
+// بعد التحقق من التوقيع والبصمة. قناة مستقلة ولا تغيّر uploadExcel القديم.
+const uploadSmartSchedule = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: MAX_FILE_SIZE, files: 1 },
+    fileFilter: function(req, file, cb) {
+        const ext = path.extname(file.originalname || '').toLowerCase();
+        if (['.xlsx', '.xls', '.xlsm', '.csv', '.pdf', '.png', '.jpg', '.jpeg'].includes(ext)) cb(null, true);
+        else cb(new Error('صيغة غير مدعومة. الصيغ المقبولة: XLSX/XLS/XLSM/CSV/PDF/PNG/JPG/JPEG'));
     }
 });
 
@@ -12092,7 +12201,7 @@ app.post('/api/upload-monthly-table', authenticate, authorizePerm('schedule.impo
     }
 });
 
-app.get('/api/get-monthly-table', authenticate, async (req, res) => {
+app.get('/api/get-monthly-table', authenticate, authorizePerm('schedule.view'), async (req, res) => {
     try {
         const data = await fs.readFile(MONTHLY_TABLE_PATH);
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -12109,7 +12218,7 @@ app.get('/api/get-monthly-table', authenticate, async (req, res) => {
     }
 });
 
-app.get('/api/check-monthly-table', authenticate, async (req, res) => {
+app.get('/api/check-monthly-table', authenticate, authorizePerm('schedule.view'), async (req, res) => {
     try {
         await fs.access(MONTHLY_TABLE_PATH);
         res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
@@ -15733,7 +15842,8 @@ async function buildLeaveMap(year, month) {
     return leaveMap;
 }
 
-async function generateNormalSchedule(year, month, leaveMap) {
+async function generateNormalSchedule(year, month, leaveMap, actor) {
+    await assertScheduleGenerationAccess(actor, getPermissionService);
     const daysInMonth = new Date(year, month, 0).getDate();
     const employees = await db.Employees.getActive();
     const schedule = [];
@@ -15838,7 +15948,8 @@ async function generateNormalSchedule(year, month, leaveMap) {
     return { schedule, alerts };
 }
 
-async function generateAlternativeSchedule(year, month, leaveMap) {
+async function generateAlternativeSchedule(year, month, leaveMap, actor) {
+    await assertScheduleGenerationAccess(actor, getPermissionService);
     const daysInMonth = new Date(year, month, 0).getDate();
     const employees = await db.Employees.getActive();
     const schedule = [];
@@ -15973,10 +16084,200 @@ async function generateRecommendations(year, month) {
 }
 
 // ============================================
+// API: P6 — الاستيراد الذكي متعدد الصيغ
+// لا تغيير على official-import/shift-roster/import القديمة، ولا اعتماد أو نشر هنا.
+// ============================================
+app.post('/api/schedule/imports', authenticate, authorizePerm('schedule.import'), uploadSmartSchedule.single('file'), handleMulterError, async (req, res) => {
+    try {
+        if (!req.file) return res.status(422).json({ error: 'الملف مطلوب', code: 'IMPORT_FILE_REQUIRED' });
+        const result = await getScheduleImportService().upload({
+            buffer: req.file.buffer, originalName: req.file.originalname, mimeType: req.file.mimetype,
+            month: (req.body || {}).month || null, user: req.user
+        });
+        res.status(201).json(result);
+    } catch (error) { handleScheduleImportError(res, error); }
+});
+app.get('/api/schedule/imports', authenticate, authorizePerm('schedule.view'), async (req, res) => {
+    try { res.json(await getScheduleImportService().list(req.query || {})); }
+    catch (error) { handleScheduleImportError(res, error); }
+});
+app.get('/api/schedule/imports/:id/file', authenticate, authorizePerm('schedule.view'), async (req, res) => {
+    try {
+        const original = await getScheduleImportService().getOriginal(req.params.id);
+        res.setHeader('Content-Type', original.mimeType);
+        res.setHeader('Content-Length', original.buffer.length);
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+        res.setHeader('Content-Disposition', `attachment; filename="schedule-import"; filename*=UTF-8''${encodeURIComponent(original.filename)}`);
+        res.send(original.buffer);
+    } catch (error) { handleScheduleImportError(res, error); }
+});
+app.get('/api/schedule/imports/:id', authenticate, authorizePerm('schedule.view'), async (req, res) => {
+    try { res.json(await getScheduleImportService().get(req.params.id)); }
+    catch (error) { handleScheduleImportError(res, error); }
+});
+app.put('/api/schedule/imports/:id/map', authenticate, authorizePerm('schedule.import'), async (req, res) => {
+    try { res.json(await getScheduleImportService().map(req.params.id, req.body || {}, req.user)); }
+    catch (error) { handleScheduleImportError(res, error); }
+});
+app.post('/api/schedule/imports/:id/review', authenticate, authorizePerm('schedule.import'), async (req, res) => {
+    try { res.json(await getScheduleImportService().review(req.params.id, req.body || {}, req.user)); }
+    catch (error) { handleScheduleImportError(res, error); }
+});
+app.post('/api/schedule/imports/:id/import', authenticate, authorizePerm('schedule.import'), async (req, res) => {
+    try {
+        const result = await getScheduleImportService().import(req.params.id, (req.body || {}).expected_analysis_hash, req.user);
+        res.status(201).json(result);
+    } catch (error) { handleScheduleImportError(res, error); }
+});
+
+// ============================================
+// API: P1-A — المرجع المعتمد ولقطات الاستمرارية
+// لا توليد ولا نشر ولا كتابة في shift_roster/schedule_months هنا.
+// ============================================
+app.get('/api/schedule/reference', authenticate, authorizePerm('schedule.view'), async (req, res) => {
+    try { res.json(await getContinuityService().getReference(req.query.target_month)); }
+    catch (error) { handleContinuityError(res, error); }
+});
+app.get('/api/schedule/versions', authenticate, authorizePerm('schedule.view'), async (req, res) => {
+    try { res.json(await getContinuityService().listVersions(req.query)); }
+    catch (error) { handleContinuityError(res, error); }
+});
+app.post('/api/schedule/versions/import-roster', authenticate, authorizePerm('schedule.import'), async (req, res) => {
+    try {
+        const body = req.body || {};
+        const version = await getContinuityService().importRoster({ month: body.month, sourceNote: body.source_note, user: req.user });
+        res.status(201).json({ version });
+    } catch (error) { handleContinuityError(res, error); }
+});
+app.get('/api/schedule/versions/:id', authenticate, authorizePerm('schedule.view'), async (req, res) => {
+    try { res.json({ version: await getContinuityService().getVersion(req.params.id) }); }
+    catch (error) { handleContinuityError(res, error); }
+});
+app.post('/api/schedule/versions/:id/open-draft', authenticate, authorizePerm('schedule.draft.edit'), async (req, res) => {
+    try { res.json({ version: await getContinuityService().openDraft(req.params.id, req.user) }); }
+    catch (error) { handleContinuityError(res, error); }
+});
+app.put('/api/schedule/versions/:id/gaps', authenticate, authorizePerm('schedule.gaps.review'), async (req, res) => {
+    try { res.json({ version: await getContinuityService().reviewGaps(req.params.id, (req.body || {}).reviews, req.user) }); }
+    catch (error) { handleContinuityError(res, error); }
+});
+app.post('/api/schedule/versions/:id/continuity/derive', authenticate, authorizePerm('schedule.draft.edit'), async (req, res) => {
+    try { res.json({ version: await getContinuityService().derive(req.params.id, req.user) }); }
+    catch (error) { handleContinuityError(res, error); }
+});
+app.put('/api/schedule/versions/:id/continuity/:employeeId', authenticate, authorizePerm('schedule.draft.edit'), async (req, res) => {
+    try { res.json({ version: await getContinuityService().assignContinuity(req.params.id, req.params.employeeId, req.body || {}, req.user) }); }
+    catch (error) { handleContinuityError(res, error); }
+});
+app.post('/api/schedule/versions/:id/approve', authenticate, authorizePerm('schedule.approve'), async (req, res) => {
+    try { res.json({ version: await getContinuityService().approve(req.params.id, (req.body || {}).content_hash, req.user) }); }
+    catch (error) { handleContinuityError(res, error); }
+});
+
+// ============================================
+// API: P1-B — مسودات التوليد والاستثناءات الموثقة
+// الحارس مرتبط بالمسار وداخل generate/regenerate؛ الرفض يسبق أي كتابة.
+// ============================================
+app.post('/api/schedule/generation-runs', authenticate, scheduleGenerationGuard, async (req, res) => {
+    try {
+        const body = req.body || {};
+        const run = await getScheduleGenerationService().generate({
+            targetMonth: body.target_month, sourceNote: body.source_note, user: req.user
+        });
+        res.status(201).json({ run });
+    } catch (error) { handleGenerationError(res, error); }
+});
+app.post('/api/schedule/generation-runs/:id/regenerate', authenticate, scheduleGenerationGuard, async (req, res) => {
+    try {
+        const run = await getScheduleGenerationService().regenerate({
+            baseRunId: req.params.id, sourceNote: (req.body || {}).source_note, user: req.user
+        });
+        res.status(201).json({ run });
+    } catch (error) { handleGenerationError(res, error); }
+});
+app.get('/api/schedule/generation-runs', authenticate, authorizePerm('schedule.view'), async (req, res) => {
+    try { res.json(await getScheduleGenerationService().listRuns(req.query)); }
+    catch (error) { handleGenerationError(res, error); }
+});
+app.get('/api/schedule/generation-runs/:id', authenticate, authorizePerm('schedule.view'), async (req, res) => {
+    try { res.json({ run: await getScheduleGenerationService().getRun(req.params.id) }); }
+    catch (error) { handleGenerationError(res, error); }
+});
+app.get('/api/schedule/exceptions', authenticate, authorizePerm('schedule.view'), async (req, res) => {
+    try { res.json(await getScheduleExceptionService().list(req.query)); }
+    catch (error) { handleGenerationError(res, error); }
+});
+app.post('/api/schedule/exceptions', authenticate, authorizePerm('schedule.exceptions.manage'), async (req, res) => {
+    try { res.status(201).json({ exception: await getScheduleExceptionService().create(req.body || {}, req.user) }); }
+    catch (error) { handleGenerationError(res, error); }
+});
+app.post('/api/schedule/exceptions/:id/cancel', authenticate, authorizePerm('schedule.exceptions.manage'), async (req, res) => {
+    try {
+        const exception = await getScheduleExceptionService().cancel(
+            req.params.id, (req.body || {}).cancellation_reason, req.user);
+        res.json({ exception });
+    } catch (error) { handleGenerationError(res, error); }
+});
+
+// ============================================
+// API: P2 — مراجعة/اعتماد/نشر منطقي/تصحيح المسودات المولدة
+// لا كتابة في shift_roster أو schedule_months؛ الصلاحيات مستقلة ولا تتوارث.
+// ============================================
+app.get('/api/schedule/generated-versions/:id/lifecycle', authenticate, authorizePerm('schedule.view'), async (req, res) => {
+    try { res.json(await getScheduleLifecycleService().getLifecycle(req.params.id)); }
+    catch (error) { handleGenerationError(res, error); }
+});
+app.post('/api/schedule/generated-versions/:id/review', authenticate, authorizePerm('schedule.draft.edit'), async (req, res) => {
+    try { res.json(await getScheduleLifecycleService().review(req.params.id, req.user)); }
+    catch (error) { handleGenerationError(res, error); }
+});
+app.post('/api/schedule/generated-versions/:id/approve', authenticate, authorizePerm('schedule.approve'), async (req, res) => {
+    try { res.json(await getScheduleLifecycleService().approve(req.params.id, (req.body || {}).content_hash, req.user)); }
+    catch (error) { handleGenerationError(res, error); }
+});
+app.post('/api/schedule/generated-versions/:id/publish', authenticate, authorizePerm('schedule.publish'), async (req, res) => {
+    try { res.json(await getScheduleLifecycleService().publish(req.params.id, (req.body || {}).content_hash, req.user)); }
+    catch (error) { handleGenerationError(res, error); }
+});
+app.post('/api/schedule/generated-versions/:id/corrections', authenticate, authorizePerm('schedule.published.edit'), async (req, res) => {
+    try { res.status(201).json(await getScheduleLifecycleService().createCorrection(req.params.id, (req.body || {}).reason, req.user)); }
+    catch (error) { handleGenerationError(res, error); }
+});
+
+// ============================================
+// API: P3 — مركز دورة الجدول ومصفوفة الإثباتات الرسمية
+// القراءة schedule.view؛ إدارة الإثباتات schedule.settings.manage فقط.
+// ============================================
+app.get('/api/schedule/workspace', authenticate, authorizePerm('schedule.view'), async (req, res) => {
+    try { res.json(await getScheduleWorkspaceService().overview(req.query.month)); }
+    catch (error) { handleGenerationError(res, error); }
+});
+app.get('/api/schedule/versions/:id/employee/:employeeId', authenticate, authorizePerm('schedule.view'), async (req, res) => {
+    try { res.json(await getScheduleWorkspaceService().employeeDetail(req.params.id, req.params.employeeId)); }
+    catch (error) { handleGenerationError(res, error); }
+});
+app.get('/api/schedule/version-comparison', authenticate, authorizePerm('schedule.view'), async (req, res) => {
+    try { res.json(await getScheduleWorkspaceService().compare(req.query.base_id, req.query.target_id)); }
+    catch (error) { handleGenerationError(res, error); }
+});
+app.get('/api/schedule/audit-log', authenticate, authorizePerm('schedule.view'), async (req, res) => {
+    try { res.json(await getScheduleWorkspaceService().audit(req.query)); }
+    catch (error) { handleGenerationError(res, error); }
+});
+app.get('/api/schedule/coverage-approvals', authenticate, authorizePerm('schedule.view'), async (req, res) => {
+    try { res.json(await getCoverageApprovalService().getMatrix(req.query.month)); }
+    catch (error) { handleGenerationError(res, error); }
+});
+app.put('/api/schedule/coverage-approvals', authenticate, authorizePerm('schedule.settings.manage'), async (req, res) => {
+    try { res.json(await getCoverageApprovalService().saveMatrix(req.body || {}, req.user)); }
+    catch (error) { handleGenerationError(res, error); }
+});
+
+// ============================================
 // API: Smart Shift Schedule
 // ============================================
 
-app.post('/api/shift-schedule/generate', authenticate, authorize(['admin', 'director']), async (req, res) => {
+app.post('/api/shift-schedule/generate', authenticate, scheduleGenerationGuard, async (req, res) => {
     try {
         const { year, month, mode = 'normal' } = req.body;
         if (!year || !month) {
@@ -15989,9 +16290,9 @@ app.post('/api/shift-schedule/generate', authenticate, authorize(['admin', 'dire
         
         let result;
         if (mode === 'alternative') {
-            result = await generateAlternativeSchedule(y, m, leaveMap);
+            result = await generateAlternativeSchedule(y, m, leaveMap, req.user);
         } else {
-            result = await generateNormalSchedule(y, m, leaveMap);
+            result = await generateNormalSchedule(y, m, leaveMap, req.user);
         }
         
         // Save to database
@@ -16025,6 +16326,9 @@ app.post('/api/shift-schedule/generate', authenticate, authorize(['admin', 'dire
         
         res.json({ success: true, schedule: result.schedule, alerts: result.alerts, mode });
     } catch (error) {
+        if (error && error.code === 'PERMISSION_DENIED' && error.permission === 'schedule.generate') {
+            return res.status(403).json({ error: error.message, code: error.code, permission: error.permission });
+        }
         console.error('Schedule generation error:', error);
         res.status(500).json({ error: 'فشل في إنشاء الجدول' });
     }

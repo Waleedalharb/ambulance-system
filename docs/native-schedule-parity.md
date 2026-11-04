@@ -24,7 +24,7 @@
 | `GET /api/teams` · `GET /api/employees` | `authenticate` | أسماء الفرق/المراكز/الموظفين للعروض |
 | `GET /api/schedule/metrics?from&to` | `schedule.view` | مؤشرات الساعات من `ScheduleMetricsService` (لا حساب في العميل) |
 | `GET /api/shift-schedule/month?month&year` | `authenticate` | الجدول المولّد (المحرك البديل): `{success, schedule, byDate:{day[],night[],off[],leave[]}, alerts}` |
-| `GET /api/check-monthly-table` | `authenticate` | `{exists: bool}` |
+| `GET /api/check-monthly-table` · `GET /api/get-monthly-table` | `schedule.view` | `{exists: bool}` · ملف Excel الخام |
 
 ## ② نموذج الكتابة (مُتحقق — لا يُختصر لقراءة)
 
@@ -44,7 +44,7 @@
 | مزامنة الملفات | `POST /api/schedule/files` | `schedule.sync` | كتابة ملفات الجدولة |
 | تصدير JSON | `POST /api/shift-roster/export` `{format,month,year,filters?}` | `schedule.export` | `{download_url, data[], format}` |
 | تصدير PDF | `GET /api/schedule/pdf?center\|group&month` | `schedule.export` | **PDF ثنائي حقيقي** (A4 أفقي RTL بترويسة رسمية) — 404 بلا بيانات |
-| الجدول الشهري (Excel) | `POST /api/upload-monthly-table` (multipart) · `GET get-monthly-table` · `DELETE /api/monthly-table` | import / clear | ملف Excel خام |
+| الجدول الشهري (Excel) | `POST /api/upload-monthly-table` (multipart) · `GET get-monthly-table` · `DELETE /api/monthly-table` | import / view / clear | ملف Excel خام |
 | توليد ذكي | `POST /api/shift-schedule/generate` `{year,month,mode: normal\|alternative}` | دور `admin`/`director` | يحذف ويعيد بناء `shift_schedule_auto` + تنبيهات، معاملة |
 | تعديل مولّد | `POST /api/shift-schedule/update` | دور `admin`/`director` | تحديث سجل `shift_schedule_auto` |
 | مسح | `POST /api/shift-roster/clear` · `/clear-all` | `schedule.clear` (يدوية حصرًا) | حذف فعلي — تأكيد مزدوج إلزامي في Native |

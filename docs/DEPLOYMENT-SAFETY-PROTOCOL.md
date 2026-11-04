@@ -32,14 +32,16 @@ ANALYSIS → IMPLEMENT → TEST → REVIEW → APPROVE → DEPLOY → POST-DEPLO
 
 ```bash
 node scripts/pre-deploy-gate.js --target scripts/<اختبار-البند>.js
+# عند الفحص على أرشيف مصدر معزول لا يتضمن .git فقط:
+node scripts/pre-deploy-gate.js --target scripts/<اختبار-البند>.js --isolated-source-archive
 ```
 
 البنود الـ 11 الإلزامية:
 
-1. **Git status** — توثيق المتغير + رفض أي تعديل على ملفات محظورة (`db/database.js`, `db/migrate.js`).
+1. **Git status** — توثيق المتغير + رفض أي تعديل على ملفات محظورة (`db/database.js`, `db/migrate.js`). في أرشيف معزول بلا `.git` يلزم تمرير `--isolated-source-archive` صراحة؛ يوثق السجل غياب بيانات Git بدل ادعاء فحصها، وتُثبت سلامة الملفات ببصمات الأدلة.
 2. **Targeted tests** — اختبار البند المعزول يمرّ بالكامل (يُحدَّد صراحة بـ `--target`).
 3. **Full regression** — `scripts/run-regression-isolated.js`.
-4. **Baseline comparison** — `167 ✅` على الأقل + صفر إخفاقات جديدة خارج القائمة المعروفة العشر + تعطل `EMPTY_PERIODS_GUARD` المعروف.
+4. **Baseline comparison** — `209/209 ✅` بالضبط + صفر إخفاقات + صفر استثناءات.
 5. **SQLite schema** — الجداول المطلوبة موجودة + `quick_check=ok` + كشف المخططات التاريخية.
 6. **Migration inspection** — كل `CREATE TABLE` محمي بـ `IF NOT EXISTS`، وكل `DROP TABLE` داخل إعادة بناء محروسة (`foreign_keys=OFF` + معاملة).
 7. **JSON fallback detection** — قرّاء المخازن المُرحَّلة (`readAnnouncements`/`readShifts`/`readPeakData`) لا يلمسون JSON إطلاقًا.
@@ -52,11 +54,11 @@ node scripts/pre-deploy-gate.js --target scripts/<اختبار-البند>.js
 
 ### الـ baseline الثابت
 
-- `167` ناجحًا — لا يقبل أقل.
-- 10 إخفاقات معروفة مسماة: W1-B ①②④، V-B ⑪⑫②④②⑦، F6 ④، SR-1 ①⑨.
-- تعطل `EMPTY_PERIODS_GUARD` في roster-sync معروف ومستقل.
-- **أي إخفاق جديد = FAIL** حتى لو بقي العدد 167.
-- تحديث الـ baseline نفسه يحتاج قرار مالك مستقل.
+- `209` ناجحًا من أصل `209` — لا يقبل عددًا مختلفًا أو أي إخفاق.
+- لا توجد إخفاقات معروفة أو أنماط فشل مستثناة بعد إغلاق P5.
+- تعطيل المحادثات قرار قائم؛ الاختبارات تثبت `403 CHAT_DISABLED` دون إعادة تفعيلها.
+- `get-monthly-table` و`check-monthly-table` مربوطان بـ`schedule.view`؛ لم يعد تنزيل الجدول استثناءً.
+- **أي إخفاق = FAIL**، وتحديث الـ baseline نفسه يحتاج قرار مالك مستقل.
 
 ---
 

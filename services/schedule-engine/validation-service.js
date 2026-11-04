@@ -76,13 +76,20 @@ function _periodOfCtx(code, isSupp) {
     }
     return null;
 }
-async function validateAssignment(db, { employeeId, date, shiftCode, operation = 'add', teamId = null, context = null }) {
+async function validateAssignment(db, {
+    employeeId, date, shiftCode, operation = 'add', teamId = null, context = null,
+    assignmentLookup = null, membershipLookup = null, coverageAssessor = null
+}) {
     const isSupp = context === 'supplementary';
     const checks = [];
     const add = (code, status, reason, detail) =>
         checks.push(Object.assign({ code, status },
             reason ? { reason } : {}, detail ? { detail } : {}));
     const isRemove = operation === 'remove';
+    // P1-B: الافتراضي هو roster الحرفي نفسه. مسودة التوليد تمرر قارئًا بديلًا
+    // بلا أي كتابة، مع بقاء قواعد E-4 والفحوص والنتائج في هذه الخدمة الموحدة.
+    const lookup = assignmentLookup || (async (empId, day) =>
+        db.get('SELECT shift_code FROM shift_roster WHERE employee_id = ? AND shift_date = ?', [empId, day]));
 
     // ── ① الموظف نشط ──
     const emp = await db.get('SELECT id, is_active FROM employees WHERE id = ?', [employeeId]);
@@ -93,7 +100,7 @@ async function validateAssignment(db, { employeeId, date, shiftCode, operation =
     }
 
     // ── ② الأهلية: عضوية فريق حية في التاريخ (+ اشتقاق/مطابقة teamId) ──
-    const membership = await db.get(
+    const membership = membershipLookup ? await membershipLookup(employeeId, date) : await db.get(
         `SELECT ta.team_id, t.name AS team_name FROM team_assignments ta
          JOIN teams t ON t.id = ta.team_id
          WHERE ta.employee_id = ? AND (ta.end_date IS NULL OR ta.end_date = '' OR ta.end_date >= ?)
@@ -123,8 +130,8 @@ async function validateAssignment(db, { employeeId, date, shiftCode, operation =
         add('SHIFT_CODE', 'pass');
     }
 
-    // ── ④ مناوبة واحدة في اليوم (لبنية shift_roster) ──
-    const existing = await db.get('SELECT shift_code FROM shift_roster WHERE employee_id = ? AND shift_date = ?', [employeeId, date]);
+    // ── ④ مناوبة واحدة في اليوم (لبنية shift_roster أو مسودة الذاكرة) ──
+    const existing = await lookup(employeeId, date);
     if (operation === 'add' && existing) {
         add('ONE_SHIFT_PER_DAY', 'fail', 'MULTIPLE_SHIFTS_SAME_DAY', { existing_code: existing.shift_code });
     } else {
@@ -140,8 +147,8 @@ async function validateAssignment(db, { employeeId, date, shiftCode, operation =
         add('NEXT_DAY', 'skip', null, { note: 'remove لا يُنشئ تعارض يوم تالٍ' });
     } else {
         const candIv = _interval(code);
-        const prevRow = await db.get('SELECT shift_code FROM shift_roster WHERE employee_id = ? AND shift_date = ?', [employeeId, _shiftDate(date, -1)]);
-        const nextRow = await db.get('SELECT shift_code FROM shift_roster WHERE employee_id = ? AND shift_date = ?', [employeeId, _shiftDate(date, 1)]);
+        const prevRow = await lookup(employeeId, _shiftDate(date, -1));
+        const nextRow = await lookup(employeeId, _shiftDate(date, 1));
         const prevIv = prevRow ? _interval(codeMap.get(String(prevRow.shift_code))) : null;
         const nextIv = nextRow ? _interval(codeMap.get(String(nextRow.shift_code))) : null;
 
@@ -218,11 +225,11 @@ async function validateAssignment(db, { employeeId, date, shiftCode, operation =
     } else {
         let back = 0, fwd = 0;
         for (let i = 1; i <= maxNights; i++) {
-            const r = await db.get('SELECT shift_code FROM shift_roster WHERE employee_id = ? AND shift_date = ?', [employeeId, _shiftDate(date, -i)]);
+            const r = await lookup(employeeId, _shiftDate(date, -i));
             if (r && _periodOfCtx(codeMap.get(String(r.shift_code)), isSupp) === 'night') back++; else break;
         }
         for (let i = 1; i <= maxNights; i++) {
-            const r = await db.get('SELECT shift_code FROM shift_roster WHERE employee_id = ? AND shift_date = ?', [employeeId, _shiftDate(date, i)]);
+            const r = await lookup(employeeId, _shiftDate(date, i));
             if (r && _periodOfCtx(codeMap.get(String(r.shift_code)), isSupp) === 'night') fwd++; else break;
         }
         const run = back + 1 + fwd;
@@ -233,16 +240,19 @@ async function validateAssignment(db, { employeeId, date, shiftCode, operation =
         }
     }
 
-    // ── ⑩ التغطية (coverage-service الموحد — تفريق ج3) ──
+    // ── ⑩ التغطية (الخدمة القديمة أو مقيّم مسودة P1-B — تفريق ج3) ──
     let coverage_before = null, coverage_after = null, wouldBreak = false, stillBelow = null;
     if (!eligible || !teamId) {
         add('COVERAGE', 'skip', null, { note: 'لا فريق نشط — لا أساس للفحص' });
     } else {
-        const cov = await coverageService.assessChange(db, {
+        const coverageInput = {
             teamId, date,
             removeEmployeeIds: isRemove || operation === 'change' ? [employeeId] : [],
             addShiftCode: isRemove ? null : shiftCode
-        });
+        };
+        const cov = coverageAssessor
+            ? await coverageAssessor(coverageInput)
+            : await coverageService.assessChange(db, coverageInput);
         coverage_before = cov.coverage_before;
         coverage_after = cov.coverage_after;
         wouldBreak = cov.wouldBreak;

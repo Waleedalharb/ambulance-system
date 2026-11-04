@@ -16,6 +16,40 @@ const BASE = process.env.BASE_URL || 'http://localhost:3080';
 const results = [];
 let TOKEN = null;
 
+// تجهيز كادر اصطناعي داخل قاعدة الانحدار المؤقتة فقط. هذا لا يغيّر قواعد
+// التشغيل ولا يفترض نجاحًا: الخادم يشتق الحالة فعليًا من shift_roster بعد
+// الإدراج، ويمنع الحارس أي توجيه عرضي إلى قاعدة المشروع الأصلية.
+function seedSyntheticRosterCrew(dbPath, shiftId, team, codePrefix, count = 2) {
+    const path = require('path');
+    if (!dbPath || path.resolve(dbPath) === path.resolve(path.join(__dirname, '..', 'data', 'ambulance.db'))) {
+        throw new Error('رفض تجهيز الكادر خارج قاعدة الانحدار المعزولة');
+    }
+    const Database = require('better-sqlite3');
+    const fixtureDb = new Database(dbPath);
+    try {
+        const shift = fixtureDb.prepare('SELECT shift_date, shift_type FROM shifts WHERE id = ?').get(shiftId);
+        if (!shift || !/^\d{4}-\d{2}-\d{2}$/.test(String(shift.shift_date || ''))) {
+            throw new Error('تعذر حل تاريخ مناوبة تجهيز الكادر');
+        }
+        if (!team || !team.id) throw new Error('تعذر حل فريق تجهيز الكادر');
+        const shiftCode = String(shift.shift_type || '').includes('ليل') ? 'N12' : 'D12';
+        const insertEmployee = fixtureDb.prepare("INSERT INTO employees (employee_code, name, job_title, is_active) VALUES (?, ?, 'مسعف اختبار', 1)");
+        const insertRoster = fixtureDb.prepare('INSERT INTO shift_roster (employee_id, team_id, shift_date, shift_code, month, year) VALUES (?, ?, ?, ?, ?, ?)');
+        const names = [];
+        for (let i = 1; i <= count; i++) {
+            const employeeCode = String(codePrefix) + '-' + i;
+            const name = 'كادر اختبار ' + codePrefix + ' — ' + i;
+            const inserted = insertEmployee.run(employeeCode, name);
+            insertRoster.run(inserted.lastInsertRowid, team.id, shift.shift_date, shiftCode,
+                Number(shift.shift_date.slice(5, 7)), Number(shift.shift_date.slice(0, 4)));
+            names.push(name);
+        }
+        return { names, shiftCode, shiftDate: shift.shift_date, teamName: team.name };
+    } finally {
+        fixtureDb.close();
+    }
+}
+
 function record(name, ok, detail = '') {
     results.push({ name, ok, detail });
     console.log(`${ok ? '✅' : '❌'} ${name}${detail ? ' — ' + detail : ''}`);
@@ -106,11 +140,17 @@ async function main() {
         '/api/leave-requests', '/api/daily-report', '/api/admin/monitor/health', '/api/center-geo',
         '/api/chat/users', '/api/chat/conversations', '/api/chat/online', '/api/users'];
     const failedGets = [];
+    const disabledChatGets = new Set(['/api/chat/users', '/api/chat/conversations', '/api/chat/online']);
     for (const g of gets) {
         const r = await api('GET', g);
-        if (r.status !== 200) failedGets.push(`${g}→${r.status}`);
+        // قرار المالك 2026-10-05: المحادثات معطلة عمدًا. النجاح هنا يثبت
+        // الحارس نفسه (403 CHAT_DISABLED)، لا إعادة تفعيل المنظومة للاختبار.
+        const expected = disabledChatGets.has(g)
+            ? r.status === 403 && r.data && r.data.code === 'CHAT_DISABLED'
+            : r.status === 200;
+        if (!expected) failedGets.push(`${g}→${r.status}/${r.data && r.data.code || 'غير متوقع'}`);
     }
-    record(`بطارية القراءة (${gets.length - failedGets.length}/${gets.length})`, failedGets.length === 0, failedGets.join(' | '));
+    record(`بطارية القراءة وحارس المحادثات (${gets.length - failedGets.length}/${gets.length})`, failedGets.length === 0, failedGets.join(' | '));
 
     // ─── 4. Shift lifecycle ───
     const start = await api('POST', '/api/start-new-shift', { shiftType: 'ليل' });
@@ -167,17 +207,16 @@ async function main() {
     const updated = compLatest2.data && compLatest2.data.completion && compLatest2.data.completion.teams['جنوب 3'] && compLatest2.data.completion.teams['جنوب 3'].status === 'missing';
     record('تعديل التكميل ينعكس', comp2.ok && !!updated);
 
-    // ─── 6b. W1-B: ترجمة التكميل إلى أحداث تشغيلية (معاملة واحدة + منع تكرار + ختم سيرفري) ───
-    // comp1 (ready) وcomp2 (missing بلا سبب) أنتجا حدثين لهذه المناوبة حتى الآن
+    // ─── 6b. W1-B: فصل قرارات الحالة عن أحداث الأشخاص (معاملة واحدة + منع تكرار) ───
+    // comp1 (ready) وcomp2 (missing بلا شخص) قراران في shift_team_status، وليسا حدثي أشخاص.
     const w1bTl0 = await api('GET', `/api/staffing/timeline?shift_id=${shiftId}`);
     const w1bEv0 = (w1bTl0.data && w1bTl0.data.events) || [];
-    const w1bStampsOk = w1bEv0.length === 2 && w1bEv0.every(e =>
-        e.shift_id === shiftId && e.shift_date === activeShift.date && e.shift_type === activeShift.type
-        && e.domain === 'staffing' && e.actor_name && e.actor_id && e.created_at);
-    record('W1-B ①: حفظا التكميل السابقان أنتجا حدثين مختومين سيرفريًا (shift/date/type/actor/time)', w1bTl0.ok && w1bStampsOk,
-        `events=${w1bEv0.length} types=${w1bEv0.map(e => e.event_type).join(',')}`);
+    const w1bDecision0 = compLatest2.data && compLatest2.data.completion && compLatest2.data.completion.teams['جنوب 3'];
+    record('W1-B ①: قرارا ready/missing محفوظان في الإسقاط ولا يُنشئان أحداث أشخاص',
+        w1bTl0.ok && w1bEv0.length === 0 && !!w1bDecision0 && w1bDecision0.status === 'missing',
+        `events=${w1bEv0.length} status=${w1bDecision0 && w1bDecision0.status}`);
 
-    // سيناريو 3 فرق: جاهز (كان ناقصًا) / ناقص بمسعف غائب معروف / خارج الخدمة ⇒ 4 أحداث
+    // سيناريو 3 فرق: 3 قرارات + حدث absence واحد فقط في سجل الأشخاص.
     const w1bPayload1 = {
         shiftType: activeShift.type, shiftDate: activeShift.date,
         teams: {
@@ -191,12 +230,18 @@ async function main() {
     const w1bTl1 = await api('GET', `/api/staffing/timeline?shift_id=${shiftId}`);
     const w1bEv1 = (w1bTl1.data && w1bTl1.data.events) || [];
     const w1bDelta1 = w1bEv1.slice(w1bEv0.length);
-    const w1bTypes1 = w1bDelta1.map(e => e.event_type).sort().join(',');
     const w1bAbsence = w1bDelta1.find(e => e.event_type === 'absence');
-    record('W1-B ②: حفظ 3 فرق أنتج 4 أحداث صحيحة (ready+missing+absence+offline) وabsence مربوط بالشخص',
-        w1bSave1.ok && w1bDelta1.length === 4 && w1bTypes1 === 'absence,missing,offline,ready'
-        && w1bAbsence && w1bAbsence.entity_id === 'محمد القحطاني' && w1bAbsence.team_id === 'جنوب 7' && w1bAbsence.center === 'الشفاء',
-        `delta=${w1bDelta1.length} types=${w1bTypes1}`);
+    const w1bLatest1 = await api('GET', `/api/completion/latest?shift_id=${shiftId}`);
+    const w1bTeams1 = w1bLatest1.data && w1bLatest1.data.completion && w1bLatest1.data.completion.teams;
+    const w1bAbsenceStamped = !!w1bAbsence && w1bAbsence.shift_id === shiftId
+        && w1bAbsence.shift_date === activeShift.date && w1bAbsence.shift_type === activeShift.type
+        && w1bAbsence.domain === 'staffing' && w1bAbsence.actor_name && w1bAbsence.actor_id && w1bAbsence.created_at;
+    record('W1-B ②: 3 قرارات + absence واحد مختوم ومربوط بالشخص، والحالات الثلاث محفوظة',
+        w1bSave1.ok && w1bDelta1.length === 1 && w1bAbsenceStamped
+        && w1bAbsence.entity_id === 'محمد القحطاني' && w1bAbsence.team_id === 'جنوب 7' && w1bAbsence.center === 'الشفاء'
+        && !!w1bTeams1 && w1bTeams1['جنوب 3'].status === 'ready' && w1bTeams1['جنوب 7'].status === 'missing'
+        && w1bTeams1['جنوب 9'].status === 'offline',
+        `decisions=3 delta=${w1bDelta1.length}`);
 
     // إعادة الحفظ بنفس البيانات ⇒ صفر أحداث جديدة (منع التكرار مع الحفظ التلقائي)
     const w1bSave2 = await api('POST', '/api/shift-completion', { ...w1bPayload1, notes: 'w1b-2' });
@@ -205,7 +250,7 @@ async function main() {
     record('W1-B ③: إعادة الحفظ المتطابق لا تُنتج أي حدث مكرر', w1bSave2.ok && w1bEv2.length === w1bEv1.length,
         `before=${w1bEv1.length} after=${w1bEv2.length}`);
 
-    // عودة «جنوب 7» جاهزًا ⇒ حدث ready + حدث arrival للشخص (إغلاق دلالي + مدة مشتقة)
+    // عودة «جنوب 7» جاهزًا ⇒ قرار ready + حدث arrival واحد يغلق الغياب دلاليًا.
     const w1bPayload3 = {
         ...w1bPayload1,
         teams: {
@@ -216,6 +261,8 @@ async function main() {
         notes: 'w1b-3'
     };
     const w1bSave3 = await api('POST', '/api/shift-completion', w1bPayload3);
+    const w1bLatest3 = await api('GET', `/api/completion/latest?shift_id=${shiftId}`);
+    const w1bTeams3 = w1bLatest3.data && w1bLatest3.data.completion && w1bLatest3.data.completion.teams;
     const w1bTl3 = await api('GET', `/api/staffing/timeline?shift_id=${shiftId}`);
     const w1bEv3 = (w1bTl3.data && w1bTl3.data.events) || [];
     const w1bDelta3 = w1bEv3.slice(w1bEv2.length);
@@ -223,10 +270,11 @@ async function main() {
     const w1bState = await api('GET', `/api/staffing/state?shift_id=${shiftId}`);
     const w1bPerson = ((w1bState.data && w1bState.data.entities) || []).find(en => en.entityId === 'محمد القحطاني');
     const w1bPair = w1bPerson && w1bPerson.closedPairs && w1bPerson.closedPairs[0];
-    record('W1-B ④: عودة الفريق جاهزًا ⇒ ready+arrival والغياب يُغلق دلاليًا بمدة مشتقة',
-        w1bSave3.ok && w1bDelta3.length === 2 && !!w1bArrival && w1bArrival.entity_id === 'محمد القحطاني'
+    record('W1-B ④: عودة الفريق جاهزًا ⇒ قرار ready + arrival واحد والغياب يُغلق بمدة مشتقة',
+        w1bSave3.ok && !!w1bTeams3 && w1bTeams3['جنوب 7'].status === 'ready'
+        && w1bDelta3.length === 1 && !!w1bArrival && w1bArrival.entity_id === 'محمد القحطاني'
         && !!w1bPerson && w1bPerson.open.length === 0 && !!w1bPair && w1bPair.closedBy.type === 'arrival' && typeof w1bPair.durationMs === 'number',
-        `delta=${w1bDelta3.length} closed=${w1bPair ? w1bPair.event_type + '→' + w1bPair.closedBy.type : 'none'}`);
+        `decision=${w1bTeams3 && w1bTeams3['جنوب 7'] && w1bTeams3['جنوب 7'].status} delta=${w1bDelta3.length} closed=${w1bPair ? w1bPair.event_type + '→' + w1bPair.closedBy.type : 'none'}`);
 
     // القراءة القديمة (الإسقاط التوافقي) لم تتغير: آخر حفظ يظهر كما كان سابقًا
     const w1bCompat = await api('GET', `/api/completion/latest?shift_id=${shiftId}`);
@@ -314,40 +362,17 @@ async function main() {
     const daily = await api('GET', '/api/daily-report');
     record('التقرير اليومي', daily.status === 200 && daily.data !== null, `status=${daily.status}`);
 
-    // ─── 9. Chat ───
-    const users = await api('GET', '/api/chat/users');
-    const others = (users.data && (users.data.users || users.data)) || [];
-    const other = Array.isArray(others) ? others.find(u => (u.id || u.user_id) && (u.username !== '4252' && u.user_id !== '4252')) : null;
-    let convId = null;
-    if (other) {
-        const otherId = other.id || other.user_id;
-        const conv = await api('POST', '/api/chat/conversations/private', { user_id: otherId });
-        convId = conv.data && (conv.data.conversation_id || conv.data.id || (conv.data.conversation && conv.data.conversation.id));
-        record('إنشاء/فتح محادثة خاصة', conv.ok && !!convId, `conv=${convId}`);
-        if (convId) {
-            const msg = await api('POST', `/api/chat/conversations/${convId}/messages`, { content: 'رسالة اختبار regression' });
-            const msgOk = msg.ok || msg.status === 201;
-            record('إرسال رسالة', msgOk, `status=${msg.status}`);
-            const msgs = await api('GET', `/api/chat/conversations/${convId}/messages`);
-            const list = msgs.data && (msgs.data.messages || msgs.data);
-            record('قراءة الرسائل', msgs.ok && Array.isArray(list) && list.length > 0);
-        }
-    } else {
-        record('إنشاء/فتح محادثة خاصة', false, 'لا يوجد مستخدم آخر');
-    }
-
-    // Archive slice (D-6): a freshly created conversation is stamped with the active shift.
-    // Group conv guarantees an INSERT (private may reopen a pre-existing unstamped one).
-    let gconvId = null;
-    if (other) {
-        const gconv = await api('POST', '/api/chat/conversations', { title: 'regression D-6', participant_ids: [other.id || other.user_id] });
-        gconvId = gconv.data && gconv.data.conversation && gconv.data.conversation.id;
-        const glist = await api('GET', '/api/chat/conversations');
-        const gitems = (glist.data && glist.data.conversations) || [];
-        const gmine = Array.isArray(gitems) ? gitems.find(c => c.id === gconvId) : null;
-        record('المحادثة تُختم بالمناوبة النشطة عند إنشائها (D-6)', !!(gconvId && gmine && gmine.shift_id === shiftId),
-            gmine ? `shift_id=${gmine.shift_id} expected=${shiftId}` : `conv=${gconvId} status=${gconv.status}`);
-    }
+    // ─── 9. Chat: قرار التعطيل ساري؛ الحارس يسبق منطق إنشاء المحادثة ───
+    const conv = await api('POST', '/api/chat/conversations/private', { user_id: 'probe-other' });
+    const chatToken = TOKEN;
+    TOKEN = null;
+    const convNoAuth = await api('POST', '/api/chat/conversations/private', { user_id: 'probe-other' }, 401);
+    TOKEN = chatToken;
+    record('حارس المحادثة الخاصة: موثّق 403 CHAT_DISABLED وبلا توكن 401',
+        conv.status === 403 && conv.data && conv.data.code === 'CHAT_DISABLED' && convNoAuth.status === 401,
+        `auth=${conv.status}/${conv.data && conv.data.code} anonymous=${convNoAuth.status}`);
+    // لا توجد محادثة مؤرشفة لأن الحارس يمنع الإنشاء قبل أي كتابة.
+    const gconvId = null;
 
     // ─── 10. Notifications ───
     const notif = await api('GET', '/api/notifications');
@@ -757,10 +782,11 @@ async function main() {
 
             // ⑪ ربط الواجهة: سير العمل كامل من الشاشة (قسم غير المعيّنة + نموذج + المسارات الثلاثة + فرق من الخادم) وبلا localStorage
             const vbRcSrc = require('fs').readFileSync(require('path').join(__dirname, '..', 'public', 'radio-completion.html'), 'utf8');
-            const vbUiWired = vbRcSrc.includes('unassignedVehicleCards') && vbRcSrc.includes('vehicleAssignModal')
+            const vbUiWired = vbRcSrc.includes('unassignedVehicleCards') && vbRcSrc.includes('vehicleTeamModal')
+                && vbRcSrc.includes('openVehicleTeamModal') && vbRcSrc.includes('confirmVehicleTeam')
                 && vbRcSrc.includes("'/api/vehicles/assignment'") && vbRcSrc.includes("'/api/vehicles/assignment/switch'")
                 && vbRcSrc.includes("'/api/vehicles/assignment/end'") && vbRcSrc.includes("'/api/teams'")
-                && vbRcSrc.includes('openVehicleAssignModal') && vbRcSrc.includes('endVehicleAssignment')
+                && vbRcSrc.includes('fetch(url,') && vbRcSrc.includes('endVehicleAssignment')
                 && !/localStorage\.(setItem|getItem)\([^)]*vehic/i.test(vbRcSrc);
             record('V-B ⑪: الواجهة مربوطة بالكامل (تعيين/نقل/إنهاء من الشاشة + فرق من /api/teams + بلا localStorage)',
                 vbUiWired);
@@ -773,8 +799,9 @@ async function main() {
             const vbStVeh = ((vbBoardSt.data && vbBoardSt.data.unassigned) || []).find(v => v.id === vbVeh);
             record('V-B ⑫: منتقي الحالة — تغيير لأي حالة في أي وقت (انتقال عكسي breakdown→active + آخر حدث يمثل الحالة + لا تدوير أحادي)',
                 vbSt1.ok && vbSt2.ok && !!vbStVeh && vbStVeh.status === 'active'
-                && vbRcSrc.includes('vehicleStatusModal') && vbRcSrc.includes('openVehicleStatusModal')
-                && vbRcSrc.includes('confirmVehicleStatus') && !vbRcSrc.includes('cycleVehicleStatus'),
+                && vbRcSrc.includes('vehicleSetReady') && vbRcSrc.includes('vehicleSetOffline')
+                && vbRcSrc.includes('postVehicleStatus') && vbRcSrc.includes('offlineModal')
+                && !vbRcSrc.includes('cycleVehicleStatus'),
                 `status=${vbStVeh && vbStVeh.status}`);
         } finally { vbdb.close(); }
     }
@@ -834,6 +861,8 @@ async function main() {
             // ④ الجاهزية: مركبة الدعم الصالحة تُبقي vehicleOk رغم عطل المركبة الأصلية للفريق المدعوم،
             //    وتعطّل مركبة الدعم أيضًا يعيد الاشتقاق الطبيعي (الدعم لا يغطي عطلًا)
             await api('POST', '/api/vehicles/events', { vehicleId: vfVehB, status: 'breakdown', reason: 'عطل اختبار دعم V-B' });
+            // لا تتجاوز الاختبار اشتقاق الخادم: جهّز كادرًا فعليًا في قاعدة النسخة المؤقتة.
+            seedSyntheticRosterCrew(process.env.DB_PATH, shift2Id, vfT2, 'P5VFS' + Date.now(), 2);
             const vfSt1 = await api('GET', `/api/staffing/state?shift_id=${shift2Id}`);
             const vfTeamWithSupport = (vfSt1.data.teams || {})[vfT2.name];
             await api('POST', '/api/vehicles/events', { vehicleId: vfVeh, status: 'breakdown', reason: 'عطل مركبة الدعم — اختبار' });
@@ -868,10 +897,10 @@ async function main() {
 
             // ⑦ ربط الواجهة: زر الدعم/إنهاء الدعم + المساران + الشارة
             const vfRcSrc = require('fs').readFileSync(require('path').join(__dirname, '..', 'public', 'radio-completion.html'), 'utf8');
-            record('V-B ②⑦: الواجهة مربوطة (دعم/إنهاء الدعم من الشاشة + شارة «يدعم» + المساران)',
+            record('V-B ②⑦: الواجهة مربوطة (دعم/إنهاء الدعم من الشاشة + شارة «تدعم» + المساران)',
                 vfRcSrc.includes("'/api/vehicles/support'") && vfRcSrc.includes("'/api/vehicles/support/end'")
                 && vfRcSrc.includes('endVehicleSupport') && vfRcSrc.includes('supportingTeamId')
-                && vfRcSrc.includes('يدعم:'));
+                && vfRcSrc.includes('تدعم:'));
 
             // تنظيف: إنهاء تعيين مركبتي الاختبار وإعادة حالة الثانية
             await api('POST', '/api/vehicles/events', { vehicleId: vfVehB, status: 'active' });
@@ -1543,29 +1572,39 @@ async function main() {
     const w1VehOk = w1VehInd.vehiclesByStatus.breakdown === 1 && w1VehInd.vehiclesByStatus.active === 1;
     record('W1-A ⑤: رزنامة النطاقات + الطيّ الدلالي (إغلاق absence بـ arrival، مدة 90د) + مؤشرات المركبات', w1ValidType && w1FoldOk && w1VehOk, `types=${w1ValidType} fold=${w1FoldOk} veh=${w1VehOk}`);
 
-    // ─── 13n. SR-1: تدفق النقص من شاشة التكميل — نموذج إلزامي → حدث شخص → اشتقاق سيرفري → عرض فقط ───
-    // SR-2: الكادر مصدره shift_roster حصرًا (مُزامَن من الجدولة عبر RosterSyncService —
-    // لا جسر JSON). الاختبار يختار فريقًا بكادر نشط حقيقي من /api/staffing/state نفسها.
+    // ─── 13n. SR-1: أحداث الأشخاص تشتق التوفر فقط؛ الحالة قرار مشرف صريح ───
+    // جهّز فريقين بكادر اصطناعي فعلي داخل قاعدة الاختبار، ثم اترك staffing/state يشتقهما.
     const srStart = await api('POST', '/api/start-new-shift', { shiftType: 'ليل' });
     const srShiftId = srStart.data && srStart.data.shiftId;
     record('SR-1 ⓪: بدء مناوبة اختبار للشريحة', !!srShiftId, `shiftId=${srShiftId}`);
 
+    let srFixtureTeams = [];
+    if (process.env.DB_PATH && srShiftId) {
+        const SrDB = require('better-sqlite3');
+        const srdb = new SrDB(process.env.DB_PATH, { readonly: true });
+        try {
+            srFixtureTeams = srdb.prepare("SELECT id, name FROM teams WHERE is_active = 1 AND name LIKE 'جنوب %' ORDER BY id ASC LIMIT 2").all();
+        } finally { srdb.close(); }
+        for (const team of srFixtureTeams) {
+            seedSyntheticRosterCrew(process.env.DB_PATH, srShiftId, team, 'P5SR' + Date.now() + '-' + team.id, 2);
+        }
+    }
+
     const srState0 = await api('GET', `/api/staffing/state?shift_id=${srShiftId}`);
     const srTeams0 = (srState0.data && srState0.data.teams) || {};
     const srWf0 = (srState0.data && srState0.data.workforce) || {};
-    // فريق تشغيلي: مركبته سليمة + كادره النشط ≥ 2 (الكادر من shift_roster)
-    const srPick = Object.keys(srTeams0).find(n => n.startsWith('جنوب') && srTeams0[n].vehicleOk
-        && (srTeams0[n].members || []).filter(m => m.state === 'active').length >= 2);
+    const srHasCrew = n => srTeams0[n] && (srTeams0[n].members || []).filter(m => m.state === 'active').length >= 2;
+    const srPick = (srFixtureTeams.map(t => t.name).find(n => srTeams0[n] && srTeams0[n].vehicleOk && srHasCrew(n))
+        || Object.keys(srTeams0).find(n => n.startsWith('جنوب') && srTeams0[n].vehicleOk && srHasCrew(n)));
+    const srPreparedOther = srFixtureTeams.map(t => t.name).find(n => n !== srPick && srHasCrew(n));
     const srT0 = srPick ? srTeams0[srPick] : null;
     const srCrew = srT0 ? srT0.members.filter(m => m.state === 'active').map(m => m.name) : [];
-    record('SR-1 ①: الاشتقاق يرى كادر shift_roster (فريق نشط بكادر ≥2 ومركبة سليمة)',
-        !!(srPick && srT0 && srCrew.length >= 2 && srT0.activeCount === srCrew.length),
-        srPick ? `team=${srPick} crew=${srCrew.length} required=${srT0.requiredPersonnel}` : 'لا فريق مؤهل — roster فارغ؟');
+    record('SR-1 ①: الاشتقاق يرى كادر shift_roster (فريق نشط بكادر ≥2 ومركبة سليمة وحالة pending)',
+        !!(srPick && srT0 && srCrew.length >= 2 && srT0.activeCount === srCrew.length && srT0.status === 'pending'),
+        srPick ? `team=${srPick} crew=${srCrew.length} status=${srT0.status}` : 'لا فريق مؤهل — roster فارغ؟');
 
     if (srPick && srCrew.length >= 2) {
-        const srReq = srT0.requiredPersonnel || 2;
         const srBase = srT0.activeCount;
-        const srExpected = (a) => a === 0 ? 'offline' : (a < srReq ? 'missing' : 'ready');
         const srTlCount = async () => (((await api('GET', `/api/staffing/timeline?shift_id=${srShiftId}`)).data || {}).events || []).length;
         const srBaseTl = await srTlCount();
 
@@ -1599,9 +1638,9 @@ async function main() {
         const srT1 = (srState1.data.teams || {})[srPick] || {};
         const srWf1 = srState1.data.workforce || {};
         const srAbsEntry = (srT1.absentees || []).find(a => a.name === srCrew[0]);
-        record('SR-1 ③: حدث غياب → الخادم يشتق (activeCount-1 + الحالة المتوقعة + الغائب بسببه + workforce.absentees+1)',
+        record('SR-1 ③: حدث غياب → activeCount-1 والغائب بسببه؛ الحالة تبقى pending بلا قرار مشرف',
             srAbs.ok && srAbs.data.appended === 1
-            && srT1.activeCount === srBase - 1 && srT1.status === srExpected(srBase - 1)
+            && srT1.activeCount === srBase - 1 && srT1.status === 'pending'
             && !!srAbsEntry && srAbsEntry.reason === 'غياب' && srAbsEntry.type === 'absence'
             && (srWf1.absentees || 0) === (srWf0.absentees || 0) + 1,
             `active=${srT1.activeCount} status=${srT1.status} wfAbs=${srWf1.absentees}`);
@@ -1609,7 +1648,7 @@ async function main() {
             !!srSseHit, srSseHit ? `count=${srSseHit.count}` : 'لم يصل الحدث');
         srSse.close();
 
-        // ⑥ idempotency: تكرار نفس الغياب يُتخطى (appended=0 ولا حدث جديد)
+        // idempotency: تكرار نفس الغياب يُتخطى (appended=0 ولا حدث جديد)
         const srDup = await api('POST', '/api/shift-completion', {
             shiftType: 'ليل', shiftDate: '2026-01-01',
             events: [{ type: 'absence', employeeName: srCrew[0], reason: 'غياب', teamId: srPick }]
@@ -1618,24 +1657,23 @@ async function main() {
             srDup.ok && srDup.data.appended === 0 && (await srTlCount()) === srBaseTl + 1,
             `appended=${srDup.data && srDup.data.appended}`);
 
-        // ⑦ «تأخر» يشتق مثل الغياب + أسباب النموذج الأربعة تُخزن حرفيًا (إجازة/تكليف)
+        // «تأخر» يخصم التوفر مثل الغياب دون تغيير قرار الحالة.
         const srLate = await api('POST', '/api/shift-completion', {
             shiftType: 'ليل', shiftDate: '2026-01-01',
             events: [{ type: 'late', employeeName: srCrew[1], reason: 'تأخر', teamId: srPick }]
         });
         const srState2 = await api('GET', `/api/staffing/state?shift_id=${srShiftId}`);
         const srT2 = (srState2.data.teams || {})[srPick] || {};
-        record('SR-1 ⑥: حدث تأخر → الاشتقاق يخصم ثانيًا (activeCount-2 والحالة المتوقعة)',
+        record('SR-1 ⑥: حدث تأخر → activeCount-2؛ الحالة تبقى pending',
             srLate.ok && srLate.data.appended === 1
-            && srT2.activeCount === srBase - 2 && srT2.status === srExpected(srBase - 2)
+            && srT2.activeCount === srBase - 2 && srT2.status === 'pending'
             && (srT2.absentees || []).some(a => a.name === srCrew[1] && a.reason === 'تأخر' && a.type === 'late'),
             `active=${srT2.activeCount} status=${srT2.status}`);
 
-        // ⑧ أسباب «إجازة» و«تكليف» تُخزن حرفيًا كـ absence (نفس خصم التوفر — النقل/الدعم شريحة لاحقة)
-        const srOtherTeam = Object.keys(srTeams0).find(n => n !== srPick && srTeams0[n].vehicleOk
-            && (srTeams0[n].members || []).filter(m => m.state === 'active').length >= 2);
+        // أسباب «إجازة» و«تكليف» تُخزن حرفيًا كـ absence في الفريق الثاني المجهز.
+        const srOtherTeam = srPreparedOther || Object.keys(srTeams0).find(n => n !== srPick && srHasCrew(n));
         const srOtherCrew = srOtherTeam ? srTeams0[srOtherTeam].members.filter(m => m.state === 'active').map(m => m.name) : [];
-        const srReasonsRes = srOtherTeam ? await api('POST', '/api/shift-completion', {
+        const srReasonsRes = srOtherTeam && srOtherCrew.length >= 2 ? await api('POST', '/api/shift-completion', {
             shiftType: 'ليل', shiftDate: '2026-01-01',
             events: [
                 { type: 'absence', employeeName: srOtherCrew[0], reason: 'إجازة', teamId: srOtherTeam },
@@ -1649,7 +1687,7 @@ async function main() {
             !!srOtherTeam && srReasonsRes.ok && srReasonsRes.data.appended === 2 && srHasVac && srHasAssign,
             `team=${srOtherTeam} appended=${srReasonsRes.data && srReasonsRes.data.appended}`);
 
-        // ⑨ عقد الملاحظات عبر events الفارغة (نفس مسار الأحداث — حل محل snapshot القديم)
+        // عقد الملاحظات عبر events الفارغة (نفس مسار الأحداث — حل محل snapshot القديم)
         const srNotes = await api('POST', '/api/shift-completion', {
             shiftType: 'ليل', shiftDate: '2026-01-01', events: [], notes: 'sr1-notes'
         });
@@ -1658,22 +1696,18 @@ async function main() {
             srNotes.ok && srComp.ok && srComp.data.completion && srComp.data.completion.notes === 'sr1-notes',
             `notes=${srComp.data && srComp.data.completion && srComp.data.completion.notes}`);
 
-        // ─── جلسة مساحة العمل: بعد الغياب/التأخر تبقى كل العمليات متاحة (لا قفل) ───
         // الفريق الآن: crew[0] غياب + crew[1] تأخر. نكمل من نفس الجلسة حرفيًا.
-
-        // ⑩ تسجيل حضور — arrival يغلق الغياب ويعيد الحاضر للاشتقاق
         const srArr = await api('POST', '/api/shift-completion', {
             shiftType: 'ليل', shiftDate: '2026-01-01',
             events: [{ type: 'arrival', employeeName: srCrew[0], teamId: srPick }]
         });
         const srT3 = ((await api('GET', `/api/staffing/state?shift_id=${srShiftId}`)).data.teams || {})[srPick] || {};
-        record('SR-1 ⑩: تسجيل حضور بعد الغياب — arrival يغلقه ويعيد الحاضر (activeCount+1)',
+        record('SR-1 ⑩: arrival يغلق الغياب ويعيد الحاضر؛ الحالة تبقى pending',
             srArr.ok && srArr.data.appended === 1
-            && srT3.activeCount === srBase - 1 && srT3.status === srExpected(srBase - 1)
+            && srT3.activeCount === srBase - 1 && srT3.status === 'pending'
             && !(srT3.absentees || []).some(a => a.name === srCrew[0]),
             `active=${srT3.activeCount} status=${srT3.status}`);
 
-        // ⑪ إضافة دعم — يظهر داعمًا ويُحسب في الحاضرين
         const srSupName = 'داعم اختبار مساحة العمل';
         const srSup = await api('POST', '/api/shift-completion', {
             shiftType: 'ليل', shiftDate: '2026-01-01',
@@ -1681,11 +1715,10 @@ async function main() {
         });
         const srT4 = ((await api('GET', `/api/staffing/state?shift_id=${srShiftId}`)).data.teams || {})[srPick] || {};
         const srSupEntry = (srT4.members || []).find(m => m.name === srSupName && m.role === 'support');
-        record('SR-1 ⑪: إضافة دعم للفرقة — يظهر داعمًا ويُحسب في الحاضرين (activeCount+1)',
-            srSup.ok && srSup.data.appended === 1 && !!srSupEntry && srT4.activeCount === srBase,
-            `active=${srT4.activeCount} support=${!!srSupEntry}`);
+        record('SR-1 ⑪: إضافة دعم تُحسب في الحاضرين دون تغيير الحالة',
+            srSup.ok && srSup.data.appended === 1 && !!srSupEntry && srT4.activeCount === srBase && srT4.status === 'pending',
+            `active=${srT4.activeCount} status=${srT4.status} support=${!!srSupEntry}`);
 
-        // ⑫ إنهاء الدعم — يخرج الداعم من الاشتقاق
         const srSupEnd = await api('POST', '/api/shift-completion', {
             shiftType: 'ليل', shiftDate: '2026-01-01',
             events: [{ type: 'support_end', employeeName: srSupName, teamId: srPick }]
@@ -1694,10 +1727,10 @@ async function main() {
         record('SR-1 ⑫: إنهاء الدعم — يخرج الداعم من الاشتقاق (activeCount يعود)',
             srSupEnd.ok && srSupEnd.data.appended === 1
             && !(srT5.members || []).some(m => m.name === srSupName)
-            && srT5.activeCount === srBase - 1,
-            `active=${srT5.activeCount}`);
+            && srT5.activeCount === srBase - 1 && srT5.status === 'pending',
+            `active=${srT5.activeCount} status=${srT5.status}`);
 
-        // ⑬ خارج الخدمة (السبب إلزامي) ثم إعادة الجاهزية — دورة حالة كاملة بلا قفل
+        // قرارا المشرف وحدهما يغيران الحالة: offline ثم ready.
         const srOffNoReason = await api('POST', '/api/shift-completion', {
             shiftType: 'ليل', shiftDate: '2026-01-01',
             events: [{ type: 'offline', teamId: srPick }]
@@ -1712,10 +1745,10 @@ async function main() {
             events: [{ type: 'ready', teamId: srPick }]
         });
         const srT7 = ((await api('GET', `/api/staffing/state?shift_id=${srShiftId}`)).data.teams || {})[srPick] || {};
-        record('SR-1 ⑬: خارج الخدمة (سبب إلزامي 400 بلا سبب) ثم إعادة الجاهزية — دورة كاملة والاشتقاق يعود',
+        record('SR-1 ⑬: قرارا offline/ready الصريحان يغيران الحالة (والسبب إلزامي للخروج)',
             srOffNoReason.status === 400 && srOff.ok && srOff.data.appended === 1
             && srT6.status === 'offline'
-            && srBack.ok && srT7.status === srExpected(srBase - 1),
+            && srBack.ok && srT7.status === 'ready',
             `noReason=${srOffNoReason.status} offline=${srT6.status} back=${srT7.status}`);
     }
 
@@ -1725,14 +1758,12 @@ async function main() {
     const srIdxSrc = f4Fs.readFileSync(f4Path.join(__dirname, '..', 'public', 'index.html'), 'utf8');
     const srRcOk = srRcSrc.includes('id="missingModal"') && srRcSrc.includes('openMissingModal')
         && srRcSrc.includes('confirmMissing') && srRcSrc.includes('MISSING_REASON_EVENT')
+        && srRcSrc.includes('id="decisionModal"') && srRcSrc.includes('openDecisionQuestion') && srRcSrc.includes('chooseDecision')
+        && srRcSrc.includes('cardSetReady') && srRcSrc.includes('cardSetOffline') && srRcSrc.includes('personArrived')
+        && srRcSrc.includes('openCoverageModal') && srRcSrc.includes('endCoverage')
         && srRcSrc.includes('/api/staffing/state') && srRcSrc.includes('/api/shift-completion')
         && !srRcSrc.includes('cycleStatus') && !srRcSrc.includes('STATUS_CYCLE')
         && !srRcSrc.includes('saveToServer(') && !srRcSrc.includes('setReason(') && !srRcSrc.includes('setMissingPerson(')
-        // مساحة عمل الفرقة: كل البطاقات تفتح في كل الحالات + كل العمليات من نفس الشاشة + لا إخفاء لفرق بلا كادر
-        && srRcSrc.includes('id="teamModal"') && srRcSrc.includes('openTeamWorkspace')
-        && srRcSrc.includes('onclick="openTeamWorkspace(')
-        && srRcSrc.includes('wsRecordArrival') && srRcSrc.includes('wsAddSupport')
-        && srRcSrc.includes('wsEndSupport') && srRcSrc.includes('wsSetOffline') && srRcSrc.includes('wsSetReady')
         && !srRcSrc.includes('if (!status.paramedics || status.paramedics.length === 0) return;');
     const srAppOk = !srAppSrc.includes('calculateWorkforceStatsLocally') && !srAppSrc.includes('loadWorkforceStats(')
         && !srAppSrc.includes('function updateTrend')
@@ -1805,10 +1836,29 @@ async function main() {
         rsAct['100'] === 1 && rsAct['200'] === 0 && rsAct['300'] === 0 && rsAct['999'] === 0 && rsEmpStill === 4,
         JSON.stringify(rsAct));
 
-    const rsS4 = await rsSync.syncFromSchedule([]);
+    // T0 (2026-10-24): مواءمة الاختبار مع حارس المسح الصامت المعتمد (G2 — اعتماد
+    // المالك 2026-08-30، commit c6df99c). السلوك المعتمد: حمولة بلا فترة صالحة
+    // وبدون explicitClear تُرفض برمي EMPTY_PERIODS_GUARD قبل أي كتابة؛ والمسح
+    // الشامل حصرًا عبر المسار الصريح (DELETE /api/schedule/employees).
+    // النية الأصلية محفوظة — إثبات أن المسح الكامل ممكن وأنه تعطيلٌ بلا حذف —
+    // لكن عبر المسار الصريح الوحيد المصرَّح به، مع إثبات أن المسار الصامت ممنوع.
+    let rsGuardThrew = false, rsGuardCode = '';
+    try {
+        await rsSync.syncFromSchedule([]);
+    } catch (gErr) {
+        rsGuardThrew = true;
+        rsGuardCode = (gErr && gErr.code) || '';
+    }
+    const rsCnt4a = tdb.prepare('SELECT COUNT(*) c FROM shift_roster').get().c;
+    const rsAct4a = tdb.prepare('SELECT COUNT(*) c FROM employees WHERE is_active = 1').get().c;
+    record('SR-2 ④: حارس المسح الصامت — حمولة فارغة بلا explicitClear تُرفض قبل أي كتابة',
+        rsGuardThrew && rsGuardCode === 'EMPTY_PERIODS_GUARD' && rsCnt4a === 1 && rsAct4a === 1,
+        `threw=${rsGuardThrew} code=${rsGuardCode} roster=${rsCnt4a} active=${rsAct4a}`);
+
+    const rsS4 = await rsSync.syncFromSchedule([], { explicitClear: true });
     const rsCnt4 = tdb.prepare('SELECT COUNT(*) c FROM shift_roster').get().c;
     const rsAct4 = tdb.prepare('SELECT COUNT(*) c FROM employees WHERE is_active = 1').get().c;
-    record('SR-2 ④: المدخل الفارغ = مسح roster بالكامل + تعطيل الجميع (بلا حذف)',
+    record('SR-2 ④ب: المسح الصريح (explicitClear) = مسح roster بالكامل + تعطيل الجميع (بلا حذف)',
         rsS4.rosterRows === 0 && rsCnt4 === 0 && rsAct4 === 0 && rsEmpStill === 4,
         `roster=${rsCnt4} active=${rsAct4}`);
     tdb.close();
@@ -1818,35 +1868,44 @@ async function main() {
     // SCHEDULE_FILE: نفس تجاوز الخادم — يبقي الاختبار على نسخة معزولة ولا يلمس ملف التشغيل المشترك
     const rsSchedPath = process.env.SCHEDULE_FILE || f4Path.join(__dirname, '..', 'data', 'schedule-employees.json');
     const rsBackup = f4Fs.readFileSync(rsSchedPath, 'utf8');
+    const rsOrig = JSON.parse(rsBackup);
+    // اشتقاق فترة العينة من النسخة التي ستُستعاد فعلًا. تثبيت يوليو كان يمسح شهرًا
+    // لا تغطيه النسخة الحالية (سبتمبر)، فينجح POST الاستعادة دون إعادة الشهر الممسوح.
+    const rsPeriodEntry = rsOrig.flatMap(e => Array.isArray(e.schedule) ? e.schedule : [])
+        .find(s => /^\d{4}-\d{2}-\d{2}$/.test(String(s && s.date || '')) && String(s && (s.shiftCode || s.shift) || '').trim());
+    if (!rsPeriodEntry) throw new Error('SR-2 ⑤: نسخة الاستعادة لا تحتوي مدخل جدولة صالحًا');
+    const rsTestDate = String(rsPeriodEntry.date);
+    const rsYear = Number(rsTestDate.slice(0, 4));
+    const rsMonth = Number(rsTestDate.slice(5, 7));
     const rsDbPath = process.env.DB_PATH || [f4Path.join(__dirname, '..', 'data', 'ambulance.db'), f4Path.join(__dirname, '..', 'database.db')].find(p => f4Fs.existsSync(p) && f4Fs.statSync(p).size > 0);
     const rsLiveDb = new BetterSqlite3(rsDbPath, { readonly: true });
-    const rsBefore = rsLiveDb.prepare(`SELECT COUNT(*) c FROM shift_roster WHERE year = 2026 AND month = 7`).get().c;
+    const rsBefore = rsLiveDb.prepare(`SELECT COUNT(*) c FROM shift_roster WHERE year = ? AND month = ?`).get(rsYear, rsMonth).c;
     let rsApiOk = false, rsRestoredOk = false, rsDetail = '';
     try {
         // رموز فريدة لكل ركضة — تمنع تلوث البقايا بين الركضات (created يبقى >= 2 دائمًا)
         const rsTag = 'T' + String(Date.now()).slice(-6);
         const rsApiFixture = [
-            { employeeNumber: rsTag + '1', name: 'اختبار مزامنة أول', team: 'جنوب 1', schedule: [{ date: '2026-07-15', shiftCode: 'D12' }] },
-            { employeeNumber: rsTag + '2', name: 'اختبار مزامنة ثان', team: 'دعم_لوجستي', schedule: [{ date: '2026-07-15', shiftCode: 'N12' }] }
+            { employeeNumber: rsTag + '1', name: 'اختبار مزامنة أول', team: 'جنوب 1', schedule: [{ date: rsTestDate, shiftCode: 'D12' }] },
+            { employeeNumber: rsTag + '2', name: 'اختبار مزامنة ثان', team: 'دعم_لوجستي', schedule: [{ date: rsTestDate, shiftCode: 'N12' }] }
         ];
         const rsPost = await api('POST', '/api/schedule/employees', { employees: rsApiFixture });
         const rsStats = rsPost.data && rsPost.data.rosterSync;
         const rsMid = new BetterSqlite3(rsDbPath, { readonly: true });
-        const rsMidCnt = rsMid.prepare(`SELECT COUNT(*) c FROM shift_roster WHERE year = 2026 AND month = 7`).get().c;
+        const rsMidCnt = rsMid.prepare(`SELECT COUNT(*) c FROM shift_roster WHERE year = ? AND month = ?`).get(rsYear, rsMonth).c;
         const rsMidEmp = rsMid.prepare(`SELECT is_active FROM employees WHERE employee_code = ?`).get(rsTag + '1');
         rsMid.close();
         rsApiOk = rsPost.ok && rsStats && rsStats.created >= 2 && rsMidCnt === 2 && rsMidEmp && rsMidEmp.is_active === 1;
-        rsDetail = `hook=${rsPost.status} midRoster=${rsMidCnt} stats=${rsStats ? rsStats.created : '—'}`;
+        rsDetail = `period=${rsYear}-${String(rsMonth).padStart(2, '0')} hook=${rsPost.status} midRoster=${rsMidCnt} stats=${rsStats ? rsStats.created : '—'}`;
     } finally {
         // الاستعادة إلزامية دائمًا: ملف الاستيراد + roster يعودان للأصل
         f4Fs.writeFileSync(rsSchedPath, rsBackup);
-        const rsOrig = JSON.parse(rsBackup);
-        await api('POST', '/api/schedule/employees', { employees: rsOrig });
+        const rsRestore = await api('POST', '/api/schedule/employees', { employees: rsOrig });
         const rsAfter = new BetterSqlite3(rsDbPath, { readonly: true });
-        const rsAfterCnt = rsAfter.prepare(`SELECT COUNT(*) c FROM shift_roster WHERE year = 2026 AND month = 7`).get().c;
+        const rsAfterCnt = rsAfter.prepare(`SELECT COUNT(*) c FROM shift_roster WHERE year = ? AND month = ?`).get(rsYear, rsMonth).c;
         rsAfter.close();
-        rsRestoredOk = rsAfterCnt === rsBefore;
-        rsDetail += ` | restore=${rsAfterCnt}/${rsBefore}`;
+        rsRestoredOk = rsRestore.ok && rsAfterCnt === rsBefore;
+        const rsRestoreError = rsRestore.data && rsRestore.data.error ? ` error=${rsRestore.data.error}` : '';
+        rsDetail += ` | restoreStatus=${rsRestore.status} restore=${rsAfterCnt}/${rsBefore}${rsRestoreError}`;
     }
     rsLiveDb.close();
     record('SR-2 ⑤: POST /api/schedule/employees يُزامن roster فورًا + الاستعادة تعيد الأصل',
@@ -2123,25 +2182,50 @@ async function main() {
     //    3) إغلاق الغياب بحدث حضور حتى يبقى pendingTeams=0 للاختبارات اللاحقة.
     let w3LiveOk = false, w3LiveDetail = 'no DB_PATH';
     if (process.env.DB_PATH) {
+        const W3DbLive = require('better-sqlite3');
+        const w3FixtureCode = 'WF3L' + String(Date.now()).slice(-8);
+        const w3FixtureName = 'عضو اختبار المسودة الحية';
         try {
-            const w3PrepLive = await api('POST', '/api/workflow/prepare', {});
-            const w3LV = (w3PrepLive.data && w3PrepLive.data.workflow) || {};
-            const W3DbLive = require('better-sqlite3');
-            const w3dbl = new W3DbLive(process.env.DB_PATH);
+            let w3PrepLive = await api('POST', '/api/workflow/prepare', {});
+            let w3LV = (w3PrepLive.data && w3PrepLive.data.workflow) || {};
+            let w3dbl = new W3DbLive(process.env.DB_PATH);
             const liveRow = w3dbl.prepare('SELECT snapshot_json FROM shift_workflows WHERE id = ?').get(w3LV.id);
+
+            // الاختبار يملك شرطه المسبق: عضو مجدول في تاريخ المناوبة نفسها. لا يعتمد
+            // على بيانات شهر تاريخي ولا يستخدم ملف الجدولة أو أي مصدر بديل عن roster.
+            const liveShift = w3LV.snapshot && w3LV.snapshot.shift;
+            const liveDate = liveShift && liveShift.date;
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(String(liveDate || ''))) throw new Error('تاريخ المناوبة الحية غير صالح');
+            const liveTeam = w3dbl.prepare("SELECT id, name, center FROM teams WHERE is_active = 1 AND name = 'جنوب 1' LIMIT 1").get()
+                || w3dbl.prepare('SELECT id, name, center FROM teams WHERE is_active = 1 ORDER BY id LIMIT 1').get();
+            if (!liveTeam) throw new Error('لا يوجد فريق نشط لاختبار المسودة الحية');
+            const empInsert = w3dbl.prepare("INSERT INTO employees (employee_code, name, job_title, is_active) VALUES (?, ?, 'مسعف', 1)")
+                .run(w3FixtureCode, w3FixtureName);
+            const liveCode = String(liveShift.type || '').includes('ليل') ? 'N12' : 'D12';
+            w3dbl.prepare('INSERT INTO shift_roster (employee_id, team_id, shift_date, shift_code, month, year) VALUES (?, ?, ?, ?, ?, ?)')
+                .run(empInsert.lastInsertRowid, liveTeam.id, liveDate, liveCode, Number(liveDate.slice(5, 7)), Number(liveDate.slice(0, 4)));
             w3dbl.close();
+
+            // prepare idempotent: نفس المسودة، لكن لقطتها الحية ترى عضو roster الجديد.
+            w3PrepLive = await api('POST', '/api/workflow/prepare', {});
+            w3LV = (w3PrepLive.data && w3PrepLive.data.workflow) || {};
             const storedEmpty = liveRow && String(liveRow.snapshot_json).trim() === '{}';
 
-            // اختيار عضو نشط من فريق مجدول من اللقطة الحية نفسها (بلا افتراض بيانات)
             const liveTeams = (w3LV.snapshot && w3LV.snapshot.staffing && w3LV.snapshot.staffing.teams) || {};
-            let pickTeam = null, pickMember = null;
+            let pickTeam = null, pickMember = null, pickCenter = '';
             for (const tn of Object.keys(liveTeams)) {
                 const ms = (liveTeams[tn] && liveTeams[tn].members) || [];
-                const act = ms.find(m => m && m.role !== 'support' && m.state === 'active' && m.name);
-                if (act) { pickTeam = tn; pickMember = act.name; break; }
+                const act = ms.find(m => m && m.code === w3FixtureCode && m.state === 'active' && m.name === w3FixtureName);
+                if (act) { pickTeam = tn; pickMember = act.name; pickCenter = liveTeams[tn].center || ''; break; }
             }
             const absBefore = (w3LV.snapshot.staffing.workforce || {}).absentees;
 
+            // قرار التكميل قناة مستقلة عن أحداث الحضور؛ تسجيله أولًا يمنع بقاء
+            // الفريق الاصطناعي pending ولا يخلط نجاح القرار بنجاح حدث الغياب.
+            const w3ReadyEv = await api('POST', '/api/shift-completion', {
+                shiftType: w3LV.snapshot.shift.type, shiftDate: w3LV.snapshot.shift.date,
+                teams: pickTeam ? { [pickTeam]: { status: 'ready', centerName: pickCenter } } : {}
+            });
             const w3AbsEv = await api('POST', '/api/shift-completion', {
                 shiftType: w3LV.snapshot.shift.type, shiftDate: w3LV.snapshot.shift.date,
                 events: [{ type: 'absence', employeeName: pickMember, teamId: pickTeam, reason: 'غياب اختبار العرض الحي' }]
@@ -2164,12 +2248,23 @@ async function main() {
             const pendingNow = pendingAfter && pendingAfter.workforce ? pendingAfter.workforce.pendingTeams : null;
 
             w3LiveOk = w3PrepLive.ok && w3LV.status === 'draft' && storedEmpty
-                && !!pickMember && w3AbsEv.ok
+                && !!pickMember && w3ReadyEv.ok && w3AbsEv.ok
                 && !!absEntry && absEntry.reason === 'غياب اختبار العرض الحي'
                 && typeof absAfter === 'number' && absAfter === (absBefore || 0) + 1
                 && w3ArrEv.ok && pendingNow === 0;
             w3LiveDetail = `stored='${liveRow ? String(liveRow.snapshot_json).slice(0, 10) : '?'}' member=${pickMember}@${pickTeam} absentees:${absBefore}→${absAfter} closed pending=${pendingNow}`;
         } catch (e) { w3LiveDetail = 'err: ' + e.message; }
+        finally {
+            try {
+                const cleanup = new W3DbLive(process.env.DB_PATH);
+                const emp = cleanup.prepare('SELECT id FROM employees WHERE employee_code = ?').get(w3FixtureCode);
+                if (emp) {
+                    cleanup.prepare('DELETE FROM shift_roster WHERE employee_id = ?').run(emp.id);
+                    cleanup.prepare('DELETE FROM employees WHERE id = ?').run(emp.id);
+                }
+                cleanup.close();
+            } catch (_) { /* القاعدة كلها مؤقتة ويحذفها المشغّل */ }
+        }
     }
     record('WF-3 ⑪: المسودة الحية — المخزن \'{}\' + الغياب يظهر في GET بلا إعادة إعداد + الإغلاق يعيد النظافة',
         w3LiveOk, w3LiveDetail);

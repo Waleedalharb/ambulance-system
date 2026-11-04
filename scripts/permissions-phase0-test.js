@@ -91,7 +91,11 @@ async function waitReady(tries = 60) {
 
     console.log('\n🧪 وحدات الخدمة (قواعد الحساب الأربع):');
     check('إثبات 2: admin يملك *', (await svc.getEffective('4252', 'admin')).star === true);
-    check('viewer بلا صلاحيات كتابة', (await svc.getEffective('v1', 'viewer')).effective.length === 0);
+    const effViewer = await svc.getEffective('v1', 'viewer');
+    check('viewer يطابق افتراض دوره: مفاتيح المجتمع المعتمدة فقط ولا كتابة تشغيلية أو إدارية',
+        JSON.stringify(effViewer.effective) === JSON.stringify(ROLES_PERMISSIONS.viewer.slice().sort())
+        && effViewer.effective.includes('community.create_activity')
+        && effViewer.effective.every(k => !/^(ops|schedule|admin|employees|shift|workflow|requests|leave)\./.test(k)));
     check('schedule.import غائبة من كل دور افتراضيًا', Object.keys(ROLES_PERMISSIONS).every(r => ROLES_PERMISSIONS[r].indexOf('schedule.import') === -1 || ROLES_PERMISSIONS[r][0] === '*'));
 
     // إثبات 6: لا سجل ← افتراضي الدور (الحزمة الموحدة: operator = 4 تنفيذ + 5 اطلاع + workflow.view)
