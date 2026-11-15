@@ -77,12 +77,14 @@ console.log('AI Provider Config:', {
 
 // SQLite Database Module (optional — falls back to JSON if unavailable)
 let db = null;
+let dbLoadError = null;
 let opsService = null;
 
 try {
     db = require('./db.js');
     console.log('✅ SQLite module loaded successfully');
 } catch (err) {
+    dbLoadError = { message: err.message, code: err.code || null };
     console.error('⚠️ SQLite module failed to load:', err.message);
     console.log('📁 Falling back to JSON file mode');
     db = null;
@@ -1265,6 +1267,11 @@ app.get('/health', (req, res) => {
             storage: !!process.env.DATA_DIR || !!process.env.RENDER_DISK_PATH,
             jwt: !!process.env.JWT_SECRET,
             websocket: !!wss
+        },
+        // تشخيص مؤقت معتمد: يعرض سبب فشل تحميل SQLite دون أي كتابة في القاعدة.
+        database: {
+            loaded: !!db,
+            loadError: dbLoadError
         },
         // إثبات التخزين الدائم: المسار الفعلي + اختبار كتابة حقيقي (يكشف غياب قرص Render)
         storageProof: (() => {
