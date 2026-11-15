@@ -78,8 +78,9 @@
   function setTiles() {
     if (!state.map) return;
     if (state.tile) state.map.removeLayer(state.tile);
-    state.tile = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; OpenStreetMap contributors', maxZoom: 19
+    state.tile = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
+      subdomains: 'abcd', maxZoom: 19
     }).addTo(state.map);
   }
   function renderSectorStrip() {

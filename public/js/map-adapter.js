@@ -57,9 +57,9 @@
         sources: {
             osm: {
                 type: 'raster',
-                tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+                tiles: ['https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png'],
                 tileSize: 256,
-                attribution: '© OpenStreetMap — نمط مؤقت محلي بانتظار مفتاح Mapbox'
+                attribution: '© OpenStreetMap © CARTO — نمط مؤقت محلي بانتظار مفتاح Mapbox'
             }
         },
         layers: [
