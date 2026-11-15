@@ -23,11 +23,13 @@ const { buildExtensionFiles } = require('./extension-builder');
 
 const ROOT = path.join(__dirname, '..');
 const PLATFORM_BASE = process.env.PLATFORM_BASE || 'http://localhost:3002';
+const sectorArg = process.argv.find(arg => /^--sector=/.test(arg));
+const SECTOR_CODE = String(process.env.CAD_SECTOR || (sectorArg ? sectorArg.split('=')[1] : '3'));
 
 function fail(msg) { console.error('❌ ' + msg); process.exit(1); }
 
 let files;
-try { files = buildExtensionFiles(PLATFORM_BASE); }
+try { files = buildExtensionFiles(PLATFORM_BASE, { sectorCode: SECTOR_CODE }); }
 catch (e) { fail(e.message); }
 
 // ── كتابة extension/ — manifest أصبح مولّدًا أيضًا (مصدر واحد للحقيقة) ──
@@ -41,13 +43,14 @@ execFileSync(process.execPath, ['--check', path.join(ROOT, 'extension', 'cad-ove
 execFileSync(process.execPath, ['--check', path.join(ROOT, 'extension', 'background.js')]);
 console.log('✅ cad-overlay-content.js = الـOverlay المعتمد حرفيًا (بلا أي سر)');
 console.log('✅ background.js وُلّد بالمفتاح — سياق الإضافة فقط، مستثنى من Git');
-console.log('✅ manifest.json وُلّد بعنوان المنصة: ' + files.base);
+console.log('✅ manifest.json وُلّد بعنوان المنصة: ' + files.base + ' — القطاع R-' + SECTOR_CODE + ' فقط');
 console.log('   ثبّت/حدّث الإضافة: chrome://extensions ← Load unpacked ← extension/');
 
-// ── حزمة التوزيع لأجهزة العمل: node scripts/build-extension.js --dist ──
-// (قرار المالك 2026-08-21): مجلد مستقل قابل للنسخ — نفس البناء المختبَر حرفيًا.
+// ── حزمة التوزيع لأجهزة العمل: node scripts/build-extension.js --sector=4 --dist ──
+// لكل قطاع مجلد مستقل، مع إبقاء مسار حزمة الجنوب السابق للتوافق.
 if (process.argv.includes('--dist')) {
-    const distDir = path.join(ROOT, 'dist', 'south-cad-overlay-extension');
+    const distName = SECTOR_CODE === '3' ? 'south-cad-overlay-extension' : 'cad-overlay-sector-' + SECTOR_CODE + '-extension';
+    const distDir = path.join(ROOT, 'dist', distName);
     fs.rmSync(distDir, { recursive: true, force: true });
     fs.mkdirSync(distDir, { recursive: true });
     fs.writeFileSync(path.join(distDir, 'manifest.json'), files.manifest, 'utf8');
@@ -56,5 +59,5 @@ if (process.argv.includes('--dist')) {
     fs.writeFileSync(path.join(distDir, 'platform-marker.js'), files.marker, 'utf8');
     fs.writeFileSync(path.join(distDir, 'background.js'), files.background, 'utf8');
     fs.writeFileSync(path.join(distDir, 'اقرأني-التثبيت.txt'), files.readme, 'utf8');
-    console.log('📦 حزمة التوزيع جاهزة: dist/south-cad-overlay-extension/ ← ' + files.base);
+    console.log('📦 حزمة التوزيع جاهزة: dist/' + distName + '/ ← ' + files.base + ' — R-' + SECTOR_CODE + ' فقط');
 }

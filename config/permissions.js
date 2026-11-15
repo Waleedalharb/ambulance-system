@@ -117,7 +117,11 @@ const PERMISSIONS = {
     'community.join_activity':   { label: 'المجتمع: الانضمام للفعاليات (لجميع الموظفين — قرار 2026-10-05)', domain: 'community' },
     'community.tournament':      { label: 'المجتمع: المشاركة في التحديات والبطولات (منح فردي فقط)', domain: 'community' },
     'community.moderate':        { label: 'المجتمع: الإشراف ومعالجة البلاغات (منح فردي فقط)', domain: 'community' },
-    'community.admin':           { label: 'المجتمع: الإدارة ومفاتيح التعطيل (منح فردي فقط)', domain: 'community' }
+    'community.admin':           { label: 'المجتمع: الإدارة ومفاتيح التعطيل (منح فردي فقط)', domain: 'community' },
+    // مركز قيادة قائد المنطقة — قراءة فقط، منح فردي حصرًا ولا يُضاف لأي دور تلقائيًا.
+    // النجمة لا تتجاوز شرط وجود نطاق فعال في RegionScopeService.
+    'region.command.view':       { label: 'عرض مركز قيادة قائد المنطقة (منح فردي فقط)', domain: 'region' },
+    'region.audit.view':         { label: 'عرض السجل القيادي للقطاعات (منح فردي فقط)', domain: 'region' }
 };
 
 const PERMISSION_KEYS = Object.keys(PERMISSIONS);

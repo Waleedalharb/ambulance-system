@@ -323,9 +323,26 @@ class VehicleEventsService {
         return { success: true, appended: 1, eventId, shiftId: shift.id, vehicleId: vehicle.id, teamId: openSupport.team_id != null ? Number(openSupport.team_id) : null };
     }
 
-    /** الحالة الحالية المشتقة لكل مركبة (آخر حالة + تاريخ مفتوح). */
-    async getState(shiftId) {
-        const events = await this.storage.getOperationalEventsByShift(shiftId, DOMAIN);
+    /** الحالة الحالية المشتقة لكل مركبة (آخر حالة + تاريخ مفتوح).
+     *  includeCurrentAssignments خيار قراءة إضافي: يرث التعيين المفتوح عبر
+     *  المناوبات مع أحداث المناوبة الحالية؛ السلوك الافتراضي لا يتغير. */
+    async getState(shiftId, opts = {}) {
+        let events = await this.storage.getOperationalEventsByShift(shiftId, DOMAIN);
+        if (opts.includeCurrentAssignments === true) {
+            const currentEntityIds = new Set(events.map(event => event.entity_id).filter(Boolean));
+            const assignments = await this.storage.all(
+                `SELECT * FROM operational_events
+                 WHERE domain = ? AND event_type IN ('assignment', 'assignment_end')
+                 ORDER BY created_at ASC, id ASC`, [DOMAIN]
+            );
+            const byId = new Map(events.map(event => [event.id, event]));
+            // لا نضيف مركبات غير مشاركة في المناوبة؛ نرث مركز/فريق كياناتها فقط.
+            for (const event of assignments) {
+                if (currentEntityIds.has(event.entity_id)) byId.set(event.id, event);
+            }
+            events = [...byId.values()].sort((a, b) =>
+                a.created_at === b.created_at ? a.id - b.id : (a.created_at < b.created_at ? -1 : 1));
+        }
         return { shiftId, domain: DOMAIN, entities: foldEvents(events, DOMAIN) };
     }
 

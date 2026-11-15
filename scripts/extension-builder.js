@@ -34,23 +34,30 @@ function matchPattern(origin) {
 /**
  * يولّد ملفات الإضافة كاملة لعنوان منصة محدد.
  * @param {string} platformBase  مثل https://emsoperations.online أو http://localhost:3002
- * @param {{dataDir?: string}} opts  dataDir: موضع integration-keys.json (افتراضيًا ROOT/data)
+ * @param {{dataDir?: string, sectorCode?: string|number}} opts  موضع المفاتيح ورقم قطاع الحزمة
  */
 function buildExtensionFiles(platformBase, opts) {
     const dataDir = (opts && opts.dataDir) || path.join(ROOT, 'data');
+    const sectorCode = String((opts && opts.sectorCode) || '3');
+    if (!/^(?:[1-9]|1\d)$/.test(sectorCode)) throw new Error('رقم قطاع CAD Overlay غير صالح: ' + sectorCode);
     const keyValue = loadActiveKey(dataDir);
     if (!keyValue) throw new Error('لا يوجد مفتاح تكامل نشط (scope=cad-reports)');
     const base = String(platformBase || '').replace(/\/+$/, '');
     if (!/^https?:\/\//.test(base)) throw new Error('عنوان المنصة غير صالح: ' + platformBase);
 
-    // سكربت المحتوى = الـOverlay المعتمد حرفيًا (بلا أي حقن أسرار)
-    const overlay = fs.readFileSync(path.join(ROOT, 'scripts', 'cad-overlay.js'), 'utf8');
+    // سكربت المحتوى = محلل الترميز المشترك + نسخة Overlay مثبتة على قطاع واحد.
+    // يبقى المصدران مستقلين، ويُدمجان هنا فقط لتعمل الإضافة بملف محتوى واحد.
+    const teamCodes = fs.readFileSync(path.join(ROOT, 'public', 'js', 'operational-team-code.js'), 'utf8');
+    const overlaySource = fs.readFileSync(path.join(ROOT, 'scripts', 'cad-overlay.js'), 'utf8');
+    const sectorMarker = "const OVERLAY_SECTOR_CODE = '3';";
+    if (!overlaySource.includes(sectorMarker)) throw new Error('تعذر تثبيت قطاع الحزمة: علامة القطاع غير موجودة');
+    const overlay = overlaySource.replace(sectorMarker, "const OVERLAY_SECTOR_CODE = '" + sectorCode + "';");
     if (/%%|INTEGRATION_KEY|X-Integration-Key/i.test(overlay))
         throw new Error('cad-overlay.js ما زال يحمل أثر مفتاح/placeholder — الفصل الأمني يمنع ذلك');
     const stamp = new Date().toISOString();
     const content = '/* ⚠️ ملف مولّد تلقائيًا — لا تعدّله يدويًا.\n'
-        + '   المصدر: scripts/cad-overlay.js | التوليد: scripts/extension-builder.js\n'
-        + '   التاريخ: ' + stamp + ' — بلا أي سر (الفصل الأمني 2026-08-20) */\n' + overlay;
+        + '   المصدر: operational-team-code.js + scripts/cad-overlay.js | التوليد: scripts/extension-builder.js\n'
+        + '   التاريخ: ' + stamp + ' — بلا أي سر (الفصل الأمني 2026-08-20) */\n' + teamCodes + '\n' + overlay;
 
     // خلفية الإضافة — المكان الوحيد للمفتاح (سياق الإضافة المعزول)
     const background = `/* ⚠️ ملف مولّد تلقائيًا — لا تعدّله يدويًا ولا تلتزم به في Git.
@@ -102,11 +109,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     const bridge = fs.readFileSync(path.join(ROOT, 'extension', 'bridge.js'), 'utf8');
     const marker = fs.readFileSync(path.join(ROOT, 'extension', 'platform-marker.js'), 'utf8');
 
+    const packageLabel = sectorCode === '3' ? 'منصة الجنوب — تسجيل بلاغات CAD' : 'CAD Overlay — القطاع ' + sectorCode;
     const manifest = JSON.stringify({
         manifest_version: 3,
-        name: 'منصة الجنوب — تسجيل بلاغات CAD',
+        name: packageLabel,
         version: '2.0.0',
-        description: 'تسجيل بلاغات CAD في منصة الجنوب بضغطة واحدة — قراءة فقط، مراقبة سلبية، بلا استخراج جلسات وبلا طلبات إضافية إلى CAD. مفتاح التكامل في خلفية الإضافة فقط (خارج سياق الصفحة).',
+        description: 'تسجيل بلاغات CAD للقطاع ' + sectorCode + ' فقط — قراءة فقط ومراقبة سلبية، مع منع فرق القطاعات الأخرى قبل الإرسال. مفتاح التكامل في خلفية الإضافة فقط.',
         host_permissions: [base + '/*'],
         background: { service_worker: 'background.js' },
         content_scripts: [
@@ -118,10 +126,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     }, null, 2);
 
     const readme = [
-        'تثبيت إضافة «منصة الجنوب — تسجيل بلاغات CAD» على جهاز العمل',
+        'تثبيت إضافة «' + packageLabel + '» على جهاز العمل',
         '═══════════════════════════════════════════════════',
         '',
         'المنصة التي ستتصل بها هذه الحزمة: ' + base,
+        'القطاع الوحيد المسموح في هذه النسخة: R-' + sectorCode,
         '',
         '1) فكّ ضغط ملف ZIP في مجلد ثابت على جهاز العمل (لا تحذفه بعد التثبيت).',
         '2) في Chrome افتح العنوان:  chrome://extensions',

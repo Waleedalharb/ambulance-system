@@ -170,7 +170,11 @@ class OperationsEngine {
             });
         });
 
-        // ShiftEnded: bus-only — no legacy WS message existed for end-shift
+        // ShiftEnded: حدث إضافي على القناة القائمة حتى لا تبقى شاشات القيادة
+        // تعرض مناوبة لم تعد نشطة. لا يغيّر أي حدث قديم أو عقد HTTP.
+        this.bus.on('ShiftEnded', (e) => {
+            safeBroadcast({ type: 'shift_ended', shiftId: e.shift_id });
+        });
 
         // ─── Slice 4: Positioning events → legacy WS shapes (byte-identical) ───
 

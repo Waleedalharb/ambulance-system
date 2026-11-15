@@ -28,8 +28,16 @@
   /* ختم البناء — تحقق بصري فوري من نسخة الـOverlay المشغَّلة فعليًا في المتصفح
      (تشخيص 2026-08-22: فشل الاختبار الحي سببه أن Chrome كان يشغّل بناءً قديمًا).
      يظهر في تلميح مقبض اللوحة وفي مسجل دورة الحياة — لا منطق ولا سلوك. */
-  const OVERLAY_BUILD = '2026-08-29.a — إصلاح دورة المستشفى (اعتماد المالك 2026-08-28): نبضة حضور ~4د + detail أخير قبل حذف المراقبة + إغلاق monitoring-lost عند اختفاء CAD بلا نهاية تسليم حقيقية';
+  const OVERLAY_BUILD = '2026-11-15.c — نسخة مستقلة لكل قطاع مع دليل الترميز الكامل وثبات مفاتيح الربط والتاريخ';
   window.__southBuild = OVERLAY_BUILD;
+  const TEAM_CODES = window.OperationalTeamCode;
+  if(!TEAM_CODES || typeof TEAM_CODES.parseOperationalTeamCode !== 'function')
+    throw new Error('محلل رمز الفرقة التشغيلي غير محمّل — أعد بناء حزمة الإضافة من المصدر');
+  /* يستبدل المولّد هذا الثابت عند بناء حزمة القطاع. الجنوب افتراضي للتوافق. */
+  const OVERLAY_SECTOR_CODE = '3';
+  const OVERLAY_SECTOR = TEAM_CODES.sectors[Number(OVERLAY_SECTOR_CODE)];
+  if(!OVERLAY_SECTOR) throw new Error('قطاع CAD Overlay غير معتمد: ' + OVERLAY_SECTOR_CODE);
+  window.__cadOverlaySector = { code: OVERLAY_SECTOR_CODE, name: OVERLAY_SECTOR.sectorName };
 
   /* ─── الالتقاط السلبي لإحداثيات البلاغ الأصلية (اعتماد المالك 2026-08-20) ───
      لا نطلق أي طلب ولا نقرأ ترويسة ولا نلمس الجلسة: نراقب فقط الاستجابات التي
@@ -262,7 +270,7 @@
   const PROBE_KNOWN_RE = /(event-manager|location-manager|dispatch-manager)\/api|cad-proxy/;
   const PROBE_DETAIL_RE = /event-manager\/api\/v\d*\/event-dispatched\/detail/;
   const PROBE_HIT_RE = /hospital|facility|handover|destination|receiving|dwell|مستشفى|منشأة|تسليم/i;
-  const PROBE_UNIT_RE = /(جنوب|سريع)\s*\d+|"unitCode"\s*:\s*"[^"]+"/g;
+  const PROBE_UNIT_RE = /R-(?:[1-9]|1\d)-(?:[RSGFM]-)?[1-4]-[1-9]\d*|(وسط|شرق|جنوب|غرب|شمال|سريع|ناري|هوائي|باص)\s*\d+|"unitCode"\s*:\s*"[^"]+"/gi;
   function probeRecord(url, via, j){
     try{
       if(!j || typeof j !== 'object') return;
@@ -347,6 +355,8 @@
         const own = (typeof c === 'object' && c && c.phases) ? c.phases : null;
         const o = { team: (typeof c === 'string' ? c : c.team),
           phases: own || (crews.length === 1 ? (phases || {}) : {}) };
+        // الرمز التشغيلي حقل عرض إضافي فقط؛ team يبقى مفتاح الربط الداخلي القديم.
+        if (typeof c === 'object' && c && c.operationalCode) o.operationalCode = c.operationalCode;
         if (own && typeof c === 'object' && c.phasesSource === 'cad-detail') o.phasesSource = 'cad-detail';
         if (typeof c === 'object' && c && c.withdrawn === true) o.withdrawn = true;
         // حالة الوحدة من CAD (قرار المالك 2026-08-22): تُمرَّر خامًا — قاعدة
@@ -374,18 +384,26 @@
      صادق عند تعذر الجلب. أي فرقة موجودة في التكميل قابلة للاختيار — لا قائمة محدودة. */
   const SOUTH_TEAMS_FALLBACK = ['جنوب 1','جنوب 2','جنوب 3','جنوب 4','جنوب 5','جنوب 6','جنوب 7','جنوب 8',
                                 'سريع 1','سريع 2','سريع 3'];
-  let teamsList = SOUTH_TEAMS_FALLBACK;
+  let teamsList = OVERLAY_SECTOR_CODE === '3' ? SOUTH_TEAMS_FALLBACK : [];
+  let teamIdentities = [];
   try{
-    const cached = JSON.parse(localStorage.getItem('southPocTeams') || 'null');
+    const cached = OVERLAY_SECTOR_CODE === '3' ? JSON.parse(localStorage.getItem('southPocTeams') || 'null') : null;
     if(cached && Array.isArray(cached.list) && cached.list.length) teamsList = cached.list;
   }catch(e){}
+  function teamDisplay(team){
+    const identity = teamIdentities.find(t => t && t.name === team);
+    return identity && identity.displayLabel ? identity.displayLabel : team;
+  }
   async function refreshTeams(){
+    // مسار التكميل الحالي خاص بالجنوب؛ لا تجلبه حزم القطاعات الأخرى إطلاقًا.
+    if(OVERLAY_SECTOR_CODE !== '3') return;
     try{
       const r = await sendToPlatform('south-teams', null);
       if(r && r.data && r.data.success && Array.isArray(r.data.teams) && r.data.teams.length){
         const list = r.data.teams.map(t => (typeof t === 'string' ? t : t && t.name)).filter(Boolean);
         if(list.length){
           teamsList = list;
+          teamIdentities = r.data.teams.filter(t => t && typeof t === 'object');
           try{ localStorage.setItem('southPocTeams', JSON.stringify({ at: Date.now(), list })); }catch(e){}
         }
       }
@@ -424,7 +442,7 @@
     const out = []; const seen = new Set();
     (document.body.innerText||'').split('\n').forEach(line => {
       const t = clean(line);
-      const m = t.match(/([ء-يA-Za-z][ء-يA-Za-z\s]*?\d+)\s*[-–]\s*\d+/);
+      const m = t.match(/(R-(?:[1-9]|1\d)-(?:[RSGFM]-)?[1-4]-[1-9]\d*|[ء-يA-Za-z][ء-يA-Za-z\s]*?\d+)\s*[-–]\s*\d+/i);
       if(m && m[1].length < 30 && !seen.has(m[1])){
         seen.add(m[1]);
         out.push({ name: m[1].trim(), withdrawn: WITHDRAWN_RE.test(t) });
@@ -461,23 +479,29 @@
     }
     watchSave();
   }
-  /* تسمية الفرقة من مسمى CAD (قرار المالك 2026-08-23): الاسم يُشتق من نمط الوحدة
-     نفسه (جنوب N / سريع N) سواء كانت في التكميل أم لا — المنصة تراقب التشغيل
-     الفعلي وليست نسخة من التكميل. فرقة غير مدرجة في التكميل تُسجَّل باسمها المشتق،
-     وعند ظهورها لاحقًا في التكميل يطابقها الخادم بسجلها القائم بهوية الوحدة
-     (runUnitId) فلا يُنشأ سجل ثانٍ. وحدات القطاعات الأخرى (شرق/غرب/شمال…) لا
-     تطابق النمط أصلًا ← null ← لا تسجيل. */
+  /* بوابة عزل القطاع: الرمز الجديد والاسم القديم يعودان إلى الاسم الداخلي نفسه،
+     لكن لا تُقبل إلا هوية قطاع هذه الحزمة. هذا الحارس المشترك يغذي التسجيل
+     التلقائي واليدوي ومراقبة المستشفيات، فلا تختلط مشاركات القطاعات. */
   function mapToSouthTeam(cadCrew){
     const name = (cadCrew || '').trim();
-    let m = name.match(/سريع\s*جنوب\s*(\d+)/);
-    if(m) return 'سريع ' + m[1];
-    m = name.match(/سريع\s*(\d+)/);
-    if(m) return 'سريع ' + m[1];
-    m = name.match(/جنوب\s*(\d+)/);
-    if(m) return 'جنوب ' + m[1];
-    // تطابق تام مع أي اسم في تكميل المناوبة — يغطي الأسماء غير النمطية (§5)
-    const exact = teamsList.find(t => t === name);
-    return exact || null; // قطاع آخر ← null ← لا تسجيل تلقائي
+    const coded = TEAM_CODES.parseOperationalTeamCode(name);
+    if(coded) return coded.sectorCode === OVERLAY_SECTOR_CODE ? coded.teamName : null;
+    // صيغ CAD القديمة قد تلحق رقم المناوبة: «جنوب 9 - 2». نزيل اللاحقة
+    // لاشتقاق الاسم الداخلي فقط، ولا نغيّر المناوبة أو أي مفتاح محفوظ.
+    const legacyName = name.replace(/\s*[-–]\s*[1-4]\s*$/, '');
+    const legacy = TEAM_CODES.identityFromTeamName(legacyName, 'صباحية');
+    if(legacy) return legacy.sectorCode === OVERLAY_SECTOR_CODE ? legacy.teamName : null;
+    // التطابق الاحتياطي مع قائمة التكميل مقيد بقائمة القطاع نفسه أيضًا.
+    const exact = OVERLAY_SECTOR_CODE === '3' ? teamsList.find(t => t === name) : null;
+    return exact || null; // خارج القطاع أو غير معتمد ← null ← لا تسجيل ولا مشاهدة
+  }
+  function operationalCodeOf(value){
+    const identity = TEAM_CODES.parseOperationalTeamCode(value);
+    return identity ? identity.operationalCode : null;
+  }
+  function crewDisplay(crew){
+    const identity = crew && TEAM_CODES.parseOperationalTeamCode(crew.operationalCode);
+    return identity ? identity.displayLabel : (crew && crew.team) || String(crew || '');
   }
 
   /* ─── فرق البلاغ من مصدر CAD الحقيقي (قرار المالك 2026-08-22) ───
@@ -496,6 +520,8 @@
       if(!team || seen.has(team)) continue;
       seen.add(team);
       const c = { team, cadReached: u.reached === true };
+      const operationalCode = operationalCodeOf(u.unit);
+      if(operationalCode) c.operationalCode = operationalCode;
       if(u.urs) c.cadUrs = u.urs;
       // Journey الوحدة الخاصة الملتقطة من التفاصيل — مصدرها journeys[] نفسها
       if(u.phases && Object.keys(u.phases).length){ c.phases = u.phases; c.phasesSource = 'cad-detail'; }
@@ -661,6 +687,8 @@
       seenT.add(team);
       const c = { team, phases: phasesFromJourneys(jr), phasesSource: 'cad-detail',
                   cadReached: jr.some(s => s && ARRIVAL[s.journeyStepCode] && !!s.journeyStepTime) };
+      const operationalCode = operationalCodeOf(u.unitCode);
+      if(operationalCode) c.operationalCode = operationalCode;
       if(ursC) c.cadUrs = ursC;
       if(u.unitId != null) c.cadUnitId = u.unitId;         // هوية الوحدة الثابتة — لا اعتماد على ترتيب units[]
       if(u.runUnitId != null) c.cadRunUnitId = u.runUnitId;
@@ -779,7 +807,7 @@
       lifeLog('auto-register', { incident: num, crews: crews.map(c => c.team + (c.cadUrs ? '#' + c.cadUrs : '')), confirmed: !!d });
       showToast('📡 البلاغ <b style="direction:ltr;display:inline-block">' + num + '</b> سُجّل <b>تلقائيًا</b><br>' +
         (crews.length
-          ? '🚑 ' + crews.map(c => c.team).join(' · ') + '<br><small>الزر اليدوي يبقى متاحًا للتصحيح</small>'
+          ? '🚑 ' + crews.map(crewDisplay).join(' · ') + '<br><small>الزر اليدوي يبقى متاحًا للتصحيح</small>'
           : '⏳ بانتظار فرقة فعلية — تُسجَّل مشاركتها تلقائيًا عند بدء رحلتها (لا Journey = لا مشاركة)'), 6000);
     } else { setObsStatus('error', (r.data && r.data.error) || ('HTTP ' + r.status)); }
   }
@@ -1100,18 +1128,20 @@
       panel.style.display = 'none';
       const t = ch.dataset.t;
       if(t === '__cancel'){ showToast('🚫 أُلغي — لم يُسجَّل أي بلاغ.', 3000); return; }
+      const identity = teamIdentities.find(item => item && item.name === t);
+      const crew = { team: t, operationalCode: identity && identity.operationalCode || undefined };
       const coords = await coordsEnsured(number);
       const phasesNow = phasesObject(), createdNow = incidentCreatedAt(), addrNow = addressFromPage(), regionNow = regionFromPage();
-      const r = await apiPost(number, code, type, [t], phasesNow, createdNow, addrNow, regionNow, coords, null, 'cad-manual');
+      const r = await apiPost(number, code, type, [crew], phasesNow, createdNow, addrNow, regionNow, coords, null, 'cad-manual');
       if(r.data && r.data.success){
-        watchAdd(number, { code, type, crews: [{ team: t }], phases: phasesNow, createdAt: createdNow, address: addrNow, region: regionNow, lat: coords ? coords.lat : null, lng: coords ? coords.lng : null }); // مراقبة + إثراء تلقائي بعد التسجيل
-        successToast(number, type, [t], coords);
+        watchAdd(number, { code, type, crews: [crew], phases: phasesNow, createdAt: createdNow, address: addrNow, region: regionNow, lat: coords ? coords.lat : null, lng: coords ? coords.lng : null }); // مراقبة + إثراء تلقائي بعد التسجيل
+        successToast(number, type, [teamDisplay(t)], coords);
       }
       else showToast('❌ فشل التسجيل: ' + ((r.data && r.data.error) || ('HTTP ' + r.status)), 6000);
     });
   }
   const chipsHtml = () =>
-    teamsList.map(t => '<span class="southPocChip" data-t="' + t + '">' + t + '</span>').join('') +
+    teamsList.map(t => '<span class="southPocChip" data-t="' + t + '">' + teamDisplay(t) + '</span>').join('') +
     '<br><span class="southPocChip" data-t="__cancel" style="border-color:#EF4444;color:#EF4444">إلغاء</span>';
 
   function askCrewManually(number, code, type){
@@ -1136,7 +1166,7 @@
     const code = proqaFromPage();
     const type = typeFromCode(code);
     const cadCrews = crewStatesFromTracker();
-    const pageCrews = cadCrews.map(c => ({ team: mapToSouthTeam(c.name), withdrawn: c.withdrawn })).filter(c => c.team);
+    const pageCrews = cadCrews.map(c => ({ team: mapToSouthTeam(c.name), operationalCode: operationalCodeOf(c.name) || undefined, withdrawn: c.withdrawn })).filter(c => c.team);
     // مصدر الحقيقة لحالة الوحدة (قرار المالك 2026-08-22): وحدات event-dispatched/detail
     // الملتقطة سلبيًا ترقّي لقطة الصفحة — ولا تُسقط فرقة ظاهرة في الصفحة ولا وحداتها
     const southCrews = mergeCrewSources(crewsFromCadUnits(number), pageCrews);
@@ -1166,7 +1196,7 @@
         } else {
           // وسم صادق لحالة كل فرقة: مسحوبة (نص الصفحة) أو ملغاة قبل المباشرة
           // (unitRequestStatus= B/C/R بلا وصول فعلي — قاعدة 2026-08-22)
-          const tag = c => c.team + (c.withdrawn ? ' (مسحوبة)' :
+          const tag = c => crewDisplay(c) + (c.withdrawn ? ' (مسحوبة)' :
             (c.cadUrs && c.cadUrs !== 'A' && !c.cadReached ? ' (ملغاة قبل المباشرة)' :
             (c.cadUrs && c.cadUrs !== 'A' && c.cadReached ? ' (أُلغيت بعد المباشرة — محتسبة)' : '')));
           successToast(number, type, southCrews.map(tag), coords);
@@ -1185,7 +1215,7 @@
     if(!r.data || !r.data.success){ showToast('❌ ' + ((r.data && r.data.error) || ('تعذر جلب إحصائية المنصة (HTTP ' + r.status + ').')), 6000); return; }
     const s = r.data;
     const rows = Object.keys(s.byCrew).sort((a,b)=>s.byCrew[b]-s.byCrew[a]||(a<b?-1:1))
-      .map(c => c + ' — <b>' + s.byCrew[c] + '</b>').join('<br>') || 'لا شيء بعد';
+      .map(c => teamDisplay(c) + ' — <b>' + s.byCrew[c] + '</b>').join('<br>') || 'لا شيء بعد';
     showToast('📊 <b>بلاغات اليوم في منصة الجنوب: ' + s.total + '</b><br>' +
       '🤒 ' + s.byType.medical + ' · 🚗 ' + s.byType.traffic + ' · 🚨 ' + s.byType.injury +
       ' · 🔥 ' + s.byType.fire + ' · 📦 ' + s.byType.other +
@@ -1324,7 +1354,7 @@
         coords = await fetchCoordsByLocId(geo.locOfIncident[num]);
       }
       // ③ لقطة الصفحة — فقط إن كان هذا البلاغ مفتوحًا أمام الموظف الآن
-      const pageCrews = onPage ? crewStatesFromTracker().map(c => ({ team: mapToSouthTeam(c.name), withdrawn: c.withdrawn })).filter(c => c.team) : [];
+      const pageCrews = onPage ? crewStatesFromTracker().map(c => ({ team: mapToSouthTeam(c.name), operationalCode: operationalCodeOf(c.name) || undefined, withdrawn: c.withdrawn })).filter(c => c.team) : [];
       // حالة الوحدة من CAD (قرار المالك 2026-08-22): إلغاء/عودة الوحدة يُرسل تلقائيًا
       // فور تغيّر لقطة event-dispatched/detail — بلا ضغطة ثانية، ودمج بلا فقدان
       const effCrews = mergeCrewSources(w.crews, pageCrews, crewsFromCadUnits(num));
@@ -1391,5 +1421,7 @@
     }, 15000);
   }
 
+  // مرجع اختبار قراءة فقط للتحقق من تطبيع الرموز واندماجها بلا هوية موازية.
+  window.__southTeamCodeTest = { mapToSouthTeam, crewStatesFromTracker, mergeCrewSources, crewsFromCadUnits, crewsFromDetail };
   return 'SouthPoC(platform) injected — مرتبط بمنصة الجنوب';
 })()
