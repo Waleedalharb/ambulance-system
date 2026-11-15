@@ -18069,7 +18069,9 @@ async function initDatabase() {
                 timeout: 300000
             });
             const { bootstrapRegionCommandProduction } = require('./scripts/region-command-production-bootstrap');
-            const bootstrap = await bootstrapRegionCommandProduction(db, { userId: '102462' });
+            const accounts = JSON.parse(await fs.readFile(USERS_PATH, 'utf8'));
+            const account = accounts.find(u => String(u.id) === '102462');
+            const bootstrap = await bootstrapRegionCommandProduction(db, { userId: '102462', account });
             fsSync.writeFileSync(regionBootstrapMarker, JSON.stringify({
                 completedAt: new Date().toISOString(),
                 regionId: bootstrap.regionId,

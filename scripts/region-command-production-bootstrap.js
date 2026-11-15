@@ -12,18 +12,17 @@ const SECTOR_CODES = ['1', '2', '3', '4', '5'];
  * تهيئة إنتاج مرة واحدة للحساب المعتمد. لا تحذف أو تغيّر أي ربط قائم.
  * المراكز تشتق حصرًا من teams.center بعد تحليل هوية الفرقة الرسمية.
  */
-async function bootstrapRegionCommandProduction(db, { userId, now = () => new Date() } = {}) {
+async function bootstrapRegionCommandProduction(db, { userId, account, now = () => new Date() } = {}) {
   if (!db || !db.tx || !db.tx.immediate) throw new Error('قاعدة SQLite المفتوحة مطلوبة');
   const normalizedUserId = String(userId || '').trim();
   if (!normalizedUserId) throw new Error('معرف حساب قائد المنطقة مطلوب');
+  // users.json هو مصدر الدخول والدور الفعلي؛ لا نعتمد على نسخة chat داخل SQLite.
+  if (!account || String(account.id) !== normalizedUserId || account.role !== 'admin' || account.isActive !== true) {
+    throw new Error('الحساب المعتمد غير موجود أو ليس مدير نظام نشطًا');
+  }
   const at = now().toISOString();
 
   return db.tx.immediate((hdl) => {
-    const user = hdl.prepare('SELECT user_id, role, is_active FROM users WHERE user_id = ?').get(normalizedUserId);
-    if (!user || user.role !== 'admin' || user.is_active !== 1) {
-      throw new Error('الحساب المعتمد غير موجود أو ليس مدير نظام نشطًا');
-    }
-
     let region = hdl.prepare('SELECT id FROM regions WHERE code = ?').get(REGION_CODE);
     if (!region) {
       hdl.prepare('INSERT INTO regions(id, code, name, status, created_at, created_by) VALUES (?, ?, ?, ?, ?, ?)')

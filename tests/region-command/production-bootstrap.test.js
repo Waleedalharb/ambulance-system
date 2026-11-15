@@ -41,7 +41,7 @@ test('bootstrap creates only Riyadh sectors and derives center links from real t
   addTeam(db, 'غير معروف 1', 'مركز آخر');
 
   // واجهة db.js الإنتاجية تصدّر tx ولا تصدّر handle الداخلي hdl.
-  const result = await bootstrapRegionCommandProduction({ tx: db.tx }, { userId: USER_ID, now });
+  const result = await bootstrapRegionCommandProduction({ tx: db.tx }, { userId: USER_ID, account: { id: USER_ID, role: 'admin', isActive: true }, now });
   assert.equal(result.regionId, 'REGION-RIYADH');
   assert.equal(result.linkedCenters, 2);
   assert.deepEqual(result.centerCounts, { 1: 0, 2: 1, 3: 1, 4: 0, 5: 0 });
@@ -65,9 +65,9 @@ test('bootstrap is idempotent and reactivates an existing current scope', async 
   addCenter(db, 'C-SOUTH', 'مركز الجنوب');
   addTeam(db, 'R-3-1-1', 'مركز الجنوب');
 
-  const first = await bootstrapRegionCommandProduction(db, { userId: USER_ID, now });
+  const first = await bootstrapRegionCommandProduction(db, { userId: USER_ID, account: { id: USER_ID, role: 'admin', isActive: true }, now });
   db.hdl.prepare('UPDATE user_access_scopes SET status = ? WHERE user_id = ?').run('suspended', USER_ID);
-  const second = await bootstrapRegionCommandProduction(db, { userId: USER_ID, now });
+  const second = await bootstrapRegionCommandProduction(db, { userId: USER_ID, account: { id: USER_ID, role: 'admin', isActive: true }, now });
 
   assert.equal(first.linkedCenters, 1);
   assert.equal(second.linkedCenters, 0);
@@ -85,11 +85,13 @@ test('bootstrap rejects a missing or non-admin account without writes', async ()
   db.hdl.prepare('INSERT INTO users(user_id, role, is_active) VALUES (?, ?, 1)').run('viewer', 'user');
 
   await assert.rejects(
-    bootstrapRegionCommandProduction(db, { userId: USER_ID, now }),
+    bootstrapRegionCommandProduction(db, { userId: USER_ID, account: null, now }),
     /الحساب المعتمد غير موجود أو ليس مدير نظام نشطًا/
   );
   await assert.rejects(
-    bootstrapRegionCommandProduction(db, { userId: 'viewer', now }),
+    bootstrapRegionCommandProduction(db, {
+      userId: 'viewer', account: { id: 'viewer', role: 'user', isActive: true }, now
+    }),
     /الحساب المعتمد غير موجود أو ليس مدير نظام نشطًا/
   );
   assert.equal(db.hdl.prepare('SELECT COUNT(*) AS count FROM regions').get().count, 0);
@@ -112,7 +114,7 @@ test('bootstrap refuses to override a current center assignment and rolls back',
     VALUES (?, ?, ?, ?, ?)`).run('SC-EXISTING', 'EAST-EXISTING', 'C-SOUTH', NOW, NOW);
 
   await assert.rejects(
-    bootstrapRegionCommandProduction(db, { userId: USER_ID, now }),
+    bootstrapRegionCommandProduction(db, { userId: USER_ID, account: { id: USER_ID, role: 'admin', isActive: true }, now }),
     /مركز الجنوب مرتبط حاليًا بقطاع آخر/
   );
   assert.equal(db.hdl.prepare('SELECT sector_id FROM sector_centers WHERE id = ?').get('SC-EXISTING').sector_id, 'EAST-EXISTING');
