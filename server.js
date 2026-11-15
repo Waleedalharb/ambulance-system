@@ -869,12 +869,17 @@ app.get('/js/map-config.runtime.js', (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
     const token = process.env.MAPBOX_PUBLIC_TOKEN;
+    const cartoApiKey = process.env.CARTO_API_KEY;
+    const config = {};
     if (token && /^pk\.[A-Za-z0-9._-]+$/.test(token)) {
-        res.send('/* إعداد خريطة الإنتاج — مفعّل من متغير البيئة (لا شيء في Git) */\n' +
-            'window.SMAP_MAP_CONFIG = { provider: "mapbox", accessToken: ' + JSON.stringify(token) +
-            ', style: "mapbox://styles/mapbox/dark-v11" };\n');
+        Object.assign(config, { provider: 'mapbox', accessToken: token, style: 'mapbox://styles/mapbox/dark-v11' });
+    }
+    if (cartoApiKey && /^cb1_[A-Za-z0-9_-]+$/.test(cartoApiKey)) config.cartoApiKey = cartoApiKey;
+    if (Object.keys(config).length) {
+        res.send('/* إعداد خرائط الإنتاج — مفعّل من متغيرات البيئة (لا شيء في Git) */\n' +
+            'window.SMAP_MAP_CONFIG = ' + JSON.stringify(config) + ';\n');
     } else {
-        res.send('/* MAPBOX_PUBLIC_TOKEN غير مضبوط في بيئة الخادم — يبقى الإعداد الافتراضي/المحلي كما هو */\n');
+        res.send('/* مفاتيح الخرائط غير مضبوطة في بيئة الخادم — يبقى الإعداد الافتراضي/المحلي كما هو */\n');
     }
 });
 // ⭐ مهم: الملفات المرفوعة تُقرأ من Render Disk وليس من public/

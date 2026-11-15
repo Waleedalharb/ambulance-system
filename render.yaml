@@ -46,6 +46,9 @@ services:
         sync: false
       - key: CORS_ORIGIN
         value: https://emsoperations.online
+      # مفتاح CARTO العام للبلاطات؛ تُضبط قيمته في Render فقط ولا تدخل Git.
+      - key: CARTO_API_KEY
+        sync: false
     disk:
       name: ambulance-data-disk
       mountPath: /data
