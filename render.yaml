@@ -7,13 +7,14 @@ services:
   - type: web
     name: ambulance-management-system
     runtime: node
+    branch: main
     region: frankfurt
     plan: standard
     buildCommand: npm ci --omit=dev
     startCommand: npm start
     healthCheckPath: /health
-    # النشر اليدوي فقط حتى اكتمال اعتماد الجاهزية؛ لا يبدأ نشر بمجرد رفع Git.
-    autoDeployTrigger: 'off'
+    # نشر تلقائي دائم من فرع الإنتاج main فقط؛ فروع التطوير لا تشغّل الإنتاج.
+    autoDeployTrigger: 'commit'
     envVars:
       - key: NODE_ENV
         value: production
