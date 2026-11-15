@@ -1268,13 +1268,6 @@ app.get('/health', (req, res) => {
             } catch (e) {
                 return { storagePath: STORAGE_PATH, dbPath: (db && db.DB_PATH) || null, writable: false, persistent: !!process.env.DATA_DIR || !!process.env.RENDER_DISK_PATH, error: e.message };
             }
-        })(),
-        // تشخيص مؤقت معتمد: قراءة فقط لكشف خطأ فتح SQLite المحجوب في السجلات.
-        databaseDiagnostics: (() => {
-            if (!db || typeof db.getDiagnostics !== 'function') {
-                return { handleReady: false, lastOpenError: 'SQLite module unavailable' };
-            }
-            return db.getDiagnostics();
         })()
     };
     if (aiMonitor) {

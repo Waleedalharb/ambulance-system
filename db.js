@@ -66,10 +66,8 @@ const logger = {
 // DATABASE CONNECTION
 // ============================================
 let db = null;
-let lastOpenError = null;
 
 async function openDb() {
-  lastOpenError = null;
   try {
     migrateLegacyDbIfNeeded();
     db = new Database(DB_PATH);
@@ -78,7 +76,6 @@ async function openDb() {
     logger.info(`Database opened at ${DB_PATH} with WAL mode`);
     return db;
   } catch (err) {
-    lastOpenError = err && err.message ? err.message : String(err);
     logger.error('Failed to open database', err);
     throw new Error(`Failed to open database: ${err.message}`);
   }
@@ -89,19 +86,6 @@ async function closeDb() {
     db.close();
     logger.info('Database connection closed');
   }
-}
-
-// تشخيص مؤقت معتمد: لا يفتح ملفًا ولا يكتب؛ يكشف فقط سبب تعذر الاتصال.
-function getDiagnostics() {
-  const result = { handleReady: !!db, lastOpenError };
-  if (!db) return result;
-  try {
-    const row = db.prepare('SELECT 1 AS ok').get();
-    result.ping = { ok: !!(row && row.ok === 1) };
-  } catch (err) {
-    result.ping = { ok: false, error: err && err.message ? err.message : String(err) };
-  }
-  return result;
 }
 
 // ============================================
@@ -7117,7 +7101,6 @@ module.exports = {
   // Core
   openDb,
   closeDb,
-  getDiagnostics,
   init,
   run,
   get,
