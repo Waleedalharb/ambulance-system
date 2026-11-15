@@ -1,0 +1,38 @@
+/* بلاطات Leaflet الموحدة: Mapbox من إعداد التشغيل، وCARTO بديلًا عند غيابه. */
+(function (root, factory) {
+    'use strict';
+    var api = factory(root);
+    if (typeof module === 'object' && module.exports) module.exports = api;
+    if (root) root.EmsMapTiles = api;
+})(typeof window !== 'undefined' ? window : globalThis, function (root) {
+    'use strict';
+
+    function getConfig() {
+        var settings = root.SMAP_MAP_CONFIG || {};
+        var token = typeof settings.accessToken === 'string' && /^pk\.[A-Za-z0-9._-]+$/.test(settings.accessToken)
+            ? settings.accessToken : '';
+        if (token) {
+            return {
+                url: 'https://api.mapbox.com/styles/v1/mapbox/light-v11/tiles/256/{z}/{x}/{y}{r}?access_token=' + encodeURIComponent(token),
+                attribution: '&copy; <a href="https://www.mapbox.com/">Mapbox</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+                maxZoom: 19
+            };
+        }
+        return {
+            url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
+            subdomains: 'abcd',
+            maxZoom: 19
+        };
+    }
+
+    function addLeafletTiles(map) {
+        if (!root.L || typeof root.L.tileLayer !== 'function') throw new Error('Leaflet غير متاح');
+        var config = getConfig();
+        var url = config.url;
+        delete config.url;
+        return root.L.tileLayer(url, config).addTo(map);
+    }
+
+    return { getConfig: getConfig, addLeafletTiles: addLeafletTiles };
+});

@@ -1940,9 +1940,7 @@ function initPeakAlertMap(alertData) {
         var centerLng = parseFloat(alertData.lng) || 46.6753;
         
         peakAlertMap = L.map('peakAlertMap').setView([centerLat, centerLng], 13);
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-            attribution: '© OpenStreetMap © CARTO'
-        }).addTo(peakAlertMap);
+        EmsMapTiles.addLeafletTiles(peakAlertMap);
         
         var marker = L.marker([centerLat, centerLng]).addTo(peakAlertMap);
         marker.bindPopup('<b>' + escapeHtml(alertData.unit) + '</b><br>' + escapeHtml(alertData.location) + '<br>⏰ ' + (alertData.startTime || '')).openPopup();
@@ -2024,7 +2022,7 @@ function initPeakMap() {
     if (peakMap) { setTimeout(function() { peakMap.invalidateSize(); }, 300); return; }
     try {
         peakMap = L.map('peakMap').setView([24.7136, 46.6753], 13);
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { attribution: '© OpenStreetMap © CARTO' }).addTo(peakMap);
+        EmsMapTiles.addLeafletTiles(peakMap);
         var marker = null;
         peakMap.on('click', function(e) {
             var lat = e.latlng.lat;
@@ -2794,9 +2792,7 @@ function initLeafletMap(focusUnit) {
         mapLeaflet.style.height = '350px';
 
         map = L.map('mapLeaflet').setView([24.7136, 46.6753], 11);
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-            attribution: '© OpenStreetMap © CARTO'
-        }).addTo(map);
+        EmsMapTiles.addLeafletTiles(map);
     }
 
     // مسح العلامات القديمة
