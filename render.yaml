@@ -10,7 +10,7 @@ services:
     branch: main
     region: frankfurt
     plan: standard
-    buildCommand: npm ci --omit=dev
+    buildCommand: npm ci --omit=dev && npm rebuild better-sqlite3 --build-from-source
     startCommand: npm start
     healthCheckPath: /health
     # نشر تلقائي دائم من فرع الإنتاج main فقط؛ فروع التطوير لا تشغّل الإنتاج.
@@ -18,8 +18,9 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      # يبقى المخطط الإضافي معطلًا حتى نجاح قراءة القاعدة وأخذ نسخة احتياطية.
       - key: REGION_COMMAND_ENABLED
-        value: 'true'
+        value: 'false'
       - key: NODE_VERSION
         value: 22.14.0
       - key: PORT
