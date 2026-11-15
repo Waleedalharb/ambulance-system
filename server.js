@@ -18057,6 +18057,28 @@ async function initDatabase() {
         } catch (e) {
             console.error('❌ Failed to sync users to SQLite:', e.message);
         }
+
+        // تهيئة قراءة قائد المنطقة مرة واحدة، بعد نسخة احتياطية متسقة.
+        // لا تُستبدل أي بيانات أو روابط قائمة؛ فشل التحقق يلغي المعاملة كاملة.
+        const regionBootstrapMarker = path.join(STORAGE_PATH, 'backups', 'region-command-riyadh-bootstrap-complete.json');
+        if (process.env.NODE_ENV === 'production' && process.env.REGION_COMMAND_ENABLED === 'true' && !fsSync.existsSync(regionBootstrapMarker)) {
+            console.log('📸 Creating consistent backup before Riyadh region bootstrap...');
+            require('child_process').execFileSync(process.execPath, [path.join(__dirname, 'scripts', 'backup.js'), 'backup'], {
+                cwd: __dirname,
+                stdio: 'inherit',
+                timeout: 300000
+            });
+            const { bootstrapRegionCommandProduction } = require('./scripts/region-command-production-bootstrap');
+            const bootstrap = await bootstrapRegionCommandProduction(db, { userId: '102462' });
+            fsSync.writeFileSync(regionBootstrapMarker, JSON.stringify({
+                completedAt: new Date().toISOString(),
+                regionId: bootstrap.regionId,
+                linkedCenters: bootstrap.linkedCenters,
+                centerCounts: bootstrap.centerCounts,
+                unmappedTeamCount: bootstrap.unmappedTeams.length
+            }, null, 2));
+            console.log(`✅ Riyadh region scope ready: ${bootstrap.linkedCenters} center links added`);
+        }
     } catch (err) {
         dbLoadError = { message: err.message, code: err.code || null, stage: 'init' };
         console.error('❌ Failed to initialize database:', err.message);
