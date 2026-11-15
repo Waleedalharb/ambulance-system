@@ -148,7 +148,7 @@ function objects(dbPath, type) {
 
   const render = fs.readFileSync(path.join(ROOT, 'render.yaml'), 'utf8');
   check('Render: Node 22 وnpm start وhealth والتخزين الدائم', /NODE_VERSION[\s\S]*?22\.14\.0/.test(render) && /startCommand: npm start/.test(render) && /healthCheckPath: \/health/.test(render) && /DB_PATH[\s\S]*?\/data\/ambulance\.db/.test(render) && /SCHEDULE_FILE[\s\S]*?\/data\/schedule-employees\.json/.test(render));
-  check('Render: JWT سري والنشر اليدوي ولا cron/preDeploy غير صالح', /JWT_SECRET\s*\n\s*sync: false/.test(render) && /autoDeployTrigger: ['"]?off['"]?/.test(render) && !/^cronJobs:/m.test(render) && !/preDeployCommand:/.test(render));
+  check('Render: JWT سري ونشر تلقائي من main ولا cron/preDeploy غير صالح', /JWT_SECRET\s*\n\s*sync: false/.test(render) && /branch:\s*main/.test(render) && /autoDeployTrigger: ['"]?commit['"]?/.test(render) && !/^cronJobs:/m.test(render) && !/preDeployCommand:/.test(render));
 
   const summary = { passed: checks.length, failed: 0, checks, output: OUT, migrationBackup: applied.backup.path, fullBackup: archive, rollbackDatabase: rollbackDb, scope: 'synthetic isolated only; no production deployment or account/coverage changes', finishedAt: new Date().toISOString() };
   fs.writeFileSync(path.join(OUT, 'summary.json'), JSON.stringify(summary, null, 2) + '\n');
