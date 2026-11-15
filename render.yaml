@@ -11,8 +11,8 @@ services:
     region: frankfurt
     plan: standard
     buildCommand: npm ci --omit=dev
-    # إعادة البناء عند الإقلاع تضمن ABI المطابق لـ Node 22 الفعلي؛ لا تلمس /data.
-    startCommand: npm rebuild better-sqlite3 && npm start
+    # تثبيت الثنائي باستخدام node مباشرة يضمن ABI 127 لـ Node 22؛ لا يلمس /data.
+    startCommand: cd node_modules/better-sqlite3 && node ../prebuild-install/bin.js && cd ../.. && npm start
     healthCheckPath: /health
     # نشر تلقائي دائم من فرع الإنتاج main فقط؛ فروع التطوير لا تشغّل الإنتاج.
     autoDeployTrigger: 'commit'
