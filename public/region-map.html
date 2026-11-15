@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#070B14">
+  <title>العرض الجغرافي التشغيلي · مركز قيادة المنطقة</title>
+  <link rel="icon" href="/favicon.ico">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="/css/region-command.css?v=2">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
+  <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js" defer></script>
+  <script src="/js/core/core-auth.js" defer></script>
+  <script src="/js/operational-team-code.js?v=1" defer></script>
+  <script src="/js/region-command-api.js?v=1" defer></script>
+  <script src="/js/region-command-views.js?v=3" defer></script>
+  <script src="/js/region-command-realtime.js?v=1" defer></script>
+  <script src="/js/region-map.js?v=6" defer></script>
+  <link rel="stylesheet" href="/css/region-map-visual.css?v=3">
+</head>
+<body class="rc-map-page">
+  <a class="rc-skip" href="#mainContent">تجاوز إلى المحتوى</a>
+  <main class="rc-map-main" id="mainContent">
+    <section class="rc-alert rc-map-floating-error" id="mapError" role="alert" hidden></section>
+    <section class="rc-quality-banner rc-map-floating-quality" id="mapQuality" hidden></section>
+    <div class="rc-map-workspace">
+      <nav class="rc-map-rail" aria-label="أدوات العرض الجغرافي">
+        <span class="rc-rail-mark" aria-hidden="true">+</span>
+        <a href="/region-command.html" aria-label="لوحة القيادة" title="لوحة القيادة">⌂</a>
+        <button type="button" id="fitMap" aria-label="ملاءمة العرض" title="ملاءمة العرض">◎</button>
+        <button type="button" id="toggleLayers" aria-label="إظهار أو إخفاء الطبقات" aria-expanded="true" title="الطبقات">▤</button>
+        <button type="button" id="toggleSectorPanel" class="rc-panel-toggle" aria-label="طي لوحة بيانات القطاع" aria-expanded="true" aria-controls="sectorPanel" title="طي لوحة القطاع">⇤</button>
+        <button type="button" data-action="theme" aria-label="تبديل الوضع الداكن والفاتح" title="تبديل المظهر">◐</button>
+        <button type="button" id="refreshMap" aria-label="تحديث البيانات" title="تحديث البيانات">↻</button>
+        <span class="rc-rail-live" aria-hidden="true"></span>
+      </nav>
+
+      <section class="rc-map-stage" aria-label="الخريطة التشغيلية">
+        <div id="regionMap" role="application" aria-label="خريطة المراكز والبلاغات التشغيلية"></div>
+        <header class="rc-header rc-map-header">
+          <div class="rc-brand"><span class="rc-brand-mark" aria-hidden="true"><span></span></span><div><h1>مركز قيادة المنطقة</h1><p>العرض الجغرافي التشغيلي</p></div></div>
+        </header>
+        <div class="rc-light-mode-label">الوضع الفاتح</div>
+        <div class="rc-map-regional-metrics" id="mapRegionalMetrics" aria-label="المؤشرات الإقليمية"></div>
+        <section class="rc-map-toolbar" aria-label="اختيار القطاع">
+          <div class="rc-sector-strip" id="mapSectorList" aria-busy="true"></div>
+          <span id="mapUpdated" class="rc-sr-only">—</span>
+        </section>
+        <div class="rc-map-loading" id="mapLoading"><span class="rc-spinner"></span><p>جارٍ تحميل البيانات الجغرافية…</p></div>
+        <div class="rc-map-notice" id="mapNotice" hidden></div>
+        <fieldset class="rc-layer-control" id="mapLayerControl">
+          <legend>الطبقات التشغيلية</legend>
+          <label><input type="checkbox" data-layer="incidents" checked><span class="rc-layer-dot rc-dot-incident"></span>البلاغات</label>
+          <label class="rc-layer-unavailable"><input type="checkbox" disabled><span class="rc-layer-dot rc-dot-team"></span>الفرق <small>الموقع الحي غير متاح</small></label>
+          <label><input type="checkbox" data-layer="centers" checked><span class="rc-layer-dot rc-dot-center"></span>المراكز</label>
+          <label class="rc-layer-unavailable"><input type="checkbox" disabled><span class="rc-layer-dot rc-dot-post"></span>التمركزات <small>لا يوجد مصدر مواقع</small></label>
+          <label><input type="checkbox" data-layer="heat"><span class="rc-layer-dot rc-dot-heat"></span>الكثافة الحرارية</label>
+          <label class="rc-layer-unavailable"><input type="checkbox" disabled><span class="rc-layer-dot rc-dot-live"></span>المواقع الحية <small>غير متاحة</small></label>
+          <label class="rc-brightness-control" for="mapBrightness">سطوع الخريطة<input id="mapBrightness" type="range" min="55" max="125" value="100" step="5"><output id="mapBrightnessValue" for="mapBrightness">100٪</output></label>
+          <p>العلامات تمثل إحداثيات مسجلة فقط. لا تُرسم حدود القطاعات دون مرجع جغرافي رسمي.</p>
+        </fieldset>
+        <div class="rc-map-disclaimer"><span><i class="rc-legend-live"></i> إحداثيات مسجلة</span><span><i class="rc-legend-unavailable"></i> الموقع الحي غير متاح</span></div>
+      </section>
+
+      <aside class="rc-map-panel" id="sectorPanel" aria-labelledby="mapSectorName">
+        <div class="rc-map-panel-head"><div><span class="rc-eyebrow">القطاع المحدد</span><h2 id="mapSectorName">—</h2><p id="mapSectorShift">—</p></div><span id="mapSectorStatus"></span></div>
+        <div class="rc-tabs rc-map-tabs" role="tablist" aria-label="تفاصيل القطاع على الخريطة">
+          <button type="button" role="tab" data-map-tab="teams" aria-selected="true">جاهزية الفرق</button>
+          <button type="button" role="tab" data-map-tab="incidents" aria-selected="false">البلاغات</button>
+          <button type="button" role="tab" data-map-tab="sources" aria-selected="false">حالة البيانات</button>
+        </div>
+        <div id="mapDetailError" class="rc-alert" hidden></div>
+        <section class="rc-map-operational-alert" id="mapOperationalAlert" aria-live="polite" hidden></section>
+        <div class="rc-sector-analytics" id="mapDetailMetrics"></div>
+        <section class="rc-response-section" aria-labelledby="responseTitle"><h3 id="responseTitle">أزمنة الاستجابة</h3><div id="mapResponseMetrics" class="rc-response-grid"></div></section>
+        <div id="mapDataFreshness" class="rc-map-freshness"><span class="rc-connection" id="connectionStatus" data-state="connecting"><span></span> جارٍ الاتصال</span><small>آخر تحديث يظهر من وقت لقطة المصدر.</small></div>
+        <div id="mapTeamsPanel" role="tabpanel"><h3 class="rc-map-list-title">جاهزية الفرق</h3><div id="mapTeamList" class="rc-map-list"></div></div>
+        <div id="mapIncidentsPanel" role="tabpanel" hidden><h3 class="rc-map-list-title">البلاغات</h3><div id="mapIncidentList" class="rc-map-list"></div></div>
+        <div id="mapSourcesPanel" role="tabpanel" hidden><h3 class="rc-map-list-title">حالة البيانات</h3><div id="mapSourceList" class="rc-map-list"></div><div id="mapCenterNotes" class="rc-map-center-notes"></div></div>
+      </aside>
+    </div>
+  </main>
+  <div class="rc-sr-only" id="liveAnnouncer" aria-live="polite"></div>
+</body>
+</html>

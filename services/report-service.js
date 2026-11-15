@@ -371,7 +371,14 @@ class ReportService {
             if (cadTimeFilled) await this._recomputeIncidentResponses(effShiftId, number, incident.cad_created_at);
 
             const addedCrews = [], skippedCrews = [], withdrawnCrews = [], cancelAfterArrivalCrews = [], correctedCrews = [], linkedCrews = [], planUnitsIgnored = [], evidencelessIgnored = [];
-            for (const c of crews) {
+            // الرمز المركب هو هوية عرض، لا مفتاح جديد: R-3-1-1 وR-3-2-1 يعودان
+            // دائمًا إلى «جنوب 1» قبل المطابقة بالمعرفات الثابتة والسجل التاريخي.
+            const TeamCode = require('../public/js/operational-team-code');
+            const normalizedCrews = crews.map(c => {
+                const identity = c && TeamCode.parseOperationalTeamCode(c.team);
+                return identity ? { ...c, team: identity.teamName, operationalCode: identity.operationalCode } : c;
+            });
+            for (const c of normalizedCrews) {
                 // دفاع مصدر الحقيقة (اعتماد المالك 2026-08-25): Available ≠ Assigned
                 // ≠ Responding ≠ Positioning ≠ Participating — لقطة CAD صريحة (وحدة
                 // بهوية CAD أو phasesSource=cad-detail) بلا أي وقت رحلة ولا cadUrs
@@ -454,7 +461,7 @@ class ReportService {
                         await this.engine.reports.addReport(effShiftId, 'CAD', c.team, type, number, phasesJsonW, respW.arrival, respW.mubashara);
                         await this.engine.storage.setParticipationWithdrawn(effShiftId, c.team, number, true);
                     }
-                    if (urs) await this.engine.storage.setParticipationCadUnitState(effShiftId, effUnit, number, urs, c.cadReached, c.cadUnitId, c.cadRunUnitId);
+                    if (urs || (!dup && hasCadIdentity)) await this.engine.storage.setParticipationCadUnitState(effShiftId, effUnit, number, urs, c.cadReached, c.cadUnitId, c.cadRunUnitId);
                     withdrawnCrews.push(c.team);
                     incidentEnriched = true; // تغيّر حالة المشاركة يغيّر التنبيهات والخريطة فورًا
                     continue;
@@ -492,7 +499,7 @@ class ReportService {
                 const r = await this.engine.reports.addReport(effShiftId, 'CAD', c.team, type, number, phasesJson, resp.arrival, resp.mubashara);
                 if (r && r.success) {
                     addedCrews.push(c.team);
-                    if (urs) await this.engine.storage.setParticipationCadUnitState(effShiftId, c.team, number, urs, c.cadReached, c.cadUnitId, c.cadRunUnitId);
+                    if (urs || hasCadIdentity) await this.engine.storage.setParticipationCadUnitState(effShiftId, c.team, number, urs, c.cadReached, c.cadUnitId, c.cadRunUnitId);
                     if (afterArrival) { cancelAfterArrivalCrews.push(c.team); incidentEnriched = true; }
                 } else skippedCrews.push(c.team);
             }

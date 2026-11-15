@@ -111,6 +111,7 @@ const cadReportMsgs = () => messages.filter(m => m.kind === 'cad-report' && m.pa
 const lifeEvents = (kind) => (ctx.window.__southLife ? ctx.window.__southLife.events : []).filter(e => e.kind === kind);
 
 function loadOverlay() {
+    vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'public', 'js', 'operational-team-code.js'), 'utf8'), ctx, { filename: 'operational-team-code.js' });
     vm.runInContext(fs.readFileSync(OVERLAY_SRC, 'utf8'), ctx, { filename: 'cad-overlay.js' });
 }
 
@@ -129,7 +130,7 @@ async function cycle() {
 (async () => {
     console.log('🧪 اختبار Incident Observer — vm sandbox بلا متصفح\n');
     loadOverlay();
-    check('T0 الـOverlay انحقن وختم البناء الجديد ظاهر', /2026-08-27\.d/.test(ctx.window.__southBuild || ''));
+    check('T0 الـOverlay انحقن وختم البناء الجديد ظاهر', /2026-11-15\.c/.test(ctx.window.__southBuild || ''));
 
     // ─── التسجيل التلقائي من لقطة القائمة (البلاغ بلا Journey بعد) ───
     listSnapshot(); await drain(); await drain();

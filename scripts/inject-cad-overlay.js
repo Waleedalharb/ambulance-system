@@ -19,12 +19,20 @@ const { execFileSync } = require('child_process');
 const ROOT = path.join(__dirname, '..');
 const BRIDGE = process.env.WEBBRIDGE_URL || 'http://127.0.0.1:10086/command';
 const SESSION = 'cad-observe';
+const SECTOR_CODE = String(process.env.CAD_SECTOR || '3');
+if (!/^(?:[1-9]|1\d)$/.test(SECTOR_CODE)) fail('رقم قطاع CAD Overlay غير صالح: ' + SECTOR_CODE);
 
 function fail(msg, code) { console.error('❌ ' + msg); process.exit(code || 1); }
 
 let overlay;
-try { overlay = fs.readFileSync(path.join(ROOT, 'scripts', 'cad-overlay.js'), 'utf8'); }
-catch (_) { fail('تعذّر قراءة scripts/cad-overlay.js'); }
+try {
+    const teamCodes = fs.readFileSync(path.join(ROOT, 'public', 'js', 'operational-team-code.js'), 'utf8');
+    const overlaySource = fs.readFileSync(path.join(ROOT, 'scripts', 'cad-overlay.js'), 'utf8');
+    const marker = "const OVERLAY_SECTOR_CODE = '3';";
+    if (!overlaySource.includes(marker)) fail('علامة قطاع CAD Overlay غير موجودة');
+    overlay = teamCodes + '\n' + overlaySource.replace(marker, "const OVERLAY_SECTOR_CODE = '" + SECTOR_CODE + "';");
+}
+catch (_) { fail('تعذّر قراءة محلل الترميز أو scripts/cad-overlay.js'); }
 if (/%%|INTEGRATION_KEY|X-Integration-Key/i.test(overlay))
     fail('cad-overlay.js يحمل أثر مفتاح/placeholder — الفصل الأمني يمنع حقنه');
 

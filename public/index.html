@@ -786,6 +786,10 @@ window.addEventListener('load', function() {
                 <i class="fas fa-rocket"></i>
                 <span>EOCC</span>
             </button>
+            <button class="operations-room-btn" id="regionCommandBtn" title="مركز قيادة قائد المنطقة" hidden style="background: linear-gradient(135deg, #1D4ED8, #0891B2);">
+                <i class="fas fa-tower-broadcast"></i>
+                <span>قيادة المنطقة</span>
+            </button>
             <button id="logoutBtn" class="operations-room-btn" style="background:linear-gradient(135deg, #EF476F, #B83253); margin-right:8px;" title="تسجيل الخروج">
                 <i class="fas fa-sign-out-alt"></i>
                 <span>خروج</span>
@@ -2798,6 +2802,7 @@ window.addEventListener('load', function() {
 <script src="js/table-sort.js?v=1" defer></script>
 <script src="js/incident-lookup.js?v=1" defer></script>
 <script src="js/app.js?v=54" defer></script><!-- v=54 (P3، 2026-09-21): مرجع المراكز من /api/ops/centers (SSOT) — حذف الجداول الثابتة operationalCenters/teamCenterMap -->
+<script src="js/region-command-entry.js?v=1" defer></script><!-- دخول مركز القيادة يظهر فقط بعد نجاح سياق الصلاحية والنطاق -->
 <script src="js/crew-batch-cancel.js?v=1" defer></script><!-- الاختيار الجماعي لفرق البلاغ في توزيع البلاغات — بعد app.js (خطافات عرض فقط) -->
 <script src="js/place-suggestion.js?v=2" defer></script><!-- PI-7: عرض «هوية الموقع» (اقتراح خارجي غير معتمد) — قراءة فقط، بعد app.js — v=2: PI-10 حالات pending/paused/incomplete -->
 <script src="js/alert-rules.js?v=1" defer></script><!-- قواعد التنبيه التشغيلي النقية — قبل smart-map.js -->

@@ -71,6 +71,7 @@ const drain = async () => { for (let i = 0; i < 6; i++) await new Promise(r => s
 
 (async () => {
     console.log('🧪 اختبار مسبار 1A — vm sandbox بلا متصفح\n');
+    vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'public', 'js', 'operational-team-code.js'), 'utf8'), ctx, { filename: 'operational-team-code.js' });
     vm.runInContext(fs.readFileSync(OVERLAY_SRC, 'utf8'), ctx, { filename: 'cad-overlay.js' });
 
     console.log('أ — التعريض والالتقاط من مسار fetch الحقيقي:');
@@ -109,7 +110,7 @@ const drain = async () => { for (let i = 0; i < 6; i++) await new Promise(r => s
     console.log('\nهـ — التصدير (قبل الفيض — عينة المستشفى ما زالت في المخزن):');
     let out = JSON.parse(ctx.window.__southProbeExportJson());
     check('هـ1 meta يحمل ختم البناء وعدد العينات وإحصاء endpoints',
-        /2026-08-27\.d/.test(out.meta.build) && out.meta.samples === ctx.window.__southProbe.buf.length &&
+        /2026-11-15\.c/.test(out.meta.build) && out.meta.samples === ctx.window.__southProbe.buf.length &&
         out.meta.callsByEndpoint && Object.keys(out.meta.callsByEndpoint).length > 0);
     check('هـ2 buf كامل في التصدير وعينة المستشفى موجودة حرفيًا',
         Array.isArray(out.buf) && JSON.stringify(out.buf).includes('مستشفى الإيمان العام'));

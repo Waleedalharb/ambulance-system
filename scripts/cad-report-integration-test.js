@@ -61,9 +61,21 @@ async function waitReady(tries = 60) {
         { key: TEST_KEY, scope: 'cad-reports', label: 'اختبار', active: true, createdAt: new Date().toISOString() },
         { key: 'revoked-' + STAMP, scope: 'cad-reports', label: 'ملغى', active: false, createdAt: new Date().toISOString() }
     ]));
-    // قياس وجود مناوبة نشطة في النسخة (مطلوبة للمسار اليدوي وCAD معًا)
-    const probe = new Database(TMP_DB, { readonly: true });
-    const active = probe.prepare("SELECT id FROM shifts WHERE status='active' ORDER BY id DESC LIMIT 1").get();
+    // استخدم مناوبة فعلية مرتبطة بجدول داخل النسخة المؤقتة؛ بعض نسخ
+    // البيانات تحتوي مناوبة نشطة حديثة بلا roster فتصبح اختبارات الهوية غير صالحة.
+    const probe = new Database(TMP_DB);
+    let active = probe.prepare("SELECT id, shift_type, shift_date FROM shifts WHERE status='active' ORDER BY id DESC LIMIT 1").get();
+    const activeRosterCount = active ? probe.prepare('SELECT COUNT(*) AS count FROM shift_roster WHERE shift_date = ?').get(active.shift_date).count : 0;
+    if (active && activeRosterCount === 0) {
+        const rosteredShift = probe.prepare(`SELECT s.id, s.shift_type, s.shift_date FROM shifts s
+            WHERE EXISTS (SELECT 1 FROM shift_roster sr WHERE sr.shift_date = s.shift_date)
+            ORDER BY s.id DESC LIMIT 1`).get();
+        if (rosteredShift) {
+            probe.prepare("UPDATE shifts SET status='pending_handover' WHERE status='active'").run();
+            probe.prepare("UPDATE shifts SET status='active' WHERE id=?").run(rosteredShift.id);
+            active = rosteredShift;
+        }
+    }
     probe.close();
     console.log('  ℹ️ المناوبة النشطة في النسخة: ' + (active ? '#' + active.id : 'لا توجد — سيناريوهات الكتابة ستُقفل'));
 
@@ -106,6 +118,19 @@ async function waitReady(tries = 60) {
         check('وقت إنشاء غير صالح ← 400', (await api('/api/cad-reports', { method: 'POST', token: TK, body: { number: '1401099', createdAt: 'بكرة الظهر', crews: [{ team: 'جنوب 8' }] } })).status === 400);
 
         if (!active) { console.log('⚠️ لا مناوبة نشطة — تُخطى سيناريوهات الكتابة'); }
+
+        // قراءة هوية العرض من تكميل المناوبة الفعلية: النوع المخزن «صباح/ليل» أو «صباحية/ليلية».
+        console.log('\n🆔 هوية فرق جنوب-teams من المناوبة الفعلية:');
+        const southTeamsResponse = await api('/api/cad-reports/south-teams', { token: TK });
+        const southTeams = southTeamsResponse.data && Array.isArray(southTeamsResponse.data.teams) ? southTeamsResponse.data.teams : [];
+        const internalSouthTeams = southTeams.filter(row => /^جنوب [1-9]\d*$/.test(row.name || ''));
+        const expectedShiftCode = active && /ليل/.test(active.shift_type || '') ? 2 : (active && /صباح/.test(active.shift_type || '') ? 1 : null);
+        check('🆔 south-teams يعيد فرق جنوب الداخلية من تكميل المناوبة',
+            southTeamsResponse.status === 200 && southTeamsResponse.data && southTeamsResponse.data.success === true && internalSouthTeams.length > 0,
+            JSON.stringify({ status: southTeamsResponse.status, teams: southTeams.length, south: internalSouthTeams.length }));
+        check('🆔 operationalCode مشتق من shift_type الفعلي وname يبقى جنوب N',
+            !!expectedShiftCode && internalSouthTeams.every(row => row.operationalCode === 'R-3-' + expectedShiftCode + '-' + row.name.split(' ')[1] && row.sectorName === 'قطاع جنوب الرياض' && row.displayLabel.includes(row.operationalCode)),
+            JSON.stringify({ shiftType: active && active.shift_type, sample: internalSouthTeams.slice(0, 2) }));
 
         // ── ① بلاغ واحد بفرقة واحدة (عبر مفتاح التكامل — بلا Session Token) ──
         console.log('\n① بلاغ بفرقة واحدة (مفتاح التكامل):');
@@ -463,6 +488,51 @@ async function waitReady(tries = 60) {
         const inc19 = (s.incidents || []).find(i => i.number === '1401099');
         check('⑲ البلاغ ظهر بالملخص بصفر فرق وصفر أثر في byCrew',
             !!inc19 && (inc19.crews || []).length === 0);
+
+        // ── ⑳ التعايش بين الرمز القديم والجديد بلا ازدواج أو تغيير للمعرفات ──
+        console.log('\n⑳ R-3-[12]-N ↔ جنوب N — نفس المشاركة والسجل التاريخي:');
+        const sPre20 = (await sum()).data;
+        const codeSnapshot = number => {
+            const db = new Database(TMP_DB, { readonly: true });
+            const value = {
+                registry: db.prepare('SELECT COUNT(*) c FROM incident_registry WHERE number = ?').get(number).c,
+                participation: db.prepare(`SELECT t.id, r.unit, t.cad_unit_id uid, t.cad_run_unit_id rid
+                    FROM report_times t JOIN reports r ON r.id = t.report_id WHERE t.incident_number = ?`).all(number)
+            };
+            db.close();
+            return value;
+        };
+        const oldCrew = (team, uid, rid) => ({ team, phases: { 'التحرك': '10:00:00 AM' }, cadUnitId: uid, cadRunUnitId: rid });
+        const codedCrew = (team, uid, rid) => ({ ...oldCrew(team, uid, rid), phasesSource: 'cad-detail', cadUrs: 'A', cadReached: false });
+        async function codeCoexistence(number, first, second, expectedUnit, uid, rid) {
+            const created = await api('/api/cad-reports', { method: 'POST', token: TK, body: { number, source: 'cad-manual', crews: [first] } });
+            const before = codeSnapshot(number);
+            const updated = await api('/api/cad-reports', { method: 'POST', token: TK, body: { number, source: 'cad-auto', crews: [second] } });
+            const after = codeSnapshot(number);
+            check('⑳ ' + number + ' created=false وaddedCrews=[] عند تبديل الصيغة',
+                created.status === 200 && updated.status === 200 && updated.data.created === false && (updated.data.addedCrews || []).length === 0,
+                JSON.stringify(updated.data));
+            check('⑳ ' + number + ' سجل بلاغ ومشاركة واحدة ونفس report_times.id ونفس معرفات CAD',
+                before.registry === 1 && after.registry === 1 && before.participation.length === 1 && after.participation.length === 1 &&
+                before.participation[0].id === after.participation[0].id && after.participation[0].unit === expectedUnit &&
+                after.participation[0].uid === uid && after.participation[0].rid === rid,
+                JSON.stringify(after));
+        }
+        await codeCoexistence('1401100', oldCrew('جنوب 1', 980001, 980000001), codedCrew('R-3-2-1', 980001, 980000001), 'جنوب 1', 980001, 980000001);
+        await codeCoexistence('1401101', codedCrew('R-3-1-2', 980002, 980000002), oldCrew('جنوب 2', 980002, 980000002), 'جنوب 2', 980002, 980000002);
+        await codeCoexistence('1401102', oldCrew('جنوب 3', 980003, 980000003), oldCrew('جنوب 3', 980003, 980000003), 'جنوب 3', 980003, 980000003);
+        await codeCoexistence('1401104', oldCrew('غرب 1', 980005, 980000005), codedCrew('R-4-2-1', 980005, 980000005), 'غرب 1', 980005, 980000005);
+        await codeCoexistence('1401105', codedCrew('R-3-R-2-4', 980006, 980000006), oldCrew('سريع 4', 980006, 980000006), 'سريع 4', 980006, 980000006);
+        await codeCoexistence('1401106', oldCrew('باص طويق 1', 980007, 980000007), codedCrew('R-5-M-2-1', 980007, 980000007), 'باص طويق 1', 980007, 980000007);
+        const sPost20 = (await sum()).data;
+        check('⑳ byCrew يجمع الصيغتين تحت جنوب N ويحتسب مرة واحدة فقط لكل بلاغ',
+            ['جنوب 1', 'جنوب 2', 'جنوب 3'].every(team => (sPost20.byCrew[team] || 0) === ((sPre20.byCrew[team] || 0) + 1)),
+            JSON.stringify({ before: sPre20.byCrew, after: sPost20.byCrew }));
+        const badSector = await api('/api/cad-reports', { method: 'POST', token: TK, body: { number: '1401103', source: 'cad-manual', crews: [oldCrew('R-20-1-1', 980004, 980000004)] } });
+        const mismatch = await api('/api/cad-reports', { method: 'POST', token: TK, body: { number: '1401103', source: 'cad-manual', crews: [{ ...oldCrew('جنوب 1', 980004, 980000004), operationalCode: 'R-3-1-9' }] } });
+        check('⑳ الرمز غير المعتمد أو المتعارض مرفوض 400 بلا أثر تشغيلي',
+            badSector.status === 400 && mismatch.status === 400 && codeSnapshot('1401103').registry === 0 && codeSnapshot('1401103').participation.length === 0,
+            JSON.stringify({ badSector: badSector.status, mismatch: mismatch.status }));
 
     } finally {
         server.kill();

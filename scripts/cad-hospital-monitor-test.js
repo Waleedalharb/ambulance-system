@@ -103,7 +103,9 @@ function serviceSuite() {
 
     // رحلة B تغدو قديمة (آخر مشاهدة قبل > 30د) ← ongoing لا يُحسب حتى لو بقيت «حالية»
     const sum3 = svc2.summarize(Date.parse('2026-08-27T14:00:00Z'), null, { '1318241:2532116': { dwellMin: 20, ongoing: true } }, Date.parse('2026-08-27T16:30:00Z'));
-    check('أ24 حالة حالية لكن قديمة (>30د بلا مشاهدة) ← لا ongoing (اختفت من القائمة)', sum3.ongoing === 0 && sum3.currentAtHospital === 0 && sum3.lastKnownOnly === 2);
+    check('أ24 حالة حالية لكن قديمة (>30د بلا مشاهدة) ← monitoring-lost بلا ongoing',
+        sum3.ongoing === 0 && sum3.currentAtHospital === 0 && sum3.monitoringLost === 1 && sum3.lastKnownOnly === 1,
+        JSON.stringify({ ongoing: sum3.ongoing, current: sum3.currentAtHospital, lost: sum3.monitoringLost, lastKnown: sum3.lastKnownOnly }));
 
     // إعادة فتح موثقة: CAD أعاد اسماً لنفس الرحلة بعد الإغلاق
     const rr = svc2.applySighting({ eventId: '1318299', unitId: 1461, runUnitId: null, unitCode: 'جنوب 6 - 2', hospitalName: 'مستشفى A', southTeam: 'جنوب 6' }, '2026-08-27T15:20:00.000Z');
@@ -176,6 +178,7 @@ async function overlaySuite() {
     ctx.XMLHttpRequest.prototype = {};
     ctx.globalThis = ctx;
     vm.createContext(ctx);
+    vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'public', 'js', 'operational-team-code.js'), 'utf8'), ctx, { filename: 'operational-team-code.js' });
     vm.runInContext(fs.readFileSync(OVERLAY_SRC, 'utf8'), ctx, { filename: 'cad-overlay.js' });
     const drain = async () => { for (let i = 0; i < 6; i++) await new Promise(r => setTimeout(r, 5)); };
     const LIST_URL = CAD + '/dispatch-manager/api/cfs/v2/response-coordinator/incident-list?page=1';
@@ -184,13 +187,14 @@ async function overlaySuite() {
 
     await ctx.window.fetch(LIST_URL);
     await drain();
-    check('ب1 مشاهدة واحدة فقط أُرسلت (null وبلا-هوية وخارج-القطاع لم تُرسل)', sightings().length === 1,
+    check('ب1 مشاهدة جنوب واحدة فقط (null وبلا-هوية والقطاعات الأخرى محجوبة)', sightings().length === 1,
         'sightings=' + sightings().length);
     const p0 = sightings()[0] && sightings()[0].payload;
     check('ب2 الحمولة تحمل الهوية الثابتة والاسم والخطوة (للتتبع فقط)',
         !!p0 && p0.eventId === '1318241' && p0.unitId === '1467' && p0.runUnitId === '2532116' &&
         p0.hospitalName === 'DR Sulaiman Al Habib - Al Suwaidi' && p0.journeyStepCode === 'HANDOVER' && !!p0.observedAt);
-    check('ب2ب فلتر القطاع: الحمولة تحمل southTeam=«جنوب 9» (مصدر الحقيقة mapToSouthTeam)', p0 && p0.southTeam === 'جنوب 9');
+    check('ب2ب الحمولة تحمل الاسم الداخلي «جنوب 9» دون تغيير', p0 && p0.southTeam === 'جنوب 9');
+    check('ب2ج فرقة الوسط القديمة لا تدخل نسخة الجنوب', !sightings().some(item => item.payload.southTeam === 'وسط 1'));
 
     await ctx.window.fetch(LIST_URL); // لقطة مكررة بنفس القيم
     await drain();

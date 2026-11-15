@@ -109,7 +109,10 @@ vm.createContext(ctx);
 const drain = async () => { for (let i = 0; i < 6; i++) await new Promise(r => setTimeout(r, 5)); };
 const cadReportMsgs = () => messages.filter(m => m.kind === 'cad-report' && m.payload && m.payload.number === INC);
 const lifeEvents = (kind) => (ctx.window.__southLife ? ctx.window.__southLife.events : []).filter(e => e.kind === kind);
-function loadOverlay() { vm.runInContext(fs.readFileSync(OVERLAY_SRC, 'utf8'), ctx, { filename: 'cad-overlay.js' }); }
+function loadOverlay() {
+    vm.runInContext(fs.readFileSync(path.join(ROOT, 'public', 'js', 'operational-team-code.js'), 'utf8'), ctx, { filename: 'operational-team-code.js' });
+    vm.runInContext(fs.readFileSync(OVERLAY_SRC, 'utf8'), ctx, { filename: 'cad-overlay.js' });
+}
 function listSnapshot() {
     // واقعيًا: وحدات الخطة لا تصل lastJourneys إطلاقًا (مثبت بالرصد) — الفعليتان فقط
     ctx.window.__southHandleCadResponse(CAD + '/dispatch-manager/api/cfs/v2/operation-controller/incident-list?page=1', {
@@ -121,7 +124,7 @@ async function cycle() { await ctx.window.__southObsTick(); await drain(); await
 async function overlaySection() {
     console.log('🧪 القسم أ — Overlay: الفلتر الدلالي لوحدات الخطة\n');
     loadOverlay();
-    check('A0 ختم البناء الجديد 2026-08-27.d ظاهر', /2026-08-27\.d/.test(ctx.window.__southBuild || ''));
+    check('A0 ختم البناء الجديد 2026-11-15.c ظاهر', /2026-11-15\.c/.test(ctx.window.__southBuild || ''));
 
     listSnapshot(); await drain(); await drain();
     locationObj.href = CAD + '/incidents/' + INC;

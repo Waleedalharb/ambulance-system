@@ -2,9 +2,9 @@
   "manifest_version": 3,
   "name": "منصة الجنوب — تسجيل بلاغات CAD",
   "version": "2.0.0",
-  "description": "تسجيل بلاغات CAD في منصة الجنوب بضغطة واحدة — قراءة فقط، مراقبة سلبية، بلا استخراج جلسات وبلا طلبات إضافية إلى CAD. مفتاح التكامل في خلفية الإضافة فقط (خارج سياق الصفحة).",
+  "description": "تسجيل بلاغات CAD للقطاع 3 فقط — قراءة فقط ومراقبة سلبية، مع منع فرق القطاعات الأخرى قبل الإرسال. مفتاح التكامل في خلفية الإضافة فقط.",
   "host_permissions": [
-    "https://emsoperations.online/*"
+    "http://localhost:3002/*"
   ],
   "background": {
     "service_worker": "background.js"
@@ -32,7 +32,7 @@
     },
     {
       "matches": [
-        "https://emsoperations.online/*"
+        "http://localhost/*"
       ],
       "js": [
         "platform-marker.js"
