@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#070B14">
+  <title>مركز قيادة قائد المنطقة</title>
+  <link rel="icon" href="/favicon.ico">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/region-command.css?v=2">
+  <link rel="stylesheet" href="/css/region-command-dashboard.css?v=1">
+  <script src="/js/core/core-auth.js" defer></script>
+  <script src="/js/operational-team-code.js?v=1" defer></script>
+  <script src="/js/region-command-api.js?v=1" defer></script>
+  <script src="/js/region-command-views.js?v=3" defer></script>
+  <script src="/js/region-command-realtime.js?v=1" defer></script>
+  <script src="/js/region-command.js?v=3" defer></script>
+</head>
+<body>
+  <a class="rc-skip" href="#mainContent">تجاوز إلى المحتوى</a>
+  <header class="rc-header">
+    <div class="rc-brand">
+      <span class="rc-brand-mark" aria-hidden="true"><span></span></span>
+      <div><h1>مركز قيادة قائد المنطقة</h1><p>الصورة التشغيلية الموحدة · قراءة فقط</p></div>
+    </div>
+    <nav class="rc-header-actions" aria-label="التنقل الرئيسي">
+      <span class="rc-connection" id="connectionStatus" data-state="connecting"><span></span> جارٍ الاتصال</span>
+      <button class="rc-icon-button" type="button" data-action="theme" aria-label="تبديل الوضع الداكن والفاتح" title="تبديل المظهر">◐</button>
+      <a class="rc-button rc-button-primary" href="/region-map.html">العرض الجغرافي <span aria-hidden="true">↗</span></a>
+      <a class="rc-button rc-button-quiet" href="/">المنصة الرئيسية</a>
+    </nav>
+  </header>
+
+  <main class="rc-main" id="mainContent">
+    <div class="rc-page-heading">
+      <div><span class="rc-eyebrow" id="pageEyebrow">غرفة القيادة / الوضع الحالي</span><h2 id="pageTitle">الصورة التشغيلية في لقطة واحدة</h2><p id="scopeDescription">جارٍ تحميل نطاق الوصول المعتمد…</p><p id="detailShift" hidden>—</p></div>
+      <div class="rc-heading-context"><span class="rc-environment-banner">قراءة تشغيلية من لقطة المصدر الحالية</span><div class="rc-heading-meta"><span id="lastUpdated">—</span><button class="rc-button rc-button-quiet" id="refreshButton" type="button">تحديث البيانات</button><button class="rc-button rc-button-quiet" id="closeDetail" type="button" hidden>العودة إلى الصورة الإقليمية</button></div></div>
+    </div>
+
+    <section class="rc-alert" id="globalError" role="alert" hidden></section>
+    <section class="rc-quality-banner" id="qualityBanner" aria-live="polite" hidden></section>
+
+    <section class="rc-status-section rc-overview-only" aria-labelledby="regionMetricsTitle">
+      <div class="rc-section-heading" hidden><h3 id="regionMetricsTitle">قراءة الحالة العامة</h3></div>
+      <div class="rc-metric-grid" id="regionMetrics" aria-busy="true"></div>
+    </section>
+
+    <div class="rc-dashboard-grid rc-overview-only">
+      <section class="rc-panel rc-sectors-panel" aria-labelledby="sectorsTitle">
+        <div class="rc-panel-header"><div><span class="rc-eyebrow">مقارنة مباشرة</span><h3 id="sectorsTitle">القطاعات الخمسة: أين توجد الفروقات؟</h3></div><span class="rc-count-chip rc-quality-chip" id="sectorCount">—</span></div>
+        <p class="rc-panel-intro">مقارنة قيم المصدر مباشرة — لا توجد درجة ضغط أو تغطية تشغيلية مركبة.</p>
+        <div class="rc-sector-columns" aria-hidden="true"><span>زمن الوصول</span><span>البلاغات</span><span>المركبات</span><span>الكادر</span><span>الجاهزية</span><span>القطاع / الجودة</span></div>
+        <div class="rc-sector-list" id="sectorList" aria-busy="true"></div>
+      </section>
+
+      <section class="rc-panel rc-decision-panel" aria-labelledby="decisionTitle">
+        <div class="rc-panel-header"><div><span class="rc-eyebrow">مراجعة محايدة</span><h3 id="decisionTitle">مركز المتابعة والقرار</h3></div><span class="rc-count-chip" id="decisionCount">—</span></div>
+        <p class="rc-panel-intro">عناصر <span dir="ltr">needs_review</span> المستخرجة من القواعد المعتمدة فقط؛ لا أولوية أو درجة مخاطرة.</p>
+        <div class="rc-decision-list" id="decisionList" aria-busy="true"></div>
+        <button class="rc-button rc-button-quiet rc-full-width" id="decisionMore" type="button" hidden>عرض المزيد</button>
+        <details class="rc-filter-disclosure"><summary>تصفية حسب القطاع والفئة</summary><div class="rc-filters">
+          <label>القطاع<select id="decisionSector"><option value="">كل القطاعات المخولة</option></select></label>
+          <label>الفئة<select id="decisionCategory"><option value="">كل الفئات</option><option value="staffing">القوى</option><option value="vehicles">المركبات</option><option value="data_quality">جودة البيانات</option></select></label>
+        </div></details>
+        <details class="rc-source-details" id="sourceDetails" open>
+          <summary>سلامة مصادر القراءة <span id="sourceReadCount">—</span></summary>
+          <div id="sourceMetaList" class="rc-source-meta-list"></div>
+        </details>
+      </section>
+    </div>
+
+    <section class="rc-trend-placeholder rc-overview-only" aria-labelledby="trendTitle">
+      <div><span class="rc-eyebrow">الاتجاه الزمني</span><h3 id="trendTitle">غير مفعّل في العرض الحالي</h3></div>
+      <div><strong>لا تتوفر سلسلة زمنية معتمدة؛ العرض الحالي <span dir="ltr">current</span> فقط.</strong><p>يظهر الرسم بعد توفر قراءات تاريخية كافية. لا تُستنتج اتجاهات من لقطة واحدة، ولا تُعرض القيم الناقصة كصفر.</p></div>
+    </section>
+
+    <section class="rc-detail-panel" id="sectorDetail" aria-labelledby="detailTitle" hidden>
+      <div id="detailError" class="rc-alert" role="alert" hidden></div>
+      <div id="detailContent">
+        <div class="rc-detail-band">
+          <div class="rc-detail-identity"><h3 id="detailTitle">—</h3><span id="detailStatus"></span><span class="rc-detail-review-count" id="detailDecisionCount">—</span></div>
+          <div class="rc-metric-grid rc-metric-grid-detail" id="detailMetrics"></div>
+        </div>
+        <div class="rc-detail-workspace">
+          <dialog class="rc-dialog rc-embedded-evidence" id="evidenceDialog" aria-labelledby="evidenceTitle">
+            <div class="rc-dialog-header"><div><span class="rc-eyebrow">المصدر والدليل</span><h3 id="evidenceTitle">دليل المؤشر</h3></div><button class="rc-icon-button" id="closeEvidence" type="button" aria-label="إغلاق">×</button></div>
+            <div id="evidenceBody" class="rc-dialog-body"></div>
+          </dialog>
+          <div class="rc-detail-data rc-panel">
+            <div class="rc-detail-review" aria-labelledby="detailReviewTitle">
+              <div class="rc-detail-review-head"><div><span class="rc-eyebrow">الانتقال التدريجي</span><h4 id="detailReviewTitle">ما الذي يحتاج متابعة في هذا القطاع؟</h4></div></div>
+              <p>اختيار العنصر يعرض سببه ودليله؛ وفتح الكيان ينقل إلى التبويب المناسب دون إجراء تنفيذي.</p>
+              <div class="rc-decision-list" id="detailDecisionList"></div>
+            </div>
+            <div class="rc-tabs" role="tablist" aria-label="بيانات القطاع">
+              <button type="button" role="tab" data-tab="teams" aria-selected="true">الفرق</button>
+              <button type="button" role="tab" data-tab="vehicles" aria-selected="false">المركبات</button>
+              <button type="button" role="tab" data-tab="incidents" aria-selected="false">البلاغات</button>
+              <button type="button" role="tab" data-tab="ledger" id="ledgerTab" aria-selected="false" hidden>السجل القيادي</button>
+            </div>
+            <div class="rc-tab-panel" id="teamsPanel" role="tabpanel"><h4 class="rc-tab-title">الفرق في المناوبة الحالية</h4><div id="teamList" class="rc-table-wrap"></div><p class="rc-table-source-note" id="teamSourceNote"></p></div>
+            <div class="rc-tab-panel" id="vehiclesPanel" role="tabpanel" hidden><h4 class="rc-tab-title">المركبات المرتبطة بالقطاع</h4><div id="vehicleList" class="rc-table-wrap"></div></div>
+            <div class="rc-tab-panel" id="incidentsPanel" role="tabpanel" hidden><h4 class="rc-tab-title">البلاغات المرتبطة بالقطاع</h4><div id="incidentList" class="rc-table-wrap"></div></div>
+            <div class="rc-tab-panel" id="ledgerPanel" role="tabpanel" hidden>
+              <div class="rc-filters rc-ledger-filters"><label>نوع الحدث<select id="ledgerEventType"><option value="">كل الأحداث</option><option value="viewed">اطلاع</option><option value="hierarchy_changed">تغيير الهيكل</option><option value="scope_changed">تغيير النطاق</option></select></label><span>السجل للقراءة والتحقق فقط؛ لا يحمل أي أثر إقرار من الواجهة.</span></div>
+              <div id="ledgerList" class="rc-ledger-list"></div>
+              <button class="rc-button rc-button-quiet" id="ledgerMore" type="button" hidden>الأحداث الأقدم</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <footer class="rc-dashboard-footer">المصدر: خدمات EMS المالكة عبر واجهات مركز القيادة · البلاغات اليدوية غير مشمولة في مصفوفة CAD · جميع المسارات للقراءة والدليل فقط</footer>
+  </main>
+  <div class="rc-sr-only" id="liveAnnouncer" aria-live="polite"></div>
+</body>
+</html>

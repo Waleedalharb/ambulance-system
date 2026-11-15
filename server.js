@@ -54,6 +54,7 @@ let vehicleEventsService = null; // W1-A: المصدر الرسمي الوحيد
 let rosterSyncService = null; // SR-2: المزامنة الوحيدة الجدولة ← employees + shift_roster (SSOT)
 let scheduleMetricsService = null; // Phase 2: مؤشرات الساعات الشهرية (اشتقاق حي، بلا عدادات مخزنة)
 let workflowService = null; // WF-1: سير العمل الرسمي — منظومة مستقلة، قراءة فقط من التكميل
+let regionCommandEventBridge = null; // جسر أحداث قراءة إقليمي موجه بالنطاق الحالي
 
 // Set timezone to Saudi Arabia (Riyadh)
 process.env.TZ = 'Asia/Riyadh';
@@ -480,6 +481,20 @@ function broadcast(data) {
     // المحرك (vehicles_updated / shift_roster_updated). الإيقاظ رخيص (debounce)
     // وبصمة الذاكرة تكفل الصمت ما لم يتغيّر المعنى — والوعي لا يكسر البث إطلاقًا.
     try { smartAwarenessService.notifyLegacyBroadcast(data); } catch (_) { /* صمت */ }
+    // حدث إقليمي إضافي موجه فقط؛ لا يغير حمولة broadcastSSE الحالية ولا فشله يؤثر فيها.
+    const regionDomains = {
+        new_report: 'incidents', report_undone: 'incidents',
+        staffing_events_updated: 'staffing', completion_updated: 'staffing', team_status_changed: 'staffing',
+        vehicles_updated: 'vehicles', positioning_updated: 'deployments',
+        shift_started: 'shifts', shift_updated: 'shifts', shift_ended: 'shifts',
+        shift_archived: 'shifts', shift_deleted: 'shifts'
+    };
+    if (regionCommandEventBridge && regionDomains[data && data.type]) {
+        regionCommandEventBridge.afterOperationalCommit({
+            domain: regionDomains[data.type], entity: data,
+            sourceVersion: data.event_id || data.eventId || data.shiftId || data.shift_id || null
+        }).catch(() => { /* الجسر يفشل صامتًا ولا يكسر المعاملة الأصلية */ });
+    }
 }
 
 // Helper: broadcast to conversation PARTICIPANTS only (DB-backed).
@@ -7692,6 +7707,7 @@ function cadIntegrationAuth(req, res, next) {
 }
 const CAD_NUMBER_RE = /^\d{4,12}$/;
 const CAD_VALID_TYPES = ['medical', 'traffic', 'injury', 'fire', 'other'];
+const OperationalTeamCode = require('./public/js/operational-team-code');
 
 app.get('/api/cad-reports', authenticate, async (req, res) => {
     try {
@@ -7829,10 +7845,14 @@ app.get('/api/cad-reports/south-teams', cadIntegrationAuth, (req, res, next) => 
         if (!opsEngine || !staffingEventsService) return res.status(503).json({ error: 'Engine unavailable' });
         const shiftId = await opsEngine.shifts.resolveShiftId(req);
         if (!shiftId) return res.json({ success: true, teams: [] });
-        const state = await staffingEventsService.getState(shiftId);
+        const [state, shift] = await Promise.all([
+            staffingEventsService.getState(shiftId),
+            opsEngine.storage.getShiftById(shiftId)
+        ]);
         const teamsObj = (state && state.teams) || {};
         const teams = Object.keys(teamsObj).map(name => ({
-            name, status: teamsObj[name] && teamsObj[name].status || null
+            ...OperationalTeamCode.identityFields(name, shift && shift.shift_type),
+            status: teamsObj[name] && teamsObj[name].status || null
         })).sort((a, b) => a.name.localeCompare(b.name, 'ar'));
         res.json({ success: true, teams });
     } catch (error) {
@@ -8212,13 +8232,35 @@ app.post('/api/cad-reports', cadIntegrationAuth, (req, res, next) => {
         // A=مقبولة B=ملغاة(aborted) C=ملغاة(cancelled) R=مرفوضة — قابلة للتمديد بإضافة
         // حرف هنا فقط. القيمة غير المعروفة تُهمَل (undefined) ← لا تخمين ولا تغيير سلوك
         const CAD_VALID_URS = ['A', 'B', 'C', 'R'];
-        const cleanCrews = (crews || [])
-            .filter(c => c && typeof c.team === 'string' && c.team.trim())
+        // دليل R-القطاع-[النوع-]المناوبة-الفرقة هوية عرض مشتقة. نطبّعه إلى
+        // الاسم الداخلي قبل أي مطابقة؛ لا يتغير أي مفتاح CAD أو ربط تاريخي.
+        const normalizedCrews = [];
+        for (const raw of (crews || [])) {
+            if (!raw || typeof raw.team !== 'string' || !raw.team.trim()) continue;
+            let team = raw.team.trim();
+            const fromTeam = OperationalTeamCode.parseOperationalTeamCode(team);
+            if (/^R-/i.test(team) && !fromTeam)
+                return res.status(400).json({ error: 'رمز الفرقة التشغيلي غير صالح؛ الصيغة المعتمدة R-القطاع-[النوع-]المناوبة-الفرقة' });
+            const suppliedCode = raw.operationalCode == null || raw.operationalCode === '' ? null : String(raw.operationalCode).trim();
+            const fromCode = suppliedCode ? OperationalTeamCode.parseOperationalTeamCode(suppliedCode) : null;
+            if (suppliedCode && !fromCode)
+                return res.status(400).json({ error: 'حقل operationalCode يحمل رمزًا غير صالح' });
+            if (fromTeam) team = fromTeam.teamName;
+            const coded = fromCode || fromTeam;
+            if (coded) {
+                const internal = OperationalTeamCode.identityFromTeamName(team, coded.shiftType);
+                if (!internal || internal.teamName !== coded.teamName)
+                    return res.status(400).json({ error: 'رمز الفرقة لا يطابق اسم الفرقة الداخلي' });
+            }
+            normalizedCrews.push({ ...raw, team, operationalCode: coded ? coded.operationalCode : undefined });
+        }
+        const cleanCrews = normalizedCrews
             .slice(0, 10)
             .map(c => {
                 const urs = String(c.cadUrs || '').trim().toUpperCase();
                 const uid = parseInt(c.cadUnitId, 10), rid = parseInt(c.cadRunUnitId, 10);
-                return { team: c.team.trim().slice(0, 100), phases: (c.phases && typeof c.phases === 'object') ? c.phases : {},
+                return { team: c.team.trim().slice(0, 100), operationalCode: c.operationalCode,
+                         phases: (c.phases && typeof c.phases === 'object') ? c.phases : {},
                          // مصدر الأزمنة (قرار المالك 2026-08-23): cad-detail = من journeys
                          // الوحدة نفسها ← تصحيح بالاستبدال؛ غيرها ← استكمال الفراغات فقط
                          phasesSource: c.phasesSource === 'cad-detail' ? 'cad-detail' : undefined,
@@ -17855,6 +17897,37 @@ app.put('/api/chat/conversations/:id/leave', authenticate, async (req, res) => {
     }
 });
 
+// مركز قيادة قائد المنطقة — Router قراءة مستقل وكسول التركيب.
+// لا تُنشأ خدماته قبل تهيئة مصادر الحقيقة، ولا يتجاوز authenticate/authorizePerm.
+let regionCommandServices = null;
+function getRegionCommandServices() {
+    if (!db) throw new Error('Region Command database unavailable');
+    if (!regionCommandServices) {
+        const RegionScopeService = require('./services/region-scope-service');
+        const RegionCommandReadService = require('./services/region-command-read-service');
+        const RegionDecisionCenterService = require('./services/region-decision-center-service');
+        const SectorCommandLedgerService = require('./services/sector-command-ledger-service');
+        const scopeService = new RegionScopeService({ db, permissionService: getPermissionService() });
+        const readService = new RegionCommandReadService({
+            scopeService,
+            staffingService: staffingEventsService,
+            vehicleService: vehicleEventsService,
+            reportService,
+            centersGeoService: getCentersGeoService(),
+            getActiveShift: async () => opsEngine && opsEngine.shifts ? opsEngine.shifts.getActiveShift() : null
+        });
+        const decisionCenter = new RegionDecisionCenterService({ readService, scopeService });
+        const ledgerService = new SectorCommandLedgerService({ db, scopeService });
+        regionCommandServices = { scopeService, readService, decisionCenter, ledgerService, permissionService: getPermissionService() };
+    }
+    return regionCommandServices;
+}
+const createRegionCommandRouter = require('./routes/region-command-routes');
+app.use('/api/region-command', createRegionCommandRouter({
+    authenticate, authorizePerm, getServices: getRegionCommandServices,
+    isEnabled: () => process.env.REGION_COMMAND_ENABLED === 'true'
+}));
+
 // 404 handler
 app.use((req, res) => {
     res.status(404).json({ error: 'المسار غير موجود' });
@@ -17884,6 +17957,15 @@ initWebSocket(server);
 // تثبيت ثنائي SQLite باستخدام Node الفعلي نفسه قبل فتح القاعدة.
 // يعمل حتى لو كانت خدمة Render تبدأ بـ node server.js مباشرة، ولا يلمس /data.
 function ensureSqliteNativeCompatibility() {
+    // لا نستبدل ثنائيًا سليمًا؛ الفحص يمنع EBUSY عندما يكون SQLite مستخدمًا
+    // بالفعل في عملية اختبار أبوية، ويُبقي الإصلاح الإجباري عند عدم التوافق.
+    try {
+        const Database = require('better-sqlite3');
+        const probe = new Database(':memory:');
+        probe.prepare('SELECT 1').get();
+        probe.close();
+        return;
+    } catch (_) { /* الثنائي الحالي غير صالح؛ نكمل إلى prebuild-install */ }
     const betterSqliteDir = path.join(__dirname, 'node_modules', 'better-sqlite3');
     const prebuildInstall = path.join(betterSqliteDir, '..', 'prebuild-install', 'bin.js');
     require('child_process').execFileSync(process.execPath, [prebuildInstall], {
@@ -18189,6 +18271,24 @@ server.listen(PORT, async () => {
             scheduleMetricsService = null;
             workflowService = null;
         }
+    }
+
+    // الجسر الإقليمي يبدأ بعد اكتمال مصادر الحقيقة، ويظل معطلًا افتراضيًا بالعلم.
+    try {
+        if (process.env.REGION_COMMAND_ENABLED === 'true' && db) {
+            const RegionCommandEventBridge = require('./services/region-command-event-bridge');
+            const regionServices = getRegionCommandServices();
+            regionCommandEventBridge = new RegionCommandEventBridge({
+                db,
+                scopeService: regionServices.scopeService,
+                permissionService: regionServices.permissionService,
+                getClients: () => sseClients
+            });
+            console.log('✅ Region Command scoped event bridge wired');
+        }
+    } catch (regionBridgeError) {
+        regionCommandEventBridge = null;
+        console.error('⚠️ Region Command event bridge unavailable:', regionBridgeError.message);
     }
     
     // Initialize RAG Engine

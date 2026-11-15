@@ -5394,6 +5394,13 @@ async function init(runMigration = false) {
   await openDb();
   await initTables();
   await runMigrations();
+  // مركز قيادة المنطقة: مخطط إضافي مستقل، معطل افتراضيًا ولا يعمل إلا
+  // عند تفعيل الميزة صراحة في البيئة المعزولة. لا DROP ولا تعديل للجداول القائمة.
+  if (process.env.REGION_COMMAND_ENABLED === 'true') {
+    const regionCommandSchema = fsSync.readFileSync(path.join(__dirname, 'deploy', 'region-command-phase-1-schema.sql'), 'utf8');
+    db.exec(regionCommandSchema);
+    logger.info('Region Command additive schema verified');
+  }
   if (runMigration) {
     await migrateAll();
   }

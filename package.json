@@ -9,9 +9,11 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node scripts/dev-server.js",
+    "test:region-command-browser": "node scripts/region-command-browser-check.js",
     "backup": "node scripts/backup.js backup",
     "backup-list": "node scripts/backup.js list",
-    "backup-cleanup": "node scripts/backup.js cleanup"
+    "backup-cleanup": "node scripts/backup.js cleanup",
+    "test:region-command": "node scripts/verify-region-command-phase-1.js"
   },
   "keywords": [
     "ambulance",

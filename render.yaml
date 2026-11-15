@@ -18,6 +18,8 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      - key: REGION_COMMAND_ENABLED
+        value: 'true'
       - key: NODE_VERSION
         value: 22.14.0
       - key: PORT
