@@ -41,7 +41,7 @@ test('bootstrap creates only Riyadh sectors and derives center links from real t
   addTeam(db, 'غير معروف 1', 'مركز آخر');
 
   // واجهة db.js الإنتاجية تصدّر tx ولا تصدّر handle الداخلي hdl.
-  const result = await bootstrapRegionCommandProduction({ tx: db.tx }, { userId: USER_ID, account: { id: USER_ID, role: 'admin', isActive: true }, now });
+  const result = await bootstrapRegionCommandProduction({ tx: db.tx }, { userId: USER_ID, account: { id: USER_ID, role: 'admin', isActive: 1 }, now });
   assert.equal(result.regionId, 'REGION-RIYADH');
   assert.equal(result.linkedCenters, 2);
   assert.deepEqual(result.centerCounts, { 1: 0, 2: 1, 3: 1, 4: 0, 5: 0 });
