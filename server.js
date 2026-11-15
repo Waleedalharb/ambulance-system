@@ -75,6 +75,12 @@ console.log('AI Provider Config:', {
     geminiKeySet: !!process.env.GEMINI_API_KEY
 });
 
+// التفعيل معتمد للإنتاج. بعض خدمات Render القائمة لا تزامن envVars من
+// render.yaml تلقائيًا؛ القيمة الصريحة false تبقى قادرة على التعطيل.
+if (process.env.NODE_ENV === 'production' && process.env.REGION_COMMAND_ENABLED === undefined) {
+    process.env.REGION_COMMAND_ENABLED = 'true';
+}
+
 // SQLite Database Module (optional — falls back to JSON if unavailable)
 let db = null;
 let dbLoadError = null;
@@ -1274,7 +1280,8 @@ app.get('/health', (req, res) => {
         // تشخيص مؤقت معتمد: يعرض سبب فشل تحميل SQLite دون أي كتابة في القاعدة.
         database: {
             loaded: !!db,
-            loadError: dbLoadError
+            loadError: dbLoadError,
+            regionCommandEnabled: process.env.REGION_COMMAND_ENABLED === 'true'
         },
         // إثبات التخزين الدائم: المسار الفعلي + اختبار كتابة حقيقي (يكشف غياب قرص Render)
         storageProof: (() => {
@@ -17996,13 +18003,17 @@ async function initDatabase() {
     }
     try {
         ensureSqliteNativeCompatibility();
-        if (process.env.REGION_COMMAND_ENABLED === 'true' && process.env.REGION_COMMAND_PRE_DEPLOY_BACKUP === 'true') {
+        const fsSync = require('fs');
+        const backupMarker = path.join(STORAGE_PATH, 'backups', 'region-command-phase-1-backup-complete.json');
+        const needsFirstRegionBackup = process.env.NODE_ENV === 'production' && !fsSync.existsSync(backupMarker);
+        if (process.env.REGION_COMMAND_ENABLED === 'true' && (process.env.REGION_COMMAND_PRE_DEPLOY_BACKUP === 'true' || needsFirstRegionBackup)) {
             console.log('📸 Creating consistent backup before Region Command schema verification...');
             require('child_process').execFileSync(process.execPath, [path.join(__dirname, 'scripts', 'backup.js'), 'backup'], {
                 cwd: __dirname,
                 stdio: 'inherit',
                 timeout: 300000
             });
+            fsSync.writeFileSync(backupMarker, JSON.stringify({ completedAt: new Date().toISOString() }));
         }
         console.log('🗄️ Initializing SQLite database...');
         await db.init(true); // init + migrate
