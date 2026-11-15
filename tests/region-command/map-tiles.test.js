@@ -34,6 +34,9 @@ test('CARTO remains the safe fallback when Mapbox is absent or invalid', () => {
     const forcedCarto = tiles.getConfig({ provider: 'carto' });
     assert.match(forcedCarto.url, /basemaps\.cartocdn\.com\/light_all/);
     assert.ok(forcedCarto.url.endsWith('?key=cb1.test_key-123'));
+    const darkCarto = tiles.getConfig({ provider: 'carto', style: 'dark' });
+    assert.match(darkCarto.url, /basemaps\.cartocdn\.com\/dark_all/);
+    assert.ok(darkCarto.url.endsWith('?key=cb1.test_key-123'));
   } finally {
     restoreGlobal('SMAP_MAP_CONFIG', previous);
   }

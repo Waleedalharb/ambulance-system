@@ -78,8 +78,9 @@
   function setTiles() {
     if (!state.map) return;
     if (state.tile) state.map.removeLayer(state.tile);
-    // تثبيت تكوين R-03/R-05 البصري المعتمد؛ Mapbox light-v11 يغيّر الألوان تحت الفلتر الليلي.
-    state.tile = EmsMapTiles.addLeafletTiles(state.map, { provider: 'carto' });
+    // CARTO الليلي الأصلي يُبقي الطرق والأسماء مقروءة؛ الفاتح يحتفظ بتكوين R-05.
+    var style = document.documentElement.dataset.theme === 'light' ? 'light' : 'dark';
+    state.tile = EmsMapTiles.addLeafletTiles(state.map, { provider: 'carto', style: style });
   }
   function renderSectorStrip() {
     var container = id('mapSectorList');
@@ -650,7 +651,7 @@
   function applyBrightness() {
     var value = Math.max(55, Math.min(125, Number(id('mapBrightness').value) || 100));
     document.documentElement.style.setProperty('--rc-map-brightness', String(value / 100));
-    document.documentElement.style.setProperty('--rc-map-dark-brightness', String(value / 100 * .58));
+    document.documentElement.style.setProperty('--rc-map-dark-brightness', String(value / 100 * .9));
     id('mapBrightnessValue').textContent = value + '٪';
     try { localStorage.setItem('regionCommandMapBrightness', String(value)); } catch (_) { /* تفضيل عرض فقط */ }
   }
