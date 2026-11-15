@@ -78,7 +78,7 @@
   function setTiles() {
     if (!state.map) return;
     if (state.tile) state.map.removeLayer(state.tile);
-    state.tile = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    state.tile = L.tileLayer('https://tile.openstreetmap.de/{z}/{x}/{y}.png', {
       attribution: '&copy; OpenStreetMap contributors', maxZoom: 19
     }).addTo(state.map);
   }
