@@ -1,7 +1,7 @@
 /* R-03 / R-05: التكوين الجغرافي المعتمد، بلا تغيير في محرك Leaflet أو مصادره. */
 :root {
   --rc-map-brightness: 1;
-  --rc-map-dark-brightness: .9;
+  --rc-map-dark-brightness: .58;
   --rc-map-glass: rgba(5, 17, 29, .88);
   --rc-map-cyan: #22D3EE;
 }
@@ -195,7 +195,7 @@ html[data-theme="light"] .rc-map-page {
 .rc-map-floating-error, .rc-map-floating-quality { position: fixed; inset-block-start: 14px; left: 60px; z-index: 3000; width: min(540px, calc(100vw - 80px)); }
 .rc-map-regional-metrics { display: none; }
 .rc-map-toolbar, .rc-layer-control { right: auto; }
-[data-theme="dark"] #regionMap .leaflet-tile { filter: brightness(var(--rc-map-dark-brightness)) saturate(.85) contrast(1.05); }
+[data-theme="dark"] #regionMap .leaflet-tile { filter: invert(1) hue-rotate(180deg) sepia(.28) hue-rotate(190deg) saturate(.85) contrast(1.12) brightness(var(--rc-map-dark-brightness)); }
 [data-theme="light"] #regionMap .leaflet-tile { filter: brightness(var(--rc-map-brightness)) saturate(.68) contrast(.92); }
 .leaflet-control-zoom { margin-inline-start: 14px !important; }
 
