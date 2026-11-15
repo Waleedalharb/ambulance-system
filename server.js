@@ -17996,6 +17996,14 @@ async function initDatabase() {
     }
     try {
         ensureSqliteNativeCompatibility();
+        if (process.env.REGION_COMMAND_ENABLED === 'true' && process.env.REGION_COMMAND_PRE_DEPLOY_BACKUP === 'true') {
+            console.log('📸 Creating consistent backup before Region Command schema verification...');
+            require('child_process').execFileSync(process.execPath, [path.join(__dirname, 'scripts', 'backup.js'), 'backup'], {
+                cwd: __dirname,
+                stdio: 'inherit',
+                timeout: 300000
+            });
+        }
         console.log('🗄️ Initializing SQLite database...');
         await db.init(true); // init + migrate
         console.log('✅ SQLite database ready');

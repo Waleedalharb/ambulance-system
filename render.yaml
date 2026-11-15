@@ -18,9 +18,11 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
-      # يبقى المخطط الإضافي معطلًا حتى نجاح قراءة القاعدة وأخذ نسخة احتياطية.
       - key: REGION_COMMAND_ENABLED
-        value: 'false'
+        value: 'true'
+      # نسخة متسقة لمرة واحدة قبل الترحيل؛ تُزال بعد نجاح التحقق الحي.
+      - key: REGION_COMMAND_PRE_DEPLOY_BACKUP
+        value: 'true'
       - key: NODE_VERSION
         value: 22.14.0
       - key: PORT
