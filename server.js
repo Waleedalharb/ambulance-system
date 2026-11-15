@@ -81,6 +81,9 @@ let dbLoadError = null;
 let opsService = null;
 
 try {
+    // يجب إصلاح الثنائي قبل تحميل db.js؛ الفحص يجري في عملية فرعية حتى
+    // لا يبقى ثنائي غير صالح محمّلًا في عملية الخادم بعد إعادة البناء.
+    ensureSqliteNativeCompatibility();
     db = require('./db.js');
     console.log('✅ SQLite module loaded successfully');
 } catch (err) {
@@ -17964,22 +17967,25 @@ initWebSocket(server);
 // تثبيت ثنائي SQLite باستخدام Node الفعلي نفسه قبل فتح القاعدة.
 // يعمل حتى لو كانت خدمة Render تبدأ بـ node server.js مباشرة، ولا يلمس /data.
 function ensureSqliteNativeCompatibility() {
-    // لا نستبدل ثنائيًا سليمًا؛ الفحص يمنع EBUSY عندما يكون SQLite مستخدمًا
-    // بالفعل في عملية اختبار أبوية، ويُبقي الإصلاح الإجباري عند عدم التوافق.
-    try {
-        const Database = require('better-sqlite3');
-        const probe = new Database(':memory:');
-        probe.prepare('SELECT 1').get();
-        probe.close();
-        return;
-    } catch (_) { /* الثنائي الحالي غير صالح؛ نكمل إلى prebuild-install */ }
-    const betterSqliteDir = path.join(__dirname, 'node_modules', 'better-sqlite3');
-    const prebuildInstall = path.join(betterSqliteDir, '..', 'prebuild-install', 'bin.js');
-    require('child_process').execFileSync(process.execPath, [prebuildInstall], {
-        cwd: betterSqliteDir,
-        stdio: 'inherit',
-        timeout: 120000
+    const childProcess = require('child_process');
+    const probeSource = "const Database=require('better-sqlite3');const db=new Database(':memory:');db.prepare('SELECT 1').get();db.close();";
+    const probe = () => childProcess.spawnSync(process.execPath, ['-e', probeSource], {
+        cwd: __dirname,
+        stdio: 'ignore',
+        timeout: 30000
     });
+    // الفحص في عملية فرعية: لا يتم تحميل أي ثنائي غير صالح في عملية الخادم.
+    if (probe().status === 0) return;
+    const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+    childProcess.execFileSync(npmCommand, ['rebuild', 'better-sqlite3', '--build-from-source'], {
+        cwd: __dirname,
+        stdio: 'inherit',
+        timeout: 240000
+    });
+    const verified = probe();
+    if (verified.status !== 0) {
+        throw new Error('تعذر تجهيز ثنائي SQLite المتوافق مع بيئة التشغيل');
+    }
 }
 
 // Initialize SQLite Database + Migrate JSON data
