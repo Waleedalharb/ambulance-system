@@ -150,7 +150,8 @@ function objects(dbPath, type) {
   const packageJson = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
   check('Render: Node 22 وnpm start وhealth والتخزين الدائم', /NODE_VERSION[\s\S]*?22\.14\.0/.test(render) && /startCommand: npm start/.test(render) && /healthCheckPath: \/health/.test(render) && /DB_PATH[\s\S]*?\/data\/ambulance\.db/.test(render) && /SCHEDULE_FILE[\s\S]*?\/data\/schedule-employees\.json/.test(render));
   check('Render: JWT سري ونشر تلقائي من main ولا cron/preDeploy غير صالح', /JWT_SECRET\s*\n\s*sync: false/.test(render) && /branch:\s*main/.test(render) && /autoDeployTrigger: ['"]?commit['"]?/.test(render) && !/^cronJobs:/m.test(render) && !/preDeployCommand:/.test(render));
-  check('SQLite: prestart يثبت الثنائي باستخدام Node الفعلي', packageJson.scripts.prestart === 'cd node_modules/better-sqlite3 && node ../prebuild-install/bin.js' && packageJson.scripts.start === 'node server.js');
+  const serverSource = fs.readFileSync(path.join(ROOT, 'server.js'), 'utf8');
+  check('SQLite: التهيئة تثبت الثنائي باستخدام Node الفعلي', /function ensureSqliteNativeCompatibility\(\)/.test(serverSource) && /execFileSync\(process\.execPath/.test(serverSource) && packageJson.scripts.start === 'node server.js');
 
   const summary = { passed: checks.length, failed: 0, checks, output: OUT, migrationBackup: applied.backup.path, fullBackup: archive, rollbackDatabase: rollbackDb, scope: 'synthetic isolated only; no production deployment or account/coverage changes', finishedAt: new Date().toISOString() };
   fs.writeFileSync(path.join(OUT, 'summary.json'), JSON.stringify(summary, null, 2) + '\n');

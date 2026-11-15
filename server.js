@@ -17888,6 +17888,18 @@ const server = require('http').createServer(app);
 // Initialize WebSocket on same HTTP server
 initWebSocket(server);
 
+// تثبيت ثنائي SQLite باستخدام Node الفعلي نفسه قبل فتح القاعدة.
+// يعمل حتى لو كانت خدمة Render تبدأ بـ node server.js مباشرة، ولا يلمس /data.
+function ensureSqliteNativeCompatibility() {
+    const betterSqliteDir = path.join(__dirname, 'node_modules', 'better-sqlite3');
+    const prebuildInstall = path.join(betterSqliteDir, '..', 'prebuild-install', 'bin.js');
+    require('child_process').execFileSync(process.execPath, [prebuildInstall], {
+        cwd: betterSqliteDir,
+        stdio: 'inherit',
+        timeout: 120000
+    });
+}
+
 // Initialize SQLite Database + Migrate JSON data
 async function initDatabase() {
     if (!db) {
@@ -17895,6 +17907,7 @@ async function initDatabase() {
         return;
     }
     try {
+        ensureSqliteNativeCompatibility();
         console.log('🗄️ Initializing SQLite database...');
         await db.init(true); // init + migrate
         console.log('✅ SQLite database ready');

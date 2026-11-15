@@ -7,7 +7,6 @@
     "node": ">=22 <23"
   },
   "scripts": {
-    "prestart": "cd node_modules/better-sqlite3 && node ../prebuild-install/bin.js",
     "start": "node server.js",
     "dev": "node scripts/dev-server.js",
     "backup": "node scripts/backup.js backup",
