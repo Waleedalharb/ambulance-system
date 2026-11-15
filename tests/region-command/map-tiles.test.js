@@ -30,6 +30,8 @@ test('CARTO remains the safe fallback when Mapbox is absent or invalid', () => {
     assert.match(tiles.getConfig().url, /basemaps\.cartocdn\.com\/light_all/);
     global.SMAP_MAP_CONFIG = { accessToken: 'sk.not-public' };
     assert.match(tiles.getConfig().url, /basemaps\.cartocdn\.com\/light_all/);
+    global.SMAP_MAP_CONFIG = { accessToken: 'pk.test_token-123' };
+    assert.match(tiles.getConfig({ provider: 'carto' }).url, /basemaps\.cartocdn\.com\/light_all/);
   } finally {
     restoreGlobal('SMAP_MAP_CONFIG', previous);
   }

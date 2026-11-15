@@ -78,7 +78,8 @@
   function setTiles() {
     if (!state.map) return;
     if (state.tile) state.map.removeLayer(state.tile);
-    state.tile = EmsMapTiles.addLeafletTiles(state.map);
+    // تثبيت تكوين R-03/R-05 البصري المعتمد؛ Mapbox light-v11 يغيّر الألوان تحت الفلتر الليلي.
+    state.tile = EmsMapTiles.addLeafletTiles(state.map, { provider: 'carto' });
   }
   function renderSectorStrip() {
     var container = id('mapSectorList');

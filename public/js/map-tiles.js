@@ -7,9 +7,10 @@
 })(typeof window !== 'undefined' ? window : globalThis, function (root) {
     'use strict';
 
-    function getConfig() {
+    function getConfig(options) {
         var settings = root.SMAP_MAP_CONFIG || {};
-        var token = typeof settings.accessToken === 'string' && /^pk\.[A-Za-z0-9._-]+$/.test(settings.accessToken)
+        var forceCarto = options && options.provider === 'carto';
+        var token = !forceCarto && typeof settings.accessToken === 'string' && /^pk\.[A-Za-z0-9._-]+$/.test(settings.accessToken)
             ? settings.accessToken : '';
         if (token) {
             return {
@@ -26,9 +27,9 @@
         };
     }
 
-    function addLeafletTiles(map) {
+    function addLeafletTiles(map, options) {
         if (!root.L || typeof root.L.tileLayer !== 'function') throw new Error('Leaflet غير متاح');
-        var config = getConfig();
+        var config = getConfig(options);
         var url = config.url;
         delete config.url;
         return root.L.tileLayer(url, config).addTo(map);
