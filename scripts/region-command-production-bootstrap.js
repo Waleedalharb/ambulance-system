@@ -16,9 +16,10 @@ async function bootstrapRegionCommandProduction(db, { userId, account, now = () 
   if (!db || !db.tx || !db.tx.immediate) throw new Error('قاعدة SQLite المفتوحة مطلوبة');
   const normalizedUserId = String(userId || '').trim();
   if (!normalizedUserId) throw new Error('معرف حساب قائد المنطقة مطلوب');
-  // users.json هو مصدر الدخول والدور الفعلي؛ لا نعتمد على نسخة chat داخل SQLite.
-  if (!account || String(account.id) !== normalizedUserId || account.role !== 'admin' || !account.isActive) {
-    throw new Error('الحساب المعتمد غير موجود أو ليس مدير نظام نشطًا');
+  // users.json هو مصدر الدخول الفعلي. الصلاحيات تبقى محكومة في مسار API؛
+  // هذه التهيئة تنشئ نطاق قراءة فقط للحساب النشط الذي اعتمده المالك.
+  if (!account || String(account.id) !== normalizedUserId || !account.isActive) {
+    throw new Error('الحساب المعتمد غير موجود أو غير نشط في مصدر الدخول');
   }
   const at = now().toISOString();
 

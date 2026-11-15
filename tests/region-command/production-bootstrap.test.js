@@ -79,20 +79,19 @@ test('bootstrap is idempotent and reactivates an existing current scope', async 
   db.close();
 });
 
-test('bootstrap rejects a missing or non-admin account without writes', async () => {
+test('bootstrap rejects a missing or inactive account without writes', async () => {
   const db = createFixture({ seed: false });
   addPlatformTables(db);
-  db.hdl.prepare('INSERT INTO users(user_id, role, is_active) VALUES (?, ?, 1)').run('viewer', 'user');
 
   await assert.rejects(
     bootstrapRegionCommandProduction(db, { userId: USER_ID, account: null, now }),
-    /الحساب المعتمد غير موجود أو ليس مدير نظام نشطًا/
+    /الحساب المعتمد غير موجود أو غير نشط في مصدر الدخول/
   );
   await assert.rejects(
     bootstrapRegionCommandProduction(db, {
-      userId: 'viewer', account: { id: 'viewer', role: 'user', isActive: true }, now
+      userId: 'viewer', account: { id: 'viewer', role: 'admin', isActive: false }, now
     }),
-    /الحساب المعتمد غير موجود أو ليس مدير نظام نشطًا/
+    /الحساب المعتمد غير موجود أو غير نشط في مصدر الدخول/
   );
   assert.equal(db.hdl.prepare('SELECT COUNT(*) AS count FROM regions').get().count, 0);
   assert.equal(db.hdl.prepare('SELECT COUNT(*) AS count FROM user_access_scopes').get().count, 0);
