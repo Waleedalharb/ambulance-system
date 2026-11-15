@@ -13,7 +13,7 @@ const SECTOR_CODES = ['1', '2', '3', '4', '5'];
  * المراكز تشتق حصرًا من teams.center بعد تحليل هوية الفرقة الرسمية.
  */
 async function bootstrapRegionCommandProduction(db, { userId, now = () => new Date() } = {}) {
-  if (!db || !db.hdl || !db.tx || !db.tx.immediate) throw new Error('قاعدة SQLite المفتوحة مطلوبة');
+  if (!db || !db.tx || !db.tx.immediate) throw new Error('قاعدة SQLite المفتوحة مطلوبة');
   const normalizedUserId = String(userId || '').trim();
   if (!normalizedUserId) throw new Error('معرف حساب قائد المنطقة مطلوب');
   const at = now().toISOString();
