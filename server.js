@@ -18033,6 +18033,7 @@ async function initDatabase() {
             console.error('❌ Failed to sync users to SQLite:', e.message);
         }
     } catch (err) {
+        dbLoadError = { message: err.message, code: err.code || null, stage: 'init' };
         console.error('❌ Failed to initialize database:', err.message);
         console.log('⚠️ Falling back to JSON file mode');
     }
