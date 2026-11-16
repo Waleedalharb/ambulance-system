@@ -55,7 +55,7 @@
     <link rel="stylesheet" href="css/smart-toolbar.css?v=5"><!-- v=5 (2026-09-01): جولة توحيد ثيم النماذج — نص الحقول/الجداول/التسميات (R1–R3) -->
     <link rel="stylesheet" href="css/app.css?v=35">
     <!-- طبقة التوحيد البصري (المرحلة الثانية) — لغة شاشة الدخول المعتمدة، تحمَّل أخيرًا لتتغلب -->
-    <link rel="stylesheet" href="css/executive-theme.css?v=7"><!-- v=7 (2026-09-02): L-6 — أنماط قسم «النماذج المرتبطة بالبلاغ» في بطاقة البلاغ (إضافة صِرفة)
+    <link rel="stylesheet" href="css/executive-theme.css?v=8"><!-- v=8: فلتر خريطة قائد المنطقة الموحد للرئيسية ونظام تمركز الفرق -->
     <!-- طبقة الهوية الموحدة (هوية التكميل المعتمدة FROZEN) — تُحمَّل بعد كل ملفات CSS -->
     <link rel="stylesheet" href="/css/platform-identity.css?v=1">
     <link rel="stylesheet" href="css/incident-lookup.css?v=1">
@@ -902,7 +902,7 @@ window.addEventListener('load', function() {
             <button id="seniorShiftBtn" class="btn btn-senior"><i class="fas fa-user-md"></i> كبار المسعفين</button>
             <button id="controlBtn" class="btn btn-control"><i class="fas fa-sliders-h"></i> تنسيق الإجازة</button>
             <button id="formsBtn" class="btn btn-forms"><i class="fas fa-file-alt"></i> النماذج</button>
-            <button id="peakTimeBtn" class="btn btn-peak"><i class="fas fa-clock"></i> وقت الذروة</button>
+            <button id="peakTimeBtn" class="btn btn-peak"><i class="fas fa-clock"></i> نظام تمركز الفرق</button>
             <button id="chartsBtn" class="btn btn-charts"><i class="fas fa-chart-line"></i> إحصائيات</button>
             <button id="analyticsBtn" class="btn" style="background:linear-gradient(135deg, #667eea, #764ba2); color:white; border:none; font-weight:700;">
                 <i class="fas fa-tachometer-alt"></i> لوحة التحكم
@@ -1730,7 +1730,7 @@ window.addEventListener('load', function() {
                 🚨 تـنـبـيـه طـوارئ
             </div>
             <div style="color: rgba(255,255,255,0.9); font-size: 0.8rem; margin-top: 4px;">
-                نظام إدارة وقت الذروة
+                نظام تمركز الفرق
             </div>
             <button onclick="closePeakAlert()" style="position: absolute; top: 12px; left: 12px; width: 32px; height: 32px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.5); background: rgba(255,255,255,0.2); color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s;">
                 <i class="fas fa-times"></i>
@@ -1971,7 +1971,7 @@ window.addEventListener('load', function() {
             <div class="peak-header-left">
                 <div class="peak-header-icon"><i class="fas fa-clock"></i></div>
                 <div class="peak-header-text">
-                    <h2>🚨 نظام إدارة وقت الذروة</h2>
+                    <h2>🚨 نظام تمركز الفرق</h2>
                     <p>إدارة التمركزات والفرق الإسعافية</p>
                 </div>
             </div>
@@ -2739,7 +2739,7 @@ window.addEventListener('load', function() {
                 <button class="sidebar-item" onclick="toggleSidebar(); navigateToPage('operations-dashboard.html?v=1');"><i class="fas fa-chart-pie"></i> الإحصائيات والتقارير</button>
                 <button class="sidebar-item" onclick="toggleSidebar(); openModalById('controlModal'); loadVacations().then(function() { renderControlList(false); });"><i class="fas fa-sliders-h"></i> تنسيق الإجازة</button>
                 <button class="sidebar-item" onclick="toggleSidebar(); openModalById('formsModal'); loadFormsList(); if(!currentFormId && FORM_DEFINITIONS.length>0) loadForm(FORM_DEFINITIONS[0].id);"><i class="fas fa-file-alt"></i> النماذج</button>
-                <button class="sidebar-item" onclick="toggleSidebar(); openPeakTimeModal();"><i class="fas fa-clock"></i> وقت الذروة</button>
+                <button class="sidebar-item" onclick="toggleSidebar(); openPeakTimeModal();"><i class="fas fa-clock"></i> نظام تمركز الفرق</button>
                 <button class="sidebar-item" onclick="toggleSidebar(); openModalById('chartsModal'); renderAllCharts();"><i class="fas fa-chart-line"></i> إحصائيات</button>
                 <button class="sidebar-item" onclick="toggleSidebar(); openModalById('analyticsModal'); renderAnalyticsDashboard();"><i class="fas fa-tachometer-alt"></i> لوحة التحكم</button>
                 <button class="sidebar-item" onclick="toggleSidebar(); navigateToPage('operations-dashboard.html?v=1');"><i class="fas fa-command-center"></i> مركز العمليات <span class="sidebar-item-status" id="sbStatusOps"></span></button>
@@ -2801,7 +2801,7 @@ window.addEventListener('load', function() {
 <script src="/js/time-riyadh.js"></script>
 <script src="js/table-sort.js?v=1" defer></script>
 <script src="js/incident-lookup.js?v=1" defer></script>
-<script src="js/map-tiles.js?v=1" defer></script><!-- بلاطات Mapbox من إعداد التشغيل، مع CARTO بديلًا -->
+<script src="js/map-tiles.js?v=2" defer></script><!-- نفس بلاطات OSM المعتمدة في مركز قيادة المنطقة -->
 <script src="js/app.js?v=56" defer></script><!-- v=56: توحيد بلاطات Mapbox في خرائط التمركز ووقت الذروة -->
 <script src="js/region-command-entry.js?v=1" defer></script><!-- دخول مركز القيادة يظهر فقط بعد نجاح سياق الصلاحية والنطاق -->
 <script src="js/crew-batch-cancel.js?v=1" defer></script><!-- الاختيار الجماعي لفرق البلاغ في توزيع البلاغات — بعد app.js (خطافات عرض فقط) -->
@@ -2812,8 +2812,8 @@ window.addEventListener('load', function() {
 <script src="js/map-config.local.js?v=1" defer onerror="void 0"></script><!-- اختياري محلي خارج Git: مفتاح Mapbox العام المقيّد — غيابه طبيعي -->
 <script src="js/map-config.runtime.js" defer></script><!-- إعداد الإنتاج من متغير البيئة MAPBOX_PUBLIC_TOKEN (المسار «ب» — اعتماد المالك 2026-08-28): لا توكن في Git، وغياب المتغير = no-op -->
 <script src="js/map-adapter.js?v=3" defer></script><!-- MapAdapter: طبقة الرسم الموحدة — قبل smart-map.js وmap-history.js · v=3: pointsLayer المجمّعة القابلة للتوسع (RC-6، اعتماد المالك 2026-09-01) -->
-<script src="js/smart-map.js?v=9" defer></script><!-- الخريطة التشغيلية الذكية — بعد app.js · v=9 (P3، 2026-09-21): المراكز/الربط من مرجع SSOT في runtime + راية حالة المرجع غير الحاجبة -->
-<script src="js/map-history.js?v=3" defer></script><!-- ذاكرة الخريطة — الوضع التاريخي التحليلي (H1–H4) داخل نفس الخريطة؛ عرض فقط · v=3: نقاط مجمّعة + بطاقة كسولة (RC-6) -->
+<script src="js/smart-map.js?v=10" defer></script><!-- الخريطة التشغيلية الذكية — مصدر بلاطات قائد المنطقة المعتمد -->
+<script src="js/map-history.js?v=4" defer></script><!-- ذاكرة الخريطة — نفس مصدر البلاطات والفلتر المرجعي -->
 <script src="js/map-guide.js?v=2" defer></script><!-- 📖 دليل استخدام الخريطة التشغيلية داخل المنصة (اعتماد المالك 2026-08-25) — محتوى ثابت يشرح، لا يلمس بيانات · v=2: حدّ بطاقة الشرح يخصم القائمة المفتوحة (اعتماد المالك 2026-08-31) -->
 <script src="js/crew-achievement-board.js?v=1" defer></script><!-- Phase D: لوحة إنجاز الفرق — بعد app.js حتى يسبقها تعريف AuthGate -->
 <script src="js/home-command.js?v=2" defer></script><!-- إعادة التشكيل v2: شريط المؤشرات الثمانية + الحالة التشغيلية + البلاغات المختصرة — مشترك في ops:sse، بلا قناة جديدة -->

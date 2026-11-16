@@ -1,4 +1,4 @@
-/* بلاطات Leaflet الموحدة: Mapbox من إعداد التشغيل، وCARTO بديلًا عند غيابه. */
+/* بلاطات Leaflet الموحدة: نفس مصدر OSM المعتمد في مركز قيادة المنطقة. */
 (function (root, factory) {
     'use strict';
     var api = factory(root);
@@ -8,23 +8,9 @@
     'use strict';
 
     function getConfig(options) {
-        var settings = root.SMAP_MAP_CONFIG || {};
-        var forceCarto = options && options.provider === 'carto';
-        var token = !forceCarto && typeof settings.accessToken === 'string' && /^pk\.[A-Za-z0-9._-]+$/.test(settings.accessToken)
-            ? settings.accessToken : '';
-        if (token) {
-            return {
-                url: 'https://api.mapbox.com/styles/v1/mapbox/light-v11/tiles/256/{z}/{x}/{y}{r}?access_token=' + encodeURIComponent(token),
-                attribution: '&copy; <a href="https://www.mapbox.com/">Mapbox</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-                maxZoom: 19
-            };
-        }
-        var cartoKey = typeof settings.cartoApiKey === 'string' ? settings.cartoApiKey : '';
-        var cartoStyle = options && options.style === 'dark' ? 'dark_all' : 'light_all';
         return {
-            url: 'https://{s}.basemaps.cartocdn.com/' + cartoStyle + '/{z}/{x}/{y}{r}.png' + (cartoKey ? '?key=' + encodeURIComponent(cartoKey) : ''),
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
-            subdomains: 'abcd',
+            url: 'https://tile.openstreetmap.de/{z}/{x}/{y}.png',
+            attribution: '&copy; OpenStreetMap contributors',
             maxZoom: 19
         };
     }

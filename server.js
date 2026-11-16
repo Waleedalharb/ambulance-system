@@ -858,10 +858,9 @@ app.use('/forms', express.static(path.join(__dirname, 'public/forms'), {
 // (اعتماد المالك 2026-08-28 — المسار «ب»): توكن Mapbox العام يُحقن من متغير
 // البيئة MAPBOX_PUBLIC_TOKEN في Render فقط — لا يدخل Git إطلاقًا (Push
 // Protection رفضه، والمالك منع تجاوز الحماية). هذا المسار يقدّم ملف إعداد
-// JavaScript تشغيليًا: إن ضُبط المتغير (وكان pk.) فعّل Mapbox Dark v11
-// (اعتماد المالك 2026-08-31: خريطة داكنة هادئة تلائم الواجهة الداكنة — نفس
-// المزود ونفس التوكن ونفس مصدر البيانات)، وإلا أعاد no-op فيبقى الإعداد
-// الافتراضي/المحلي كما هو حرفيًا.
+// JavaScript تشغيليًا. مسار الرسم مثبّت على Leaflet ليطابق خريطة قائد
+// المنطقة المعتمدة؛ لا تسمح مفاتيح البيئة بتبديل المزود أو تغيير شكلها.
+// تبقى قراءة المفاتيح للتوافق مع الإعدادات القائمة دون استخدامها لتبديل Leaflet.
 // صفر منطق تشغيلي هنا — مجرد إعداد مزود الرسم. التوكن لا يُسجَّل في logs
 // ولا يظهر إلا في هذه الاستجابة (مكانه الطبيعي: المتصفح يحتاجه للرسم،
 // وحمايته المعتمدة هي تقييد النطاق من لوحة Mapbox على emsoperations.online).
@@ -872,7 +871,7 @@ app.get('/js/map-config.runtime.js', (req, res) => {
     const cartoApiKey = process.env.CARTO_API_KEY;
     const config = {};
     if (token && /^pk\.[A-Za-z0-9._-]+$/.test(token)) {
-        Object.assign(config, { provider: 'mapbox', accessToken: token, style: 'mapbox://styles/mapbox/dark-v11' });
+        Object.assign(config, { provider: 'leaflet', accessToken: token, style: 'mapbox://styles/mapbox/dark-v11' });
     }
     if (cartoApiKey && /^cb1_[A-Za-z0-9_-]+$/.test(cartoApiKey)) config.cartoApiKey = cartoApiKey;
     if (Object.keys(config).length) {

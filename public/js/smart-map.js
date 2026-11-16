@@ -378,9 +378,8 @@
         map = L.map('opsMap', { scrollWheelZoom: false, attributionControl: true }).setView([24.7136, 46.6753], 12);
         map.on('click', function () { map.scrollWheelZoom.enable(); });
         map.on('mouseout', function () { map.scrollWheelZoom.disable(); });
-        var tiles = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
-            subdomains: 'abcd', maxZoom: 19
+        var tiles = L.tileLayer('https://tile.openstreetmap.de/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors', maxZoom: 19
         });
         tiles.on('tileerror', function () {
             var note = document.getElementById('opsMapTileNote');

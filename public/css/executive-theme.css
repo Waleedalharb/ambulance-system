@@ -1245,11 +1245,16 @@ body::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.16); }
 @media (max-width: 720px) { .smap-kpis { grid-template-columns: repeat(2, 1fr); } .smap-card { width: calc(100% - 28px); } }
 
 /* ============================================================
-   نظام التنبيه التشغيلي + تليين سواد الخريطة (قرار 2026-08-21)
+   فلتر الخريطة المرجعي الموحد — مطابق لمركز قيادة المنطقة
    ============================================================ */
-/* تليين بلاطات الخلفية فقط — لا يمس ألوان الحالات ولا العلامات */
-/* Black Map ≠ Black Blank: سواد تنفيذي مع إبقاء الطرق والمعالم مقروءة */
-.ops-map-wrap .leaflet-tile-pane { filter: brightness(1.06) saturate(0.80) contrast(1.05); }
+/* يطبق على البلاطات فقط؛ ألوان الحالات والعلامات لا تتغير. */
+#opsMap .leaflet-tile,
+#histMap .leaflet-tile,
+#peakMap .leaflet-tile,
+#peakAlertMap .leaflet-tile,
+#mapLeaflet .leaflet-tile {
+    filter: invert(1) hue-rotate(180deg) sepia(.28) hue-rotate(190deg) saturate(.85) contrast(1.12) brightness(.58);
+}
 
 /* شريط التنبيه — طبقة انتباه تشغيلية (§11 — 2026-08-21): مثبّت في زاوية الخريطة
    العليا (بداية السطر) بعمود ضيق لا يحجب مركز الخريطة ولا العلامات، وقابل للإغلاق

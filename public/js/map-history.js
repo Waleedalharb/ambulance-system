@@ -104,9 +104,8 @@
         hmap = L.map('histMap', { scrollWheelZoom: false, attributionControl: true, trackResize: false }).setView([24.7136, 46.6753], 11);
         hmap.on('click', function () { hmap.scrollWheelZoom.enable(); });
         hmap.on('mouseout', function () { hmap.scrollWheelZoom.disable(); });
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
-            subdomains: 'abcd', maxZoom: 19
+        L.tileLayer('https://tile.openstreetmap.de/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors', maxZoom: 19
         }).addTo(hmap);
         layers = {
             heat: (typeof L.heatLayer === 'function') ? L.heatLayer([], { radius: 28, blur: 22, maxZoom: 16, minOpacity: 0.25 }) : null,
