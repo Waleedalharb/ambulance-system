@@ -251,6 +251,12 @@ console.log('\n— M10: الأقفال البنيوية —');
     check('M10⑧ الإعداد المُدرج في Git بلا مفتاح وافتراضي leaflet',
         cfgMain.includes("provider: 'leaflet'") && !/pk\.eyJ/.test(cfgMain));
     check('M10⑨ ملف المفتاح المحلي مستثنى من Git', gitignore.includes('map-config.local.js'));
+    const app = read('public/js/app.js');
+    const directOsmLayers = app.match(/L\.tileLayer\('https:\/\/tile\.openstreetmap\.de\/\{z\}\/\{x\}\/\{y\}\.png'/g) || [];
+    check('M10⑪ خرائط التمركز والتنبيه والمعاينة تستخدم بلاطات المرجع مباشرة بلا مساعد وسيط',
+        directOsmLayers.length === 3 && !app.includes('EmsMapTiles') &&
+        app.includes("}).addTo(peakMap);") && app.includes("}).addTo(peakAlertMap);") && app.includes("}).addTo(map);") &&
+        index.includes('js/app.js?v=57') && !index.includes('js/map-tiles.js'));
 }
 
 console.log('\n— M11: صفر مصادر بيانات / GPS / ازدحام في طبقة الرسم —');

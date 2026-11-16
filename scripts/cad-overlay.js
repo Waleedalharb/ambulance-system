@@ -28,7 +28,7 @@
   /* ختم البناء — تحقق بصري فوري من نسخة الـOverlay المشغَّلة فعليًا في المتصفح
      (تشخيص 2026-08-22: فشل الاختبار الحي سببه أن Chrome كان يشغّل بناءً قديمًا).
      يظهر في تلميح مقبض اللوحة وفي مسجل دورة الحياة — لا منطق ولا سلوك. */
-  const OVERLAY_BUILD = '2026-08-29.a — إصلاح دورة المستشفى (اعتماد المالك 2026-08-28): نبضة حضور ~4د + detail أخير قبل حذف المراقبة + إغلاق monitoring-lost عند اختفاء CAD بلا نهاية تسليم حقيقية';
+  const OVERLAY_BUILD = '2026-11-17.a — توافق الترميز التشغيلي R-3 مع حفظ مفاتيح الفرق التاريخية وعزل القطاعات الأخرى';
   window.__southBuild = OVERLAY_BUILD;
 
   /* ─── الالتقاط السلبي لإحداثيات البلاغ الأصلية (اعتماد المالك 2026-08-20) ───
@@ -468,12 +468,28 @@
      (runUnitId) فلا يُنشأ سجل ثانٍ. وحدات القطاعات الأخرى (شرق/غرب/شمال…) لا
      تطابق النمط أصلًا ← null ← لا تسجيل. */
   function mapToSouthTeam(cadCrew){
-    const name = (cadCrew || '').trim();
-    let m = name.match(/سريع\s*جنوب\s*(\d+)/);
+    const name = String(cadCrew || '').replace(/[‎‏‪-‮⁦-⁩﻿]/g, '').trim();
+    const normalized = name.replace(/[٠-٩]/g, d => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)))
+      .replace(/[۰-۹]/g, d => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d))).toUpperCase();
+    /* الرمز التشغيلي واجهة CAD الجديدة؛ مفتاح المنصة التاريخي يبقى «جنوب N»/«سريع N».
+       القطاع 3 فقط: لا يمر أي رمز لقطاع آخر عبر قائمة التكميل أو التطابق التام. */
+    let m = normalized.match(/^R-(\d{1,2})-(?:(R|S|G|F|M)-)?([1-4])-([1-9]\d*)$/);
+    if(m){
+      if(Number(m[1]) !== 3) return null;
+      const number = Number(m[4]);
+      if(m[2] === 'R') return 'سريع ' + number;
+      if(m[2] === 'S') return 'هوائي ' + number;
+      if(m[2] === 'G') return 'دراجة أو سكوتر جنوب ' + number;
+      if(m[2] === 'F') return 'فراجلة جنوب ' + number;
+      if(m[2] === 'M') return 'باص جنوب ' + number;
+      return 'جنوب ' + number;
+    }
+    if(/^R-\d{1,2}-/.test(normalized)) return null; // رمز مشوّه أو غير مدعوم ← لا تخمين
+    m = normalized.match(/سريع\s*جنوب\s*(\d+)/);
     if(m) return 'سريع ' + m[1];
-    m = name.match(/سريع\s*(\d+)/);
+    m = normalized.match(/سريع\s*(\d+)/);
     if(m) return 'سريع ' + m[1];
-    m = name.match(/جنوب\s*(\d+)/);
+    m = normalized.match(/جنوب\s*(\d+)/);
     if(m) return 'جنوب ' + m[1];
     // تطابق تام مع أي اسم في تكميل المناوبة — يغطي الأسماء غير النمطية (§5)
     const exact = teamsList.find(t => t === name);

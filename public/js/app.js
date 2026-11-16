@@ -1940,7 +1940,9 @@ function initPeakAlertMap(alertData) {
         var centerLng = parseFloat(alertData.lng) || 46.6753;
         
         peakAlertMap = L.map('peakAlertMap').setView([centerLat, centerLng], 13);
-        EmsMapTiles.addLeafletTiles(peakAlertMap);
+        L.tileLayer('https://tile.openstreetmap.de/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors', maxZoom: 19
+        }).addTo(peakAlertMap);
         
         var marker = L.marker([centerLat, centerLng]).addTo(peakAlertMap);
         marker.bindPopup('<b>' + escapeHtml(alertData.unit) + '</b><br>' + escapeHtml(alertData.location) + '<br>⏰ ' + (alertData.startTime || '')).openPopup();
@@ -2022,7 +2024,9 @@ function initPeakMap() {
     if (peakMap) { setTimeout(function() { peakMap.invalidateSize(); }, 300); return; }
     try {
         peakMap = L.map('peakMap').setView([24.7136, 46.6753], 13);
-        EmsMapTiles.addLeafletTiles(peakMap);
+        L.tileLayer('https://tile.openstreetmap.de/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors', maxZoom: 19
+        }).addTo(peakMap);
         var marker = null;
         peakMap.on('click', function(e) {
             var lat = e.latlng.lat;
@@ -2792,7 +2796,9 @@ function initLeafletMap(focusUnit) {
         mapLeaflet.style.height = '350px';
 
         map = L.map('mapLeaflet').setView([24.7136, 46.6753], 11);
-        EmsMapTiles.addLeafletTiles(map);
+        L.tileLayer('https://tile.openstreetmap.de/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors', maxZoom: 19
+        }).addTo(map);
     }
 
     // مسح العلامات القديمة

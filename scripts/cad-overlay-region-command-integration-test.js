@@ -227,7 +227,7 @@ async function startBrowser(auth) {
   await cdp.send('Page.enable');
   await cdp.send('Runtime.enable');
   await cdp.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
-  await cdp.send('Page.addScriptToEvaluateOnNewDocument', { source: `try{localStorage.setItem('auth_access_token',${JSON.stringify(auth.accessToken)});localStorage.setItem('authToken',${JSON.stringify(auth.accessToken)});localStorage.setItem('auth_refresh_token',${JSON.stringify(auth.refreshToken)});}catch(_){}` });
+  await cdp.send('Page.addScriptToEvaluateOnNewDocument', { source: `try{localStorage.setItem('auth_access_token',${JSON.stringify(auth.accessToken)});localStorage.setItem('authToken',${JSON.stringify(auth.accessToken)});localStorage.setItem('auth_refresh_token',${JSON.stringify(auth.refreshToken)});localStorage.setItem('auth_user',${JSON.stringify(JSON.stringify(auth.user))});}catch(_){}` });
   await cdp.send('Page.navigate', { url: BASE + '/region-command.html?sector=TEST-S3' });
   await waitFor(() => evaluate('document.readyState === "complete" && document.getElementById("connectionStatus")?.dataset.state === "connected"'), 25000, 'actual region page and SSE');
   check('صفحة قائد المنطقة الفعلية اتصلت بـSSE', true);
@@ -307,6 +307,19 @@ async function stopChild(child) {
     const screenshot = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
     fs.writeFileSync(path.join(OUT, 'actual-region-command-live.png'), Buffer.from(screenshot.data, 'base64'));
     results.browserScreenshot = 'actual-region-command-live.png';
+
+    await cdp.send('Page.navigate', { url: BASE + '/' });
+    await waitFor(() => evaluate(`document.readyState === 'complete' && typeof openPeakMap === 'function' && getComputedStyle(document.getElementById('loginScreen')).display === 'none' && !!document.querySelector('#opsMap .leaflet-tile')`), 30000, 'actual authenticated home map');
+    await evaluate('openPeakMap(); true');
+    await waitFor(() => evaluate(`document.querySelectorAll('#peakMap .leaflet-tile').length >= 4 && Array.from(document.querySelectorAll('#peakMap .leaflet-tile')).every(img=>img.complete&&img.naturalWidth>0)`), 30000, 'all positioning map tiles rendered');
+    await sleep(750);
+    const parity = await evaluate(`(()=>{const home=document.querySelector('#opsMap .leaflet-tile');const peak=document.querySelector('#peakMap .leaflet-tile');return {homeFilter:getComputedStyle(home).filter,peakFilter:getComputedStyle(peak).filter,peakSrc:peak.src,modalVisible:getComputedStyle(document.getElementById('peakMapModal')).display!=='none',loginHidden:getComputedStyle(document.getElementById('loginScreen')).display==='none'};})()`);
+    check('نافذة نظام تمركز الفرق تعرض بلاطات OSM الفعلية بعد الدخول', parity.peakSrc.startsWith('https://tile.openstreetmap.de/') && parity.modalVisible && parity.loginHidden, parity);
+    check('فلتر خريطة التمركز مطابق حرفيًا لخريطة المنصة الرئيسية', parity.homeFilter === parity.peakFilter, parity);
+    const positioningScreenshot = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
+    fs.writeFileSync(path.join(OUT, 'actual-positioning-map.png'), Buffer.from(positioningScreenshot.data, 'base64'));
+    results.positioningScreenshot = 'actual-positioning-map.png';
+    check('لا استثناءات JavaScript بعد فتح خريطة التمركز الفعلية', cdp.exceptions.length === 0, cdp.exceptions.map(item => item.text));
   } catch (error) {
     results.push({ name: 'اكتمال الاختبار', pass: false, error: error.stack || String(error) });
     console.error(error.stack || error);

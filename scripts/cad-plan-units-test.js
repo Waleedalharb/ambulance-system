@@ -121,7 +121,7 @@ async function cycle() { await ctx.window.__southObsTick(); await drain(); await
 async function overlaySection() {
     console.log('🧪 القسم أ — Overlay: الفلتر الدلالي لوحدات الخطة\n');
     loadOverlay();
-    check('A0 ختم البناء الجديد 2026-08-27.d ظاهر', /2026-08-27\.d/.test(ctx.window.__southBuild || ''));
+    check('A0 ختم بناء توافق الرموز 2026-11-17.a ظاهر', /2026-11-17\.a/.test(ctx.window.__southBuild || ''));
 
     listSnapshot(); await drain(); await drain();
     locationObj.href = CAD + '/incidents/' + INC;
