@@ -307,6 +307,29 @@ button.rc-metric-card:hover { border-color: color-mix(in srgb, var(--rc-accent) 
 .rc-map-marker.incident { width: 14px; height: 14px; border-radius: 4px 50% 50% 50%; transform: rotate(-45deg); background: #FB7185; }
 .rc-map-marker.incident[data-severity="green"] { background: #34D399; }
 .rc-map-marker.incident[data-severity="yellow"] { background: #FBBF24; }
+/* تمركز مخطط بإحداثيات مسجلة؛ اللون يشرح حالة الخطة ولا يوحي بتتبع GPS. */
+.leaflet-marker-icon.rc-positioning-marker-wrap { overflow: visible !important; background: transparent !important; border: 0 !important; }
+.rc-positioning-marker { display: block; width: 40px; height: 48px; color: #FBBF24; filter: drop-shadow(0 4px 5px rgba(0,0,0,.5)); }
+.rc-positioning-marker[data-phase="planned"] { color: #60A5FA; }
+.rc-positioning-marker[data-phase="arrived"] { color: #34D399; }
+.rc-positioning-marker svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.rc-positioning-marker__pin { fill: #101C28; stroke: currentColor; stroke-width: 2; }
+.rc-positioning-marker__hub { fill: currentColor; stroke: #F8FAFC; stroke-width: 1.4; }
+.rc-positioning-marker__cross { fill: none; stroke: #101C28; stroke-width: 2.2; stroke-linecap: round; }
+.rc-positioning-popup-phase { color: currentColor !important; font-weight: 600; }
+.rc-positioning-popup-note { color: var(--rc-accent-soft) !important; }
+/* علامات ProQA المعتمدة: دبوس داكن + رمز محلي + حلقة أولوية دقيقة، بلا وميض أو هالات. */
+.leaflet-marker-icon.rc-proqa-marker-wrap { overflow: visible !important; background: transparent !important; border: 0 !important; }
+.rc-proqa-marker { display: block; width: 42px; height: 50px; color: var(--rc-proqa-priority, #8EA5AF); filter: drop-shadow(0 4px 5px rgba(0,0,0,.5)); }
+.rc-proqa-marker__svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.rc-proqa-popup-type { color: var(--rc-text) !important; font-weight: 600; }
+.rc-proqa-popup-code { direction: ltr; unicode-bidi: isolate; text-align: right; font-variant-numeric: tabular-nums; }
+.rc-proqa-popup-priority { font-weight: 600; }
+.rc-proqa-popup-priority[data-tone="red"] { color: #FF626B !important; }
+.rc-proqa-popup-priority[data-tone="yellow"] { color: #F4BB55 !important; }
+.rc-proqa-popup-priority[data-tone="green"] { color: #47D7A0 !important; }
+.rc-proqa-popup-priority[data-tone="unknown"] { color: #8EA5AF !important; }
+.rc-map-row .rc-proqa-row-code { direction: ltr; unicode-bidi: isolate; text-align: right; color: var(--rc-accent-soft); font-variant-numeric: tabular-nums; }
 .rc-sector-tooltip { padding: 5px 9px !important; border: 1px solid rgba(255,255,255,.12) !important; border-radius: 8px !important; background: rgba(7,11,20,.9) !important; color: #F8FAFC !important; box-shadow: 0 5px 18px rgba(0,0,0,.3) !important; font: 600 11px "IBM Plex Sans Arabic", Tahoma, sans-serif !important; direction: rtl; }
 .rc-sector-tooltip::before { display: none; }
 .rc-map-popup { min-width: 190px; direction: rtl; font-family: "IBM Plex Sans Arabic", Tahoma, sans-serif; }

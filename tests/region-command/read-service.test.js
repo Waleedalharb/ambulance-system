@@ -20,7 +20,7 @@ function sources() {
       { entityId: 'V3', entityName: 'خارج', center: 'مركز C3', open: [{ status: 'active' }] }
     ] }) },
     reportService: { getIncidentSummary: async shiftId => ({ incidents: [
-      { number: 'I-1', type: 'إصابة', status: 'active', createdAt: NOW, bestArrivalMin: 8, crews: [{ unit: 'فريق 1', counted: true }] },
+      { number: 'I-1', code: '29B05U', type: 'إصابة', status: 'active', createdAt: NOW, bestArrivalMin: 8, crews: [{ unit: 'فريق 1', counted: true }] },
       { number: 'I-2', type: 'مرض', status: 'closed', createdAt: NOW, bestArrivalMin: 12, crews: [{ unit: 'فريق 2', counted: true }] },
       { number: 'I-3', status: 'active', bestArrivalMin: 1, crews: [{ unit: 'خارج', counted: true }] }
     ] }) }
@@ -65,6 +65,7 @@ test('read service filters every owner result through sector centers and wraps a
   assert.equal(detail.sector.metrics.vehiclesTotal.value, 2);
   assert.equal(detail.sector.metrics.incidentsTotal.value, 2);
   assert.equal(detail.sector.metrics.avgResponseMinutes.value, 10);
+  assert.equal(detail.sector.incidents[0].code, '29B05U');
   assert.equal(detail.sector.decisionCount.value, 2);
   assertNoRawOperationalNumbers(detail);
   db.close();

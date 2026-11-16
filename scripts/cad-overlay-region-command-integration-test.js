@@ -157,6 +157,7 @@ async function prepareCopy() {
   const grant = db.prepare('INSERT INTO user_access_scopes(id, user_id, scope_type, scope_id, status, effective_from, granted_at, reason) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
   grant.run('TEST-GRANT-REGION', 'test-region-leader', 'region', 'TEST-R', 'active', '2020-01-01T00:00:00.000Z', now, 'اختبار معزول فقط');
   grant.run('TEST-GRANT-OTHER', 'test-other-sector', 'sector', 'TEST-S4', 'active', '2020-01-01T00:00:00.000Z', now, 'اختبار معزول فقط');
+  db.prepare("INSERT INTO user_permissions(user_id, permission_key, granted, granted_by) VALUES ('test-region-leader', 'ops.deployments', 1, 'integration-test')").run();
   db.close();
   return { active, shiftCode };
 }
@@ -279,6 +280,7 @@ async function stopChild(child) {
     const map = await api('/api/region-command/sectors/TEST-S3/map', { token: auth.accessToken });
     const mapped = map.data?.incidents?.items?.find(item => item.id === firstNumber);
     check('الخريطة الفعلية تقرأ نفس البلاغ وإحداثياته', map.status === 200 && mapped?.coordinateStatus === 'ok' && mapped?.teamIdentities?.[0]?.operationalCode === `R-3-${shiftCode}-1`, mapped);
+    check('الخريطة تحتفظ بكود ProQA ولا تغيّر severity التشغيلي', mapped?.code === '29B05U' && mapped?.severity === incident.severity, { code: mapped?.code, mapSeverity: mapped?.severity, detailSeverity: incident.severity });
 
     const dbBefore = new Database(TMP_DB, { readonly: true });
     const before = dbBefore.prepare('SELECT t.id, r.unit, t.cad_unit_id, t.cad_run_unit_id FROM report_times t JOIN reports r ON r.id=t.report_id WHERE t.incident_number=?').all(firstNumber);
@@ -307,6 +309,57 @@ async function stopChild(child) {
     const screenshot = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
     fs.writeFileSync(path.join(OUT, 'actual-region-command-live.png'), Buffer.from(screenshot.data, 'base64'));
     results.browserScreenshot = 'actual-region-command-live.png';
+
+    await cdp.send('Page.navigate', { url: BASE + '/region-map.html?sector=TEST-S3' });
+    await waitFor(() => evaluate(`document.readyState === 'complete' && Array.from(document.querySelectorAll('.rc-proqa-marker-wrap')).filter(item=>item.title.includes(${JSON.stringify(firstNumber)})).length === 1 && Array.from(document.querySelectorAll('.rc-proqa-marker-wrap')).filter(item=>item.title.includes(${JSON.stringify(secondNumber)})).length === 1`), 30000, 'approved ProQA markers on actual region map');
+    check('كل بلاغ نشط يظهر بدبوس ProQA واحد دون العلامة القديمة', await evaluate(`document.querySelectorAll('.rc-proqa-marker[data-proqa-category="29"][data-proqa-tone="yellow"]').length >= 2 && document.querySelectorAll('.rc-map-marker.incident').length === 0`));
+    check('لون الحلقة من ProQA Bravo وليس من severity التشغيلي', await evaluate(`window.ProQAIncidentIcons.resolve('29B05U').tone === 'yellow' && window.ProQAIncidentIcons.resolve('29B05U').category === 29`));
+    await evaluate('document.querySelector(\'[data-map-tab="incidents"]\').click(); true');
+    await waitFor(() => evaluate(`document.getElementById('mapIncidentList').textContent.includes('29B05U') && document.getElementById('mapIncidentList').textContent.includes('حوادث المرور والنقل')`), 10000, 'ProQA code in incident list');
+    await evaluate(`(()=>{const marker=Array.from(document.querySelectorAll('.rc-proqa-marker-wrap')).find(item=>item.title.includes(${JSON.stringify(secondNumber)}));if(!marker)return false;marker.click();return true;})()`);
+    await waitFor(() => evaluate(`document.querySelector('.leaflet-popup')?.textContent.includes('29B05U') && document.querySelector('.leaflet-popup')?.textContent.includes('Bravo')`), 10000, 'ProQA popup details');
+    check('تفاصيل البلاغ تعرض الفئة والكود الكامل والأولوية والحالة', await evaluate(`(()=>{const text=document.querySelector('.leaflet-popup')?.textContent||'';return text.includes('حوادث المرور والنقل')&&text.includes('ProQA: 29B05U')&&text.includes('Bravo')&&text.includes('الحالة:');})()`));
+    await sleep(500);
+    const proqaScreenshot = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
+    fs.writeFileSync(path.join(OUT, 'actual-region-map-proqa.png'), Buffer.from(proqaScreenshot.data, 'base64'));
+    results.proqaMapScreenshot = 'actual-region-map-proqa.png';
+    const crop = await evaluate(`(()=>{document.querySelector('.leaflet-popup-close-button')?.click();const marker=Array.from(document.querySelectorAll('.rc-proqa-marker-wrap')).find(item=>item.title.includes(${JSON.stringify(secondNumber)}));window.__proqaHiddenMarkers=Array.from(document.querySelectorAll('.leaflet-marker-icon')).filter(item=>item!==marker).map(item=>({item,visibility:item.style.visibility}));window.__proqaHiddenMarkers.forEach(entry=>{entry.item.style.visibility='hidden';});const rect=marker.getBoundingClientRect();return {x:Math.max(0,rect.left-12),y:Math.max(0,rect.top-12),width:66,height:74};})()`);
+    await sleep(300);
+    const markerScreenshot = await cdp.send('Page.captureScreenshot', { format: 'png', clip: { ...crop, scale: 4 } });
+    fs.writeFileSync(path.join(OUT, 'proqa-marker-crop.png'), Buffer.from(markerScreenshot.data, 'base64'));
+    results.proqaMarkerCrop = 'proqa-marker-crop.png';
+    await evaluate('window.__proqaHiddenMarkers.forEach(entry=>{entry.item.style.visibility=entry.visibility;});delete window.__proqaHiddenMarkers;true');
+    check('لا استثناءات JavaScript بعد عرض أيقونات ProQA والتفاصيل', cdp.exceptions.length === 0, cdp.exceptions.map(item => item.text));
+
+    await evaluate('window.__positioningNoReload = "preserved"; true');
+    const positioningTitle = `تمركز قائد المنطقة ${suffix}`;
+    const nowMs = Date.now();
+    const createdPositioning = await api('/api/peak-plans', {
+      method: 'POST', token: auth.accessToken, body: {
+        title: positioningTitle, planType: 'positioning', location: 'طريق الاختبار — موقع التمركز المسجل',
+        unit: 'جنوب 1', teamType: 'advanced', startTime: new Date(nowMs - 10 * 60000).toISOString(),
+        endTime: new Date(nowMs + 120 * 60000).toISOString(), priority: 'high', lat: 24.545, lng: 46.725
+      }
+    });
+    const positioningId = createdPositioning.data?.plan?.id;
+    check('إنشاء تمركز فعلي عبر PositioningService في المناوبة النشطة', createdPositioning.status === 200 && !!positioningId, createdPositioning.data);
+    await waitFor(() => regionEvents(leaderSse).find(event => event.sectorId === 'TEST-S3' && event.entityType === 'deployments'), 15000, 'scoped positioning SSE');
+    check('حدث التمركز اللحظي موجه لقطاع الجنوب ولا يصل للقطاع الآخر', !regionEvents(otherSse).some(event => event.sectorId === 'TEST-S3' && event.entityType === 'deployments'));
+    await waitFor(() => evaluate(`Array.from(document.querySelectorAll('.rc-positioning-marker-wrap')).filter(item=>item.title.includes(${JSON.stringify(positioningTitle)})).length === 1`), 25000, 'positioning marker live without refresh');
+    check('التمركز ظهر مرة واحدة على الخريطة المفتوحة دون Refresh', await evaluate('window.__positioningNoReload === "preserved"'));
+    const positioningMap = await api('/api/region-command/sectors/TEST-S3/map', { token: auth.accessToken });
+    const positioningItem = positioningMap.data?.positionings?.items?.find(item => item.id === String(positioningId));
+    check('قراءة الخريطة تعيد خطة المناوبة الحالية وإحداثياتها وحالتها الزمنية', positioningItem?.coordinateStatus === 'ok' && positioningItem?.temporalStatus === 'en_route' && positioningItem?.teams?.includes('جنوب 1'), positioningItem);
+    await evaluate(`(()=>{const input=document.querySelector('[data-layer="positionings"]');input.click();return true;})()`);
+    check('إخفاء طبقة التمركزات يزيل علاماتها فقط', await evaluate(`document.querySelectorAll('.rc-positioning-marker-wrap').length === 0 && document.querySelectorAll('.rc-proqa-marker-wrap').length >= 2`));
+    await evaluate(`(()=>{const input=document.querySelector('[data-layer="positionings"]');input.click();const marker=Array.from(document.querySelectorAll('.rc-positioning-marker-wrap')).find(item=>item.title.includes(${JSON.stringify(positioningTitle)}));if(marker)marker.click();return !!marker;})()`);
+    await waitFor(() => evaluate(`document.querySelector('.rc-positioning-popup')?.textContent.includes(${JSON.stringify(positioningTitle)})`), 10000, 'positioning popup');
+    check('إعادة إظهار الطبقة لا تكرر العلامة وتعرض التفاصيل والتحذير من اعتبارها GPS', await evaluate(`document.querySelectorAll('.rc-positioning-marker-wrap').length === 1 && document.querySelector('.rc-positioning-popup').textContent.includes('ليست تتبعًا حيًا') && document.querySelector('.rc-positioning-popup').textContent.includes('R-3-')`));
+    await sleep(500);
+    const positioningRegionScreenshot = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
+    fs.writeFileSync(path.join(OUT, 'actual-region-map-positioning.png'), Buffer.from(positioningRegionScreenshot.data, 'base64'));
+    results.positioningRegionScreenshot = 'actual-region-map-positioning.png';
+    check('لا استثناءات JavaScript بعد تحديث التمركز وإخفاء وإظهار طبقته', cdp.exceptions.length === 0, cdp.exceptions.map(item => item.text));
 
     await cdp.send('Page.navigate', { url: BASE + '/' });
     await waitFor(() => evaluate(`document.readyState === 'complete' && typeof openPeakMap === 'function' && getComputedStyle(document.getElementById('loginScreen')).display === 'none' && !!document.querySelector('#opsMap .leaflet-tile')`), 30000, 'actual authenticated home map');

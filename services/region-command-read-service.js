@@ -55,13 +55,14 @@ function count(value, sourceAt, expected, available, options = {}) {
 }
 
 class RegionCommandReadService {
-  constructor({ scopeService, staffingService, vehicleService, reportService, centersGeoService = null, getActiveShift, now = () => new Date() }) {
+  constructor({ scopeService, staffingService, vehicleService, reportService, centersGeoService = null, positioningService = null, getActiveShift, now = () => new Date() }) {
     if (!scopeService) throw new Error('RegionCommandReadService: scopeService مطلوب');
     this.scopeService = scopeService;
     this.staffingService = staffingService;
     this.vehicleService = vehicleService;
     this.reportService = reportService;
     this.centersGeoService = centersGeoService;
+    this.positioningService = positioningService;
     this.getActiveShift = getActiveShift;
     this.now = now;
     this.decisionCenter = null;
@@ -197,7 +198,7 @@ class RegionCommandReadService {
           ? count(Math.round(responseValues.reduce((a, b) => a + b, 0) / responseValues.length * 10) / 10, sourceAt, relevant.length, responseValues.length, { stale: incidents.value.stale === true })
           : metric(null, { status: 'partial', reasonCode: 'RESPONSE_TIME_COVERAGE_INCOMPLETE', sourceAt, coverage: quality(relevant.length, responseValues.length, 'partial') });
       base.incidents = relevant.map(i => ({
-        id: String(i.number), type: i.type || null, status: i.status || 'active', severity: i.severity || null,
+        id: String(i.number), code: i.code || null, type: i.type || null, status: i.status || 'active', severity: i.severity || null,
         createdAt: i.createdAt || i.cadCreatedAt || null, district: i.district || null,
         bestArrivalMin: typeof i.bestArrivalMin === 'number' ? metric(i.bestArrivalMin, { sourceAt, coverage: quality(1, 1, COMPLETE) }) : unavailable('RESPONSE_TIME_UNAVAILABLE'),
         ...incidentTeamViews(i, teamNames, shift.shift_type)
@@ -222,6 +223,43 @@ class RegionCommandReadService {
       if (!value) throw new Error('empty');
       return { owner, value, error: null };
     } catch (_) { return { owner, value: null, error: 'SOURCE_UNAVAILABLE' }; }
+  }
+
+  _mapCoordinate(value, limit) {
+    if (value === null || value === undefined || String(value).trim() === '') return null;
+    const number = Number(value);
+    return Number.isFinite(number) && Math.abs(number) <= limit ? number : null;
+  }
+
+  _positioningLayer({ positioning, staffing, teamNames, shift }) {
+    if (staffing.error) return { status: 'unavailable', reasonCode: 'TEAM_SCOPE_SOURCE_UNAVAILABLE', sourceAt: null, items: [] };
+    if (positioning.error) return { status: 'unavailable', reasonCode: positioning.error, sourceAt: null, items: [] };
+    const now = new Date(this.now()).getTime();
+    const items = (Array.isArray(positioning.value) ? positioning.value : []).filter(plan => {
+      if (!plan || plan.status !== 'active' || String(plan.shiftId) !== String(shift.id) || plan.departureTime) return false;
+      const units = [...(Array.isArray(plan.units) ? plan.units : []), plan.unit].map(unit => String(unit || '').trim());
+      return units.some(unit => teamNames.has(unit));
+    }).map(plan => {
+      const units = [...new Set([...(Array.isArray(plan.units) ? plan.units : []), plan.unit]
+        .map(unit => String(unit || '').trim()).filter(unit => teamNames.has(unit)))];
+      const lat = this._mapCoordinate(plan.lat, 90);
+      const lng = this._mapCoordinate(plan.lng, 180);
+      const startAt = plan.startTime ? new Date(plan.startTime).getTime() : NaN;
+      const temporalStatus = plan.arrivalTime ? 'arrived' : Number.isFinite(startAt) && startAt > now ? 'planned' : 'en_route';
+      return {
+        id: String(plan.id), title: plan.title || null, location: plan.location || null,
+        planType: plan.planType || null, priority: plan.priority || null, status: plan.status,
+        temporalStatus, startTime: plan.startTime || null, endTime: plan.endTime || null,
+        arrivalTime: plan.arrivalTime || null, createdAt: plan.createdAt || null,
+        lat, lng, coordinateStatus: lat !== null && lng !== null ? 'ok' : 'unavailable',
+        reasonCode: lat !== null && lng !== null ? null : 'POSITIONING_COORDINATES_UNAVAILABLE',
+        teams: units, teamIdentities: units.map(unit => TeamCode.identityFields(unit, shift.shift_type))
+      };
+    });
+    return {
+      status: 'ok', reasonCode: null,
+      sourceAt: latest(items.flatMap(item => [item.createdAt, item.arrivalTime, item.startTime])), items
+    };
   }
 
   async getSectorMap({ actor, sectorId, view = 'current', shiftId = null }) {
@@ -256,27 +294,36 @@ class RegionCommandReadService {
       shift: shift ? { id: String(shift.id), name: shift.shift_name || shift.name || null, type: shift.shift_type || null, date: shift.shift_date || null } : null,
       centers: mappedCenters,
       incidents: { status: 'unavailable', reasonCode: 'NO_ACTIVE_SHIFT', sourceAt: null, items: [] },
+      positionings: { status: 'unavailable', reasonCode: 'NO_ACTIVE_SHIFT', sourceAt: null, items: [] },
       sourceMeta: [{ ownerService: 'CentersGeoService', status: geoError ? 'unavailable' : 'ok', reasonCode: geoError }]
     };
     if (!shift) {
       base.incidents.reasonCode = shiftResult.error || 'NO_ACTIVE_SHIFT';
+      base.positionings.reasonCode = shiftResult.error || 'NO_ACTIVE_SHIFT';
+      base.sourceMeta.push({ ownerService: 'PositioningService', status: 'unavailable', reasonCode: base.positionings.reasonCode });
       return base;
     }
-    const [staffing, incidents] = await Promise.all([
+    const [staffing, incidents, positioning] = await Promise.all([
       this._readSource('StaffingEventsService', () => this.staffingService && this.staffingService.deriveTeamReadiness(shift.id)),
-      this._readSource('ReportService', () => this.reportService && this.reportService.getIncidentSummary(shift.id))
+      this._readSource('ReportService', () => this.reportService && this.reportService.getIncidentSummary(shift.id)),
+      this._readSource('PositioningService', () => this.positioningService && this.positioningService.list())
     ]);
     base.sourceMeta.push(
       { ownerService: 'StaffingEventsService', status: staffing.error ? 'unavailable' : staffing.value.stale ? 'stale' : 'ok', reasonCode: staffing.error || null },
       { ownerService: 'ReportService', status: incidents.error ? 'unavailable' : incidents.value.stale ? 'stale' : 'ok', reasonCode: incidents.error || null }
     );
+    const centerNames = new Set(centers.map(center => center.name));
+    const teamNames = new Set(staffing.error ? [] : Object.entries(staffing.value.teams || {})
+      .filter(([, team]) => team.center && centerNames.has(team.center)).map(([name]) => name));
+    base.positionings = this._positioningLayer({ positioning, staffing, teamNames, shift });
+    base.sourceMeta.push({
+      ownerService: 'PositioningService', status: base.positionings.status,
+      reasonCode: base.positionings.reasonCode, sourceAt: base.positionings.sourceAt
+    });
     if (staffing.error || incidents.error) {
       base.incidents.reasonCode = staffing.error ? 'TEAM_SCOPE_SOURCE_UNAVAILABLE' : incidents.error;
       return base;
     }
-    const centerNames = new Set(centers.map(center => center.name));
-    const teamNames = new Set(Object.entries(staffing.value.teams || {})
-      .filter(([, team]) => team.center && centerNames.has(team.center)).map(([name]) => name));
     const relevant = (incidents.value.incidents || []).filter(incident =>
       (incident.crews || []).some(crew => crew.counted && teamNames.has(crew.unit)));
     const sourceAt = latest(relevant.map(incident => incident.createdAt || incident.cadCreatedAt));
@@ -286,7 +333,7 @@ class RegionCommandReadService {
         const lat = typeof incident.lat === 'number' && Number.isFinite(incident.lat) && Math.abs(incident.lat) <= 90 ? incident.lat : null;
         const lng = typeof incident.lng === 'number' && Number.isFinite(incident.lng) && Math.abs(incident.lng) <= 180 ? incident.lng : null;
         return {
-          id: String(incident.number), type: incident.type || null, status: incident.status || 'active',
+          id: String(incident.number), code: incident.code || null, type: incident.type || null, status: incident.status || 'active',
           severity: incident.severity || null, createdAt: incident.createdAt || incident.cadCreatedAt || null,
           district: incident.district || null, street: incident.street || null, lat, lng,
           coordinateStatus: lat !== null && lng !== null ? 'ok' : 'unavailable',

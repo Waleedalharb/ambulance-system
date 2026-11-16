@@ -497,13 +497,21 @@ function broadcast(data) {
         new_report: 'incidents', report_undone: 'incidents',
         staffing_events_updated: 'staffing', completion_updated: 'staffing', team_status_changed: 'staffing',
         vehicles_updated: 'vehicles', positioning_updated: 'deployments',
+        peak_plan_added: 'deployments', peak_plan_updated: 'deployments',
         shift_started: 'shifts', shift_updated: 'shifts', shift_ended: 'shifts',
         shift_archived: 'shifts', shift_deleted: 'shifts'
     };
     if (regionCommandEventBridge && regionDomains[data && data.type]) {
+        const plan = data.plan || {};
+        const entity = regionDomains[data.type] === 'deployments' ? {
+            ...data,
+            center: data.center || plan.center || null,
+            unit: data.unit || plan.unit || null,
+            shiftId: data.shiftId || data.shift_id || plan.shiftId || null
+        } : data;
         regionCommandEventBridge.afterOperationalCommit({
-            domain: regionDomains[data.type], entity: data,
-            sourceVersion: data.event_id || data.eventId || data.shiftId || data.shift_id || null
+            domain: regionDomains[data.type], entity,
+            sourceVersion: data.event_id || data.eventId || data.shiftId || data.shift_id || plan.id || null
         }).catch(() => { /* الجسر يفشل صامتًا ولا يكسر المعاملة الأصلية */ });
     }
 }
@@ -17935,6 +17943,7 @@ function getRegionCommandServices() {
             vehicleService: vehicleEventsService,
             reportService,
             centersGeoService: getCentersGeoService(),
+            positioningService,
             getActiveShift: async () => opsEngine && opsEngine.shifts ? opsEngine.shifts.getActiveShift() : null
         });
         const decisionCenter = new RegionDecisionCenterService({ readService, scopeService });

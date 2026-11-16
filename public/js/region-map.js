@@ -66,7 +66,7 @@
       return false;
     }
     state.map = L.map('regionMap', { zoomControl: true, attributionControl: true, keyboard: true }).setView([24.7136, 46.6753], 10);
-    state.layers = { boundaries: L.layerGroup().addTo(state.map), centers: L.layerGroup().addTo(state.map), incidents: L.layerGroup().addTo(state.map), heat: typeof L.heatLayer === 'function' ? L.heatLayer([], { radius: 28, blur: 22, minOpacity: .22 }) : null };
+    state.layers = { boundaries: L.layerGroup().addTo(state.map), centers: L.layerGroup().addTo(state.map), incidents: L.layerGroup().addTo(state.map), positionings: L.layerGroup().addTo(state.map), heat: typeof L.heatLayer === 'function' ? L.heatLayer([], { radius: 28, blur: 22, minOpacity: .22 }) : null };
     setTiles();
     watchMapSize();
     state.map.on('tileerror', function () {
@@ -145,8 +145,15 @@
   }
   function popupForIncident(incident) {
     var popup = V.node('div', 'rc-map-popup');
+    var presentation = window.ProQAIncidentIcons.resolve(incident.code);
     popup.appendChild(V.node('strong', '', 'بلاغ ' + incident.id));
-    popup.appendChild(V.node('p', '', (incident.type || 'بلاغ تشغيلي') + ' · ' + V.statusLabel(incident.status)));
+    popup.appendChild(V.node('p', 'rc-proqa-popup-type', presentation.category === null ? (incident.type || presentation.label) : presentation.label));
+    popup.appendChild(V.node('p', 'rc-proqa-popup-code', incident.code ? 'ProQA: ' + incident.code : 'ProQA: غير متاح'));
+    var priority = V.node('p', 'rc-proqa-popup-priority', presentation.classificationAvailable ? 'الأولوية: ' + presentation.priorityName + ' — ' + presentation.priorityLabel : 'الأولوية: التصنيف غير متاح');
+    priority.dataset.tone = presentation.tone;
+    popup.appendChild(priority);
+    popup.appendChild(V.node('p', '', 'الحالة: ' + V.statusLabel(incident.status)));
+    if (incident.type && presentation.category !== null) popup.appendChild(V.node('p', '', 'الوصف المسجل: ' + incident.type));
     popup.appendChild(V.node('p', '', incident.district || incident.street || 'الموقع النصي غير متاح'));
     var teams = V.node('div', 'rc-map-popup-teams');
     teams.appendChild(V.node('span', '', 'الفرق:'));
@@ -266,11 +273,36 @@
     } else fitPoints(state.points);
     showBoundaryNotice(missing);
   }
+  function positioningPhaseLabel(phase) {
+    return { planned: 'مخطط — لم يبدأ', en_route: 'جارٍ — لم يُسجل الوصول', arrived: 'وصل إلى التمركز' }[phase] || 'حالة التوقيت غير متاحة';
+  }
+  function positioningMarkerHtml(positioning) {
+    return '<span class="rc-positioning-marker" data-phase="' + positioning.temporalStatus + '">' +
+      '<svg viewBox="0 0 40 48" aria-hidden="true"><path class="rc-positioning-marker__pin" d="M20 2C10.6 2 3 9.6 3 19c0 12.4 17 27 17 27s17-14.6 17-27C37 9.6 29.4 2 20 2Z"></path>' +
+      '<circle class="rc-positioning-marker__hub" cx="20" cy="19" r="10"></circle><path class="rc-positioning-marker__cross" d="M20 13v12M14 19h12"></path></svg></span>';
+  }
+  function popupForPositioning(positioning) {
+    var popup = V.node('div', 'rc-map-popup rc-positioning-popup');
+    popup.dataset.positioningId = positioning.id;
+    popup.appendChild(V.node('strong', '', positioning.title || 'تمركز تشغيلي'));
+    popup.appendChild(V.node('p', 'rc-positioning-popup-phase', positioningPhaseLabel(positioning.temporalStatus)));
+    popup.appendChild(V.node('p', '', positioning.location || 'الموقع النصي غير متاح'));
+    var teams = V.node('div', 'rc-map-popup-teams');
+    teams.appendChild(V.node('span', '', 'الفرق المستهدفة:'));
+    teams.appendChild(V.teamList(positioning.teamIdentities, positioning.teams));
+    popup.appendChild(teams);
+    popup.appendChild(V.node('p', '', 'البداية: ' + V.formatDate(positioning.startTime, true)));
+    popup.appendChild(V.node('p', '', 'النهاية: ' + V.formatDate(positioning.endTime, true)));
+    if (positioning.arrivalTime) popup.appendChild(V.node('p', '', 'تسجيل الوصول: ' + V.formatDate(positioning.arrivalTime, true)));
+    popup.appendChild(V.node('small', 'rc-positioning-popup-note', 'إحداثيات التمركز المسجلة — ليست تتبعًا حيًا للفرقة.'));
+    return popup;
+  }
   function renderLayers() {
     if (!state.map || !state.layers) return;
     renderBoundaries();
     state.layers.centers.clearLayers();
     state.layers.incidents.clearLayers();
+    state.layers.positionings.clearLayers();
     var heatPoints = [];
     state.points = [];
     state.maps.forEach(function (data, sectorId) {
@@ -284,12 +316,37 @@
         marker.on('click', function () { selectSector(sectorId, false); });
         state.points.push({ sectorId: sectorId, lat: center.lat, lng: center.lng });
       });
+      if (data.positionings && Array.isArray(data.positionings.items)) {
+        data.positionings.items.forEach(function (positioning) {
+          if (positioning.coordinateStatus !== 'ok' || positioning.lat === null || positioning.lng === null) return;
+          var icon = L.divIcon({
+            className: 'rc-marker-wrap rc-positioning-marker-wrap', html: positioningMarkerHtml(positioning),
+            iconSize: [40, 48], iconAnchor: [20, 45], popupAnchor: [0, -42]
+          });
+          var marker = L.marker([positioning.lat, positioning.lng], {
+            icon: icon, keyboard: true,
+            title: 'تمركز ' + (positioning.title || positioning.id) + ' — ' + positioningPhaseLabel(positioning.temporalStatus),
+            // إبقاء رمز + مقروءًا عند اشتراك التمركز والبلاغ في نقطة متقاربة.
+            zIndexOffset: 600,
+            positioningId: positioning.id
+          }).addTo(state.layers.positionings);
+          marker.bindPopup(popupForPositioning(positioning));
+          marker.on('click', function () { selectSector(sectorId, false); });
+          state.points.push({ sectorId: sectorId, lat: positioning.lat, lng: positioning.lng });
+        });
+      }
       if (data.incidents && Array.isArray(data.incidents.items)) {
         data.incidents.items.forEach(function (incident) {
           if (incident.status !== 'active' || incident.coordinateStatus !== 'ok' || incident.lat === null || incident.lng === null) return;
-          var severity = ['green', 'yellow', 'red'].includes(incident.severity) ? incident.severity : 'red';
-          var icon = L.divIcon({ className: 'rc-marker-wrap', html: '<span class="rc-map-marker incident" data-severity="' + severity + '"></span>', iconSize: [16, 16], iconAnchor: [8, 8] });
-          var marker = L.marker([incident.lat, incident.lng], { icon: icon, keyboard: true, title: 'بلاغ ' + incident.id }).addTo(state.layers.incidents);
+          // حلقة ProQA من كود CAD فقط؛ incident.severity التشغيلي يبقى مستقلًا ولا يحدد لونها.
+          var presentation = window.ProQAIncidentIcons.resolve(incident.code);
+          var icon = L.divIcon({
+            className: 'rc-marker-wrap rc-proqa-marker-wrap',
+            html: window.ProQAIncidentIcons.markerHtml(incident.code),
+            iconSize: [42, 50], iconAnchor: [21, 48], popupAnchor: [0, -44]
+          });
+          var title = presentation.label + (incident.code ? ' · ' + incident.code : ' · التصنيف غير متاح');
+          var marker = L.marker([incident.lat, incident.lng], { icon: icon, keyboard: true, title: 'بلاغ ' + incident.id + ' — ' + title }).addTo(state.layers.incidents);
           marker.bindPopup(popupForIncident(incident));
           marker.on('click', function () { selectSector(sectorId, false); });
           state.points.push({ sectorId: sectorId, lat: incident.lat, lng: incident.lng });
@@ -595,12 +652,16 @@
     var mapData = selectedMapData();
     var incidents = mapData.flatMap(function (data) { return data.incidents ? data.incidents.items : []; });
     incidents.forEach(function (incident) {
+      var presentation = window.ProQAIncidentIcons.resolve(incident.code);
       var row = V.node('article', 'rc-map-row');
+      row.dataset.proqaCategory = presentation.category === null ? 'unknown' : String(presentation.category);
+      row.dataset.proqaTone = presentation.tone;
       var head = V.node('div', 'rc-map-row-head');
       head.appendChild(V.node('strong', '', 'بلاغ ' + incident.id));
       head.appendChild(V.statusBadge(incident.status));
       row.appendChild(head);
-      row.appendChild(V.node('p', '', (incident.type || 'بلاغ') + ' · ' + (incident.district || incident.street || 'الحي غير متاح')));
+      row.appendChild(V.node('p', '', (presentation.category === null ? (incident.type || presentation.label) : presentation.label) + ' · ' + (incident.district || incident.street || 'الحي غير متاح')));
+      row.appendChild(V.node('p', 'rc-proqa-row-code', incident.code ? 'ProQA: ' + incident.code + ' · ' + presentation.priorityName : 'ProQA: التصنيف غير متاح'));
       row.appendChild(V.teamList(incident.teamIdentities, incident.teams));
       row.appendChild(V.node('small', '', incident.coordinateStatus === 'ok' ? 'موقع مسجل على الخريطة' : 'بلا إحداثيات — لا يُرسم'));
       container.appendChild(row);
@@ -625,6 +686,11 @@
     var notes = V.clear(id('mapCenterNotes'));
     mapData.flatMap(function (data) { return data.centers || []; }).filter(function (center) { return center.coordinateStatus !== 'ok'; }).forEach(function (center) {
       notes.appendChild(V.node('p', '', center.name + ': ' + V.reasonLabel(center.reasonCode)));
+    });
+    mapData.flatMap(function (data) { return data.positionings ? data.positionings.items : []; }).filter(function (positioning) {
+      return positioning.coordinateStatus !== 'ok';
+    }).forEach(function (positioning) {
+      notes.appendChild(V.node('p', '', 'تمركز ' + (positioning.title || positioning.id) + ': إحداثيات التمركز غير مسجلة؛ لم يُرسم موقع بديل.'));
     });
   }
   function setMapTab(tab) {
