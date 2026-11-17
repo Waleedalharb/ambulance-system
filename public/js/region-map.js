@@ -319,8 +319,9 @@
       if (data.positionings && Array.isArray(data.positionings.items)) {
         data.positionings.items.forEach(function (positioning) {
           if (positioning.coordinateStatus !== 'ok' || positioning.lat === null || positioning.lng === null) return;
+          var positioningPulse = data.positionings.status === 'ok' && positioning.status === 'active' ? ' rc-live-pulse' : '';
           var icon = L.divIcon({
-            className: 'rc-marker-wrap rc-positioning-marker-wrap', html: positioningMarkerHtml(positioning),
+            className: 'rc-marker-wrap rc-positioning-marker-wrap' + positioningPulse, html: positioningMarkerHtml(positioning),
             iconSize: [40, 48], iconAnchor: [20, 45], popupAnchor: [0, -42]
           });
           var marker = L.marker([positioning.lat, positioning.lng], {
@@ -340,8 +341,9 @@
           if (incident.status !== 'active' || incident.coordinateStatus !== 'ok' || incident.lat === null || incident.lng === null) return;
           // حلقة ProQA من كود CAD فقط؛ incident.severity التشغيلي يبقى مستقلًا ولا يحدد لونها.
           var presentation = window.ProQAIncidentIcons.resolve(incident.code);
+          var incidentPulse = data.incidents.status === 'ok' ? ' rc-live-pulse' : '';
           var icon = L.divIcon({
-            className: 'rc-marker-wrap rc-proqa-marker-wrap',
+            className: 'rc-marker-wrap rc-proqa-marker-wrap' + incidentPulse,
             html: window.ProQAIncidentIcons.markerHtml(incident.code),
             iconSize: [42, 50], iconAnchor: [21, 48], popupAnchor: [0, -44]
           });

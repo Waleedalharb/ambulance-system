@@ -104,6 +104,20 @@ class Cdp {
           return;
         }
         this.externalRequests.push({ url: request.url, resourceType, fulfilledLocally: true });
+        const vendorFiles = {
+          'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js': ['leaflet.js', 'application/javascript'],
+          'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css': ['leaflet.css', 'text/css'],
+          'https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js': ['leaflet-heat.js', 'application/javascript']
+        };
+        const vendorFile = vendorFiles[request.url];
+        if (process.env.REGION_COMMAND_TEST_VENDOR && vendorFile) {
+          this.send('Fetch.fulfillRequest', {
+            requestId, responseCode: 200,
+            responseHeaders: [{ name: 'Content-Type', value: vendorFile[1] }, { name: 'Cache-Control', value: 'no-store' }],
+            body: fs.readFileSync(path.join(process.env.REGION_COMMAND_TEST_VENDOR, vendorFile[0])).toString('base64')
+          }).catch(error => exceptions.push({ text: error.message }));
+          return;
+        }
         const image = resourceType === 'Image';
         this.send('Fetch.fulfillRequest', {
           requestId, responseCode: image ? 200 : 204,
@@ -262,6 +276,10 @@ async function regionDashboard() {
     check('لوحة فرق الخريطة تعرض الرمز والقطاع والمناوبة ورقم الفرقة', await evaluate(`(()=>{const text=document.getElementById('mapTeamList').textContent;return text.includes('R-3-2-1')&&text.includes('R-3-2-2')&&text.includes('قطاع جنوب الرياض')&&text.includes('ليلية')&&text.includes('فرقة 1');})()`));
     await click('[data-map-tab="incidents"]');
     check('بلاغات الخريطة تعرض رموز الفرق المرتبطة', await evaluate(`(()=>{const text=document.getElementById('mapIncidentList').textContent;return text.includes('R-3-2-1')&&text.includes('R-3-2-2')&&text.includes('قطاع جنوب الرياض');})()`));
+    check('البلاغ المتوسط ينبض باستمرار دون تغيير الرمز', await evaluate(`(()=>{const marker=document.querySelector('.rc-proqa-marker[data-proqa-tone="yellow"]');const pulse=getComputedStyle(marker,'::before');return marker.closest('.rc-live-pulse')&&marker.querySelector('.rc-proqa-marker__svg .rc-proqa-marker__glyph')&&pulse.animationName==='rc-proqa-pulse-medium'&&pulse.animationDuration==='2.5s'&&pulse.animationIterationCount==='infinite';})()`));
+    check('البلاغ عالي الخطورة له نبض مزدوج مستمر', await evaluate(`(()=>{const marker=document.querySelector('.rc-proqa-marker[data-proqa-tone="red"]');const pulse=getComputedStyle(marker,'::before');return marker.closest('.rc-live-pulse')&&pulse.animationName==='rc-proqa-pulse-high'&&pulse.animationDuration==='1.8s'&&pulse.animationIterationCount==='infinite';})()`));
+    check('التمركز النشط له تنفس هادئ مستقل ومستمر', await evaluate(`(()=>{const marker=document.querySelector('.rc-positioning-marker');const pulse=getComputedStyle(marker,'::before');return marker.closest('.rc-live-pulse')&&pulse.animationName==='rc-positioning-breathe'&&pulse.animationDuration==='5s'&&pulse.animationIterationCount==='infinite';})()`));
+    check('البلاغ المغلق وبلا إحداثيات لا يظهران كعلامات نابضة', await evaluate('!document.querySelector(\'[title^="بلاغ TEST-I-2 "]\') && !document.querySelector(\'[title^="بلاغ TEST-I-NO-GEO "]\')'));
     await click('[data-map-tab="teams"]');
     check('توزيع RTL يضع لوحة القطاع يمين الخريطة', await evaluate('(()=>{const map=document.querySelector(".rc-map-stage").getBoundingClientRect();const panel=document.querySelector(".rc-map-panel").getBoundingClientRect();return map.left < panel.left && getComputedStyle(document.querySelector(".rc-map-workspace > *")).direction === "rtl";})()'));
     check('لا تُرسم مضلعات للقطاعات', await evaluate('document.querySelectorAll("#regionMap path.leaflet-interactive").length') === 0);
@@ -270,11 +288,12 @@ async function regionDashboard() {
     await evaluate('document.querySelector("[data-layer=heat]").click(); true');
     check('طبقة الكثافة الحرارية قابلة للتفعيل', await evaluate('document.querySelector("[data-layer=heat]").checked'));
     check('اللوحة التحليلية تعرض الجاهزية الفعلية والقوة والمركبات وتوزيع الفرق', await evaluate('document.getElementById("mapReadinessValue").textContent.includes("0") && document.querySelectorAll("#mapDetailMetrics .rc-force-row").length === 2 && document.getElementById("mapDetailMetrics").textContent.includes("مشغولة في بلاغ") && !!document.getElementById("mapTeamDistribution")'));
-    check('الخريطة تعرض زمن المباشرة وتغطيته الفعلية', await evaluate('document.getElementById("mapResponseMetrics").textContent.includes("5.3") && document.getElementById("mapResponseMetrics").textContent.includes("3 / 4")'));
+    check('الخريطة تعرض زمن المباشرة وتغطيته الفعلية', await evaluate('document.getElementById("mapResponseMetrics").textContent.includes("5.3") && document.getElementById("mapResponseMetrics").textContent.replace(/\\s/g,"").includes("3/4")'));
     check('قائمة فرق الخريطة تعرض البلاغات النشطة للفرق المشغولة', await evaluate('document.getElementById("mapTeamList").textContent.includes("TEST-I-NEW") && document.getElementById("mapTeamList").textContent.includes("مشغولة في بلاغ")'));
     await evaluate(`window.__mapResizeChecks=[];
       const originalInvalidate=L.Map.prototype.invalidateSize;
       L.Map.prototype.invalidateSize=function(options){
+        window.__testMap=this;
         const before=this.getCenter(); const zoom=this.getZoom();
         const result=originalInvalidate.call(this,options);
         const after=this.getCenter();
@@ -285,7 +304,8 @@ async function regionDashboard() {
     await click('#toggleSectorPanel');
     await waitFor(`document.querySelector(".rc-map-workspace").classList.contains("rc-panel-collapsed") && document.querySelector(".rc-map-stage").getBoundingClientRect().width > ${expandedMapWidth + 250} && window.__mapResizeChecks.length > 0`, 10000, 'collapsed map expansion');
     check('طي اللوحة يمدد الخريطة تلقائيًا', await evaluate('document.getElementById("toggleSectorPanel").getAttribute("aria-expanded") === "false" && document.getElementById("sectorPanel").inert'));
-    check('الطي يحفظ مركز الخريطة وزومها والقطاع والطبقات', await evaluate(`(()=>{const checks=window.__mapResizeChecks;const last=checks[checks.length-1];return Math.abs(last.before.lat-last.after.lat)<1e-9 && Math.abs(last.before.lng-last.after.lng)<1e-9 && last.zoomBefore===last.zoomAfter && new URLSearchParams(location.search).get("sector")==="S1" && document.querySelector("[data-layer=heat]").checked && document.querySelector("[data-layer=centers]").checked;})()`));
+    await sleep(1300);
+    check('الطي يحفظ مركز الخريطة وزومها والقطاع والطبقات', await evaluate(`(()=>{const first=window.__mapResizeChecks[0];const current=window.__testMap.getCenter();return Math.abs(first.before.lat-current.lat)<1e-9 && Math.abs(first.before.lng-current.lng)<1e-9 && first.zoomBefore===window.__testMap.getZoom() && new URLSearchParams(location.search).get("sector")==="S1" && document.querySelector("[data-layer=heat]").checked && document.querySelector("[data-layer=centers]").checked;})()`));
     await screenshot('03b-region-map-collapsed');
     await click('#toggleSectorPanel');
     await waitFor(`!document.querySelector(".rc-map-workspace").classList.contains("rc-panel-collapsed") && Math.abs(document.querySelector(".rc-map-stage").getBoundingClientRect().width - ${expandedMapWidth}) < 3`, 10000, 'expanded map restoration');
@@ -303,6 +323,14 @@ async function regionDashboard() {
     await screenshot('04-region-map-light');
     await click('[data-map-tab="sources"]');
     check('تبويب حالة المصادر يعرض بيانات', await evaluate('document.getElementById("mapSourceList").textContent.length > 20'));
+    await navigate(baseUrl + '/region-map.html?sector=S2');
+    await waitFor('document.querySelector(".rc-proqa-marker[data-proqa-tone=green]")', 15000, 'green incident pulse');
+    check('البلاغ منخفض الخطورة ينبض بهدوء أبطأ', await evaluate(`(()=>{const marker=document.querySelector('.rc-proqa-marker[data-proqa-tone="green"]');const pulse=getComputedStyle(marker,'::before');return marker.closest('.rc-live-pulse')&&pulse.animationName==='rc-proqa-pulse-low'&&pulse.animationDuration==='4s'&&pulse.animationIterationCount==='infinite';})()`));
+    await post('/__test/mode', { mode: 'stale' });
+    await navigate(baseUrl + '/region-map.html?sector=S1');
+    await waitFor('document.querySelectorAll(".rc-proqa-marker-wrap").length>=2', 15000, 'stale incident markers');
+    check('المصدر القديم يوقف نبض البلاغات', await evaluate(`Array.from(document.querySelectorAll('.rc-proqa-marker-wrap')).every(wrapper=>!wrapper.classList.contains('rc-live-pulse')&&getComputedStyle(wrapper.querySelector('.rc-proqa-marker'),'::before').animationName==='none')`));
+    await post('/__test/mode', { mode: 'ok' });
   } else {
     await waitFor('!document.getElementById("mapError").hidden && document.getElementById("mapError").textContent.includes("مكتبة الخرائط غير متاحة")', 10000, 'Leaflet unavailable fallback');
     check('غياب Leaflet الخارجي يظهر عذرًا صريحًا ولا يختلق خريطة', await evaluate('document.getElementById("mapError").textContent.includes("مكتبة الخرائط غير متاحة")'));

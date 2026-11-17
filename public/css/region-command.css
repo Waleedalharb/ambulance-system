@@ -318,10 +318,44 @@ button.rc-metric-card:hover { border-color: color-mix(in srgb, var(--rc-accent) 
 .rc-positioning-marker__cross { fill: none; stroke: #101C28; stroke-width: 2.2; stroke-linecap: round; }
 .rc-positioning-popup-phase { color: currentColor !important; font-weight: 600; }
 .rc-positioning-popup-note { color: var(--rc-accent-soft) !important; }
-/* علامات ProQA المعتمدة: دبوس داكن + رمز محلي + حلقة أولوية دقيقة، بلا وميض أو هالات. */
+/* علامات ProQA المعتمدة: الرمز ثابت؛ النبض هالة خارجية فقط حسب أولوية CAD. */
 .leaflet-marker-icon.rc-proqa-marker-wrap { overflow: visible !important; background: transparent !important; border: 0 !important; }
-.rc-proqa-marker { display: block; width: 42px; height: 50px; color: var(--rc-proqa-priority, #8EA5AF); filter: drop-shadow(0 4px 5px rgba(0,0,0,.5)); }
-.rc-proqa-marker__svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.rc-proqa-marker { position: relative; display: block; width: 42px; height: 50px; color: var(--rc-proqa-priority, #8EA5AF); filter: drop-shadow(0 4px 5px rgba(0,0,0,.5)); }
+.rc-proqa-marker__svg { position: relative; z-index: 1; display: block; width: 100%; height: 100%; overflow: visible; }
+.rc-proqa-marker::before, .rc-positioning-marker::before {
+  content: ""; position: absolute; z-index: 0; pointer-events: none; border-radius: 50%;
+  border: 2px solid currentColor; opacity: 0; transform: translate(-50%, -50%) scale(.72);
+}
+.rc-proqa-marker::before { inset-inline-start: 50%; top: 38%; width: 32px; height: 32px; }
+.rc-proqa-marker-wrap.rc-live-pulse .rc-proqa-marker[data-proqa-tone="green"]::before { animation: rc-proqa-pulse-low 4s ease-out infinite; }
+.rc-proqa-marker-wrap.rc-live-pulse .rc-proqa-marker[data-proqa-tone="yellow"]::before { animation: rc-proqa-pulse-medium 2.5s ease-out infinite; }
+.rc-proqa-marker-wrap.rc-live-pulse .rc-proqa-marker[data-proqa-tone="red"]::before { animation: rc-proqa-pulse-high 1.8s ease-out infinite; }
+.rc-positioning-marker { position: relative; }
+.rc-positioning-marker svg { position: relative; z-index: 1; }
+.rc-positioning-marker::before { inset-inline-start: 50%; top: 40%; width: 28px; height: 28px; border-width: 1.5px; }
+.rc-positioning-marker-wrap.rc-live-pulse .rc-positioning-marker::before { animation: rc-positioning-breathe 5s ease-in-out infinite; }
+@keyframes rc-proqa-pulse-low {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(.72); }
+  18% { opacity: .32; }
+  82%, 100% { opacity: 0; transform: translate(-50%, -50%) scale(1.65); }
+}
+@keyframes rc-proqa-pulse-medium {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(.72); }
+  18% { opacity: .45; }
+  82%, 100% { opacity: 0; transform: translate(-50%, -50%) scale(1.7); }
+}
+@keyframes rc-proqa-pulse-high {
+  0%, 8% { opacity: 0; transform: translate(-50%, -50%) scale(.72); }
+  18% { opacity: .58; }
+  43% { opacity: 0; transform: translate(-50%, -50%) scale(1.65); }
+  43.1%, 51% { opacity: 0; transform: translate(-50%, -50%) scale(.72); }
+  61% { opacity: .52; }
+  88%, 100% { opacity: 0; transform: translate(-50%, -50%) scale(1.65); }
+}
+@keyframes rc-positioning-breathe {
+  0%, 100% { opacity: .08; transform: translate(-50%, -50%) scale(.82); }
+  50% { opacity: .3; transform: translate(-50%, -50%) scale(1.5); }
+}
 .rc-proqa-popup-type { color: var(--rc-text) !important; font-weight: 600; }
 .rc-proqa-popup-code { direction: ltr; unicode-bidi: isolate; text-align: right; font-variant-numeric: tabular-nums; }
 .rc-proqa-popup-priority { font-weight: 600; }

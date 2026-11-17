@@ -95,15 +95,15 @@ const reportService = {
     if (mode === 'unavailable') throw new Error('synthetic source outage');
     let incidents;
     if (Number(shiftId) === 101) incidents = [
-      { number: 'TEST-I-1', type: 'إصابة اختبارية', status: 'active', severity: 'yellow', district: 'حي اختبار 1', createdAt: NOW, lat: 24.612, lng: 46.752, bestArrivalMin: 8, bestMubasharaMin: 5, crews: [{ unit: 'جنوب 1', counted: true, cadUrs: 'A' }] },
-      { number: 'TEST-I-2', type: 'حالة اختبارية', status: 'closed', severity: 'green', district: 'حي اختبار 2', createdAt: NOW, lat: 24.62, lng: 46.76, bestArrivalMin: 12, bestMubasharaMin: 7, crews: [{ unit: 'جنوب 2', counted: true }] },
+      { number: 'TEST-I-1', code: '29B02', type: 'إصابة اختبارية', status: 'active', severity: 'yellow', district: 'حي اختبار 1', createdAt: NOW, lat: 24.612, lng: 46.752, bestArrivalMin: 8, bestMubasharaMin: 5, crews: [{ unit: 'جنوب 1', counted: true, cadUrs: 'A' }] },
+      { number: 'TEST-I-2', code: '17A01', type: 'حالة اختبارية', status: 'closed', severity: 'green', district: 'حي اختبار 2', createdAt: NOW, lat: 24.62, lng: 46.76, bestArrivalMin: 12, bestMubasharaMin: 7, crews: [{ unit: 'جنوب 2', counted: true }] },
       { number: 'TEST-I-NO-GEO', type: 'بلا إحداثيات', status: 'active', district: 'حي اختبار 3', createdAt: NOW, lat: null, lng: null, bestArrivalMin: 10, bestMubasharaMin: null, crews: [{ unit: 'جنوب 1', counted: true, cadUrs: 'A' }] }
     ];
     else {
       const item = otherTeams[shiftId];
-      incidents = [{ number: 'TEST-I-' + shiftId, type: 'حالة اختبارية', status: 'active', severity: 'red', district: 'حي ' + item.name, createdAt: NOW, lat: 24.63, lng: 46.77, bestArrivalMin: 9, bestMubasharaMin: 6, crews: [{ unit: item.name, counted: true }] }];
+      incidents = [{ number: 'TEST-I-' + shiftId, code: Number(shiftId) === 202 ? '17A01' : '10D01', type: 'حالة اختبارية', status: 'active', severity: 'red', district: 'حي ' + item.name, createdAt: NOW, lat: 24.63, lng: 46.77, bestArrivalMin: 9, bestMubasharaMin: 6, crews: [{ unit: item.name, counted: true }] }];
     }
-    if (revision && Number(shiftId) === 101) incidents.push({ number: 'TEST-I-NEW', type: 'تحديث لحظي اختباري', status: 'active', severity: 'red', district: 'حي التحديث', createdAt: NOW, lat: 24.616, lng: 46.757, bestArrivalMin: 7, bestMubasharaMin: 4, crews: [{ unit: 'جنوب 2', counted: true, cadUrs: 'A' }] });
+    if (revision && Number(shiftId) === 101) incidents.push({ number: 'TEST-I-NEW', code: '9E01', type: 'تحديث لحظي اختباري', status: 'active', severity: 'red', district: 'حي التحديث', createdAt: NOW, lat: 24.616, lng: 46.757, bestArrivalMin: 7, bestMubasharaMin: 4, crews: [{ unit: 'جنوب 2', counted: true, cadUrs: 'A' }] });
     return { shiftId, incidents, stale: mode === 'stale' };
   },
   getHistoricalSummary: async (from, to) => {
@@ -132,8 +132,13 @@ const centersGeoService = { getData: () => mode === 'geo-unavailable' ? null : (
     'مركز C6': { center: [24.65, 46.79] }
   }, nonGeographic: { 'مركز C5': 'مركز اختبار غير جغرافي' }
 }) };
+const positioningService = { list: async () => [{
+  id: 'TEST-POSITIONING-1', shiftId: '101', title: 'تمركز اختباري', location: 'موقع اختباري',
+  status: 'active', unit: 'جنوب 1', units: ['جنوب 1'], planType: 'تغطية',
+  startTime: NOW, createdAt: NOW, lat: 24.614, lng: 46.754, departureTime: null
+}] };
 const readService = new RegionCommandReadService({
-  scopeService, staffingService, vehicleService, reportService, centersGeoService,
+  scopeService, staffingService, vehicleService, reportService, centersGeoService, positioningService,
   getActiveShift: async ({ sectorId }) => mode === 'empty' ? null : ({ id: shiftBySector[sectorId], shift_name: 'مناوبة اختبار اصطناعية', shift_type: 'ليلية', shift_date: '2026-11-14' }),
   now: () => NOW
 });
