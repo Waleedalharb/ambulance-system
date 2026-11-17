@@ -906,7 +906,7 @@ class ReportService {
         const byType = {}, byCrew = {}, byDistrict = {}, byStatus = {};
         const rtArrival = [], rtMubashara = [];
         let cancBeforeArrival = 0, cancAfterArrival = 0;
-        const detail = inRange.map(({ ic }) => {
+        const detail = inRange.map(({ ic, ts }) => {
             const t = ic.type || 'other';
             byType[t] = (byType[t] || 0) + 1; // مرة واحدة لكل بلاغ — مثل الملخص الشيفتي
             const dName = ic.district || 'غير محدد';
@@ -946,6 +946,7 @@ class ReportService {
                 number: ic.number, code: ic.code, type: t, source: ic.source,
                 status: st, severity: null, // ذاكرة تاريخية: لا خطورة حية إطلاقًا
                 shiftId: ic.shift_id != null ? ic.shift_id : null,
+                occurredAt: new Date(ts).toISOString(),
                 createdAt: ic.created_at, cadCreatedAt: ic.cad_created_at || null,
                 address: ic.address || null, region: ic.region || null, district: ic.district || null,
                 street: ic.street || null, city: ic.city || null,

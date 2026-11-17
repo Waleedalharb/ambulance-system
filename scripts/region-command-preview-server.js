@@ -19,6 +19,23 @@ function argValue(name, fallback) {
 const port = Number(argValue('--port', process.env.PORT || 7100));
 const host = argValue('--host', process.env.HOST || '127.0.0.1');
 const db = createFixture();
+// خمسة قطاعات مستقلة داخل R1 للمعاينة فقط؛ لا يتغير fixture اختبارات الوحدة.
+db.hdl.prepare("UPDATE regions SET name='منطقة الرياض' WHERE id='R1'").run();
+db.hdl.prepare("UPDATE sectors SET code='R-3', name='قطاع جنوب الرياض' WHERE id='S1'").run();
+db.hdl.prepare("UPDATE sectors SET code='R-2', name='قطاع شرق الرياض' WHERE id='S2'").run();
+db.hdl.prepare("UPDATE sectors SET region_id='R1', code='R-1', name='قطاع وسط الرياض' WHERE id='S3'").run();
+db.hdl.prepare("INSERT INTO centers(id,name) VALUES ('C6','مركز C6')").run();
+db.hdl.prepare("INSERT INTO sectors(id,region_id,code,name,status,created_at) VALUES ('S4','R1','R-4','قطاع شمال الرياض','active',?),('S5','R1','R-5','قطاع غرب الرياض','active',?)").run(NOW, NOW);
+db.hdl.prepare("INSERT INTO sector_centers(id,sector_id,center_id,effective_from,effective_to,created_at) VALUES ('SC5','S4','C5','2020-01-01T00:00:00.000Z',NULL,?),('SC6','S5','C6','2020-01-01T00:00:00.000Z',NULL,?)").run(NOW, NOW);
+db.hdl.exec('CREATE TABLE teams (id INTEGER PRIMARY KEY, name TEXT NOT NULL, center TEXT NOT NULL, is_active INTEGER NOT NULL DEFAULT 1)');
+const insertTeam = db.hdl.prepare('INSERT INTO teams(id, name, center, is_active) VALUES (?, ?, ?, 1)');
+insertTeam.run(1, 'جنوب 1', 'مركز C1');
+insertTeam.run(2, 'جنوب 2', 'مركز C2');
+insertTeam.run(3, 'شرق 1', 'مركز C3');
+insertTeam.run(4, 'وسط 1', 'مركز C4');
+insertTeam.run(5, 'شمال 1', 'مركز C5');
+insertTeam.run(6, 'غرب 1', 'مركز C6');
+insertTeam.run(7, 'فريق خارج النطاق', 'مركز C7');
 const accounts = {
   region: { id: 'region', role: 'director', name: 'قائد منطقة اختبار', permissions: new Set(['region.command.view', 'region.audit.view']) },
   sector: { id: 'sector', role: 'user', name: 'قائد قطاع اختبار', permissions: new Set(['region.command.view']) },
@@ -37,42 +54,87 @@ const permissionService = {
 const scopeService = new RegionScopeService({ db, permissionService, now: () => NOW });
 let mode = 'ok';
 let revision = 0;
+const shiftBySector = { S1: 101, S2: 202, S3: 303, S4: 404, S5: 505 };
+const otherTeams = {
+  202: { name: 'شرق 1', center: 'مركز C3', vehicleId: 'V3', activeCount: 3, requiredPersonnel: 3 },
+  303: { name: 'وسط 1', center: 'مركز C4', vehicleId: 'V4', activeCount: 2, requiredPersonnel: 2 },
+  404: { name: 'شمال 1', center: 'مركز C5', vehicleId: 'V5', activeCount: 2, requiredPersonnel: 2 },
+  505: { name: 'غرب 1', center: 'مركز C6', vehicleId: 'V6', activeCount: 2, requiredPersonnel: 2 }
+};
 const staffingService = { deriveTeamReadiness: async shiftId => {
   if (mode === 'unavailable') throw new Error('synthetic source outage');
-  const teams = shiftId === 101 ? {
-    'جنوب 1': { status: 'ready', center: 'مركز C1', activeCount: 2, requiredPersonnel: 2, lastDecision: { at: NOW } },
-    'جنوب 2': { status: revision ? 'ready' : 'missing', center: 'مركز C2', activeCount: revision ? 2 : 1, requiredPersonnel: 2, lastDecision: { at: NOW } }
-  } : {
-    'فريق اختبار 3': { status: 'ready', center: 'مركز C3', activeCount: 3, requiredPersonnel: 3, lastDecision: { at: NOW } }
+  let teams;
+  if (Number(shiftId) === 101) teams = {
+    'جنوب 1': { status: 'ready', center: 'مركز C1', activeCount: 2, requiredPersonnel: 2, vehicleId: 'V1', lastDecision: { at: NOW } },
+    'جنوب 2': { status: revision ? 'ready' : 'missing', center: 'مركز C2', activeCount: revision ? 2 : 1, requiredPersonnel: 2, vehicleId: 'V2', lastDecision: { at: NOW } }
   };
+  else {
+    const item = otherTeams[shiftId];
+    teams = { [item.name]: { status: 'ready', center: item.center, activeCount: item.activeCount, requiredPersonnel: item.requiredPersonnel, vehicleId: item.vehicleId, lastDecision: { at: NOW } } };
+  }
   return { shiftId, teams, stale: mode === 'stale' };
 } };
-const vehicleService = { getState: async shiftId => {
-  if (mode === 'unavailable') throw new Error('synthetic source outage');
-  return { shiftId, stale: mode === 'stale', entities: shiftId === 101 ? [
-    { entityId: 'V1', entityName: 'مركبة اختبار 1', center: 'مركز C1', open: [{ status: 'active', created_at: NOW }] },
-    { entityId: 'V2', entityName: 'مركبة اختبار 2', center: 'مركز C2', open: [{ status: 'breakdown', created_at: NOW }] }
-  ] : [{ entityId: 'V3', entityName: 'مركبة اختبار 3', center: 'مركز C3', open: [{ status: 'active', created_at: NOW }] }] };
-} };
-const reportService = { getIncidentSummary: async shiftId => {
-  if (mode === 'unavailable') throw new Error('synthetic source outage');
-  const incidents = shiftId === 101 ? [
-    { number: 'TEST-I-1', type: 'إصابة اختبارية', status: 'active', severity: 'yellow', district: 'حي اختبار 1', createdAt: NOW, lat: 24.612, lng: 46.752, bestArrivalMin: 8, crews: [{ unit: 'جنوب 1', counted: true }] },
-    { number: 'TEST-I-2', type: 'حالة اختبارية', status: 'closed', severity: 'green', district: 'حي اختبار 2', createdAt: NOW, lat: 24.62, lng: 46.76, bestArrivalMin: 12, crews: [{ unit: 'جنوب 2', counted: true }] },
-    { number: 'TEST-I-NO-GEO', type: 'بلا إحداثيات', status: 'active', district: 'حي اختبار 3', createdAt: NOW, lat: null, lng: null, bestArrivalMin: 10, crews: [{ unit: 'جنوب 1', counted: true }] }
-  ] : [{ number: 'TEST-I-3', type: 'حالة اختبارية', status: 'active', severity: 'red', district: 'حي اختبار 4', createdAt: NOW, lat: 24.63, lng: 46.77, bestArrivalMin: 9, crews: [{ unit: 'فريق اختبار 3', counted: true }] }];
-  if (revision && shiftId === 101) incidents.push({ number: 'TEST-I-NEW', type: 'تحديث لحظي اختباري', status: 'active', severity: 'red', district: 'حي التحديث', createdAt: NOW, lat: 24.616, lng: 46.757, bestArrivalMin: 7, crews: [{ unit: 'جنوب 2', counted: true }] });
-  return { shiftId, incidents, stale: mode === 'stale' };
-} };
+const vehicleService = {
+  getBoard: async shiftId => {
+    if (mode === 'unavailable') throw new Error('synthetic source outage');
+    let vehicles;
+    if (Number(shiftId) === 101) vehicles = [
+      { id: 'V1', name: 'مركبة اختبار 1', status: 'active', since: NOW },
+      { id: 'V2', name: 'مركبة اختبار 2', status: 'breakdown', since: NOW }
+    ];
+    else {
+      const item = otherTeams[shiftId];
+      vehicles = [{ id: item.vehicleId, name: 'مركبة ' + item.name, status: 'active', since: NOW }];
+    }
+    return { shiftId, vehicles, stale: mode === 'stale' };
+  },
+  getState: async () => { throw new Error('synthetic fixture requires the current vehicle board'); }
+};
+const reportService = {
+  getIncidentSummary: async shiftId => {
+    if (mode === 'unavailable') throw new Error('synthetic source outage');
+    let incidents;
+    if (Number(shiftId) === 101) incidents = [
+      { number: 'TEST-I-1', type: 'إصابة اختبارية', status: 'active', severity: 'yellow', district: 'حي اختبار 1', createdAt: NOW, lat: 24.612, lng: 46.752, bestArrivalMin: 8, bestMubasharaMin: 5, crews: [{ unit: 'جنوب 1', counted: true, cadUrs: 'A' }] },
+      { number: 'TEST-I-2', type: 'حالة اختبارية', status: 'closed', severity: 'green', district: 'حي اختبار 2', createdAt: NOW, lat: 24.62, lng: 46.76, bestArrivalMin: 12, bestMubasharaMin: 7, crews: [{ unit: 'جنوب 2', counted: true }] },
+      { number: 'TEST-I-NO-GEO', type: 'بلا إحداثيات', status: 'active', district: 'حي اختبار 3', createdAt: NOW, lat: null, lng: null, bestArrivalMin: 10, bestMubasharaMin: null, crews: [{ unit: 'جنوب 1', counted: true, cadUrs: 'A' }] }
+    ];
+    else {
+      const item = otherTeams[shiftId];
+      incidents = [{ number: 'TEST-I-' + shiftId, type: 'حالة اختبارية', status: 'active', severity: 'red', district: 'حي ' + item.name, createdAt: NOW, lat: 24.63, lng: 46.77, bestArrivalMin: 9, bestMubasharaMin: 6, crews: [{ unit: item.name, counted: true }] }];
+    }
+    if (revision && Number(shiftId) === 101) incidents.push({ number: 'TEST-I-NEW', type: 'تحديث لحظي اختباري', status: 'active', severity: 'red', district: 'حي التحديث', createdAt: NOW, lat: 24.616, lng: 46.757, bestArrivalMin: 7, bestMubasharaMin: 4, crews: [{ unit: 'جنوب 2', counted: true, cadUrs: 'A' }] });
+    return { shiftId, incidents, stale: mode === 'stale' };
+  },
+  getHistoricalSummary: async (from, to) => {
+    if (mode === 'unavailable') throw new Error('synthetic source outage');
+    const incidents = [
+      { number: 'TEST-H-SHARED', shiftId: 'H1', occurredAt: '2026-11-13T21:30:00.000Z', bestArrivalMin: 8, bestMubasharaMin: 4, crews: [{ unit: 'جنوب 1', counted: true }, { unit: 'شرق 1', counted: true }] },
+      { number: 'TEST-H-S1', shiftId: 'H2', occurredAt: '2026-11-12T10:00:00.000Z', bestArrivalMin: 10, bestMubasharaMin: 6, crews: [{ unit: 'جنوب 2', counted: true }] },
+      { number: 'TEST-H-NO-TIME', shiftId: 'H3', occurredAt: '2026-11-11T09:00:00.000Z', bestArrivalMin: null, bestMubasharaMin: null, crews: [{ unit: 'جنوب 1', counted: true }] },
+      { number: 'TEST-H-S2', shiftId: 'H4', occurredAt: '2026-11-10T12:00:00.000Z', bestArrivalMin: 12, bestMubasharaMin: 8, crews: [{ unit: 'شرق 1', counted: true }] },
+      { number: 'TEST-H-S3', shiftId: 'H6', occurredAt: '2026-11-09T12:00:00.000Z', bestArrivalMin: 11, bestMubasharaMin: 7, crews: [{ unit: 'وسط 1', counted: true }] },
+      { number: 'TEST-H-S4', shiftId: 'H7', occurredAt: '2026-11-08T12:00:00.000Z', bestArrivalMin: 13, bestMubasharaMin: 8, crews: [{ unit: 'شمال 1', counted: true }] },
+      { number: 'TEST-H-S5', shiftId: 'H8', occurredAt: '2026-11-13T12:00:00.000Z', bestArrivalMin: 7, bestMubasharaMin: 5, crews: [{ unit: 'غرب 1', counted: true }] },
+      { number: 'TEST-H-OUTSIDE', shiftId: 'H5', occurredAt: '2026-11-13T08:00:00.000Z', bestArrivalMin: 1, bestMubasharaMin: 1, crews: [{ unit: 'فريق خارج النطاق', counted: true }] }
+    ];
+    return {
+      incidents: incidents.filter(incident => Date.parse(incident.occurredAt) >= from && Date.parse(incident.occurredAt) <= to),
+      unresolvedTimeCount: 1,
+      stale: mode === 'stale'
+    };
+  }
+};
 const centersGeoService = { getData: () => mode === 'geo-unavailable' ? null : ({
   centers: {
     'مركز C1': { center: [24.61, 46.75] }, 'مركز C2': { center: [24.62, 46.76] },
-    'مركز C3': { center: [24.63, 46.77] }, 'مركز C4': { center: [24.64, 46.78] }
+    'مركز C3': { center: [24.63, 46.77] }, 'مركز C4': { center: [24.64, 46.78] },
+    'مركز C6': { center: [24.65, 46.79] }
   }, nonGeographic: { 'مركز C5': 'مركز اختبار غير جغرافي' }
 }) };
 const readService = new RegionCommandReadService({
   scopeService, staffingService, vehicleService, reportService, centersGeoService,
-  getActiveShift: async ({ sectorId }) => mode === 'empty' ? null : ({ id: sectorId === 'S1' ? 101 : 202, shift_name: 'مناوبة اختبار اصطناعية', shift_type: 'ليلية', shift_date: '2026-11-14' }),
+  getActiveShift: async ({ sectorId }) => mode === 'empty' ? null : ({ id: shiftBySector[sectorId], shift_name: 'مناوبة اختبار اصطناعية', shift_type: 'ليلية', shift_date: '2026-11-14' }),
   now: () => NOW
 });
 const decisionCenter = new RegionDecisionCenterService({ readService, scopeService });

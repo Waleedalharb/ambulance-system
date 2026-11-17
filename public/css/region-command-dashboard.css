@@ -444,3 +444,45 @@ body:not(.rc-detail-mode) .rc-status-section [data-metric="teamsPending"] { --rc
 .rc-detail-band [data-metric="readinessRate"] .rc-metric-value { color: var(--rc-warning); }
 .rc-detail-band [data-metric="vehiclesActive"] .rc-metric-value { color: var(--rc-danger); }
 @media (max-width: 768px) { body:not(.rc-detail-mode) .rc-status-section .rc-metric-card::before { display: none; } }
+
+/* مؤشرات التشغيل الحي والاتجاه التاريخي؛ لا تُستنتج أي قيم في الواجهة. */
+.rc-status-section .rc-metric-grid { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.rc-metric-grid-detail { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.rc-team-state { display: grid; gap: 5px; }
+.rc-team-incident-link { color: var(--rc-accent-soft); font-weight: 600; direction: ltr; text-align: right; }
+.rc-status[data-state="busy"] { border-color: rgba(96, 165, 250, .45); background: rgba(30, 64, 175, .22); color: #93C5FD; }
+.rc-trend-panel { margin-block-start: 28px; padding: 24px; border: 1px solid #182438; border-radius: 10px; background: var(--rc-dashboard-band); box-shadow: 0 12px 34px rgba(0, 0, 0, .08); }
+.rc-trend-chart { display: grid; grid-template-columns: minmax(280px, .8fr) minmax(420px, 1.2fr); gap: 18px; margin-block-start: 18px; }
+.rc-trend-series { min-width: 0; padding: 16px 18px 12px; border: 1px solid var(--rc-line-soft); border-radius: 9px; background: var(--rc-dashboard-row); }
+.rc-trend-series-head { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-block-end: 8px; }
+.rc-trend-series-head h4 { margin: 0; font-size: 14px; }
+.rc-trend-legend { display: flex; flex-wrap: wrap; gap: 12px; color: var(--rc-muted); font-size: 10px; }
+.rc-trend-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.rc-trend-legend i { width: 14px; height: 3px; border-radius: 3px; background: var(--trend-color); }
+.rc-trend-series svg { display: block; width: 100%; height: auto; overflow: visible; direction: ltr; }
+.rc-trend-grid-line { stroke: var(--rc-line-soft); stroke-width: 1; stroke-dasharray: 3 5; }
+.rc-trend-axis-label, .rc-trend-day-label { fill: var(--rc-muted); font-family: inherit; font-size: 10px; }
+.rc-trend-day-label { font-size: 9px; }
+.rc-trend-line { stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+.rc-trend-point { stroke: var(--rc-dashboard-row); stroke-width: 2; }
+.rc-trend-unit, .rc-trend-note { color: var(--rc-muted); font-size: 10px; line-height: 1.8; }
+.rc-trend-note { margin-block-start: 14px; padding-block-start: 12px; border-block-start: 1px solid var(--rc-line-soft); }
+.rc-trend-empty { display: grid; min-height: 210px; place-items: center; color: var(--rc-muted); font-size: 12px; text-align: center; }
+.rc-detail-workspace.rc-evidence-closed { grid-template-columns: minmax(0, 1fr); }
+@media (max-width: 1260px) {
+  .rc-status-section .rc-metric-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .rc-status-section .rc-metric-card { border-block-end: 1px solid var(--rc-line); }
+  .rc-status-section .rc-metric-card:nth-child(4) { border-inline-start: 0; }
+  .rc-status-section .rc-metric-card:nth-child(5) { border-inline-start: 0; }
+  .rc-trend-chart { grid-template-columns: 1fr; }
+}
+@media (max-width: 768px) {
+  .rc-status-section .rc-metric-grid, .rc-metric-grid-detail { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .rc-status-section .rc-metric-card:nth-child(4), .rc-status-section .rc-metric-card:nth-child(5) { border-inline-start: 1px solid var(--rc-line); }
+  .rc-status-section .rc-metric-card:nth-child(odd) { border-inline-start: 0; }
+  .rc-status-section .rc-metric-card:last-child { border-block-end: 0; }
+  .rc-trend-panel { padding: 16px 12px; }
+  .rc-trend-series { padding-inline: 10px; }
+  .rc-trend-series-head { align-items: flex-start; flex-direction: column; }
+  .rc-trend-day-label { font-size: 8px; }
+}

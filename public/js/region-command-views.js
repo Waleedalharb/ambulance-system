@@ -3,14 +3,14 @@
   var STATUS = {
     ok: 'متاح', complete: 'مكتمل', stale: 'بيانات قديمة', partial: 'تغطية غير مكتملة',
     unavailable: 'غير متاح', unresolved: 'غير محسوم', not_applicable: 'لا ينطبق',
-    ready: 'جاهزة', missing: 'ناقصة', offline: 'خارج الخدمة', pending: 'بانتظار التكميل',
+    ready: 'جاهزة', busy: 'مشغولة في بلاغ', missing: 'ناقصة', offline: 'خارج الخدمة', pending: 'بانتظار التكميل',
     active: 'نشط', closed: 'مغلق', cancelled: 'ملغى', breakdown: 'عطل', out_of_service: 'خارج الخدمة',
     needs_review: 'تحتاج مراجعة', viewed: 'اطلاع', hierarchy_changed: 'تغيير الهيكل', scope_changed: 'تغيير النطاق'
   };
   var REASONS = {
     SOURCE_UNAVAILABLE: 'المصدر غير متاح', NO_ACTIVE_SHIFT: 'لا توجد مناوبة نشطة',
     REGION_COVERAGE_INCOMPLETE: 'التغطية الإقليمية غير مكتملة', COVERAGE_INCOMPLETE: 'التغطية غير مكتملة',
-    RESPONSE_TIME_COVERAGE_INCOMPLETE: 'أزمنة الوصول غير مكتملة', NO_INCIDENTS: 'لا توجد بلاغات',
+    RESPONSE_TIME_COVERAGE_INCOMPLETE: 'تغطية أزمنة الاستجابة غير مكتملة', NO_INCIDENTS: 'لا توجد بلاغات',
     NO_REQUIRED_TEAMS: 'لا توجد فرق مطلوبة', TEAM_SCOPE_SOURCE_UNAVAILABLE: 'تعذر حسم فرق القطاع',
     CENTER_GEO_SOURCE_UNAVAILABLE: 'مرجع إحداثيات المراكز غير متاح', CENTER_COORDINATES_UNAVAILABLE: 'إحداثيات المركز غير متاحة',
     NON_GEOGRAPHIC_CENTER: 'مركز غير جغرافي', TEAM_MISSING: 'فرقة ناقصة', TEAM_OFFLINE: 'فرقة خارج الخدمة', TEAM_PENDING: 'بانتظار قرار التكميل',
@@ -21,10 +21,11 @@
     teamsReady: 'الفرق الجاهزة', teamsTotal: 'إجمالي الفرق', staffActive: 'الكادر الحاضر',
     staffRequired: 'الكادر المطلوب', readinessRate: 'جاهزية الفرق', vehiclesActive: 'المركبات العاملة',
     vehiclesTotal: 'إجمالي المركبات', incidentsActive: 'البلاغات النشطة', incidentsTotal: 'إجمالي البلاغات',
-    avgResponseMinutes: 'متوسط زمن الوصول', decisionCount: 'تحتاج مراجعة', centerCount: 'المراكز', sectorCount: 'القطاعات',
-    teamsMissing: 'فرق ناقصة', teamsOffline: 'فرق خارج الخدمة', teamsPending: 'بانتظار التكميل'
+    avgResponseMinutes: 'متوسط زمن الوصول', avgMubasharaMinutes: 'متوسط زمن المباشرة',
+    decisionCount: 'تحتاج مراجعة', centerCount: 'المراكز', sectorCount: 'القطاعات',
+    teamsBusy: 'فرق مشغولة في بلاغ', teamsMissing: 'فرق ناقصة', teamsOffline: 'فرق خارج الخدمة', teamsPending: 'بانتظار التكميل'
   };
-  var UNITS = { avgResponseMinutes: 'د', readinessRate: '٪' };
+  var UNITS = { avgResponseMinutes: 'د', avgMubasharaMinutes: 'د', readinessRate: '٪' };
   function node(tag, className, text) {
     var element = document.createElement(tag);
     if (className) element.className = className;
@@ -65,7 +66,7 @@
     var state = node('span', 'rc-metric-state', statusLabel(metric && metric.status));
     state.dataset.state = metric && metric.status || 'unavailable';
     card.appendChild(state);
-    var meta = reasonLabel(metric && metric.reasonCode) || options.note || (metric && metric.sourceAt ? 'المصدر: ' + formatDate(metric.sourceAt) : 'المصدر والتغطية موضحان في الدليل');
+    var meta = [reasonLabel(metric && metric.reasonCode), options.note || (metric && metric.sourceAt ? 'المصدر: ' + formatDate(metric.sourceAt) : 'المصدر والتغطية موضحان في الدليل')].filter(Boolean).join(' · ');
     card.appendChild(node('small', 'rc-metric-meta', meta));
     if (options.onEvidence) {
       card.setAttribute('aria-label', (options.label || LABELS[key] || key) + ' — عرض الدليل');

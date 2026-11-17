@@ -404,6 +404,9 @@ html[data-theme="light"] .rc-map-workspace.rc-panel-collapsed { grid-template-co
 .rc-team-orbit-center strong { color: var(--rc-text); font-size: 22px; line-height: 1; }
 .rc-team-orbit-center span { margin-block-start: 4px; color: var(--rc-muted); font-size: 8px; }
 .rc-team-ready { color: #2DD4BF; background: #2DD4BF; }
+.rc-team-busy { color: #60A5FA; background: #60A5FA; }
+.rc-map-row .rc-team-incident-link { color: #93C5FD; font-weight: 600; }
+.rc-map-row:has(.rc-status[data-state="busy"]) { border-color: rgba(96, 165, 250, .42); background: rgba(30, 64, 175, .12); }
 .rc-team-missing { color: #F59E0B; background: #F59E0B; }
 .rc-team-offline { color: #FB7185; background: #FB7185; }
 .rc-team-pending { color: #A78BFA; background: #A78BFA; }

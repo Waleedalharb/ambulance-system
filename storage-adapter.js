@@ -28,8 +28,26 @@ class StorageAdapter {
         return this.db.get('SELECT * FROM shifts WHERE id = ?', [id]);
     }
 
-    async getActiveShift() {
-        return this.db.get("SELECT * FROM shifts WHERE status = 'active' ORDER BY id DESC LIMIT 1");
+    async getActiveShift(scope = {}) {
+        const centerNames = Array.isArray(scope.centerNames)
+            ? [...new Set(scope.centerNames.map(name => String(name || '').trim()).filter(Boolean))]
+            : [];
+        if (!centerNames.length) {
+            return this.db.get("SELECT * FROM shifts WHERE status = 'active' ORDER BY id DESC LIMIT 1");
+        }
+        const placeholders = centerNames.map(() => '?').join(',');
+        // لكل قطاع مناوبته النشطة المثبتة بأحداثه أو بلاغاته؛ لا تُعير مناوبة
+        // الجنوب لبقية القطاعات فتظهر بياناتها الصفرية وكأنها قراءة حقيقية.
+        return this.db.get(
+            `SELECT s.* FROM shifts s
+             WHERE s.status = 'active' AND (
+               EXISTS (SELECT 1 FROM operational_events oe
+                       WHERE oe.shift_id = s.id AND oe.center IN (${placeholders}))
+               OR EXISTS (SELECT 1 FROM shift_reports sr
+                          WHERE sr.shift_id = s.id AND sr.center IN (${placeholders}))
+             ) ORDER BY s.id DESC LIMIT 1`,
+            [...centerNames, ...centerNames]
+        );
     }
 
     async archiveShift(id) {

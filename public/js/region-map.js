@@ -510,8 +510,8 @@
     constellation.id = 'mapTeamDistribution';
     var legend = V.node('div', 'rc-team-legend');
     var definitions = [
-      ['teamsReady', 'مكتملة', 'ready'], ['teamsMissing', 'ناقصة', 'missing'],
-      ['teamsOffline', 'خارج الخدمة', 'offline'], ['teamsPending', 'بانتظار التكميل', 'pending']
+      ['teamsReady', 'جاهزة', 'ready'], ['teamsBusy', 'مشغولة في بلاغ', 'busy'],
+      ['teamsMissing', 'ناقصة', 'missing'], ['teamsOffline', 'خارج الخدمة', 'offline'], ['teamsPending', 'بانتظار التكميل', 'pending']
     ];
     var dots = [];
     definitions.forEach(function (definition) {
@@ -607,7 +607,7 @@
     V.clear(id('mapSectorStatus')).appendChild(V.statusBadge(sector.status));
     renderAnalytics(sector.metrics);
     var responses = V.clear(id('mapResponseMetrics'));
-    responses.appendChild(responseMetric('زمن المباشرة', '—', 'غير متاح في مصدر البيانات الحالي'));
+    responses.appendChild(responseMetric('زمن المباشرة', V.metricText(sector.metrics.avgMubasharaMinutes, 'avgMubasharaMinutes'), 'من أزمنة المباشرة المسجلة في CAD', sector.metrics.avgMubasharaMinutes, 'avgMubasharaMinutes'));
     responses.appendChild(responseMetric('متوسط الوصول', V.metricText(sector.metrics.avgResponseMinutes, 'avgResponseMinutes'), 'من بلاغات CAD المرتبطة بالقطاع', sector.metrics.avgResponseMinutes, 'avgResponseMinutes'));
     var reviewCount = sector.decisionCount && sector.decisionCount.value;
     var alert = id('mapOperationalAlert');
@@ -635,6 +635,7 @@
       head.appendChild(V.statusBadge(team.status));
       row.appendChild(head);
       row.appendChild(V.node('p', '', team.center + ' · الحاضر / المطلوب: ' + V.metricText(team.activeCount) + ' / ' + V.metricText(team.requiredPersonnel)));
+      if (team.status === 'busy' && team.activeIncidentIds && team.activeIncidentIds.length) row.appendChild(V.node('small', 'rc-team-incident-link', 'البلاغ النشط: ' + team.activeIncidentIds.join('، ')));
       row.appendChild(V.node('small', '', 'الموقع الحي غير متاح'));
       container.appendChild(row);
     });

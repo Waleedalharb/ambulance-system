@@ -17944,7 +17944,9 @@ function getRegionCommandServices() {
             reportService,
             centersGeoService: getCentersGeoService(),
             positioningService,
-            getActiveShift: async () => opsEngine && opsEngine.shifts ? opsEngine.shifts.getActiveShift() : null
+            getActiveShift: async ({ centerNames = [] } = {}) => opsEngine && opsEngine.storage
+                ? opsEngine.storage.getActiveShift({ centerNames })
+                : null
         });
         const decisionCenter = new RegionDecisionCenterService({ readService, scopeService });
         const ledgerService = new SectorCommandLedgerService({ db, scopeService });

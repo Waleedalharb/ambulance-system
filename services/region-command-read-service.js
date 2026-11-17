@@ -48,10 +48,36 @@ function latest(values) {
   return valid.length ? valid[valid.length - 1] : null;
 }
 function sourceStatus(sourceAt, stale) { return stale ? 'stale' : 'ok'; }
+const RIYADH_DAY_FORMAT = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Riyadh', year: 'numeric', month: '2-digit', day: '2-digit' });
+function riyadhDateKey(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  const parts = RIYADH_DAY_FORMAT.formatToParts(date);
+  const part = type => parts.find(item => item.type === type).value;
+  return `${part('year')}-${part('month')}-${part('day')}`;
+}
 function count(value, sourceAt, expected, available, options = {}) {
   const coverage = quality(expected, available, expected === null || available === null ? 'unknown' : available === expected ? COMPLETE : 'partial');
   if (coverage.status === 'partial') return metric(null, { status: 'partial', reasonCode: 'COVERAGE_INCOMPLETE', sourceAt, coverage });
   return metric(value, { sourceAt, coverage, status: options.stale ? 'stale' : 'ok' });
+}
+function timeAverage(incidents, key, sourceAt, stale = false) {
+  if (!incidents.length) return metric(null, { status: 'not_applicable', reasonCode: 'NO_INCIDENTS', sourceAt, coverage: quality(0, 0, COMPLETE) });
+  const values = incidents.map(i => i[key]).filter(v => typeof v === 'number' && Number.isFinite(v));
+  const coverage = quality(incidents.length, values.length, values.length === incidents.length ? COMPLETE : 'partial');
+  if (!values.length) return metric(null, { status: 'partial', reasonCode: 'RESPONSE_TIME_COVERAGE_INCOMPLETE', sourceAt, coverage });
+  const value = Math.round(values.reduce((a, b) => a + b, 0) / values.length * 10) / 10;
+  // المتوسط المحسوب من الأزمنة المسجلة يبقى مفيدًا، بشرط إظهار تغطيته الناقصة
+  // بجواره بدل إخفائه أو تقديمه كمتوسط مكتمل لكل البلاغات.
+  return metric(value, {
+    status: values.length === incidents.length ? (stale ? 'stale' : 'ok') : 'partial',
+    reasonCode: values.length === incidents.length ? null : 'RESPONSE_TIME_COVERAGE_INCOMPLETE',
+    sourceAt, coverage, allowPartialValue: true
+  });
+}
+function crewKeepsTeamBusy(crew) {
+  if (!crew || crew.withdrawn || crew.manualCancelled || crew.legacySnapshot) return false;
+  return !['B', 'C', 'R'].includes(String(crew.cadUrs || '').toUpperCase());
 }
 
 class RegionCommandReadService {
@@ -71,7 +97,7 @@ class RegionCommandReadService {
   async _shift(sector, centers, requestedShiftId) {
     if (!this.getActiveShift) return { shift: null, error: 'SOURCE_UNAVAILABLE' };
     try {
-      const shift = await this.getActiveShift({ sectorId: sector.id, centerIds: centers.map(c => c.id) });
+      const shift = await this.getActiveShift({ sectorId: sector.id, centerIds: centers.map(c => c.id), centerNames: centers.map(c => c.name) });
       if (requestedShiftId && (!shift || String(shift.id) !== String(requestedShiftId))) {
         throw new RegionCommandError('SHIFT_NOT_IN_SCOPE', 'المناوبة المطلوبة غير متاحة ضمن القطاع الحالي', 403);
       }
@@ -103,6 +129,7 @@ class RegionCommandReadService {
         if (!['sectorCount', 'centerCount', 'decisionCount'].includes(key)) base.metrics[key] = unavailable(reason);
       }
       base.metrics.centerCount = count(centers.length, null, centers.length, centers.length);
+      base.metrics.teamsBusy = unavailable(reason);
       for (const owner of ['StaffingEventsService', 'VehicleEventsService', 'ReportService']) {
         base.dataQuality[owner] = { status: 'unavailable', reasonCode: reason, sourceAt: null };
         base.sourceMeta.push({ ownerService: owner, status: 'unavailable', reasonCode: reason, sourceAt: null });
@@ -112,7 +139,9 @@ class RegionCommandReadService {
 
     const [staffing, vehicles, incidents] = await Promise.all([
       this._readSource('StaffingEventsService', () => this.staffingService && this.staffingService.deriveTeamReadiness(shift.id)),
-      this._readSource('VehicleEventsService', () => this.vehicleService && this.vehicleService.getState(shift.id, { includeCurrentAssignments: true })),
+      this._readSource('VehicleEventsService', () => this.vehicleService && (this.vehicleService.getBoard
+        ? this.vehicleService.getBoard(shift.id)
+        : this.vehicleService.getState(shift.id, { includeCurrentAssignments: true }))),
       this._readSource('ReportService', () => this.reportService && this.reportService.getIncidentSummary(shift.id))
     ]);
     base.metrics.centerCount = count(centers.length, null, centers.length, centers.length);
@@ -156,16 +185,30 @@ class RegionCommandReadService {
     }
 
     if (!vehicles.error) {
-      const entities = (vehicles.value.entities || []).filter(e => e.center && centerNames.has(e.center));
-      const withStatus = entities.map(e => {
-        const open = Array.isArray(e.open) ? e.open : [];
-        const statusEvent = [...open].reverse().find(event => event.status);
-        return {
-          id: String(e.entityId), name: e.entityName || null, center: e.center,
-          status: statusEvent ? statusEvent.status : null,
-          sourceAt: statusEvent && statusEvent.created_at || e.lastEvent && e.lastEvent.created_at || null
-        };
-      });
+      const teamByVehicle = new Map(sectorTeams.filter(team => team.vehicleId).map(team => [String(team.vehicleId), team]));
+      let withStatus;
+      if (Array.isArray(vehicles.value.vehicles)) {
+        // getBoard يشتق الحالة الحالية من كامل خط المركبة، حتى إن لم يتغير
+        // وضعها خلال هذه المناوبة؛ getState وحده كان يعيد 0/0 في هذه الحالة.
+        withStatus = vehicles.value.vehicles.map(vehicle => {
+          const team = teamByVehicle.get(String(vehicle.id));
+          return team && centerNames.has(team.center) ? {
+            id: String(vehicle.id), name: vehicle.name || null, center: team.center,
+            teamName: team.name, status: vehicle.status || null, sourceAt: vehicle.since || null
+          } : null;
+        }).filter(Boolean);
+      } else {
+        const entities = (vehicles.value.entities || []).filter(e => e.center && centerNames.has(e.center));
+        withStatus = entities.map(e => {
+          const open = Array.isArray(e.open) ? e.open : [];
+          const statusEvent = [...open].reverse().find(event => event.status);
+          return {
+            id: String(e.entityId), name: e.entityName || null, center: e.center,
+            status: statusEvent ? statusEvent.status : null,
+            sourceAt: statusEvent && statusEvent.created_at || e.lastEvent && e.lastEvent.created_at || null
+          };
+        });
+      }
       const sourceAt = latest(withStatus.map(v => v.sourceAt));
       base.metrics.vehiclesTotal = count(withStatus.length, sourceAt, withStatus.length, withStatus.length, { stale: vehicles.value.stale === true });
       base.metrics.vehiclesActive = count(withStatus.filter(v => v.status === 'active').length, sourceAt, withStatus.length, withStatus.length, { stale: vehicles.value.stale === true });
@@ -182,32 +225,61 @@ class RegionCommandReadService {
 
     if (staffing.error) {
       // لا يمكن نسب البلاغ إلى القطاع بلا قائمة فرقه؛ الصفر هنا سيكون مضللًا.
-      for (const key of ['incidentsTotal', 'incidentsActive', 'avgResponseMinutes']) base.metrics[key] = unavailable('TEAM_SCOPE_SOURCE_UNAVAILABLE');
+      for (const key of ['incidentsTotal', 'incidentsActive', 'avgResponseMinutes', 'avgMubasharaMinutes', 'teamsBusy']) base.metrics[key] = unavailable('TEAM_SCOPE_SOURCE_UNAVAILABLE');
       base.dataQuality.ReportService = { status: 'unavailable', reasonCode: 'TEAM_SCOPE_SOURCE_UNAVAILABLE', sourceAt: null };
       base.sourceMeta.push({ ownerService: 'ReportService', status: 'unavailable', reasonCode: 'TEAM_SCOPE_SOURCE_UNAVAILABLE', sourceAt: null });
     } else if (!incidents.error) {
       const teamNames = new Set(sectorTeams.map(t => t.name));
-      const relevant = (incidents.value.incidents || []).filter(incident => (incident.crews || []).some(c => c.counted && teamNames.has(c.unit)));
+      const allIncidents = incidents.value.incidents || [];
+      const relevant = allIncidents.filter(incident => (incident.crews || []).some(c => c.counted && teamNames.has(c.unit)));
       const sourceAt = latest(relevant.map(i => i.createdAt || i.cadCreatedAt));
       base.metrics.incidentsTotal = count(relevant.length, sourceAt, relevant.length, relevant.length, { stale: incidents.value.stale === true });
       base.metrics.incidentsActive = count(relevant.filter(i => i.status === 'active').length, sourceAt, relevant.length, relevant.length, { stale: incidents.value.stale === true });
-      const responseValues = relevant.map(i => i.bestArrivalMin).filter(v => typeof v === 'number' && Number.isFinite(v));
-      base.metrics.avgResponseMinutes = relevant.length === 0
-        ? metric(null, { status: 'not_applicable', reasonCode: 'NO_INCIDENTS', sourceAt, coverage: quality(0, 0, COMPLETE) })
-        : responseValues.length === relevant.length
-          ? count(Math.round(responseValues.reduce((a, b) => a + b, 0) / responseValues.length * 10) / 10, sourceAt, relevant.length, responseValues.length, { stale: incidents.value.stale === true })
-          : metric(null, { status: 'partial', reasonCode: 'RESPONSE_TIME_COVERAGE_INCOMPLETE', sourceAt, coverage: quality(relevant.length, responseValues.length, 'partial') });
+      base.metrics.avgResponseMinutes = timeAverage(relevant, 'bestArrivalMin', sourceAt, incidents.value.stale === true);
+      base.metrics.avgMubasharaMinutes = timeAverage(relevant, 'bestMubasharaMin', sourceAt, incidents.value.stale === true);
       base.incidents = relevant.map(i => ({
         id: String(i.number), code: i.code || null, type: i.type || null, status: i.status || 'active', severity: i.severity || null,
         createdAt: i.createdAt || i.cadCreatedAt || null, district: i.district || null,
         bestArrivalMin: typeof i.bestArrivalMin === 'number' ? metric(i.bestArrivalMin, { sourceAt, coverage: quality(1, 1, COMPLETE) }) : unavailable('RESPONSE_TIME_UNAVAILABLE'),
+        bestMubasharaMin: typeof i.bestMubasharaMin === 'number' ? metric(i.bestMubasharaMin, { sourceAt, coverage: quality(1, 1, COMPLETE) }) : unavailable('RESPONSE_TIME_UNAVAILABLE'),
         ...incidentTeamViews(i, teamNames, shift.shift_type)
       }));
+
+      // الترشيح الفعلي في CAD (بما فيه قبول الوحدة قبل تسجيل أول مرحلة)
+      // يغيّر قابلية الفرقة للتكليف، لكنه لا يدخل عدّاد المشاركة أو الإنجاز.
+      const busyByTeam = new Map();
+      for (const incident of allIncidents) {
+        if (incident.status !== 'active') continue;
+        for (const crew of incident.crews || []) {
+          if (!teamNames.has(crew.unit) || !crewKeepsTeamBusy(crew)) continue;
+          if (!busyByTeam.has(crew.unit)) busyByTeam.set(crew.unit, []);
+          busyByTeam.get(crew.unit).push(String(incident.number));
+        }
+      }
+      const staffingSourceAt = base.metrics.teamsTotal.sourceAt;
+      const staffingStale = base.metrics.teamsTotal.status === 'stale';
+      base.teams = sectorTeams.map(team => {
+        const activeIncidentIds = busyByTeam.get(team.name) || [];
+        return withTeamIdentity({
+          ...team, completionStatus: team.status,
+          status: team.status === 'ready' && activeIncidentIds.length ? 'busy' : team.status,
+          activeIncidentIds,
+          activeCount: count(team.activeCount, staffingSourceAt, 1, typeof team.activeCount === 'number' ? 1 : 0, { stale: staffingStale }),
+          requiredPersonnel: count(team.requiredPersonnel, staffingSourceAt, 1, typeof team.requiredPersonnel === 'number' ? 1 : 0, { stale: staffingStale })
+        }, shift.shift_type);
+      });
+      const readyTeams = base.teams.filter(team => team.status === 'ready').length;
+      const expected = base.teams.length;
+      base.metrics.teamsReady = count(readyTeams, staffingSourceAt, expected, expected, { stale: staffingStale });
+      base.metrics.teamsBusy = count([...busyByTeam.keys()].length, sourceAt, expected, expected, { stale: incidents.value.stale === true });
+      base.metrics.readinessRate = expected > 0
+        ? count(Math.round(readyTeams / expected * 100), staffingSourceAt, expected, expected, { stale: staffingStale })
+        : metric(null, { status: 'not_applicable', reasonCode: 'NO_REQUIRED_TEAMS', sourceAt: staffingSourceAt, coverage: quality(0, 0, COMPLETE) });
       const status = sourceStatus(sourceAt, incidents.value.stale === true);
       base.dataQuality.ReportService = { status, reasonCode: null, sourceAt };
       base.sourceMeta.push({ ownerService: 'ReportService', status, sourceAt, shiftId: currentShiftId });
     } else {
-      for (const key of ['incidentsTotal', 'incidentsActive', 'avgResponseMinutes']) base.metrics[key] = unavailable(incidents.error);
+      for (const key of ['incidentsTotal', 'incidentsActive', 'avgResponseMinutes', 'avgMubasharaMinutes', 'teamsBusy']) base.metrics[key] = unavailable(incidents.error);
       base.dataQuality.ReportService = { status: 'unavailable', reasonCode: incidents.error, sourceAt: null };
       base.sourceMeta.push({ ownerService: 'ReportService', status: 'unavailable', reasonCode: incidents.error, sourceAt: null });
     }
@@ -355,6 +427,84 @@ class RegionCommandReadService {
     return { success: true, generatedAt: snapshot.generatedAt, view, sector: snapshot, sourceMeta: snapshot.sourceMeta };
   }
 
+  _trendRange() {
+    const now = new Date(this.now());
+    const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Riyadh', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(now);
+    const part = type => parts.find(item => item.type === type).value;
+    const todayStart = Date.UTC(Number(part('year')), Number(part('month')) - 1, Number(part('day'))) - 3 * 3600000;
+    const from = todayStart - 6 * 86400000;
+    const dates = Array.from({ length: 7 }, (_, index) => new Date(from + index * 86400000 + 3 * 3600000).toISOString().slice(0, 10));
+    return { from: new Date(from).toISOString(), to: now.toISOString(), bucket: 'day', dates };
+  }
+
+  _trendSeries(incidents, range, { stale = false, unresolvedTimeCount = 0 } = {}) {
+    const incidentsByDay = new Map(range.dates.map(date => [date, []]));
+    for (const incident of incidents) {
+      const day = riyadhDateKey(incident.occurredAt);
+      if (incidentsByDay.has(day)) incidentsByDay.get(day).push(incident);
+    }
+    const points = range.dates.map(date => {
+      const daily = incidentsByDay.get(date);
+      const sourceAt = latest(daily.map(incident => incident.occurredAt));
+      return {
+        date,
+        incidentsTotal: count(daily.length, sourceAt, daily.length, daily.length, { stale }),
+        avgResponseMinutes: timeAverage(daily, 'bestArrivalMin', sourceAt, stale),
+        avgMubasharaMinutes: timeAverage(daily, 'bestMubasharaMin', sourceAt, stale)
+      };
+    });
+    return {
+      status: unresolvedTimeCount > 0 ? 'partial' : stale ? 'stale' : 'ok',
+      reasonCode: unresolvedTimeCount > 0 ? 'HISTORY_TIME_COVERAGE_INCOMPLETE' : null,
+      sourceAt: latest(incidents.map(incident => incident.occurredAt)),
+      range: { from: range.from, to: range.to, bucket: range.bucket }, points,
+      unresolvedTimeCount: count(unresolvedTimeCount, null, unresolvedTimeCount, unresolvedTimeCount)
+    };
+  }
+
+  async _attachTrends(sectors, totals, actor) {
+    const range = this._trendRange();
+    const unavailableTrend = reason => ({
+      status: 'unavailable', reasonCode: reason, sourceAt: null,
+      range: { from: range.from, to: range.to, bucket: range.bucket }, points: [],
+      unresolvedTimeCount: unavailable(reason)
+    });
+    const historical = await this._readSource('ReportService', () => this.reportService && this.reportService.getHistoricalSummary
+      && this.reportService.getHistoricalSummary(Date.parse(range.from), Date.parse(range.to)));
+    if (historical.error) {
+      for (const sector of sectors) sector.trends = unavailableTrend(historical.error);
+      totals.trends = unavailableTrend(historical.error);
+      return;
+    }
+    const incidents = historical.value.incidents || [];
+    const unresolvedTimeCount = historical.value.unresolvedTimeCount || 0;
+    const regional = new Map();
+    let availableSectors = 0;
+    for (const sector of sectors) {
+      let teamNames = [];
+      try {
+        teamNames = this.scopeService.resolveSectorTeamNames
+          ? await this.scopeService.resolveSectorTeamNames(actor, sector.id, this.now())
+          : sector.teams.map(team => team.name);
+      } catch (_) { teamNames = sector.teams.map(team => team.name); }
+      const names = new Set(teamNames);
+      if (!names.size) {
+        sector.trends = unavailableTrend('TEAM_SCOPE_SOURCE_UNAVAILABLE');
+        continue;
+      }
+      const relevant = incidents.filter(incident => (incident.crews || []).some(crew => crew.counted && names.has(crew.unit)));
+      sector.trends = this._trendSeries(relevant, range, { stale: historical.value.stale === true, unresolvedTimeCount });
+      availableSectors++;
+      for (const incident of relevant) regional.set(String(incident.shiftId) + '|' + String(incident.number), incident);
+    }
+    totals.trends = this._trendSeries([...regional.values()], range, { stale: historical.value.stale === true, unresolvedTimeCount });
+    totals.trends.coverage = quality(sectors.length, availableSectors, availableSectors === sectors.length ? COMPLETE : 'partial');
+    if (availableSectors !== sectors.length) {
+      totals.trends.status = 'partial';
+      totals.trends.reasonCode = 'REGION_COVERAGE_INCOMPLETE';
+    }
+  }
+
   async getOverview({ actor, regionId, view = 'current' }) {
     const resolved = await this.scopeService.resolveRegionSectors(actor, regionId);
     const sectors = [];
@@ -372,11 +522,12 @@ class RegionCommandReadService {
     const allCenters = new Set(sectors.flatMap(s => s.centers.map(c => c.id)));
     totals.metrics.centerCount = count(allCenters.size, null, resolved.sectors.length, sectors.length);
     totals.status = Object.values(totals.metrics).every(m => m.status === 'ok' || m.status === 'not_applicable') ? 'complete' : 'partial';
+    await this._attachTrends(sectors, totals, actor);
     return { success: true, generatedAt: new Date(this.now()).toISOString(), view, scope: { regionId: resolved.regionId }, sectors, totals, sourceMeta: sectors.flatMap(s => s.sourceMeta.map(m => ({ ...m, sectorId: s.id }))) };
   }
 
   _totals(sectors) {
-    const keys = ['teamsTotal', 'teamsReady', 'teamsMissing', 'teamsOffline', 'teamsPending', 'staffActive', 'staffRequired', 'vehiclesTotal', 'vehiclesActive', 'incidentsTotal', 'incidentsActive', 'decisionCount'];
+    const keys = ['teamsTotal', 'teamsReady', 'teamsBusy', 'teamsMissing', 'teamsOffline', 'teamsPending', 'staffActive', 'staffRequired', 'vehiclesTotal', 'vehiclesActive', 'incidentsTotal', 'incidentsActive', 'decisionCount'];
     const out = {};
     for (const key of keys) {
       const values = sectors.map(s => s.metrics[key] || s.decisionCount).filter(Boolean);
@@ -384,14 +535,24 @@ class RegionCommandReadService {
         out[key] = metric(null, { status: 'partial', reasonCode: 'REGION_COVERAGE_INCOMPLETE', coverage: quality(sectors.length, values.filter(v => v.value !== null && v.coverage.status === COMPLETE).length, 'partial') });
       } else out[key] = count(values.reduce((sum, m) => sum + m.value, 0), latest(values.map(v => v.sourceAt)), sectors.length, sectors.length, { stale: values.some(v => v.status === 'stale') });
     }
-    const response = sectors.map(s => s.metrics.avgResponseMinutes).filter(Boolean);
-    const covered = response.filter(m => m.value !== null && m.coverage.status === COMPLETE);
-    const expected = response.reduce((sum, m) => sum + (m.coverage.expected || 0), 0);
-    if (expected === 0 && response.every(m => m.status === 'not_applicable')) out.avgResponseMinutes = metric(null, { status: 'not_applicable', reasonCode: 'NO_INCIDENTS', coverage: quality(0, 0, COMPLETE) });
-    else if (covered.length !== response.length || covered.reduce((sum, m) => sum + m.coverage.expected, 0) !== expected) out.avgResponseMinutes = metric(null, { status: 'partial', reasonCode: 'REGION_COVERAGE_INCOMPLETE', coverage: quality(expected, covered.reduce((sum, m) => sum + m.coverage.available, 0), 'partial') });
-    else {
-      const weighted = covered.reduce((sum, m) => sum + m.value * m.coverage.available, 0) / expected;
-      out.avgResponseMinutes = count(Math.round(weighted * 10) / 10, latest(response.map(m => m.sourceAt)), expected, expected, { stale: response.some(m => m.status === 'stale') });
+    for (const key of ['avgResponseMinutes', 'avgMubasharaMinutes']) {
+      const values = sectors.map(s => s.metrics[key]).filter(Boolean);
+      const expected = values.reduce((sum, m) => sum + (m.coverage.expected || 0), 0);
+      const available = values.reduce((sum, m) => sum + (m.coverage.available || 0), 0);
+      const covered = values.filter(m => m.value !== null);
+      if (expected === 0 && values.every(m => m.status === 'not_applicable')) {
+        out[key] = metric(null, { status: 'not_applicable', reasonCode: 'NO_INCIDENTS', coverage: quality(0, 0, COMPLETE) });
+      } else if (!available || covered.length !== values.length) {
+        out[key] = metric(null, { status: 'partial', reasonCode: 'REGION_COVERAGE_INCOMPLETE', coverage: quality(expected, available, 'partial') });
+      } else {
+        const weighted = covered.reduce((sum, m) => sum + m.value * m.coverage.available, 0) / available;
+        out[key] = metric(Math.round(weighted * 10) / 10, {
+          status: available === expected && values.every(m => m.status !== 'partial') ? (values.some(m => m.status === 'stale') ? 'stale' : 'ok') : 'partial',
+          reasonCode: available === expected ? null : 'RESPONSE_TIME_COVERAGE_INCOMPLETE',
+          sourceAt: latest(values.map(m => m.sourceAt)), coverage: quality(expected, available, available === expected ? COMPLETE : 'partial'),
+          allowPartialValue: true
+        });
+      }
     }
     const ready = out.teamsReady;
     const total = out.teamsTotal;

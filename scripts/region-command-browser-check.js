@@ -167,31 +167,48 @@ async function click(selector) {
 }
 async function regionDashboard() {
   await login('region');
-  await waitFor('document.querySelectorAll(".rc-sector-card").length === 2 && document.getElementById("regionMetrics").getAttribute("aria-busy") === "false"', 15000, 'region overview');
+  await waitFor('document.querySelectorAll(".rc-sector-card").length === 5 && document.getElementById("regionMetrics").getAttribute("aria-busy") === "false"', 15000, 'region overview');
   await waitFor('document.getElementById("connectionStatus").dataset.state === "connected"', 10000, 'SSE connected');
-  check('قائد المنطقة يرى قطاعي الاختبار', await evaluate('document.querySelectorAll(".rc-sector-card").length') === 2);
+  check('قائد المنطقة يرى القطاعات الخمسة', await evaluate('document.querySelectorAll(".rc-sector-card").length') === 5);
   check('لا يوجد خطأ عام عند التحميل', await evaluate('document.getElementById("globalError").hidden'));
-  check('المؤشرات الستة ظاهرة', await evaluate('document.querySelectorAll("#regionMetrics .rc-metric-card").length') === 6);
+  check('شريط المؤشرات الإقليمية يحتوي ستة مؤشرات', await evaluate('document.querySelectorAll("#regionMetrics .rc-metric-card").length') === 6);
   check('مؤشر الجاهزية مميز لآلية الاختبار والدليل', await evaluate('document.querySelectorAll("#regionMetrics [data-metric=readinessRate]").length') === 1);
-  check('كل قطاع يعرض خمس قيم مقارنة مستقلة وفق R-01', await evaluate('Array.from(document.querySelectorAll(".rc-sector-card")).every(card=>card.querySelectorAll(".rc-sector-stat").length===5)'));
-  check('عناصر المراجعة لا تتحول إلى عمود سادس في مقارنة القطاعات', await evaluate('!document.querySelector(".rc-sector-columns").textContent.includes("تحتاج مراجعة")'));
-  check('شارة جودة المصدر تعرض الاكتمال الفعلي', await evaluate('document.getElementById("sectorCount").textContent.includes("جودة المصدر")'));
-  check('الاتجاه الزمني غير مفعّل دون اختلاق سلسلة تاريخية', (await evaluate('document.querySelector(".rc-trend-placeholder").textContent')).includes('لا تتوفر سلسلة زمنية معتمدة'));
+  check('زمن الوصول ظاهر وزمن المباشرة محفوظ في التفاصيل فقط', await evaluate(`(()=>{const arrival=document.querySelector('#regionMetrics [data-metric="avgResponseMinutes"]');return arrival&&arrival.textContent.includes('تغطية الأزمنة')&&!document.querySelector('#regionMetrics [data-metric="avgMubasharaMinutes"]');})()`));
+  check('كل قطاع يعرض الحلقة والكادر والمركبات والبلاغات والرسم الفعلي', await evaluate('Array.from(document.querySelectorAll(".rc-sector-card")).every(card=>card.querySelectorAll(".rc-home-sector-stat").length===3&&card.querySelector(".rc-home-ring")&&card.querySelector(".rc-sector-sparkline svg"))'));
+  check('جودة البيانات تعرض صفوف المصادر الخمسة', await evaluate('document.querySelectorAll("#qualitySources .rc-quality-source").length===5&&document.getElementById("qualityCompleteness").textContent.includes("5 / 5")'));
+  check('توزيع القوى والمقارنة مبنيان على البيانات الحالية', await evaluate('document.querySelector("#workforceDistribution .rc-workforce-ring")&&document.querySelectorAll("#sectorComparison .rc-comparison-row").length===5'));
+  check('الطقس والمناوبة الأخرى لا يختلقان قيمًا', await evaluate('document.getElementById("weatherValue").textContent.trim()==="—"&&document.querySelector(".rc-shift-item[data-shift-type=صباحية] strong").textContent.trim()==="—"&&document.querySelector(".rc-shift-item[data-shift-type=صباحية]").textContent.includes("غير متاحة")'));
   check('لا يوجد تجاوز أفقي في لوحة سطح المكتب', await evaluate('document.documentElement.scrollWidth <= window.innerWidth + 1'), await evaluate('({scrollWidth:document.documentElement.scrollWidth,innerWidth:window.innerWidth})'));
   await evaluate('document.getElementById("sourceDetails").open=true; true');
-  check('سجل المصادر يفتح ويعرض قراءاته الفعلية', await evaluate('document.getElementById("sourceDetails").open && document.querySelectorAll("#sourceMetaList .rc-source-meta-row").length > 0 && document.getElementById("sourceMetaList").textContent.includes("وقت المصدر")'));
+  check('سجل المصادر يفتح ويعرض قراءاته الفعلية', await evaluate('document.getElementById("sourceDetails").open && document.querySelectorAll("#sourceMetaList .rc-source-meta-row").length === 15 && document.getElementById("sourceMetaList").textContent.includes("وقت المصدر")'));
+  await evaluate('document.getElementById("sourceDetails").open=false; true');
+  for (const sectorId of ['S1','S2','S3','S4','S5']) {
+    await evaluate(`document.querySelector('.rc-sector-card[data-sector-id="${sectorId}"]').click(); true`);
+    await waitFor(`document.querySelector('.rc-selected-sector-inner').dataset.sectorId==='${sectorId}'`, 5000, 'home selection ' + sectorId);
+    check('اختيار ' + sectorId + ' يحدث اللوحة الجانبية دون فقد الصفحة', await evaluate(`document.querySelector('.rc-sector-card[data-sector-id="${sectorId}"]').getAttribute('aria-selected')==='true'&&document.querySelector('[data-home-action="map"]').href.includes('sector=${sectorId}')&&document.querySelectorAll('.rc-sector-card').length===5`));
+    await screenshot('home-' + sectorId + '-dark');
+  }
+  for (const metric of ['readinessRate','staffActive','teamsReady','vehiclesActive','incidentsActive']) {
+    await click(`[data-comparison-metric="${metric}"]`);
+    check('تبويب المقارنة ' + metric + ' يعمل بالبيانات الفعلية', await evaluate(`document.querySelector('[data-comparison-metric="${metric}"]').getAttribute('aria-selected')==='true'&&document.querySelectorAll('#sectorComparison .rc-comparison-row').length===5`));
+  }
+  await click('[data-comparison-metric="staffActive"]');
+  await evaluate('document.querySelector(\'.rc-sector-card[data-sector-id="S1"]\').click(); true');
   await screenshot('01-region-dashboard-dark');
   await click('[data-action="theme"]');
   check('الوضع الفاتح للوحة القيادة يعمل', await evaluate('document.documentElement.dataset.theme === "light"'));
   await screenshot('01b-region-dashboard-light');
   await click('[data-action="theme"]');
+  await evaluate('window.scrollTo({top:0,behavior:"auto"}); true');
 
-  await evaluate('document.querySelector(".rc-sector-card .rc-button").click(); true');
+  await click('[data-home-action="detail"]');
   await waitFor('document.querySelectorAll("#teamList tbody tr").length === 2 && document.querySelectorAll("#detailDecisionList .rc-decision-entry").length === 2', 10000, 'sector teams and decisions');
   check('تفاصيل S1 تعرض فرقتين', await evaluate('document.querySelectorAll("#teamList tbody tr").length') === 2);
   check('رموز الفرق الليلية تظهر مع القطاع والمناوبة ورقم الفرقة في جدول الفرق', await evaluate(`(()=>{const text=document.getElementById('teamList').textContent;return text.includes('R-3-2-1')&&text.includes('R-3-2-2')&&text.includes('قطاع جنوب الرياض')&&text.includes('ليلية')&&text.includes('فرقة 1')&&text.includes('فرقة 2');})()`));
+  check('الفرقة المرشحة فعليًا مشغولة وتعرض أرقام بلاغاتها النشطة', await evaluate(`(()=>{const text=document.getElementById('teamList').textContent;return text.includes('مشغولة في بلاغ')&&text.includes('TEST-I-1')&&text.includes('TEST-I-NO-GEO');})()`));
+  check('مؤشرات القطاع الستة تشمل زمن المباشرة الفعلي وتغطيته الجزئية', await evaluate(`(()=>{const cards=document.querySelectorAll('#detailMetrics .rc-metric-card');const mubashara=document.querySelector('#detailMetrics [data-metric="avgMubasharaMinutes"]');return cards.length===6&&mubashara&&mubashara.dataset.state==='partial'&&mubashara.textContent.includes('6 د')&&mubashara.textContent.includes('2 / 3');})()`));
   check('تفاصيل S1 تعرض عنصري المراجعة من بيانات القطاع', await evaluate('document.querySelectorAll("#detailDecisionList .rc-decision-entry").length') === 2);
-  check('R-02 يعرض صفحة القطاع المستقلة بدل إبقاء لوحة المقارنة', await evaluate('document.body.classList.contains("rc-detail-mode") && getComputedStyle(document.querySelector(".rc-dashboard-grid")).display === "none"'));
+  check('R-02 يعرض صفحة القطاع المستقلة بدل إبقاء لوحة المقارنة', await evaluate('document.body.classList.contains("rc-detail-mode") && getComputedStyle(document.querySelector(".rc-home-layout")).display === "none"'));
   await waitFor('document.getElementById("evidenceDialog").open && document.getElementById("evidenceBody").textContent.includes("الكيان")', 10000, 'automatic embedded evidence');
   check('الدليل مدمج داخل مساحة التفاصيل وليس نافذة modal', await evaluate('document.querySelector(".rc-detail-workspace").contains(document.getElementById("evidenceDialog")) && !document.getElementById("evidenceDialog").matches(":modal")'));
   check('عناصر مراجعة القطاع صفوف ملونة حسب الفئة الفعلية', await evaluate('document.querySelector("#detailDecisionList [data-category=staffing]") && document.querySelector("#detailDecisionList [data-category=vehicles]")'));
@@ -209,6 +226,8 @@ async function regionDashboard() {
   await click('#decisionList .rc-decision-item');
   await waitFor('document.getElementById("evidenceDialog").open && document.getElementById("evidenceBody").textContent.includes("الكيان")', 10000, 'regional decision evidence');
   await click('#closeEvidence');
+  await waitFor('document.querySelector(".rc-detail-workspace").classList.contains("rc-evidence-closed")', 5000, 'closed evidence layout');
+  check('إغلاق الدليل يعيد بيانات القطاع لملء المساحة دون فراغ جانبي', await evaluate('(()=>{const workspace=document.querySelector(".rc-detail-workspace").getBoundingClientRect();const data=document.querySelector(".rc-detail-data").getBoundingClientRect();return Math.abs(workspace.width-data.width)<2;})()'));
   await click('[data-tab="vehicles"]');
   check('تبويب المركبات يعرض مركبتين', await evaluate('document.querySelectorAll("#vehicleList tbody tr").length') === 2);
   await click('[data-tab="incidents"]');
@@ -233,10 +252,12 @@ async function regionDashboard() {
   await sleep(1800);
   check('لا يوجد polling دوري للملخص', requests.filter(item => item.url.includes('/api/region-command/overview')).length === requestCount);
   await screenshot('02c-sector-live-update');
+  await click('#closeDetail');
+  check('العودة للرئيسية تحفظ القطاع وتبويب المقارنة بعد التحديث اللحظي', await evaluate('document.querySelector(\'.rc-sector-card[data-sector-id="S1"]\').getAttribute("aria-selected")==="true"&&document.querySelector(\'.rc-selected-sector-inner\').dataset.sectorId==="S1"&&document.querySelector(\'[data-comparison-metric="staffActive"]\').getAttribute("aria-selected")==="true"'));
 
   await navigate(baseUrl + '/region-map.html?sector=S1');
   if (await evaluate('typeof window.L === "object" && typeof window.L.map === "function"')) {
-    await waitFor('document.querySelector("#regionMap").classList.contains("leaflet-container") && document.querySelectorAll(".rc-map-marker").length >= 4 && document.getElementById("mapSectorName").textContent.includes("قطاع اختبار 1")', 20000, 'map layers');
+    await waitFor('document.querySelector("#regionMap").classList.contains("leaflet-container") && document.querySelectorAll(".rc-map-marker").length >= 4 && document.getElementById("mapSectorName").textContent.includes("قطاع جنوب الرياض")', 20000, 'map layers');
     check('الخريطة تعرض علامات من الإحداثيات الاصطناعية', await evaluate('document.querySelectorAll(".rc-map-marker").length >= 4'));
     check('لوحة فرق الخريطة تعرض الرمز والقطاع والمناوبة ورقم الفرقة', await evaluate(`(()=>{const text=document.getElementById('mapTeamList').textContent;return text.includes('R-3-2-1')&&text.includes('R-3-2-2')&&text.includes('قطاع جنوب الرياض')&&text.includes('ليلية')&&text.includes('فرقة 1');})()`));
     await click('[data-map-tab="incidents"]');
@@ -248,7 +269,9 @@ async function regionDashboard() {
     check('خريطة الأساس لا تستخدم CARTO أو مفتاح API', requests.every(item => !item.url.includes('basemaps.cartocdn.com')));
     await evaluate('document.querySelector("[data-layer=heat]").click(); true');
     check('طبقة الكثافة الحرارية قابلة للتفعيل', await evaluate('document.querySelector("[data-layer=heat]").checked'));
-    check('اللوحة التحليلية تعرض الجاهزية والقوة والمركبات وتوزيع الفرق', await evaluate('document.getElementById("mapReadinessValue").textContent.includes("50") && document.querySelectorAll("#mapDetailMetrics .rc-force-row").length === 2 && document.querySelectorAll("#mapDetailMetrics .rc-team-legend-item").length === 4 && !!document.getElementById("mapTeamDistribution")'));
+    check('اللوحة التحليلية تعرض الجاهزية الفعلية والقوة والمركبات وتوزيع الفرق', await evaluate('document.getElementById("mapReadinessValue").textContent.includes("0") && document.querySelectorAll("#mapDetailMetrics .rc-force-row").length === 2 && document.getElementById("mapDetailMetrics").textContent.includes("مشغولة في بلاغ") && !!document.getElementById("mapTeamDistribution")'));
+    check('الخريطة تعرض زمن المباشرة وتغطيته الفعلية', await evaluate('document.getElementById("mapResponseMetrics").textContent.includes("5.3") && document.getElementById("mapResponseMetrics").textContent.includes("3 / 4")'));
+    check('قائمة فرق الخريطة تعرض البلاغات النشطة للفرق المشغولة', await evaluate('document.getElementById("mapTeamList").textContent.includes("TEST-I-NEW") && document.getElementById("mapTeamList").textContent.includes("مشغولة في بلاغ")'));
     await evaluate(`window.__mapResizeChecks=[];
       const originalInvalidate=L.Map.prototype.invalidateSize;
       L.Map.prototype.invalidateSize=function(options){
@@ -296,11 +319,16 @@ async function regionDashboard() {
 
   await viewport(390, 844, true);
   await navigate(baseUrl + '/region-command.html');
-  await waitFor('document.querySelectorAll(".rc-sector-card").length === 2 && document.getElementById("connectionStatus").dataset.state === "connected"', 15000, 'mobile dashboard');
+  await waitFor('document.querySelectorAll(".rc-sector-card").length === 5 && document.getElementById("connectionStatus").dataset.state === "connected"', 15000, 'mobile dashboard');
   if (await evaluate('document.documentElement.dataset.theme !== "dark"')) await click('[data-action="theme"]');
   check('لا يوجد تجاوز أفقي على الجوال', await evaluate('document.documentElement.scrollWidth <= window.innerWidth + 1'), await evaluate('({scrollWidth:document.documentElement.scrollWidth,innerWidth:window.innerWidth})'));
   await screenshot('05-region-dashboard-mobile');
-  await viewport(1440, 1000, false);
+  await evaluate('document.querySelector(".rc-sector-card[data-sector-id=S3]").scrollIntoView({block:"center",inline:"nearest",behavior:"instant"});document.querySelector(".rc-sector-card[data-sector-id=S3]").click(); true');
+  await waitFor('document.querySelector(".rc-selected-sector-inner").dataset.sectorId==="S3"', 5000, 'mobile sector selection');
+  check('اختيار القطاع واللوحة الجانبية يعملان على الجوال', await evaluate('document.querySelector(".rc-selected-sector-inner").dataset.sectorId==="S3"&&document.documentElement.scrollWidth<=window.innerWidth+1'));
+  await screenshot('05b-region-selected-mobile');
+  await evaluate('window.scrollTo({top:0,behavior:"auto"}); true');
+  await viewport(1672, 941, false);
 
   for (const mode of ['stale', 'unavailable', 'empty']) {
     await post('/__test/mode', { mode });
@@ -316,7 +344,7 @@ async function regionDashboard() {
   }
   await post('/__test/mode', { mode: 'geo-unavailable' });
   await navigate(baseUrl + '/region-map.html?sector=S1');
-  await waitFor('document.getElementById("mapSectorName").textContent.includes("قطاع اختبار 1")', 15000, 'geo unavailable detail');
+  await waitFor('document.getElementById("mapSectorName").textContent.includes("قطاع جنوب الرياض")', 15000, 'geo unavailable detail');
   await click('[data-map-tab="sources"]');
   check('غياب مرجع الإحداثيات موثق دون مواقع بديلة', (await evaluate('document.getElementById("mapSourceList").textContent')).includes('CENTER_GEO_SOURCE_UNAVAILABLE') || (await evaluate('document.getElementById("mapSourceList").textContent')).includes('مرجع إحداثيات المراكز غير متاح'));
   check('لا علامات مراكز عند تعطل مرجع إحداثياتها', await evaluate('document.querySelectorAll(".rc-map-marker:not(.incident)").length') === 0);
@@ -349,7 +377,7 @@ async function main() {
     '--headless=new', '--no-sandbox', '--disable-gpu', '--disable-background-networking',
     '--no-first-run', '--no-default-browser-check', '--ignore-certificate-errors',
     '--remote-debugging-port=' + debugPort, '--remote-allow-origins=*',
-    '--user-data-dir=' + PROFILE, '--window-size=1440,1000', 'about:blank'
+    '--user-data-dir=' + PROFILE, '--window-size=1672,941', 'about:blank'
   ], { stdio: ['ignore', 'ignore', 'pipe'] });
   let browserErrors = '';
   browser.stderr.on('data', chunk => { browserErrors += chunk.toString(); });
@@ -370,7 +398,7 @@ async function main() {
   await cdp.send('Runtime.enable');
   await cdp.send('Network.enable');
   await cdp.send('Fetch.enable', { patterns: [{ urlPattern: 'http://*/*', requestStage: 'Request' }, { urlPattern: 'https://*/*', requestStage: 'Request' }] });
-  await viewport(1440, 1000, false);
+  await viewport(1672, 941, false);
   await regionDashboard();
   await scopedAccounts();
   check('كل طلب خارجي حُجب وعولج محليًا دون اتصال خارجي', cdp.externalRequests.length > 0 && cdp.externalRequests.every(item => item.fulfilledLocally), { intercepted: cdp.externalRequests.length });

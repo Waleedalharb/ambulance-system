@@ -61,7 +61,8 @@ test('read service filters every owner result through sector centers and wraps a
   const detail = await readService.getSectorDetail({ actor, sectorId: 'S1' });
   assert.equal(detail.sector.shiftId, '101');
   assert.equal(detail.sector.metrics.teamsTotal.value, 2);
-  assert.equal(detail.sector.metrics.teamsReady.value, 1);
+  assert.equal(detail.sector.metrics.teamsReady.value, 0, 'الفرقة المرشحة لبلاغ نشط ليست جاهزة للتكليف');
+  assert.equal(detail.sector.metrics.teamsBusy.value, 1);
   assert.equal(detail.sector.metrics.vehiclesTotal.value, 2);
   assert.equal(detail.sector.metrics.incidentsTotal.value, 2);
   assert.equal(detail.sector.metrics.avgResponseMinutes.value, 10);
@@ -138,7 +139,7 @@ test('metric evidence exposes approved formula and wrapped numerator/denominator
   const { db, readService, actor } = setup();
   const evidence = await readService.getMetricEvidence({ actor, sectorId: 'S1', metricKey: 'readinessRate', metricVersion: '1.0.0' });
   assert.equal(evidence.metric.ownerService, 'StaffingEventsService');
-  assert.equal(evidence.numerator.value, 1);
+  assert.equal(evidence.numerator.value, 0, 'البسط يستبعد الفرقة المشغولة في البلاغ النشط');
   assert.equal(evidence.denominator.value, 2);
   await assert.rejects(readService.getMetricEvidence({ actor, sectorId: 'S1', metricKey: 'invented', metricVersion: '1' }), e => e.code === 'METRIC_NOT_SUPPORTED');
   db.close();

@@ -16,6 +16,7 @@ const definitions = [
   ['incidentsTotal', 'إجمالي البلاغات', 'incident', 'ReportService', 'getIncidentSummary.incidents'],
   ['incidentsActive', 'البلاغات النشطة', 'incident', 'ReportService', 'getIncidentSummary.status=active'],
   ['avgResponseMinutes', 'متوسط زمن الوصول', 'minute', 'ReportService', 'mean(incident.bestArrivalMin)'],
+  ['avgMubasharaMinutes', 'متوسط زمن المباشرة', 'minute', 'ReportService', 'mean(incident.bestMubasharaMin)'],
   ['decisionCount', 'عناصر تحتاج مراجعة', 'item', 'RegionDecisionCenterService', 'deriveNeedsReview']
 ];
 

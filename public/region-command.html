@@ -10,71 +10,117 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/region-command.css?v=2">
-  <link rel="stylesheet" href="/css/region-command-dashboard.css?v=1">
+  <link rel="stylesheet" href="/css/region-command-dashboard.css?v=2">
+  <link rel="stylesheet" href="/css/region-command-home.css?v=1">
   <script src="/js/core/core-auth.js" defer></script>
   <script src="/js/operational-team-code.js?v=1" defer></script>
   <script src="/js/region-command-api.js?v=1" defer></script>
-  <script src="/js/region-command-views.js?v=3" defer></script>
+  <script src="/js/region-command-views.js?v=5" defer></script>
   <script src="/js/region-command-realtime.js?v=1" defer></script>
-  <script src="/js/region-command.js?v=3" defer></script>
+  <script src="/js/region-command.js?v=5" defer></script>
 </head>
 <body>
+  <svg class="rc-svg-defs" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+    <symbol id="rc-i-home" viewBox="0 0 24 24"><path d="m3 11 9-8 9 8v9a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/></symbol>
+    <symbol id="rc-i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20v-2a6 6 0 0 1 12 0v2M16 5a3 3 0 0 1 0 6M18 14a5 5 0 0 1 3 4v2"/></symbol>
+    <symbol id="rc-i-map" viewBox="0 0 24 24"><path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3zM9 3v15M15 6v15"/></symbol>
+    <symbol id="rc-i-check" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12 2.5 2.5L16 9"/></symbol>
+    <symbol id="rc-i-truck" viewBox="0 0 24 24"><path d="M3 6h11v10H3zM14 10h4l3 3v3h-7z"/><circle cx="7" cy="18" r="2"/><circle cx="18" cy="18" r="2"/></symbol>
+    <symbol id="rc-i-bell" viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></symbol>
+    <symbol id="rc-i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+    <symbol id="rc-i-layers" viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5zM3 12l9 5 9-5M3 16l9 5 9-5"/></symbol>
+    <symbol id="rc-i-chart" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></symbol>
+    <symbol id="rc-i-data" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 2 4 3 8 3s8-1 8-3V5M4 11v6c0 2 4 3 8 3s8-1 8-3v-6"/></symbol>
+    <symbol id="rc-i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5 19 19M19 5l-1.5 1.5M6.5 17.5 5 19"/></symbol>
+    <symbol id="rc-i-moon" viewBox="0 0 24 24"><path d="M20 15a8 8 0 0 1-11-11 9 9 0 1 0 11 11z"/></symbol>
+    <symbol id="rc-i-list" viewBox="0 0 24 24"><path d="M9 6h12M9 12h12M9 18h12M3 6h2M3 12h2M3 18h2"/></symbol>
+    <symbol id="rc-i-refresh" viewBox="0 0 24 24"><path d="M20 6v5h-5M4 18v-5h5M18.5 9A7 7 0 0 0 6 6.5L4 11M5.5 15A7 7 0 0 0 18 17.5l2-4.5"/></symbol>
+  </svg>
   <a class="rc-skip" href="#mainContent">تجاوز إلى المحتوى</a>
   <header class="rc-header">
     <div class="rc-brand">
       <span class="rc-brand-mark" aria-hidden="true"><span></span></span>
-      <div><h1>مركز قيادة قائد المنطقة</h1><p>الصورة التشغيلية الموحدة · قراءة فقط</p></div>
+      <div><h1>مركز قيادة قائد المنطقة</h1><p>الصورة التشغيلية الموحدة · الرياض</p></div>
     </div>
     <nav class="rc-header-actions" aria-label="التنقل الرئيسي">
+      <a class="rc-button rc-button-quiet" href="/"><svg class="rc-icon"><use href="#rc-i-home"/></svg>الصفحة الرئيسية</a>
+      <a class="rc-button rc-button-primary" href="/region-command.html" aria-current="page"><svg class="rc-icon"><use href="#rc-i-users"/></svg>القوى العاملة</a>
+      <a class="rc-button rc-button-quiet" href="/region-map.html"><svg class="rc-icon"><use href="#rc-i-map"/></svg>العرض الجغرافي</a>
       <span class="rc-connection" id="connectionStatus" data-state="connecting"><span></span> جارٍ الاتصال</span>
       <button class="rc-icon-button" type="button" data-action="theme" aria-label="تبديل الوضع الداكن والفاتح" title="تبديل المظهر">◐</button>
-      <a class="rc-button rc-button-primary" href="/region-map.html">العرض الجغرافي <span aria-hidden="true">↗</span></a>
-      <a class="rc-button rc-button-quiet" href="/">المنصة الرئيسية</a>
     </nav>
   </header>
 
   <main class="rc-main" id="mainContent">
-    <div class="rc-page-heading">
-      <div><span class="rc-eyebrow" id="pageEyebrow">غرفة القيادة / الوضع الحالي</span><h2 id="pageTitle">الصورة التشغيلية في لقطة واحدة</h2><p id="scopeDescription">جارٍ تحميل نطاق الوصول المعتمد…</p><p id="detailShift" hidden>—</p></div>
-      <div class="rc-heading-context"><span class="rc-environment-banner">قراءة تشغيلية من لقطة المصدر الحالية</span><div class="rc-heading-meta"><span id="lastUpdated">—</span><button class="rc-button rc-button-quiet" id="refreshButton" type="button">تحديث البيانات</button><button class="rc-button rc-button-quiet" id="closeDetail" type="button" hidden>العودة إلى الصورة الإقليمية</button></div></div>
-    </div>
-
     <section class="rc-alert" id="globalError" role="alert" hidden></section>
     <section class="rc-quality-banner" id="qualityBanner" aria-live="polite" hidden></section>
 
-    <section class="rc-status-section rc-overview-only" aria-labelledby="regionMetricsTitle">
-      <div class="rc-section-heading" hidden><h3 id="regionMetricsTitle">قراءة الحالة العامة</h3></div>
-      <div class="rc-metric-grid" id="regionMetrics" aria-busy="true"></div>
-    </section>
+    <div class="rc-home-layout rc-overview-only">
+      <div class="rc-home-primary">
+        <section class="rc-home-hero" aria-labelledby="pageTitle">
+          <div class="rc-home-hero-title">
+            <span class="rc-eyebrow" id="pageEyebrow">غرفة القيادة / الوضع الحالي</span>
+            <h2 id="pageTitle">القوى العاملة والجاهزية التشغيلية</h2>
+            <p id="scopeDescription">جارٍ تحميل نطاق الوصول المعتمد…</p>
+          </div>
+          <div class="rc-home-hero-context">
+            <div class="rc-home-clock"><svg class="rc-icon"><use href="#rc-i-clock"/></svg><div><strong id="homeClock">—</strong><span id="homeDate">—</span></div></div>
+            <div class="rc-home-weather"><svg class="rc-icon"><use href="#rc-i-sun"/></svg><div><strong id="weatherValue">—</strong><span>الطقس غير متاح · الرياض</span></div></div>
+            <button class="rc-icon-button rc-home-refresh" id="refreshButton" type="button" aria-label="تحديث البيانات" title="تحديث البيانات"><svg class="rc-icon"><use href="#rc-i-refresh"/></svg></button>
+            <span class="rc-sr-only" id="lastUpdated">—</span>
+          </div>
+        </section>
 
-    <div class="rc-dashboard-grid rc-overview-only">
-      <section class="rc-panel rc-sectors-panel" aria-labelledby="sectorsTitle">
-        <div class="rc-panel-header"><div><span class="rc-eyebrow">مقارنة مباشرة</span><h3 id="sectorsTitle">القطاعات الخمسة: أين توجد الفروقات؟</h3></div><span class="rc-count-chip rc-quality-chip" id="sectorCount">—</span></div>
-        <p class="rc-panel-intro">مقارنة قيم المصدر مباشرة — لا توجد درجة ضغط أو تغطية تشغيلية مركبة.</p>
-        <div class="rc-sector-columns" aria-hidden="true"><span>زمن الوصول</span><span>البلاغات</span><span>المركبات</span><span>الكادر</span><span>الجاهزية</span><span>القطاع / الجودة</span></div>
-        <div class="rc-sector-list" id="sectorList" aria-busy="true"></div>
-      </section>
+        <section class="rc-status-section" aria-labelledby="regionMetricsTitle">
+          <h3 class="rc-sr-only" id="regionMetricsTitle">المؤشرات الإقليمية</h3>
+          <div class="rc-metric-grid" id="regionMetrics" aria-busy="true"></div>
+        </section>
 
-      <section class="rc-panel rc-decision-panel" aria-labelledby="decisionTitle">
-        <div class="rc-panel-header"><div><span class="rc-eyebrow">مراجعة محايدة</span><h3 id="decisionTitle">مركز المتابعة والقرار</h3></div><span class="rc-count-chip" id="decisionCount">—</span></div>
-        <p class="rc-panel-intro">عناصر <span dir="ltr">needs_review</span> المستخرجة من القواعد المعتمدة فقط؛ لا أولوية أو درجة مخاطرة.</p>
-        <div class="rc-decision-list" id="decisionList" aria-busy="true"></div>
-        <button class="rc-button rc-button-quiet rc-full-width" id="decisionMore" type="button" hidden>عرض المزيد</button>
-        <details class="rc-filter-disclosure"><summary>تصفية حسب القطاع والفئة</summary><div class="rc-filters">
-          <label>القطاع<select id="decisionSector"><option value="">كل القطاعات المخولة</option></select></label>
-          <label>الفئة<select id="decisionCategory"><option value="">كل الفئات</option><option value="staffing">القوى</option><option value="vehicles">المركبات</option><option value="data_quality">جودة البيانات</option></select></label>
-        </div></details>
-        <details class="rc-source-details" id="sourceDetails" open>
-          <summary>سلامة مصادر القراءة <span id="sourceReadCount">—</span></summary>
-          <div id="sourceMetaList" class="rc-source-meta-list"></div>
-        </details>
-      </section>
+        <section class="rc-home-sectors" aria-labelledby="sectorsTitle">
+          <div class="rc-home-section-title"><h3 id="sectorsTitle"><svg class="rc-icon"><use href="#rc-i-layers"/></svg>القطاعات التشغيلية <span id="sectorCount">(—)</span></h3></div>
+          <div class="rc-sector-list" id="sectorList" aria-busy="true"></div>
+        </section>
+
+        <div class="rc-home-bottom-grid">
+          <section class="rc-home-panel rc-quality-panel" id="qualityPanel" aria-labelledby="qualityTitle">
+            <div class="rc-home-panel-title"><h3 id="qualityTitle"><svg class="rc-icon"><use href="#rc-i-data"/></svg>مركز المتابعة وجودة البيانات</h3></div>
+            <div class="rc-quality-summary" id="qualityCompleteness">—</div>
+            <div class="rc-quality-sources" id="qualitySources"></div>
+            <details class="rc-home-disclosure">
+              <summary>عناصر المراجعة والمصادر <span id="decisionCount">—</span></summary>
+              <div class="rc-filters">
+                <label>القطاع<select id="decisionSector"><option value="">كل القطاعات المخولة</option></select></label>
+                <label>الفئة<select id="decisionCategory"><option value="">كل الفئات</option><option value="staffing">القوى</option><option value="vehicles">المركبات</option><option value="data_quality">جودة البيانات</option></select></label>
+              </div>
+              <div class="rc-decision-list" id="decisionList" aria-busy="true"></div>
+              <button class="rc-button rc-button-quiet rc-full-width" id="decisionMore" type="button" hidden>عرض المزيد</button>
+            </details>
+            <details class="rc-source-details rc-home-disclosure" id="sourceDetails">
+              <summary>سجل قراءات المصدر <span id="sourceReadCount">—</span></summary>
+              <div id="sourceMetaList" class="rc-source-meta-list"></div>
+            </details>
+          </section>
+
+          <section class="rc-home-panel rc-workforce-panel" id="workforcePanel" aria-labelledby="workforceTitle">
+            <div class="rc-home-panel-title"><h3 id="workforceTitle"><svg class="rc-icon"><use href="#rc-i-users"/></svg>توزيع القوى العاملة</h3></div>
+            <div id="workforceDistribution" class="rc-workforce-distribution"></div>
+          </section>
+
+          <section class="rc-home-panel rc-comparison-panel" id="comparisonPanel" aria-labelledby="comparisonTitle">
+            <div class="rc-home-panel-title"><h3 id="comparisonTitle"><svg class="rc-icon"><use href="#rc-i-chart"/></svg>مقارنة القطاعات</h3></div>
+            <div class="rc-comparison-tabs" id="comparisonTabs" role="tablist" aria-label="مؤشر المقارنة"></div>
+            <div class="rc-sector-comparison" id="sectorComparison"></div>
+          </section>
+        </div>
+      </div>
+
+      <aside class="rc-selected-sector" id="selectedSectorPanel" aria-label="ملخص القطاع المحدد" aria-busy="true"></aside>
     </div>
 
-    <section class="rc-trend-placeholder rc-overview-only" aria-labelledby="trendTitle">
-      <div><span class="rc-eyebrow">الاتجاه الزمني</span><h3 id="trendTitle">غير مفعّل في العرض الحالي</h3></div>
-      <div><strong>لا تتوفر سلسلة زمنية معتمدة؛ العرض الحالي <span dir="ltr">current</span> فقط.</strong><p>يظهر الرسم بعد توفر قراءات تاريخية كافية. لا تُستنتج اتجاهات من لقطة واحدة، ولا تُعرض القيم الناقصة كصفر.</p></div>
-    </section>
+    <div class="rc-detail-heading-only">
+      <div><span class="rc-eyebrow">تفاصيل القطاع / مركز المتابعة / الدليل</span><h2>من المؤشر العام إلى سبب المتابعة</h2><p id="detailShift" hidden>—</p></div>
+      <button class="rc-button rc-button-quiet" id="closeDetail" type="button" hidden>العودة إلى الصورة الإقليمية</button>
+    </div>
 
     <section class="rc-detail-panel" id="sectorDetail" aria-labelledby="detailTitle" hidden>
       <div id="detailError" class="rc-alert" role="alert" hidden></div>
@@ -83,7 +129,7 @@
           <div class="rc-detail-identity"><h3 id="detailTitle">—</h3><span id="detailStatus"></span><span class="rc-detail-review-count" id="detailDecisionCount">—</span></div>
           <div class="rc-metric-grid rc-metric-grid-detail" id="detailMetrics"></div>
         </div>
-        <div class="rc-detail-workspace">
+        <div class="rc-detail-workspace rc-evidence-closed">
           <dialog class="rc-dialog rc-embedded-evidence" id="evidenceDialog" aria-labelledby="evidenceTitle">
             <div class="rc-dialog-header"><div><span class="rc-eyebrow">المصدر والدليل</span><h3 id="evidenceTitle">دليل المؤشر</h3></div><button class="rc-icon-button" id="closeEvidence" type="button" aria-label="إغلاق">×</button></div>
             <div id="evidenceBody" class="rc-dialog-body"></div>

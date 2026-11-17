@@ -114,6 +114,18 @@ class RegionScopeService {
     );
   }
 
+  async resolveSectorTeamNames(actor, sectorId, at) {
+    const centers = await this.resolveSectorCenters(actor, sectorId, at);
+    if (!centers.length) return [];
+    const placeholders = centers.map(() => '?').join(',');
+    const rows = await this.db.all(
+      `SELECT t.name FROM teams t JOIN centers c ON t.center = c.name
+       WHERE CAST(c.id AS TEXT) IN (${placeholders}) AND t.is_active = 1 ORDER BY t.name`,
+      centers.map(center => String(center.id))
+    );
+    return rows.map(row => row.name);
+  }
+
   async canViewSector(actor, sectorId, permissionService = this.permissionService, at) {
     try {
       if (!permissionService || !(await permissionService.hasPermission(String(actor.id), actor.role, 'region.command.view'))) return false;
