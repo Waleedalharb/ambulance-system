@@ -134,12 +134,23 @@ test('regional trend filters sector teams, deduplicates shared incidents and rea
 
 test('scoped active shift selection never lends another sector its shift', async () => {
   const hdl = new Database(':memory:');
-  hdl.exec(`CREATE TABLE shifts (id INTEGER PRIMARY KEY, status TEXT, shift_name TEXT);
+  hdl.exec(`CREATE TABLE shifts (id INTEGER PRIMARY KEY, status TEXT, shift_name TEXT, shift_date TEXT);
     CREATE TABLE operational_events (id INTEGER PRIMARY KEY, shift_id INTEGER, center TEXT);
     CREATE TABLE shift_reports (id INTEGER PRIMARY KEY, shift_id INTEGER, center TEXT);
-    INSERT INTO shifts VALUES (1, 'active', 'مناوبة أ'), (2, 'active', 'مناوبة ب'), (3, 'active', 'مناوبة ج');
+    CREATE TABLE teams (id INTEGER PRIMARY KEY, name TEXT, center TEXT);
+    CREATE TABLE shift_team_status (shift_id INTEGER, team_id TEXT, status TEXT);
+    CREATE TABLE shift_roster (id INTEGER PRIMARY KEY, team_id INTEGER, shift_date TEXT);
+    INSERT INTO shifts VALUES
+      (1, 'active', 'مناوبة أ', '2026-11-17'),
+      (2, 'active', 'مناوبة ب', '2026-11-17'),
+      (3, 'active', 'مناوبة ج', '2026-11-17'),
+      (4, 'active', 'مناوبة تكميل', '2026-11-17'),
+      (5, 'active', 'مناوبة مجدولة', '2026-11-17');
     INSERT INTO operational_events VALUES (1, 1, 'مركز أ'), (2, 2, 'مركز ب');
-    INSERT INTO shift_reports VALUES (1, 3, 'مركز ج');`);
+    INSERT INTO shift_reports VALUES (1, 3, 'مركز ج');
+    INSERT INTO teams VALUES (4, 'فريق جاهز', 'مركز تكميل'), (5, 'فريق مجدول', 'مركز جدولة');
+    INSERT INTO shift_team_status VALUES (4, 'فريق جاهز', 'ready');
+    INSERT INTO shift_roster VALUES (1, 5, '2026-11-17');`);
   const db = {
     get: async (sql, params = []) => hdl.prepare(sql).get(...params) || null,
     all: async (sql, params = []) => hdl.prepare(sql).all(...params),
@@ -149,7 +160,11 @@ test('scoped active shift selection never lends another sector its shift', async
   assert.equal((await storage.getActiveShift({ centerNames: ['مركز أ'] })).id, 1);
   assert.equal((await storage.getActiveShift({ centerNames: ['مركز ب'] })).id, 2);
   assert.equal((await storage.getActiveShift({ centerNames: ['مركز ج'] })).id, 3);
+  assert.equal((await storage.getActiveShift({ centerNames: ['مركز تكميل'] })).id, 4,
+    'a saved completion decision selects its sector shift without operational events');
+  assert.equal((await storage.getActiveShift({ centerNames: ['مركز جدولة'] })).id, 5,
+    'a scheduled roster selects its sector shift before the first completion');
   assert.equal(await storage.getActiveShift({ centerNames: ['مركز غير مرتبط'] }), null);
-  assert.equal((await storage.getActiveShift()).id, 3, 'unscoped legacy behavior remains unchanged');
+  assert.equal((await storage.getActiveShift()).id, 5, 'unscoped legacy behavior remains unchanged');
   hdl.close();
 });

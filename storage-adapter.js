@@ -36,8 +36,9 @@ class StorageAdapter {
             return this.db.get("SELECT * FROM shifts WHERE status = 'active' ORDER BY id DESC LIMIT 1");
         }
         const placeholders = centerNames.map(() => '?').join(',');
-        // لكل قطاع مناوبته النشطة المثبتة بأحداثه أو بلاغاته؛ لا تُعير مناوبة
+        // لكل قطاع مناوبته النشطة المثبتة ببياناته الفعلية؛ لا تُعير مناوبة
         // الجنوب لبقية القطاعات فتظهر بياناتها الصفرية وكأنها قراءة حقيقية.
+        // قرارات التكميل والجدولة مصدران مستقلان عن أحداث الأشخاص والبلاغات.
         return this.db.get(
             `SELECT s.* FROM shifts s
              WHERE s.status = 'active' AND (
@@ -45,8 +46,14 @@ class StorageAdapter {
                        WHERE oe.shift_id = s.id AND oe.center IN (${placeholders}))
                OR EXISTS (SELECT 1 FROM shift_reports sr
                           WHERE sr.shift_id = s.id AND sr.center IN (${placeholders}))
+               OR EXISTS (SELECT 1 FROM shift_team_status sts
+                          JOIN teams t ON t.name = sts.team_id OR CAST(t.id AS TEXT) = sts.team_id
+                          WHERE sts.shift_id = s.id AND t.center IN (${placeholders}))
+               OR EXISTS (SELECT 1 FROM shift_roster ro
+                          JOIN teams t ON t.id = ro.team_id
+                          WHERE ro.shift_date = s.shift_date AND t.center IN (${placeholders}))
              ) ORDER BY s.id DESC LIMIT 1`,
-            [...centerNames, ...centerNames]
+            [...centerNames, ...centerNames, ...centerNames, ...centerNames]
         );
     }
 
