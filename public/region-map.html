@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-  <link rel="stylesheet" href="/css/region-command.css?v=6">
+  <link rel="stylesheet" href="/css/region-command.css?v=7">
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
   <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js" defer></script>
   <script src="/js/core/core-auth.js" defer></script>
@@ -21,8 +21,8 @@
   <script src="/js/alert-rules.js" defer></script>
   <script src="/js/proqa-fontawesome-paths.js?v=2" defer></script>
   <script src="/js/proqa-incident-icons.js?v=1" defer></script>
-  <script src="/js/region-map.js?v=16" defer></script>
-  <link rel="stylesheet" href="/css/region-map-visual.css?v=6">
+  <script src="/js/region-map.js?v=18" defer></script>
+  <link rel="stylesheet" href="/css/region-map-visual.css?v=7">
 </head>
 <body class="rc-map-page">
   <a class="rc-skip" href="#mainContent">تجاوز إلى المحتوى</a>
@@ -59,6 +59,7 @@
           <label><input type="checkbox" data-layer="incidents" checked><span class="rc-layer-dot rc-dot-incident"></span>البلاغات</label>
           <label class="rc-layer-unavailable"><input type="checkbox" disabled><span class="rc-layer-dot rc-dot-team"></span>الفرق <small>الموقع الحي غير متاح</small></label>
           <label><input type="checkbox" data-layer="centers" checked><span class="rc-layer-dot rc-dot-center"></span>المراكز</label>
+          <label><input type="checkbox" data-layer="boundaries" checked><span class="rc-layer-dot rc-dot-boundary"></span>الحدود <small id="boundaryLayerStatus">جارٍ التحقق</small></label>
           <label><input type="checkbox" data-layer="positionings" checked><span class="rc-layer-dot rc-dot-post"></span>التمركزات <small>مخططة، ليست تتبعًا حيًا</small></label>
           <label><input type="checkbox" data-layer="heat"><span class="rc-layer-dot rc-dot-heat"></span>الكثافة الحرارية</label>
           <label class="rc-layer-unavailable"><input type="checkbox" disabled><span class="rc-layer-dot rc-dot-live"></span>المواقع الحية <small>غير متاحة</small></label>

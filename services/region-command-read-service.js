@@ -1,5 +1,7 @@
 'use strict';
 
+const fs = require('fs');
+const path = require('path');
 const { RegionCommandError } = require('./region-command-errors');
 const { getMetric, METRICS } = require('../config/region-command-metrics');
 const TeamCode = require('../public/js/operational-team-code');
@@ -80,6 +82,22 @@ function crewKeepsTeamBusy(crew) {
   return !['B', 'C', 'R'].includes(String(crew.cadUrs || '').toUpperCase());
 }
 
+// تصنيف البلاغات المطلوب في العرض الجغرافي يعتمد رمز ProQA المسجل في CAD فقط،
+// دون استنتاج من النص الحر: 29/34 حوادث، 7 حرائق، 26 مرضية، و9E إيكو توقف قلب وتنفس.
+function incidentCategory(code) {
+  const match = String(code || '').trim().match(/^(\d{1,2})/);
+  return match ? parseInt(match[1], 10) : null;
+}
+const INCIDENT_BREAKDOWN_BUCKETS = [
+  { key: 'accidents', label: 'حوادث', test: category => category === 29 || category === 34 },
+  { key: 'fires', label: 'حرائق', test: category => category === 7 },
+  { key: 'medical', label: 'مرضية', test: category => category === 26 },
+  { key: 'echo', label: 'إيكو — توقف قلب وتنفس', test: (category, code) => /^9E/i.test(String(code || '').trim()) }
+];
+function breakdownUnavailable(reasonCode) {
+  return { status: 'unavailable', reasonCode, sourceAt: null, items: [] };
+}
+
 class RegionCommandReadService {
   constructor({ scopeService, staffingService, vehicleService, reportService, centersGeoService = null, positioningService = null, getActiveShift, now = () => new Date() }) {
     if (!scopeService) throw new Error('RegionCommandReadService: scopeService مطلوب');
@@ -92,6 +110,30 @@ class RegionCommandReadService {
     this.getActiveShift = getActiveShift;
     this.now = now;
     this.decisionCenter = null;
+    this._boundariesByName = undefined;
+  }
+
+  // حدود القطاعات المعتمدة من ملف GeoJSON محلي (data/sector-boundaries.geojson).
+  // تُطابَق باسم القطاع فقط؛ أي قطاع بلا سجل يُعاد بلا حدود ولا يُختلق له مضلع.
+  _sectorBoundary(sector) {
+    if (this._boundariesByName === undefined) {
+      this._boundariesByName = null;
+      try {
+        const file = path.join(__dirname, '..', 'data', 'sector-boundaries.geojson');
+        const parsed = JSON.parse(fs.readFileSync(file, 'utf8'));
+        const features = parsed && Array.isArray(parsed.features) ? parsed.features : [];
+        const map = new Map();
+        for (const feature of features) {
+          const name = feature && feature.properties && feature.properties.name;
+          const geometry = feature && feature.geometry;
+          if (!name || !geometry || !['Polygon', 'MultiPolygon'].includes(geometry.type)) continue;
+          map.set(String(name).trim(), { type: 'Feature', properties: feature.properties, geometry });
+        }
+        this._boundariesByName = map;
+      } catch (_) { this._boundariesByName = null; }
+    }
+    if (!this._boundariesByName || !sector || !sector.name) return null;
+    return this._boundariesByName.get(String(sector.name).trim()) || null;
   }
 
   async _shift(sector, centers, requestedShiftId) {
@@ -121,7 +163,8 @@ class RegionCommandReadService {
       status: 'complete', view, shiftId: currentShiftId, generatedAt,
       shift: shift ? { id: String(shift.id), name: shift.shift_name || shift.name || null, type: shift.shift_type || null, date: shift.shift_date || null } : null,
       centers: centers.map(c => ({ id: String(c.id), name: c.name })),
-      teams: [], vehicles: [], incidents: [], metrics: {}, dataQuality: {}, sourceMeta: []
+      teams: [], vehicles: [], incidents: [], metrics: {}, dataQuality: {}, sourceMeta: [],
+      incidentBreakdown: breakdownUnavailable(shiftResult.error || 'NO_ACTIVE_SHIFT')
     };
     if (!currentShiftId) {
       const reason = shiftResult.error || 'NO_ACTIVE_SHIFT';
@@ -179,7 +222,7 @@ class RegionCommandReadService {
       base.dataQuality.StaffingEventsService = { status, reasonCode: null, sourceAt };
       base.sourceMeta.push({ ownerService: 'StaffingEventsService', status, sourceAt, shiftId: currentShiftId });
     } else {
-      for (const key of ['teamsTotal', 'teamsReady', 'teamsMissing', 'teamsOffline', 'teamsPending', 'staffActive', 'staffRequired', 'readinessRate']) base.metrics[key] = unavailable(staffing.error);
+      for (const key of ['teamsTotal', 'teamsReady', 'teamsMissing', 'teamsOffline', 'teamsPending', 'staffActive', 'staffRequired', 'readinessRate', 'operationalPressure']) base.metrics[key] = unavailable(staffing.error);
       base.dataQuality.StaffingEventsService = { status: 'unavailable', reasonCode: staffing.error, sourceAt: null };
       base.sourceMeta.push({ ownerService: 'StaffingEventsService', status: 'unavailable', reasonCode: staffing.error, sourceAt: null });
     }
@@ -225,7 +268,8 @@ class RegionCommandReadService {
 
     if (staffing.error) {
       // لا يمكن نسب البلاغ إلى القطاع بلا قائمة فرقه؛ الصفر هنا سيكون مضللًا.
-      for (const key of ['incidentsTotal', 'incidentsActive', 'avgResponseMinutes', 'avgMubasharaMinutes', 'teamsBusy']) base.metrics[key] = unavailable('TEAM_SCOPE_SOURCE_UNAVAILABLE');
+      for (const key of ['incidentsTotal', 'incidentsActive', 'avgResponseMinutes', 'avgMubasharaMinutes', 'teamsBusy', 'operationalPressure']) base.metrics[key] = unavailable('TEAM_SCOPE_SOURCE_UNAVAILABLE');
+      base.incidentBreakdown = breakdownUnavailable('TEAM_SCOPE_SOURCE_UNAVAILABLE');
       base.dataQuality.ReportService = { status: 'unavailable', reasonCode: 'TEAM_SCOPE_SOURCE_UNAVAILABLE', sourceAt: null };
       base.sourceMeta.push({ ownerService: 'ReportService', status: 'unavailable', reasonCode: 'TEAM_SCOPE_SOURCE_UNAVAILABLE', sourceAt: null });
     } else if (!incidents.error) {
@@ -233,8 +277,21 @@ class RegionCommandReadService {
       const allIncidents = incidents.value.incidents || [];
       const relevant = allIncidents.filter(incident => (incident.crews || []).some(c => c.counted && teamNames.has(c.unit)));
       const sourceAt = latest(relevant.map(i => i.createdAt || i.cadCreatedAt));
-      base.metrics.incidentsTotal = count(relevant.length, sourceAt, relevant.length, relevant.length, { stale: incidents.value.stale === true });
-      base.metrics.incidentsActive = count(relevant.filter(i => i.status === 'active').length, sourceAt, relevant.length, relevant.length, { stale: incidents.value.stale === true });
+      const incidentStale = incidents.value.stale === true;
+      base.metrics.incidentsTotal = count(relevant.length, sourceAt, relevant.length, relevant.length, { stale: incidentStale });
+      base.metrics.incidentsActive = count(relevant.filter(i => i.status === 'active').length, sourceAt, relevant.length, relevant.length, { stale: incidentStale });
+      base.incidentBreakdown = {
+        status: incidentStale ? 'stale' : 'ok', reasonCode: null, sourceAt,
+        items: INCIDENT_BREAKDOWN_BUCKETS.map(bucket => {
+          const bucketIncidents = relevant.filter(i => bucket.test(incidentCategory(i.code), i.code));
+          return {
+            key: bucket.key, label: bucket.label,
+            total: count(bucketIncidents.length, sourceAt, bucketIncidents.length, bucketIncidents.length, { stale: incidentStale }),
+            active: count(bucketIncidents.filter(i => i.status === 'active').length, sourceAt, bucketIncidents.length, bucketIncidents.length, { stale: incidentStale }),
+            avgResponseMinutes: timeAverage(bucketIncidents, 'bestArrivalMin', sourceAt, incidentStale)
+          };
+        })
+      };
       base.metrics.avgResponseMinutes = timeAverage(relevant, 'bestArrivalMin', sourceAt, incidents.value.stale === true);
       base.metrics.avgMubasharaMinutes = timeAverage(relevant, 'bestMubasharaMin', sourceAt, incidents.value.stale === true);
       base.incidents = relevant.map(i => ({
@@ -275,11 +332,18 @@ class RegionCommandReadService {
       base.metrics.readinessRate = expected > 0
         ? count(Math.round(readyTeams / expected * 100), staffingSourceAt, expected, expected, { stale: staffingStale })
         : metric(null, { status: 'not_applicable', reasonCode: 'NO_REQUIRED_TEAMS', sourceAt: staffingSourceAt, coverage: quality(0, 0, COMPLETE) });
+      // الضغط التشغيلي: البلاغات النشطة مقابل الفرق المتاحة للتكليف (الجاهزة)؛
+      // غياب الفرق الجاهزة مع وجود بلاغات نشطة يعني ضغطًا كاملًا.
+      const activeIncidents = relevant.filter(i => i.status === 'active').length;
+      base.metrics.operationalPressure = expected === 0
+        ? metric(null, { status: 'not_applicable', reasonCode: 'NO_REQUIRED_TEAMS', sourceAt, coverage: quality(0, 0, COMPLETE) })
+        : count(readyTeams > 0 ? Math.round(activeIncidents / readyTeams * 100) : (activeIncidents > 0 ? 100 : 0), sourceAt, expected, expected, { stale: incidentStale });
       const status = sourceStatus(sourceAt, incidents.value.stale === true);
       base.dataQuality.ReportService = { status, reasonCode: null, sourceAt };
       base.sourceMeta.push({ ownerService: 'ReportService', status, sourceAt, shiftId: currentShiftId });
     } else {
-      for (const key of ['incidentsTotal', 'incidentsActive', 'avgResponseMinutes', 'avgMubasharaMinutes', 'teamsBusy']) base.metrics[key] = unavailable(incidents.error);
+      for (const key of ['incidentsTotal', 'incidentsActive', 'avgResponseMinutes', 'avgMubasharaMinutes', 'teamsBusy', 'operationalPressure']) base.metrics[key] = unavailable(incidents.error);
+      base.incidentBreakdown = breakdownUnavailable(incidents.error);
       base.dataQuality.ReportService = { status: 'unavailable', reasonCode: incidents.error, sourceAt: null };
       base.sourceMeta.push({ ownerService: 'ReportService', status: 'unavailable', reasonCode: incidents.error, sourceAt: null });
     }
@@ -362,7 +426,7 @@ class RegionCommandReadService {
     });
     const base = {
       success: true, generatedAt: new Date(this.now()).toISOString(), view,
-      sector: { id: sector.id, regionId: sector.region_id, code: sector.code, name: sector.name },
+      sector: { id: sector.id, regionId: sector.region_id, code: sector.code, name: sector.name, boundary: this._sectorBoundary(sector) },
       shift: shift ? { id: String(shift.id), name: shift.shift_name || shift.name || null, type: shift.shift_type || null, date: shift.shift_date || null } : null,
       centers: mappedCenters,
       incidents: { status: 'unavailable', reasonCode: 'NO_ACTIVE_SHIFT', sourceAt: null, items: [] },

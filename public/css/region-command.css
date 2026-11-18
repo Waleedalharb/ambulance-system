@@ -276,6 +276,7 @@ button.rc-metric-card:hover { border-color: color-mix(in srgb, var(--rc-accent) 
 .rc-layer-dot { width: 7px; height: 7px; border-radius: 50%; }
 .rc-dot-incident { background: #FB7185; }
 .rc-dot-center { background: #22D3EE; }
+.rc-dot-boundary { border: 1px solid #A78BFA; background: rgba(167, 139, 250, .18); }
 .rc-dot-heat { background: #FBBF24; }
 .rc-map-disclaimer { position: absolute; z-index: 650; inset-block-end: 14px; inset-inline: 16px; padding: 8px 12px; border: 1px solid rgba(255,255,255,.07); border-radius: 9px; background: rgba(7, 11, 20, .78); color: #94A3B8; font-size: .6rem; text-align: center; backdrop-filter: blur(12px); }
 .rc-map-panel { min-width: 0; padding: 22px; border: 1px solid var(--rc-line-soft); border-radius: 16px; background: var(--rc-surface-soft); box-shadow: var(--rc-shadow); backdrop-filter: blur(24px); overflow-y: auto; max-height: calc(100vh - 176px); }

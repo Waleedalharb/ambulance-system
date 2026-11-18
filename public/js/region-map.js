@@ -163,7 +163,8 @@
     return popup;
   }
   function boundaryStyle(sectorId, selected) {
-    return { color: sectorColor(sectorId), weight: selected ? 4 : 2, opacity: selected ? .98 : .58, fillColor: sectorColor(sectorId), fillOpacity: selected ? .16 : .035, dashArray: selected ? null : '7 6', lineJoin: 'round', className: selected ? 'rc-sector-boundary is-selected' : 'rc-sector-boundary' };
+    // إطار رفيع وتعبئة خفيفة جدًا على نمط لوحة CAD المرجعية، حتى لا تحجب تفاصيل الخريطة.
+    return { color: sectorColor(sectorId), weight: selected ? 2.4 : 1.3, opacity: selected ? .92 : .52, fillColor: sectorColor(sectorId), fillOpacity: selected ? .07 : .022, dashArray: selected ? null : '4 5', lineJoin: 'round', className: selected ? 'rc-sector-boundary is-selected' : 'rc-sector-boundary' };
   }
   function validCoordinateTree(node) {
     if (!Array.isArray(node) || !node.length) return false;
@@ -194,6 +195,14 @@
       state.boundaryLayers.set(sectorId, layer);
       state.sectorBounds.set(sectorId, bounds);
     });
+    updateBoundaryAvailability();
+  }
+  function updateBoundaryAvailability() {
+    var status = id('boundaryLayerStatus');
+    if (!status || !state.overview) return;
+    var available = state.overview.sectors.filter(function (sector) { return state.sectorBounds.has(sector.id); }).length;
+    var total = state.overview.sectors.length;
+    status.textContent = available === 0 ? 'غير متاح' : available === total ? 'متاح' : available + ' من ' + total;
   }
   function highlightBoundaries() {
     state.boundaryLayers.forEach(function (layer, sectorId) {
@@ -231,10 +240,22 @@
     clearTimeout(state.mapMoveTimer);
     state.mapMoveTimer = setTimeout(finish, 1200);
   }
+  function boundariesEnabled() {
+    var input = document.querySelector('[data-layer="boundaries"]');
+    return !input || input.checked;
+  }
+  function missingBoundaryNames() {
+    if (!state.overview) return [];
+    return state.overview.sectors.filter(function (sector) {
+      return (!state.selectedId || state.selectedId === sector.id) && !state.sectorBounds.has(sector.id);
+    }).map(function (sector) { return sector.name; });
+  }
   function showBoundaryNotice(missing) {
-    if (!missing || !missing.length) { id('mapNotice').hidden = true; return; }
+    var toggle = document.querySelector('[data-layer="boundaries"]');
+    if (!boundariesEnabled() || !missing || !missing.length) { id('mapNotice').hidden = true; return; }
     id('mapNotice').textContent = 'لا توجد حدود جغرافية معتمدة لـ' + missing.join('، ') + '. تم استخدام الإحداثيات المسجلة فقط دون اختلاق مضلعات.';
     id('mapNotice').hidden = false;
+    if (toggle) toggle.setAttribute('aria-describedby', 'mapNotice');
   }
   function fitMapBounds(bounds, options) {
     prepareMapMove();
@@ -440,29 +461,35 @@
     if (meta) head.appendChild(V.node('span', '', meta));
     return head;
   }
-  function readinessOverview(metrics) {
-    var section = V.node('section', 'rc-readiness-overview');
-    section.dataset.state = metrics.readinessRate && metrics.readinessRate.status || 'unavailable';
+  function buildGauge(metricKey, label, metric, valueId) {
     var gauge = V.node('div', 'rc-readiness-gauge');
-    gauge.dataset.metric = 'readinessRate';
+    gauge.dataset.metric = metricKey;
+    gauge.dataset.state = metric && metric.status || 'unavailable';
     gauge.setAttribute('role', 'img');
-    gauge.setAttribute('aria-label', 'جاهزية الفرق: ' + V.metricText(metrics.readinessRate, 'readinessRate'));
-    var readiness = hasMetricValue(metrics.readinessRate) ? Math.max(0, Math.min(100, metrics.readinessRate.value)) : 0;
+    gauge.setAttribute('aria-label', label + ': ' + V.metricText(metric, metricKey));
+    var percent = hasMetricValue(metric) ? Math.max(0, Math.min(100, metric.value)) : 0;
     var ticks = '';
     for (var tick = 0; tick < 36; tick += 1) {
       var angle = (tick / 36 * 360 - 90) * Math.PI / 180;
-      var active = tick / 36 * 100 < readiness;
+      var active = tick / 36 * 100 < percent;
       ticks += '<line class="' + (active ? 'rc-gauge-tick is-active' : 'rc-gauge-tick') + '" x1="' + (60 + Math.cos(angle) * 52) + '" y1="' + (60 + Math.sin(angle) * 52) + '" x2="' + (60 + Math.cos(angle) * 57) + '" y2="' + (60 + Math.sin(angle) * 57) + '"></line>';
     }
     gauge.innerHTML = '<svg viewBox="0 0 120 120" aria-hidden="true"><g>' + ticks + '</g><circle class="rc-gauge-track" cx="60" cy="60" r="44" pathLength="100"></circle><circle class="rc-gauge-progress" cx="60" cy="60" r="44" pathLength="100"></circle></svg>';
     var progress = gauge.querySelector('.rc-gauge-progress');
-    if (hasMetricValue(metrics.readinessRate)) progress.style.strokeDasharray = Math.max(0, Math.min(100, metrics.readinessRate.value)) + ' 100';
-    else progress.style.strokeDasharray = '0 100';
+    progress.style.strokeDasharray = (hasMetricValue(metric) ? Math.max(0, Math.min(100, metric.value)) : 0) + ' 100';
     var gaugeValue = V.node('div', 'rc-gauge-value');
-    gaugeValue.appendChild(V.node('strong', '', V.metricText(metrics.readinessRate, 'readinessRate'))).id = 'mapReadinessValue';
-    gaugeValue.appendChild(V.node('span', '', 'جاهزية الفرق'));
+    gaugeValue.appendChild(V.node('strong', '', V.metricText(metric, metricKey))).id = valueId;
+    gaugeValue.appendChild(V.node('span', '', label));
     gauge.appendChild(gaugeValue);
-    section.appendChild(gauge);
+    return gauge;
+  }
+  function readinessOverview(metrics) {
+    var section = V.node('section', 'rc-readiness-overview');
+    section.dataset.state = metrics.readinessRate && metrics.readinessRate.status || 'unavailable';
+    var pair = V.node('div', 'rc-gauge-pair');
+    pair.appendChild(buildGauge('readinessRate', 'جاهزية الفرق', metrics.readinessRate, 'mapReadinessValue'));
+    pair.appendChild(buildGauge('operationalPressure', 'الضغط التشغيلي', metrics.operationalPressure, 'mapPressureValue'));
+    section.appendChild(pair);
     var summary = V.node('div', 'rc-readiness-summary');
     summary.appendChild(V.node('span', 'rc-analytics-kicker', 'الصورة التشغيلية'));
     summary.appendChild(V.node('h3', '', 'اكتمال جاهزية الفرق'));
@@ -474,6 +501,12 @@
     pending.appendChild(V.node('i', ''));
     pending.appendChild(document.createTextNode('بانتظار التكميل: ' + V.metricText(metrics.teamsPending)));
     summary.appendChild(pending);
+    var pressure = V.node('span', 'rc-completion-chip rc-pressure-chip');
+    pressure.dataset.state = hasMetricValue(metrics.operationalPressure) && metrics.operationalPressure.value >= 100 ? 'attention' : 'neutral';
+    pressure.dataset.metric = 'operationalPressure';
+    pressure.appendChild(V.node('i', ''));
+    pressure.appendChild(document.createTextNode('الضغط التشغيلي: البلاغات النشطة مقابل الفرق الجاهزة'));
+    summary.appendChild(pressure);
     section.appendChild(summary);
     return section;
   }
@@ -550,7 +583,31 @@
     section.appendChild(layout);
     return section;
   }
-  function incidentSignal(metrics) {
+  function incidentBreakdownList(breakdown) {
+    var list = V.node('div', 'rc-incident-breakdown');
+    if (!breakdown || breakdown.status === 'unavailable') {
+      list.dataset.state = 'unavailable';
+      list.appendChild(V.node('small', 'rc-incident-empty', 'تفصيل البلاغات حسب الرمز غير متاح حاليًا'));
+      return list;
+    }
+    list.dataset.state = breakdown.status || 'ok';
+    (breakdown.items || []).forEach(function (item) {
+      var chip = V.node('article', 'rc-breakdown-chip');
+      chip.dataset.metric = item.key;
+      var head = V.node('div', 'rc-breakdown-head');
+      head.appendChild(V.node('strong', '', hasMetricValue(item.total) ? String(item.total.value) : '—'));
+      head.appendChild(V.node('span', '', item.label));
+      chip.appendChild(head);
+      var activeNote = hasMetricValue(item.active) && item.active.value > 0 ? item.active.value + ' نشطة' : 'لا نشطة';
+      var response = hasMetricValue(item.avgResponseMinutes)
+        ? 'زمن الاستجابة ' + V.metricText(item.avgResponseMinutes, 'avgResponseMinutes')
+        : 'زمن الاستجابة غير متاح';
+      chip.appendChild(V.node('small', '', activeNote + ' · ' + response));
+      list.appendChild(chip);
+    });
+    return list;
+  }
+  function incidentSignal(metrics, breakdown) {
     var section = V.node('section', 'rc-incident-signal');
     section.dataset.metric = 'incidentsActive';
     section.dataset.state = metrics.incidentsActive && metrics.incidentsActive.status || 'unavailable';
@@ -570,17 +627,18 @@
     if (!visible) dots.appendChild(V.node('span', 'rc-incident-empty', '—'));
     stage.appendChild(dots);
     content.appendChild(stage);
+    content.appendChild(incidentBreakdownList(breakdown));
     if (total > visible) content.appendChild(V.node('small', 'rc-incident-more', '+' + (total - visible) + ' بلاغات أخرى ضمن الإجمالي الفعلي'));
     section.appendChild(content);
     return section;
   }
-  function renderAnalytics(metrics) {
+  function renderAnalytics(metrics, breakdown) {
     var container = V.clear(id('mapDetailMetrics'));
     container.setAttribute('aria-busy', 'false');
     container.appendChild(readinessOverview(metrics));
     container.appendChild(forceDistribution(metrics));
     container.appendChild(teamDistribution(metrics));
-    container.appendChild(incidentSignal(metrics));
+    container.appendChild(incidentSignal(metrics, breakdown));
   }
   function responseMetric(label, value, note, metric, key) {
     var item = V.node('div', 'rc-response-item');
@@ -607,7 +665,7 @@
     id('mapSectorName').textContent = sector.name;
     id('mapSectorShift').textContent = sector.id === null ? 'النطاق الإقليمي الكامل' : sector.shift ? (sector.shift.name || 'المناوبة الحالية') + ' · ' + (sector.shift.type || '') : 'لا توجد مناوبة نشطة';
     V.clear(id('mapSectorStatus')).appendChild(V.statusBadge(sector.status));
-    renderAnalytics(sector.metrics);
+    renderAnalytics(sector.metrics, sector.incidentBreakdown);
     var responses = V.clear(id('mapResponseMetrics'));
     responses.appendChild(responseMetric('زمن المباشرة', V.metricText(sector.metrics.avgMubasharaMinutes, 'avgMubasharaMinutes'), 'من أزمنة المباشرة المسجلة في CAD', sector.metrics.avgMubasharaMinutes, 'avgMubasharaMinutes'));
     responses.appendChild(responseMetric('متوسط الوصول', V.metricText(sector.metrics.avgResponseMinutes, 'avgResponseMinutes'), 'من بلاغات CAD المرتبطة بالقطاع', sector.metrics.avgResponseMinutes, 'avgResponseMinutes'));
@@ -767,6 +825,7 @@
           layer.addTo(state.map);
           if (layer === state.layers.heat) layer.setLatLngs(state.heatPoints);
         } else removeOperationalLayer(layer);
+        if (layer === state.layers.boundaries) showBoundaryNotice(missingBoundaryNames());
       });
     });
     Array.prototype.forEach.call(document.querySelectorAll('[data-map-tab]'), function (button) { button.addEventListener('click', function () { setMapTab(button.dataset.mapTab); }); });

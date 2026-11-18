@@ -25,7 +25,7 @@
     decisionCount: 'تحتاج مراجعة', centerCount: 'المراكز', sectorCount: 'القطاعات',
     teamsBusy: 'فرق مشغولة في بلاغ', teamsMissing: 'فرق ناقصة', teamsOffline: 'فرق خارج الخدمة', teamsPending: 'بانتظار التكميل'
   };
-  var UNITS = { avgResponseMinutes: 'د', avgMubasharaMinutes: 'د', readinessRate: '٪' };
+  var UNITS = { avgResponseMinutes: 'د', avgMubasharaMinutes: 'د', readinessRate: '٪', operationalPressure: '٪' };
   function node(tag, className, text) {
     var element = document.createElement(tag);
     if (className) element.className = className;
