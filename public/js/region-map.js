@@ -599,9 +599,16 @@
       head.appendChild(V.node('span', '', item.label));
       chip.appendChild(head);
       var activeNote = hasMetricValue(item.active) && item.active.value > 0 ? item.active.value + ' نشطة' : 'لا نشطة';
-      var response = hasMetricValue(item.avgResponseMinutes)
-        ? 'زمن الاستجابة ' + V.metricText(item.avgResponseMinutes, 'avgResponseMinutes')
-        : 'زمن الاستجابة غير متاح';
+      // المتوسط محسوب من كل بلاغات المناوبة المخزنة لهذه الفئة (نشطة ومغلقة)؛
+      // نعلن التغطية بصدق عندما تفتقد بعض البلاغات زمن وصول مسجلًا.
+      var response;
+      if (hasMetricValue(item.avgResponseMinutes)) {
+        var coverage = item.avgResponseMinutes.coverage || {};
+        var partial = typeof coverage.expected === 'number' && typeof coverage.available === 'number' && coverage.available < coverage.expected;
+        response = 'متوسط استجابة المناوبة: ' + V.metricText(item.avgResponseMinutes, 'avgResponseMinutes') + (partial ? ' (من أزمنة ' + coverage.available + ' من ' + coverage.expected + ' بلاغًا)' : '');
+      } else {
+        response = 'لا يوجد زمن وصول مسجل بعد في هذه المناوبة';
+      }
       chip.appendChild(V.node('small', '', activeNote + ' · ' + response));
       list.appendChild(chip);
     });
