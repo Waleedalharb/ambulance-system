@@ -11,7 +11,7 @@ const definitions = [
   ['staffActive', 'الكادر الحاضر', 'person', 'StaffingEventsService', 'deriveTeamReadiness.activeCount'],
   ['staffRequired', 'الكادر المطلوب', 'person', 'StaffingEventsService', 'deriveTeamReadiness.requiredPersonnel'],
   ['readinessRate', 'جاهزية الفرق التشغيلية', 'percent', 'StaffingEventsService', 'readyTeams/requiredTeams*100'],
-  ['operationalPressure', 'الضغط التشغيلي للقطاع', 'percent', 'ReportService', 'activeIncidents/readyTeams*100'],
+  ['operationalPressure', 'الضغط التشغيلي للقطاع', 'percent', 'ReportService', 'busyTeams/totalTeams*100'],
   ['vehiclesTotal', 'إجمالي المركبات', 'vehicle', 'VehicleEventsService', 'getState.entities'],
   ['vehiclesActive', 'المركبات العاملة', 'vehicle', 'VehicleEventsService', 'foldEvents.status=active'],
   ['incidentsTotal', 'إجمالي البلاغات', 'incident', 'ReportService', 'getIncidentSummary.incidents'],

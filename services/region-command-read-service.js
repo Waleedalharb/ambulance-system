@@ -83,16 +83,17 @@ function crewKeepsTeamBusy(crew) {
 }
 
 // تصنيف البلاغات المطلوب في العرض الجغرافي يعتمد رمز ProQA المسجل في CAD فقط،
-// دون استنتاج من النص الحر: 29/34 حوادث، 7 حرائق، 26 مرضية، و9E إيكو توقف قلب وتنفس.
+// دون استنتاج من النص الحر: 29/34 حوادث، 30 إصابات، 7 حرائق، 26 مرضية، و9 توقف قلب وتنفس.
 function incidentCategory(code) {
   const match = String(code || '').trim().match(/^(\d{1,2})/);
   return match ? parseInt(match[1], 10) : null;
 }
 const INCIDENT_BREAKDOWN_BUCKETS = [
   { key: 'accidents', label: 'حوادث', test: category => category === 29 || category === 34 },
+  { key: 'injuries', label: 'إصابات', test: category => category === 30 },
   { key: 'fires', label: 'حرائق', test: category => category === 7 },
   { key: 'medical', label: 'مرضية', test: category => category === 26 },
-  { key: 'echo', label: 'إيكو — توقف قلب وتنفس', test: (category, code) => /^9E/i.test(String(code || '').trim()) }
+  { key: 'echo', label: 'إيكو — توقف قلب وتنفس', test: category => category === 9 }
 ];
 function breakdownUnavailable(reasonCode) {
   return { status: 'unavailable', reasonCode, sourceAt: null, items: [] };
@@ -332,12 +333,12 @@ class RegionCommandReadService {
       base.metrics.readinessRate = expected > 0
         ? count(Math.round(readyTeams / expected * 100), staffingSourceAt, expected, expected, { stale: staffingStale })
         : metric(null, { status: 'not_applicable', reasonCode: 'NO_REQUIRED_TEAMS', sourceAt: staffingSourceAt, coverage: quality(0, 0, COMPLETE) });
-      // الضغط التشغيلي: البلاغات النشطة مقابل الفرق المتاحة للتكليف (الجاهزة)؛
-      // غياب الفرق الجاهزة مع وجود بلاغات نشطة يعني ضغطًا كاملًا.
-      const activeIncidents = relevant.filter(i => i.status === 'active').length;
+      // الضغط التشغيلي: الفرق المشغولة في بلاغات من إجمالي فرق القطاع — يقيس
+      // استنزاف القوة الكلية ولا يتضخم بانشغال الفرق كالقسمة على الجاهزة فقط.
+      const busyTeamsCount = [...busyByTeam.keys()].length;
       base.metrics.operationalPressure = expected === 0
         ? metric(null, { status: 'not_applicable', reasonCode: 'NO_REQUIRED_TEAMS', sourceAt, coverage: quality(0, 0, COMPLETE) })
-        : count(readyTeams > 0 ? Math.round(activeIncidents / readyTeams * 100) : (activeIncidents > 0 ? 100 : 0), sourceAt, expected, expected, { stale: incidentStale });
+        : count(Math.round(busyTeamsCount / expected * 100), sourceAt, expected, expected, { stale: incidentStale });
       const status = sourceStatus(sourceAt, incidents.value.stale === true);
       base.dataQuality.ReportService = { status, reasonCode: null, sourceAt };
       base.sourceMeta.push({ ownerService: 'ReportService', status, sourceAt, shiftId: currentShiftId });

@@ -461,24 +461,40 @@
     if (meta) head.appendChild(V.node('span', '', meta));
     return head;
   }
-  function buildGauge(metricKey, label, metric, valueId) {
+  function lerpColorChannel(from, to, t) { return Math.round(from + (to - from) * t); }
+  function lerpColor(from, to, t) {
+    return 'rgb(' + lerpColorChannel(from[0], to[0], t) + ',' + lerpColorChannel(from[1], to[1], t) + ',' + lerpColorChannel(from[2], to[2], t) + ')';
+  }
+  // تدرج الضغط التشغيلي: أخضر مستقر → كهرماني متوسط → أحمر عالٍ، بتداخل مستمر
+  // على كامل السلم بدل قفزات لونية عند عتبات ثابتة.
+  function pressureColor(percent) {
+    var stable = [71, 215, 160], medium = [244, 187, 85], high = [255, 98, 107];
+    var clamped = Math.max(0, Math.min(100, percent));
+    return clamped <= 50 ? lerpColor(stable, medium, clamped / 50) : lerpColor(medium, high, (clamped - 50) / 50);
+  }
+  function buildGauge(metricKey, label, metric, valueId, colorForValue) {
     var gauge = V.node('div', 'rc-readiness-gauge');
     gauge.dataset.metric = metricKey;
     gauge.dataset.state = metric && metric.status || 'unavailable';
     gauge.setAttribute('role', 'img');
     gauge.setAttribute('aria-label', label + ': ' + V.metricText(metric, metricKey));
     var percent = hasMetricValue(metric) ? Math.max(0, Math.min(100, metric.value)) : 0;
+    var color = colorForValue && hasMetricValue(metric) ? colorForValue(percent) : null;
     var ticks = '';
     for (var tick = 0; tick < 36; tick += 1) {
       var angle = (tick / 36 * 360 - 90) * Math.PI / 180;
       var active = tick / 36 * 100 < percent;
-      ticks += '<line class="' + (active ? 'rc-gauge-tick is-active' : 'rc-gauge-tick') + '" x1="' + (60 + Math.cos(angle) * 52) + '" y1="' + (60 + Math.sin(angle) * 52) + '" x2="' + (60 + Math.cos(angle) * 57) + '" y2="' + (60 + Math.sin(angle) * 57) + '"></line>';
+      ticks += '<line class="' + (active ? 'rc-gauge-tick is-active' : 'rc-gauge-tick') + '" x1="' + (60 + Math.cos(angle) * 52) + '" y1="' + (60 + Math.sin(angle) * 52) + '" x2="' + (60 + Math.cos(angle) * 57) + '" y2="' + (60 + Math.sin(angle) * 57) + '"' + (active && color ? ' style="stroke:' + color + '"' : '') + '></line>';
     }
     gauge.innerHTML = '<svg viewBox="0 0 120 120" aria-hidden="true"><g>' + ticks + '</g><circle class="rc-gauge-track" cx="60" cy="60" r="44" pathLength="100"></circle><circle class="rc-gauge-progress" cx="60" cy="60" r="44" pathLength="100"></circle></svg>';
     var progress = gauge.querySelector('.rc-gauge-progress');
     progress.style.strokeDasharray = (hasMetricValue(metric) ? Math.max(0, Math.min(100, metric.value)) : 0) + ' 100';
+    if (color) progress.style.stroke = color;
     var gaugeValue = V.node('div', 'rc-gauge-value');
-    gaugeValue.appendChild(V.node('strong', '', V.metricText(metric, metricKey))).id = valueId;
+    var strong = V.node('strong', '', V.metricText(metric, metricKey));
+    strong.id = valueId;
+    if (color) strong.style.color = color;
+    gaugeValue.appendChild(strong);
     gaugeValue.appendChild(V.node('span', '', label));
     gauge.appendChild(gaugeValue);
     return gauge;
@@ -488,7 +504,7 @@
     section.dataset.state = metrics.readinessRate && metrics.readinessRate.status || 'unavailable';
     var pair = V.node('div', 'rc-gauge-pair');
     pair.appendChild(buildGauge('readinessRate', 'جاهزية الفرق', metrics.readinessRate, 'mapReadinessValue'));
-    pair.appendChild(buildGauge('operationalPressure', 'الضغط التشغيلي', metrics.operationalPressure, 'mapPressureValue'));
+    pair.appendChild(buildGauge('operationalPressure', 'الضغط التشغيلي', metrics.operationalPressure, 'mapPressureValue', pressureColor));
     section.appendChild(pair);
     var summary = V.node('div', 'rc-readiness-summary');
     summary.appendChild(V.node('span', 'rc-analytics-kicker', 'الصورة التشغيلية'));
@@ -502,10 +518,12 @@
     pending.appendChild(document.createTextNode('بانتظار التكميل: ' + V.metricText(metrics.teamsPending)));
     summary.appendChild(pending);
     var pressure = V.node('span', 'rc-completion-chip rc-pressure-chip');
-    pressure.dataset.state = hasMetricValue(metrics.operationalPressure) && metrics.operationalPressure.value >= 100 ? 'attention' : 'neutral';
+    pressure.dataset.state = 'neutral';
     pressure.dataset.metric = 'operationalPressure';
-    pressure.appendChild(V.node('i', ''));
-    pressure.appendChild(document.createTextNode('الضغط التشغيلي: البلاغات النشطة مقابل الفرق الجاهزة'));
+    var pressureDot = V.node('i', '');
+    if (hasMetricValue(metrics.operationalPressure)) pressureDot.style.background = pressureColor(metrics.operationalPressure.value);
+    pressure.appendChild(pressureDot);
+    pressure.appendChild(document.createTextNode('الضغط التشغيلي: الفرق المشغولة في بلاغات من إجمالي فرق القطاع'));
     summary.appendChild(pressure);
     section.appendChild(summary);
     return section;
